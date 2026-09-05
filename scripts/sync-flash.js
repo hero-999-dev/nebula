@@ -35,18 +35,24 @@ if (process.platform !== 'win32') {
   process.exit(0);
 }
 
-/** Find the drive by its volume label. */
+/**
+ * Find the drive by looking for its hub, not by asking for a volume label.
+ *
+ * Identifying it by content is both letter-independent (the drive's own
+ * _hub/AGENTS.md insists on that) and more robust than a WMI query, which
+ * returns nothing from some sandboxed shells.
+ */
 function findDrive() {
-  const out = execFileSync('powershell', [
-    '-NoProfile', '-NonInteractive', '-Command',
-    `Get-CimInstance Win32_LogicalDisk | Where-Object { $_.VolumeName -eq '${LABEL}' } | Select-Object -First 1 -ExpandProperty DeviceID`,
-  ], { encoding: 'utf8' }).trim();
-  return out || null;
+  for (let c = 'D'.charCodeAt(0); c <= 'Z'.charCodeAt(0); c++) {
+    const letter = `${String.fromCharCode(c)}:`;
+    if (fs.existsSync(path.join(`${letter}\\`, '_hub', 'AGENTS.md'))) return letter;
+  }
+  return null;
 }
 
 const drive = findDrive();
 if (!drive) {
-  console.log(`Drive "${LABEL}" is not plugged in - nothing to sync.`);
+  console.log(`The "${LABEL}" drive is not plugged in (no _hub/AGENTS.md on any drive) - nothing to sync.`);
   process.exit(0);
 }
 

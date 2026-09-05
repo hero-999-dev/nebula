@@ -72,6 +72,11 @@ jobs:
 
       - run: npm ci
 
+      # electron-builder only packages what vite already emitted; without this
+      # it fails with 'entry file "dist-electron/main.js" does not exist'.
+      - name: Build renderer + main
+        run: npm run build
+
       - name: Build universal DMG + ZIP
         run: npx electron-builder --mac dmg zip --universal --publish never
         env:
