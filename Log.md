@@ -10,6 +10,7 @@ Verifying the update path end to end: this release exists so an installed 0.3.0 
 * (no commits since the last release)
 
 ---
+
 ## [2026-09-06 01:00] v0.3.0 - by claude
 
 First public release. Nebula moves from a locally-built portable exe to a

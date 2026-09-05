@@ -34,7 +34,12 @@ function run(cmd, cmdArgs, opts = {}) {
 }
 
 function runLoud(cmd, cmdArgs) {
-  execFileSync(cmd, cmdArgs, { cwd: ROOT, stdio: 'inherit', shell: process.platform === 'win32' });
+  // npm/npx are .cmd shims on Windows and need a shell. node does not — and
+  // giving it one concatenates the arguments unquoted, so a repository path
+  // containing a space (…\AI Workspace\…) becomes two arguments and the script
+  // "cannot be found". Only shell what actually needs shelling.
+  const needsShell = process.platform === 'win32' && (cmd === 'npm' || cmd === 'npx');
+  execFileSync(cmd, cmdArgs, { cwd: ROOT, stdio: 'inherit', shell: needsShell });
 }
 
 function git(...gitArgs) {
@@ -125,6 +130,7 @@ const entry = [
   bullets.length ? bullets.join('\n') : '* (no commits since the last release)',
   '',
   '---',
+  '',
   '',
 ].join('\n');
 
