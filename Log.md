@@ -4,6 +4,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-06 01:06] v0.3.3 - by claude
+
+No app changes; this release exists so the silent-install path can be verified from an installed 0.3.2.
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-06 01:00] v0.3.2 - by claude
 
 Update installs silently: the previous build opened the NSIS wizard and waited for clicks instead of just installing.
