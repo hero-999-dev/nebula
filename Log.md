@@ -3,6 +3,16 @@
 One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
+
+## [2026-09-06 01:00] v0.3.2 - by claude
+
+Update installs silently: the previous build opened the NSIS wizard and waited for clicks instead of just installing.
+
+* updater: install silently
+* release: do not shell out to node, and space Log.md entries
+
+---
+
 ## [2026-09-06 00:53] v0.3.1 - by claude
 
 Verifying the update path end to end: this release exists so an installed 0.3.0 can update to it.
