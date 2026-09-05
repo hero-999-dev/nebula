@@ -166,7 +166,12 @@ export async function initUpdater(opts = {}) {
     } catch (err) {
       console.warn('[nebula] pre-update snapshot failed:', err.message);
     }
-    setImmediate(() => autoUpdater.quitAndInstall(false, true));
+    // (isSilent, isForceRunAfter). isSilent MUST be true: with false the NSIS
+    // assisted installer opens its wizard and waits for clicks, so the user
+    // presses "Restart and install", the app closes, and they are left staring
+    // at a setup dialog. They already consented by pressing the button — run it
+    // silently and relaunch.
+    setImmediate(() => autoUpdater.quitAndInstall(true, true));
     return status;
   });
 
