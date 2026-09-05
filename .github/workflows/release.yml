@@ -1,0 +1,128 @@
+name: Release
+
+# Pushing a v* tag (npm run push) builds Windows + macOS and publishes one
+# GitHub Release. Installed copies of Nebula read latest.yml from that release,
+# so the release must NOT be a draft.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+
+      - name: Build renderer + main
+        run: npm run build
+
+      - name: Package installer + portable
+        run: npx electron-builder --win nsis portable --publish never
+
+      - name: Assert the update manifest exists
+        shell: bash
+        run: |
+          # Without latest.yml no installed app can ever see this release.
+          # Fail here rather than shipping a release nobody can update from.
+          test -f release/latest.yml || { echo "release/latest.yml missing"; ls -la release; exit 1; }
+          cat release/latest.yml
+
+      - name: Assert electron-updater is inside the asar
+        shell: bash
+        run: |
+          # If vite bundles electron-updater instead of leaving it external,
+          # the app still builds and silently never checks for updates.
+          npx asar list release/win-unpacked/resources/app.asar > asar.txt
+          # asar prints Windows separators on a Windows runner, POSIX ones elsewhere.
+          grep -qE 'node_modules[\\/]electron-updater' asar.txt || { echo "electron-updater not packaged"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win
+          path: |
+            release/Nebula-Setup-*.exe
+            release/Nebula-portable-*.exe
+            release/latest.yml
+            release/*.blockmap
+          if-no-files-found: error
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build universal DMG + ZIP
+        run: npx electron-builder --mac dmg zip --universal --publish never
+        env:
+          # No Apple Developer certificate: the build is unsigned, which is why
+          # macOS gets "notify + download" rather than in-place auto-update.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac
+          path: |
+            release/*-mac.dmg
+            release/*-mac.zip
+            release/latest-mac.yml
+          if-no-files-found: error
+
+  publish:
+    needs: [build-win, build-mac]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - run: ls -la dist
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Nebula ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: dist/**/*
+          body: |
+            ## Download
+
+            | Platform | File | Notes |
+            |---|---|---|
+            | **Windows** | `Nebula-Setup-*.exe` | Installer. **Updates itself** from here on. |
+            | **Windows portable** | `Nebula-portable-*.exe` | Runs from a folder or USB stick. Does not auto-update. |
+            | **macOS** (Apple Silicon + Intel) | `Nebula-*-mac.dmg` | Open, drag to Applications. First launch: **right-click -> Open**. |
+
+            ### Updating
+
+            The installed Windows app checks this page on its own and offers the
+            update in-app. macOS is unsigned, so it tells you a new version is
+            out and brings you back here to download it.
+
+            **Your notes are never touched by an update.** They live in your user
+            profile, not next to the app, and Nebula copies the whole vault aside
+            before it installs anything.

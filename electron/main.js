@@ -1,0 +1,220 @@
+import { app, BrowserWindow, shell, ipcMain, session } from 'electron';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { initUpdater } from './updater.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const isDev = !!process.env.VITE_DEV_SERVER_URL;
+
+// Set by `npm run dev` and the reset scripts so development can never open the
+// installed app's profile. Without it both would be <appData>/nebula and a
+// `npm run reset` would delete the notes of the app the user actually uses.
+if (process.env.NEBULA_USER_DATA) {
+  app.setPath('userData', process.env.NEBULA_USER_DATA);
+}
+
+/** Notes live here as one JSON file per note. This directory is the vault. */
+const storageRoot = () => path.join(app.getPath('userData'), 'storage');
+
+function resolveInStorage(rel) {
+  const root = storageRoot();
+  const abs = path.resolve(root, String(rel ?? ''));
+  if (abs !== root && !abs.startsWith(root + path.sep)) throw new Error('Invalid storage path');
+  return abs;
+}
+
+/**
+ * Copy the vault aside.
+ *
+ * Without a label this is the daily safety net: one copy per calendar day in
+ * backups/YYYY-MM-DD, newest 7 kept. With a label it is an extra, un-rotated
+ * copy — used right before an update installs, so a bad release can never be
+ * the last thing that touched a user's notes. Only the dated directories are
+ * ever pruned; labelled ones stay until the user removes them.
+ */
+function snapshotStorage({ label } = {}) {
+  try {
+    const src = storageRoot();
+    if (!fsSync.existsSync(src)) return null;
+    const backupsDir = path.join(app.getPath('userData'), 'backups');
+    const name = label ?? new Date().toISOString().slice(0, 10);
+    const dest = path.join(backupsDir, name);
+    if (!fsSync.existsSync(dest)) {
+      fsSync.mkdirSync(backupsDir, { recursive: true });
+      fsSync.cpSync(src, dest, { recursive: true });
+    }
+    const dirs = fsSync.readdirSync(backupsDir)
+      .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+      .sort();
+    for (const dir of dirs.slice(0, -7)) {
+      fsSync.rmSync(path.join(backupsDir, dir), { recursive: true, force: true });
+    }
+    return dest;
+  } catch (err) {
+    console.warn('[nebula] storage snapshot failed:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Record which version last opened this vault. Nothing reads it yet; it is what
+ * a future format change will migrate from, and it makes "which build wrote
+ * these files" answerable from the folder alone.
+ */
+function stampVaultMeta() {
+  try {
+    const file = path.join(storageRoot(), 'meta.json');
+    let meta = {};
+    if (fsSync.existsSync(file)) {
+      try { meta = JSON.parse(fsSync.readFileSync(file, 'utf8')); } catch { meta = {}; }
+    }
+    const next = {
+      schemaVersion: 1,
+      appVersion: app.getVersion(),
+      firstOpened: meta.firstOpened ?? new Date().toISOString(),
+      lastOpened: new Date().toISOString(),
+    };
+    fsSync.mkdirSync(storageRoot(), { recursive: true });
+    fsSync.writeFileSync(file, JSON.stringify(next, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('[nebula] vault meta write failed:', err.message);
+  }
+}
+
+let mainWindow = null;
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    minWidth: 720,
+    minHeight: 480,
+    show: false,
+    title: 'Nebula',
+    backgroundColor: '#F6F1E7',
+    icon: path.join(__dirname, '../build/icon.png'),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      webviewTag: true, // AI panel embeds a real chat webview
+    },
+  });
+
+  win.once('ready-to-show', () => win.show());
+
+  if (isDev) {
+    win.loadURL(process.env.VITE_DEV_SERVER_URL);
+  } else {
+    win.loadFile(path.join(__dirname, '../dist/index.html'));
+  }
+
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  mainWindow = win;
+  win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
+  return win;
+}
+
+app.whenReady().then(async () => {
+  // Webviews load arbitrary sites — allow only what chat UIs legitimately need.
+  const ALLOWED_PERMISSIONS = new Set([
+    'media', 'notifications', 'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'openExternal',
+  ]);
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
+    cb(ALLOWED_PERMISSIONS.has(permission));
+  });
+
+  snapshotStorage();
+  stampVaultMeta();
+
+  ipcMain.handle('storage:root', () => storageRoot());
+
+  ipcMain.handle('storage:read', async (_e, rel) => {
+    try {
+      const data = await fs.readFile(resolveInStorage(rel), 'utf8');
+      return { ok: true, data };
+    } catch (err) {
+      // "not there" and "could not be read" are different answers. Collapsing
+      // them is what lets a transient failure look like an empty vault.
+      return { ok: false, missing: err.code === 'ENOENT', error: err.message };
+    }
+  });
+
+  // Atomic: write a temp file then rename over the target, so a note file is
+  // never left half-written (a crash or a racing write can't corrupt it).
+  ipcMain.handle('storage:write', async (_e, rel, content) => {
+    const abs = resolveInStorage(rel);
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    const tmp = `${abs}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      await fs.writeFile(tmp, content, 'utf8');
+      await fs.rename(tmp, abs);
+    } catch (err) {
+      await fs.rm(tmp, { force: true }).catch(() => {});
+      throw err;
+    }
+    return { ok: true, path: abs };
+  });
+
+  ipcMain.handle('storage:list', async (_e, relDir) => {
+    try {
+      const files = await fs.readdir(resolveInStorage(relDir));
+      return { ok: true, files: files.filter((f) => f.endsWith('.json') && f !== 'meta.json') };
+    } catch (err) {
+      // A missing directory really is an empty vault — a first run. Anything
+      // else (permissions, a locked profile, a bad path) is a failure, and the
+      // renderer must NOT treat it as "no notes yet" and seed over the top.
+      if (err.code === 'ENOENT') return { ok: true, files: [] };
+      console.warn('[nebula] storage list failed:', err.message);
+      return { ok: false, files: [], error: err.message };
+    }
+  });
+
+  ipcMain.handle('storage:delete', async (_e, rel) => {
+    try {
+      const abs = resolveInStorage(rel);
+      if (!rel || abs === storageRoot()) return { ok: false };
+      await fs.rm(abs, { recursive: true, force: true });
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  });
+
+  ipcMain.handle('storage:reveal', async (_e, rel) => {
+    const abs = resolveInStorage(rel);
+    try {
+      await fs.access(abs);
+      shell.showItemInFolder(abs);
+    } catch {
+      await fs.mkdir(storageRoot(), { recursive: true });
+      shell.openPath(storageRoot());
+    }
+    return { ok: true, path: abs };
+  });
+
+  ipcMain.handle('app:version', () => app.getVersion());
+
+  createWindow();
+
+  await initUpdater({
+    getWindow: () => mainWindow,
+    beforeInstall: async () => {
+      snapshotStorage({ label: `pre-update-${app.getVersion()}-${Date.now()}` });
+    },
+  });
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});

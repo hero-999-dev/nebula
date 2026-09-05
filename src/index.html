@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="paper">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nebula</title>
+  <link rel="stylesheet" href="./css/tokens.css" />
+  <link rel="stylesheet" href="./css/app.css" />
+  <link rel="stylesheet" href="./css/editor.css" />
+</head>
+<body>
+  <div id="app">
+    <aside class="side" id="side">
+      <div class="brand">
+        <!-- same mark as the app icon: crescent + sparkle -->
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path fill-rule="evenodd" d="M2.3 12a8.2 8.2 0 1 0 16.4 0 8.2 8.2 0 1 0-16.4 0zM8.4 11.4a7.2 7.2 0 1 0 14.4 0 7.2 7.2 0 1 0-14.4 0z"/>
+          <path d="M18 5l.7 2.8 2.8.7-2.8.7-.7 2.8-.7-2.8-2.8-.7 2.8-.7z"/>
+        </svg>
+        <span>Nebula</span>
+      </div>
+      <input id="side-filter" type="search" placeholder="Filter notes…" aria-label="Filter notes" />
+      <nav class="note-list" id="note-list" aria-label="Notes"></nav>
+      <div class="side-foot">
+        <button class="btn primary" id="btn-new" type="button">New note</button>
+        <button class="btn ghost" id="btn-theme" type="button" title="Toggle theme">Theme</button>
+        <div class="side-meta">
+          <span class="app-version" id="app-version"></span>
+          <button class="btn ghost btn-mini" id="btn-check-updates" type="button" title="Check for updates">Check for updates</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="demo-banner" id="demo-banner" hidden>Browser preview — notes stay in memory only. Use the desktop app for disk storage.</div>
+      <header class="page-head">
+        <input id="title" class="title-input" placeholder="Untitled" autocomplete="off" spellcheck="true" />
+        <span class="savestate" id="savestate"></span>
+        <div class="pad" id="pad" role="group" aria-label="Move the editing bar">
+          <button type="button" data-pad="top"    title="Editing bar: top"><span data-icon="up"></span></button>
+          <button type="button" data-pad="right"  title="Editing bar: right"><span data-icon="right"></span></button>
+          <button type="button" data-pad="ai"     title="Toggle AI panel"><span data-icon="ai"></span></button>
+          <button type="button" data-pad="bottom" title="Editing bar: bottom"><span data-icon="down"></span></button>
+          <button type="button" data-pad="left"   title="Editing bar: left"><span data-icon="left"></span></button>
+          <button type="button" data-pad="hide"   title="Hide / show the editing bar"><span data-icon="minus"></span></button>
+        </div>
+      </header>
+
+      <div class="edit-shell" id="edit-shell">
+        <div class="toolbar" id="toolbar">
+          <div class="tb-row">
+            <button type="button" class="tb" data-act="undo" title="Undo (Ctrl+Z)"><span data-icon="undo"></span></button>
+            <button type="button" class="tb" data-act="redo" title="Redo (Ctrl+Y)"><span data-icon="redo"></span></button>
+            <span class="tb-sep"></span>
+            <select class="tb-select" id="tb-outline" title="Outline format">
+              <option value="p">Paragraph</option>
+              <option value="h1">Heading 1</option>
+              <option value="h2">Heading 2</option>
+              <option value="h3">Heading 3</option>
+              <option value="blockquote">Quote</option>
+            </select>
+            <span class="tb-sep"></span>
+            <button type="button" class="tb" data-act="ul" title="Bulleted list"><span data-icon="bullets"></span></button>
+            <button type="button" class="tb" data-act="ol" title="Numbered list"><span data-icon="numbers"></span></button>
+            <button type="button" class="tb" data-act="todo" title="To-do"><span data-icon="todo"></span></button>
+            <button type="button" class="tb" data-act="outdent" title="Decrease indent (Shift+Tab)"><span data-icon="outdent"></span></button>
+            <button type="button" class="tb" data-act="indent" title="Increase indent (Tab)"><span data-icon="indent"></span></button>
+            <span class="tb-sep"></span>
+            <button type="button" class="tb" data-act="save" title="Save now (Ctrl+S)"><span data-icon="save"></span></button>
+            <button type="button" class="tb" data-act="print" title="Print (Ctrl+P)"><span data-icon="print"></span></button>
+            <button type="button" class="tb" data-act="cut" title="Cut (Ctrl+X)"><span data-icon="cut"></span></button>
+            <button type="button" class="tb" data-act="copy" title="Copy (Ctrl+C)"><span data-icon="copy"></span></button>
+            <button type="button" class="tb" data-act="paste" title="Paste (Ctrl+V)"><span data-icon="paste"></span></button>
+            <span class="tb-sep"></span>
+            <span class="tb-wrap">
+              <button type="button" class="tb" data-act="shape-rect" title="Insert shape"><span data-icon="shapes"></span></button>
+              <button type="button" class="tb tb-caret" data-menu="menu-shapes" title="Shape kind">▾</button>
+              <div class="tb-menu" id="menu-shapes" hidden>
+                <button type="button" data-shape-add="rect">▭ Rectangle</button>
+                <button type="button" data-shape-add="ellipse">◯ Ellipse</button>
+                <button type="button" data-shape-add="diamond">◇ Diamond</button>
+              </div>
+            </span>
+            <button type="button" class="tb" data-act="codeblock" title="Code block (with language)"><span data-icon="code"></span></button>
+            <button type="button" class="tb" data-act="divider" title="Divider"><span data-icon="divider"></span></button>
+          </div>
+
+          <div class="tb-row">
+            <span class="tb-combo">
+              <input id="tb-font" class="tb-input tb-input--font" list="font-list" placeholder="Font" title="Font — pick or type" />
+              <datalist id="font-list">
+                <option value="Charter, Georgia, serif">Serif</option>
+                <option value="Inter, 'Segoe UI', sans-serif">Sans</option>
+                <option value="Arial"></option>
+                <option value="Georgia"></option>
+                <option value="Times New Roman"></option>
+                <option value="Courier New"></option>
+                <option value="Comic Sans MS"></option>
+                <option value="Cascadia Code"></option>
+              </datalist>
+            </span>
+            <span class="tb-combo">
+              <input id="tb-size" class="tb-input tb-input--size" list="size-list" inputmode="numeric" placeholder="Size" title="Size — pick or type any number (px)" />
+              <datalist id="size-list">
+                <option value="10"></option><option value="12"></option><option value="14"></option>
+                <option value="16"></option><option value="18"></option><option value="20"></option>
+                <option value="24"></option><option value="28"></option><option value="32"></option>
+                <option value="48"></option><option value="72"></option>
+              </datalist>
+            </span>
+            <span class="tb-sep"></span>
+            <span class="tb-wrap">
+              <button type="button" class="tb tb-color" data-act="color" title="Text color (Ctrl+T)"><span data-icon="textColor"></span><i class="tb-bar" id="color-bar"></i></button>
+              <button type="button" class="tb tb-caret" data-menu="menu-color" title="Text color">▾</button>
+              <div class="tb-menu" id="menu-color" hidden></div>
+            </span>
+            <span class="tb-wrap">
+              <button type="button" class="tb tb-color" data-act="hilite" title="Highlight (Ctrl+H)"><span class="hl-letter">H</span><i class="tb-bar" id="hilite-bar"></i></button>
+              <button type="button" class="tb tb-caret" data-menu="menu-hilite" title="Highlight color">▾</button>
+              <div class="tb-menu" id="menu-hilite" hidden></div>
+            </span>
+            <span class="tb-sep"></span>
+            <button type="button" class="tb" data-act="bold" title="Bold (Ctrl+B)"><span data-icon="bold"></span></button>
+            <button type="button" class="tb" data-act="italic" title="Italic (Ctrl+I)"><span data-icon="italic"></span></button>
+            <span class="tb-wrap">
+              <button type="button" class="tb" data-act="underline" title="Underline (Ctrl+U)"><span data-icon="underline"></span></button>
+              <button type="button" class="tb tb-caret" data-menu="menu-underline" title="Underline style">▾</button>
+              <div class="tb-menu" id="menu-underline" hidden>
+                <button type="button" data-ustyle="u-single"><u>Single</u></button>
+                <button type="button" data-ustyle="u-double"><span class="u-double">Double</span></button>
+                <button type="button" data-ustyle="u-bold"><span class="u-bold">Bold</span></button>
+                <button type="button" data-ustyle="u-wavy"><span class="u-wavy">Wavy</span></button>
+                <button type="button" data-ustyle="u-dash"><span class="u-dash">Dashed</span></button>
+                <button type="button" data-ustyle="none">None</button>
+              </div>
+            </span>
+            <button type="button" class="tb" data-act="strike" title="Strikethrough (Ctrl+Shift+S)"><span data-icon="strike"></span></button>
+            <button type="button" class="tb" data-act="code" title="Inline code (Ctrl+E)"><span data-icon="code"></span></button>
+            <button type="button" class="tb" data-act="eq" title="Equation (Ctrl+Q)"><span data-icon="equation"></span></button>
+            <span class="tb-sep"></span>
+            <button type="button" class="tb" data-act="al" title="Align left"><span data-icon="alignLeft"></span></button>
+            <button type="button" class="tb" data-act="ac" title="Align center"><span data-icon="alignCenter"></span></button>
+            <button type="button" class="tb" data-act="ar" title="Align right"><span data-icon="alignRight"></span></button>
+            <button type="button" class="tb" data-act="aj" title="Justify"><span data-icon="alignJustify"></span></button>
+          </div>
+        </div>
+
+        <div class="editor-frame" id="editor-frame">
+          <div id="editor" class="editor" contenteditable="true" spellcheck="true" data-placeholder="Start writing…  ( / for blocks )"></div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="ai-panel" id="ai-panel" hidden>
+      <div class="ai-resize" id="ai-resize" title="Drag to resize"></div>
+      <div class="ai-head">
+        <div class="ai-tabs" id="ai-tabs" role="tablist"></div>
+        <button type="button" class="btn ghost ai-x" id="ai-close" title="Close"><span data-icon="close"></span></button>
+      </div>
+      <div class="ai-body" id="ai-body"></div>
+    </aside>
+  </div>
+
+  <div id="mini-bar" class="mini-bar" hidden>
+    <button type="button" data-act="bold" title="Bold"><span data-icon="bold"></span></button>
+    <button type="button" data-act="italic" title="Italic"><span data-icon="italic"></span></button>
+    <button type="button" data-act="underline" title="Underline"><span data-icon="underline"></span></button>
+    <button type="button" data-act="strike" title="Strikethrough"><span data-icon="strike"></span></button>
+    <span class="mb-sep"></span>
+    <button type="button" data-act="color" title="Text color"><span data-icon="textColor"></span></button>
+    <button type="button" data-act="hilite" title="Highlight"><span class="hl-letter">H</span></button>
+    <button type="button" data-act="code" title="Inline code"><span data-icon="code"></span></button>
+  </div>
+
+  <div id="shape-bar" class="shape-bar" hidden></div>
+  <div id="slash-menu" class="float-menu" hidden></div>
+
+  <div class="update-card" id="update-card" role="status" aria-live="polite" hidden>
+    <p class="uc-text" id="uc-text"></p>
+    <div class="uc-bar" id="uc-bar" hidden><i id="uc-fill"></i></div>
+    <div class="uc-actions">
+      <button class="btn ghost" id="uc-dismiss" type="button">Later</button>
+      <button class="btn primary" id="uc-action" type="button" hidden></button>
+    </div>
+  </div>
+
+  <div class="overlay" id="ov-dialog" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <p class="dlg-title" id="dlg-title"></p>
+      <input id="dlg-input" type="text" autocomplete="off" />
+      <div class="dlg-actions">
+        <button class="btn ghost" id="dlg-cancel" type="button">Cancel</button>
+        <button class="btn primary" id="dlg-ok" type="button">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>

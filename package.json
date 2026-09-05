@@ -1,0 +1,91 @@
+{
+  "name": "nebula",
+  "version": "0.3.0",
+  "description": "Nebula — calm notes with a real editor: movable editing bar, line icons, markdown code blocks with syntax colors, free-floating shapes, AI panel with tabs.",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "icons": "powershell -ExecutionPolicy Bypass -File build/make-icon.ps1",
+    "kill": "node scripts/kill-nebula.js",
+    "reset": "npm run kill && node scripts/reset-notes.js",
+    "pack:win": "npm run kill && npm run build && electron-builder --win nsis portable --publish never",
+    "pack:mac": "npm run build && electron-builder --mac dmg zip --universal --publish never",
+    "fresh": "npm run reset && npm run pack:win",
+    "push": "node scripts/release.js",
+    "sync-flash": "node scripts/sync-flash.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "build": {
+    "appId": "com.nebula.app",
+    "productName": "Nebula",
+    "icon": "build/icon.png",
+    "directories": { "output": "release" },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "build/icon.png",
+      "package.json",
+      "node_modules/**/*"
+    ],
+    "publish": [
+      { "provider": "github", "owner": "hero-999-dev", "repo": "nebula" }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Nebula",
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "Nebula-Setup-${version}.exe"
+    },
+    "portable": {
+      "artifactName": "Nebula-portable-${version}.exe"
+    },
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["universal"] },
+        { "target": "zip", "arch": ["universal"] }
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png",
+      "artifactName": "Nebula-${version}-mac.${ext}",
+      "darkModeSupport": true,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": null
+    },
+    "dmg": {
+      "title": "Nebula ${version}",
+      "iconSize": 100,
+      "window": { "width": 540, "height": 380 },
+      "contents": [
+        { "x": 140, "y": 180 },
+        { "x": 400, "y": 180, "type": "link", "path": "/Applications" }
+      ]
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "jsdom": "^25.0.1",
+    "vite": "^6.0.3",
+    "vite-plugin-electron": "^0.28.8",
+    "vitest": "^2.1.8"
+  }
+}

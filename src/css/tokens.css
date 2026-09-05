@@ -1,0 +1,34 @@
+/* Ember palette — paper & ink, one clay accent */
+
+:root {
+  --paper: #F6F1E7;
+  --paper-raised: #FDFBF6;
+  --paper-sunken: #EFE8D8;
+  --ink: #201E1A;
+  --ink-soft: #55503F;
+  --ink-faint: #8A8371;
+  --rule: #DDD3BF;
+  --clay: #C15F3C;
+  --clay-soft: #E8CDBD;
+  --fern: #6E8B6A;
+  --madder: #9E3B32;
+  --shadow: rgba(60, 50, 30, 0.12);
+  --serif: "Charter", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono: "Cascadia Code", "Consolas", monospace;
+}
+
+:root[data-theme="ember"] {
+  --paper: #17140F;
+  --paper-raised: #201C15;
+  --paper-sunken: #100E0A;
+  --ink: #EDE4D3;
+  --ink-soft: #B4A88E;
+  --ink-faint: #776F5C;
+  --rule: #35301F;
+  --clay: #E8A87C;
+  --clay-soft: #4A3524;
+  --fern: #8FAE8B;
+  --madder: #D07A6E;
+  --shadow: rgba(0, 0, 0, 0.5);
+}
