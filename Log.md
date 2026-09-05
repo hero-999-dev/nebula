@@ -2,6 +2,14 @@
 
 One entry per release. Written by `npm run push`; edit freely afterwards.
 
+
+## [2026-09-06 00:53] v0.3.1 - by claude
+
+Verifying the update path end to end: this release exists so an installed 0.3.0 can update to it.
+
+* (no commits since the last release)
+
+---
 ## [2026-09-06 01:00] v0.3.0 - by claude
 
 First public release. Nebula moves from a locally-built portable exe to a

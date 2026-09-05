@@ -1,6 +1,6 @@
 {
   "name": "nebula",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Nebula — calm notes with a real editor: movable editing bar, line icons, markdown code blocks with syntax colors, free-floating shapes, AI panel with tabs.",
   "main": "dist-electron/main.js",
   "type": "module",
@@ -26,7 +26,9 @@
     "appId": "com.nebula.app",
     "productName": "Nebula",
     "icon": "build/icon.png",
-    "directories": { "output": "release" },
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
@@ -35,12 +37,26 @@
       "node_modules/**/*"
     ],
     "publish": [
-      { "provider": "github", "owner": "hero-999-dev", "repo": "nebula" }
+      {
+        "provider": "github",
+        "owner": "hero-999-dev",
+        "repo": "nebula"
+      }
     ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "signAndEditExecutable": false
     },
@@ -59,8 +75,18 @@
     },
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["universal"] },
-        { "target": "zip", "arch": ["universal"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
       ],
       "category": "public.app-category.productivity",
       "icon": "build/icon.png",
@@ -73,10 +99,21 @@
     "dmg": {
       "title": "Nebula ${version}",
       "iconSize": 100,
-      "window": { "width": 540, "height": 380 },
+      "window": {
+        "width": 540,
+        "height": 380
+      },
       "contents": [
-        { "x": 140, "y": 180 },
-        { "x": 400, "y": 180, "type": "link", "path": "/Applications" }
+        {
+          "x": 140,
+          "y": 180
+        },
+        {
+          "x": 400,
+          "y": 180,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     }
   },
