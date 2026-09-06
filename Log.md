@@ -8,6 +8,16 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-06 15:32] v0.3.7 - by claude
+
+Main violet theme, a crisp icon at every size, and the version now agrees everywhere.
+
+* Three themes, a vector icon, and one version number
+* publish-site: follow the renamed gate directory
+
+---
+
 ## [2026-09-06 14:18] v0.3.6 - by claude
 
 About panel readability, and the docs site now carries the version it was released with.

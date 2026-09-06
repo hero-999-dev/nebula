@@ -1,6 +1,6 @@
 {
   "projectName": "Nebula",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "lastUpdated": "2026-09-06",
   "currentPhase": "v0.3.5 — findability and self-documentation: real exe icon, About panel, agent ritual, Electron smoke test, local docs site with mind maps, gated web mirror.",
   "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, command palette, search, i18n.",
