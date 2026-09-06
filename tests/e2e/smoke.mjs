@@ -58,8 +58,26 @@ try {
   check('preload bridge exposes updates', bridge.updates);
   check('preload bridge exposes paths + reveal', bridge.paths && bridge.reveal);
 
-  check('sidebar mark is the crescent, not a ring',
-    await win.evaluate(() => document.querySelectorAll('.brand svg path').length === 2));
+  // Three themes, and the picker shows which one is on without being clicked.
+  const themes = await win.evaluate(() => {
+    const btns = [...document.querySelectorAll('#theme-pick [data-theme]')];
+    return { names: btns.map((b) => b.dataset.theme), on: btns.filter((b) => b.classList.contains('on')).map((b) => b.dataset.theme) };
+  });
+  check('theme picker offers main, dark and light',
+    themes.names.join(',') === 'main,dark,light', themes.names.join(','));
+  check('main is the theme on a fresh profile',
+    themes.on.length === 1 && themes.on[0] === 'main', themes.on.join(','));
+
+  const switched = await win.evaluate(async () => {
+    document.querySelector('#theme-pick [data-theme="light"]').click();
+    const applied = document.documentElement.dataset.theme;
+    const paper = getComputedStyle(document.body).backgroundColor;
+    document.querySelector('#theme-pick [data-theme="main"]').click();
+    return { applied, paper, back: document.documentElement.dataset.theme };
+  });
+  check('switching to light repaints and switching back restores',
+    switched.applied === 'light' && switched.back === 'main' && switched.paper === 'rgb(246, 241, 231)',
+    switched.paper);
 
   // The seed notes are what a genuine first run gets, and they must reach disk.
   await win.waitForFunction(() => document.querySelectorAll('.note-row').length > 0, undefined, { timeout: 10_000 });

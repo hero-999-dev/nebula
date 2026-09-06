@@ -122,7 +122,7 @@ async function boot() {
     titleEl.select();
   });
 
-  initTheme($('btn-theme'));
+  initTheme($('theme-pick'));
   // The update button lives inside About: one place that answers "which build
   // is this, where is it, and is there a newer one".
   const checkButton = $('btn-check-updates');

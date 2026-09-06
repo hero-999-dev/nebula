@@ -30,7 +30,7 @@ body {
   letter-spacing: 0.02em;
   padding: 2px 6px 8px;
 }
-.brand svg { width: 22px; height: 22px; color: var(--clay); }
+.brand { color: var(--ink); }
 
 .side input[type="search"] {
   width: 100%;
@@ -52,7 +52,16 @@ body {
   padding: 0 4px;
 }
 
+/* These are <button>s and were never given a colour, a background, a width or
+   an alignment — so they rendered as the browser's default grey pill with black
+   text. On the warm light theme that passed for styling; on a dark one it is
+   black on light grey. Say what they look like. */
 .note-row {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  background: transparent;
+  color: var(--ink);
   padding: 8px 10px;
   border-radius: 8px;
   cursor: pointer;
@@ -74,6 +83,35 @@ body {
 }
 
 .side-foot { display: flex; flex-direction: column; gap: 6px; }
+
+/* Three themes as a segmented control: which one is on is visible without
+   clicking, unlike a button that only says "Theme". */
+.theme-pick {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: var(--paper-raised);
+}
+.theme-pick button {
+  flex: 1;
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 4px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.theme-pick button:hover { color: var(--ink); background: var(--paper-sunken); }
+.theme-pick button.on {
+  background: var(--clay);
+  color: var(--paper-sunken);
+  font-weight: 600;
+}
+:root[data-theme="light"] .theme-pick button.on { color: #fff; }
 
 .side-meta {
   display: flex;
@@ -114,7 +152,7 @@ body {
   border-color: var(--clay);
   color: #fff;
 }
-:root[data-theme="ember"] .btn.primary { color: var(--paper-sunken); }
+:root:not([data-theme="light"]) .btn.primary { color: var(--paper-sunken); }
 .btn.ghost {
   background: transparent;
   border-color: transparent;

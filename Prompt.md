@@ -19,8 +19,11 @@ reference build it descends from (Notion + Obsidian + Excel + Xmind + Anki +
 Discord in one app) proved that shape works but is exhausting to maintain, so
 this rewrite keeps the plumbing and re-earns each feature one at a time.
 
-Look: paper and ink with one clay accent. Serif content, sans chrome. Two
-themes, Paper (default) and Ember dark. No third theme.
+Look: serif content, sans chrome, one accent. Three themes and only three —
+**Main**, a violet dark theme that is the app's own identity and the default;
+**Dark**, warm paper-and-ink inverted; **Light**, the same warm palette upright.
+The app icon is the Main accent, so the thing in the taskbar and the thing on
+screen are obviously the same product.
 
 ### The editor is the product
 
@@ -109,12 +112,16 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.3.4)
+## Current implementation state (v0.3.6)
 
 **Working:** the whole editor described above — dock pad, two-row toolbar,
 mini toolbar, slash menu, code blocks with syntax colours, free-floating shapes,
-AI panel with tabs and custom sites, Paper/Ember themes, six seed notes (one per
-feature) so every function can be checked by hand.
+AI panel with tabs and custom sites, the Main/Dark/Light theme picker, six seed
+notes (one per feature) so every function can be checked by hand.
+
+**Identity:** the icon is drawn from vector geometry at every size that ships
+(16 → 256 in a real multi-size `.ico`), not downscaled from one large bitmap,
+because Windows draws the title bar at 16px and a resampled mark looks it.
 
 **Storage:** per-note JSON under `<userData>/storage/notes/`, atomic writes,
 path-guarded IPC, daily vault snapshots (newest 7), `storage/meta.json` version
@@ -125,7 +132,7 @@ stamp, and a dev profile at `<repo>/.dev-profile` that development cannot escape
 on Windows and notify-and-download elsewhere; `npm run push` is the whole
 release ritual.
 
-**Quality:** 61 unit tests, 22 Electron smoke checks against the real app
+**Quality:** 61 unit tests, 24 Electron smoke checks against the real app
 (including "an unreadable vault seeds nothing", verified by breaking the guard
 on purpose and watching the suite go red).
 

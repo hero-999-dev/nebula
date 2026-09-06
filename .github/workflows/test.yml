@@ -18,3 +18,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+
+      # The version is printed in four places and was hand-copied into three of
+      # them; they had drifted three versions apart before this check existed.
+      - name: Versions agree with package.json
+        run: npm run check:versions

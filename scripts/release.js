@@ -19,6 +19,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT } from './paths.js';
+import { stampVersions, checkVersions } from './versions.js';
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
@@ -136,19 +137,22 @@ runLoud('npm', ['run', 'smoke']);
 pkg.version = version;
 fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
 
-// memory.json's version and date are mechanical — keep them in step here so the
-// only thing a session has to write by hand is what actually happened.
-const memoryPath = path.join(ROOT, 'memory.json');
-if (fs.existsSync(memoryPath)) {
-  try {
-    const memory = JSON.parse(fs.readFileSync(memoryPath, 'utf8'));
-    memory.version = version;
-    memory.lastUpdated = new Date().toISOString().slice(0, 10);
-    fs.writeFileSync(memoryPath, `${JSON.stringify(memory, null, 2)}\n`, 'utf8');
-  } catch (err) {
-    console.warn(`  ! memory.json could not be updated: ${err.message}`);
-  }
+// Everything that prints a version is rewritten from package.json, and the docs
+// site is rebuilt HERE rather than after the tag — so the site committed in this
+// release is the site this release publishes. Building it later is what made the
+// published page trail one version behind.
+const stamped = stampVersions(version);
+if (stamped.length) console.log(`  restamped ${stamped.join(', ')}`);
+
+console.log('\n> npm run site');
+runLoud('npm', ['run', 'site']);
+
+const versions = checkVersions(version);
+if (!versions.ok) {
+  for (const r of versions.rows) console.error(`  ${r.ok ? 'ok   ' : 'DRIFT'} ${r.file} -> ${r.found ?? '(not found)'}`);
+  fail(`Version surfaces disagree with package.json (${version}). Nothing was committed.`);
 }
+console.log(`  versions agree: ${versions.rows.map((r) => r.file).join(', ')}`);
 
 const lastTag = tryGit('describe', '--tags', '--abbrev=0');
 const range = lastTag ? `${lastTag}..HEAD` : null;
@@ -204,11 +208,11 @@ console.log('  Installed copies of Nebula offer the update on their next check.\
 // a missing USB drive nor a network hiccup should read as a failed release.
 
 try {
-  // Rebuilt here so the published page carries the version that was just tagged.
-  runLoud('npm', ['run', 'site']);
+  // The site was built and committed above, so this publishes exactly what the
+  // tag contains — the repository copy and the published copy cannot diverge.
   runLoud('node', [path.join(ROOT, 'scripts', 'publish-site.js')]);
 } catch {
-  console.warn('  (docs site not published — run `npm run site && npm run publish-site` to retry)');
+  console.warn('  (docs site not published — run `npm run publish-site` to retry)');
 }
 
 if (!skipFlash) {

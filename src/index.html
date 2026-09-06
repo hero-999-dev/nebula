@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="paper">
+<html lang="en" data-theme="main">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -11,23 +11,18 @@
 <body>
   <div id="app">
     <aside class="side" id="side">
-      <div class="brand">
-        <!-- Same mark as the app icon: crescent + sparkle.
-             The crescent is ONE closed path — big arc out, small arc back. Two
-             overlapping circles with fill-rule="evenodd" does not work: the part
-             of the cutting circle that falls outside the big one is odd too, so
-             it fills, and the mark renders as a ring with a notch. -->
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M15.82 4.4A9 9 0 1 0 15.82 19.6A7.6 7.6 0 0 1 15.82 4.4Z"/>
-          <path d="M17.6 7.2l.85 1.55 1.55.85-1.55.85-.85 1.55-.85-1.55-1.55-.85 1.55-.85z"/>
-        </svg>
-        <span>Nebula</span>
-      </div>
+      <!-- No mark here: the window's own title bar already shows the icon a few
+           pixels above this line, and two of them side by side read as clutter. -->
+      <div class="brand"><span>Nebula</span></div>
       <input id="side-filter" type="search" placeholder="Filter notes…" aria-label="Filter notes" />
       <nav class="note-list" id="note-list" aria-label="Notes"></nav>
       <div class="side-foot">
         <button class="btn primary" id="btn-new" type="button">New note</button>
-        <button class="btn ghost" id="btn-theme" type="button" title="Toggle theme">Theme</button>
+        <div class="theme-pick" id="theme-pick" role="group" aria-label="Theme">
+          <button type="button" data-theme="main" title="Main — violet">Main</button>
+          <button type="button" data-theme="dark" title="Dark">Dark</button>
+          <button type="button" data-theme="light" title="Light">Light</button>
+        </div>
         <div class="side-meta">
           <span class="app-version" id="app-version" title="About Nebula"></span>
           <button class="btn ghost btn-mini" id="btn-check-updates" type="button" title="Check for updates">Check for updates</button>

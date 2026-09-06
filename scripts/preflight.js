@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ROOT } from './paths.js';
+import { checkVersions } from './versions.js';
 
 const c = {
   reset: '\x1b[0m', bold: '\x1b[1m', dim: '\x1b[2m',
@@ -96,6 +97,17 @@ for (const file of TRACKED) {
 if (srcTouched) {
   console.log(`\n  ${c.dim}Code changed since the last release. Log.md, tests.md and memory.json${c.reset}`);
   console.log(`  ${c.dim}are expected to change with it — npm run push checks this too.${c.reset}`);
+}
+
+/* ------------------------------------------------------- do the versions agree */
+
+head('Versions');
+{
+  const { ok, rows } = checkVersions(pkg?.version);
+  for (const r of rows) {
+    console.log(`  ${r.ok ? `${c.dim}ok${c.reset}   ` : `${c.red}DRIFT${c.reset}`} ${r.file.padEnd(18)} ${r.found ?? '(not found)'}`);
+  }
+  if (!ok) console.log(`\n  ${c.yellow}npm run push restamps these; do not edit a version by hand.${c.reset}`);
 }
 
 /* ------------------------------------------------------------------- say it */

@@ -107,8 +107,11 @@ function createWindow() {
     minHeight: 480,
     show: false,
     title: 'Nebula',
-    backgroundColor: '#F6F1E7',
-    icon: path.join(__dirname, '../build/icon.png'),
+    backgroundColor: '#17122A',
+    // The .ico on Windows, not the 1024px PNG: the title bar draws at 16px, and
+    // handing Electron one huge bitmap makes it downscale — which is what made
+    // the title-bar and taskbar mark look mushy. The .ico carries a real 16px.
+    icon: path.join(__dirname, process.platform === 'win32' ? '../build/icon.ico' : '../build/icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

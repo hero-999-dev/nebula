@@ -96,6 +96,9 @@ installs and runs while being wrong.
 | `quitAndInstall(false, …)` | Opens the NSIS wizard and waits for clicks. Must be `true` — the user already consented by pressing the button. |
 | `evenodd` subtraction | Two overlapping circles do not subtract; the cutter's outside is odd too and fills. Draw a lune as one closed arc path. |
 | `npx asar extract-file` | Writes into the **current directory**. Run it in a temp folder — it once overwrote this repo's `package.json`. |
+| Version numbers in prose | Never type one. `package.json` is the source; `scripts/versions.js` stamps README, Prompt, memory and the site, and `npm run push` refuses to commit if they disagree. They had drifted three versions apart. |
+| Unstyled controls | A `<button>` with no `color`/`background` is the browser's grey-on-black default, which passes unnoticed on a light theme and is broken on a dark one. Probe the running app for `rgb(0, 0, 0)` / `rgb(240, 240, 240)` after any theme work. |
+| The icon | Built from vector geometry at each shipped size by `build/make-icon.ps1`. Do not let electron-builder derive the `.ico` from one large PNG — three resamplings later, 16px is mush. |
 
 ---
 

@@ -11,6 +11,7 @@
     "test": "vitest run",
     "smoke": "node tests/e2e/smoke.mjs",
     "preflight": "node scripts/preflight.js",
+    "check:versions": "node scripts/versions.js",
     "site": "node scripts/build-site.js",
     "publish-site": "node scripts/publish-site.js",
     "icons": "powershell -ExecutionPolicy Bypass -File build/make-icon.ps1",
@@ -38,6 +39,7 @@
       "dist/**/*",
       "dist-electron/**/*",
       "build/icon.png",
+      "build/icon.ico",
       "package.json",
       "node_modules/**/*"
     ],
@@ -49,6 +51,7 @@
       }
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",

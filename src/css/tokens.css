@@ -1,6 +1,39 @@
-/* Ember palette — paper & ink, one clay accent */
+/* Three themes, one token set.
+ *
+ *   main   violet, the default — the app's own identity, matching the icon
+ *   dark   ember: paper & ink inverted, clay accent
+ *   light  paper: the original warm light theme
+ *
+ * `main` is written on :root itself rather than in an attribute block, so the
+ * app has its real colours before any script runs — no flash of the wrong
+ * theme while theme.js reads localStorage.
+ */
 
-:root {
+:root,
+:root[data-theme="main"] {
+  --paper: #17122A;
+  --paper-raised: #201A38;
+  --paper-sunken: #100C1E;
+  --ink: #EDE7F7;
+  --ink-soft: #B6ACCB;
+  --ink-faint: #7A7192;
+  --rule: #302842;
+  --clay: #A78BFA;          /* the accent, and the light end of the icon's gradient */
+  --clay-soft: #372B5C;
+  --fern: #8FD1B0;
+  --madder: #F2789A;
+  --shadow: rgba(8, 4, 20, 0.55);
+  --serif: "Charter", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono: "Cascadia Code", "Consolas", monospace;
+
+  /* Scrollbars, focus rings, caret and any control we have not styled follow
+     the theme. Without this the browser keeps its light-mode defaults and a
+     dark theme gets black text on grey widgets. */
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
   --paper: #F6F1E7;
   --paper-raised: #FDFBF6;
   --paper-sunken: #EFE8D8;
@@ -13,12 +46,10 @@
   --fern: #6E8B6A;
   --madder: #9E3B32;
   --shadow: rgba(60, 50, 30, 0.12);
-  --serif: "Charter", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --sans: "Inter", "Segoe UI", system-ui, sans-serif;
-  --mono: "Cascadia Code", "Consolas", monospace;
+  color-scheme: light;
 }
 
-:root[data-theme="ember"] {
+:root[data-theme="dark"] {
   --paper: #17140F;
   --paper-raised: #201C15;
   --paper-sunken: #100E0A;

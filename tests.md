@@ -55,6 +55,41 @@ Launch 3 — a vault that cannot be read (`storage/notes` created as a *file*, s
 
 ## Log
 
+### [2026-09-06] v0.3.7 — three themes, a vector icon, and one version
+
+**Smoke 22 → 24.** The check that asserted the sidebar mark's path count is
+gone — the mark itself is gone, because the window title bar shows the icon two
+pixels above it. In its place: the theme picker offers exactly `main, dark,
+light`, `main` is what a fresh profile gets, and switching to light actually
+repaints (`body` becomes `rgb(246, 241, 231)`) and switching back restores.
+Asserting the attribute alone would pass on a theme whose tokens never load.
+
+**A bug the light theme had been hiding.** Making a dark theme the default
+exposed that `.note-row` is a `<button>` that was never given a colour, a
+background, a width or an alignment — every note row was the browser's default
+grey pill with black text, and on cream that looked deliberate. Found by asking
+the running app for computed styles rather than by looking at a screenshot:
+
+```
+button.note-row   color rgb(0, 0, 0)   background rgb(240, 240, 240)
+```
+
+The same probe now returns `[]` for every `button, select, input, textarea`
+whose colour or background is still a UA default. `color-scheme` is set per
+theme as well, so scrollbars, carets and focus rings follow.
+
+**Version drift is now a check, not a habit.** `package.json` said 0.3.6, the
+committed docs site 0.3.5, README and Prompt 0.3.4. `scripts/versions.js`
+stamps every surface from `package.json` and compares them; `npm run push`
+refuses to commit when they disagree, preflight prints the table, and CI runs
+`npm run check:versions`. The release also builds the site *before* the commit,
+so the committed page and the published page are the same file.
+
+**The .ico had no images in it.** The first run wrote a 200-byte file: a header
+and nine entries pointing at nothing, because PowerShell unrolled the byte
+array and `BinaryWriter.Write` silently took a different overload. `Write-Ico`
+now compares the file size against the sum of its parts and throws.
+
 ### [2026-09-06] v0.3.5 — Electron smoke suite, About, icon
 
 **Added `tests/e2e/smoke.mjs` (22 checks).** First Electron-level coverage in

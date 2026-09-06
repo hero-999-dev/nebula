@@ -139,9 +139,11 @@ const page = `<!doctype html>
 <title>Nebula v${esc(pkg.version)} — documentation</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23a280e5' d='M15.82 4.4A9 9 0 1 0 15.82 19.6A7.6 7.6 0 0 1 15.82 4.4Z'/%3E%3Cpath fill='%23a280e5' d='M17.6 7.2l.85 1.55 1.55.85-1.55.85-.85 1.55-.85-1.55-1.55-.85 1.55-.85z'/%3E%3C/svg%3E">
 <style>
+/* The same violet the app's Main theme and its icon use, so the documentation
+   and the product read as one thing. Dark here IS the app's Main palette. */
 :root{
   --bg:#f6f1e7; --panel:#fdfbf6; --sunken:#efe8d8; --ink:#201e1a; --soft:#55503f;
-  --faint:#8a8371; --rule:#ddd3bf; --accent:#c15f3c; --accent-soft:#e8cdbd;
+  --faint:#8a8371; --rule:#ddd3bf; --accent:#7c3aed; --accent-soft:#e4dcfb;
   --serif:"Charter","Iowan Old Style","Palatino Linotype",Georgia,serif;
   --sans:"Inter","Segoe UI",system-ui,sans-serif;
   --mono:"Cascadia Code",Consolas,ui-monospace,monospace;
@@ -149,14 +151,14 @@ const page = `<!doctype html>
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#17140f; --panel:#201c15; --sunken:#100e0a; --ink:#ede4d3; --soft:#b4a88e;
-    --faint:#776f5c; --rule:#35301f; --accent:#e8a87c; --accent-soft:#4a3524;
+    --bg:#17122a; --panel:#201a38; --sunken:#100c1e; --ink:#ede7f7; --soft:#b6accb;
+    --faint:#7a7192; --rule:#302842; --accent:#a78bfa; --accent-soft:#372b5c;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"]{
-  --bg:#17140f; --panel:#201c15; --sunken:#100e0a; --ink:#ede4d3; --soft:#b4a88e;
-  --faint:#776f5c; --rule:#35301f; --accent:#e8a87c; --accent-soft:#4a3524;
+  --bg:#17122a; --panel:#201a38; --sunken:#100c1e; --ink:#ede7f7; --soft:#b6accb;
+  --faint:#7a7192; --rule:#302842; --accent:#a78bfa; --accent-soft:#372b5c;
   color-scheme: dark;
 }
 *{box-sizing:border-box}
