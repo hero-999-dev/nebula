@@ -7,6 +7,16 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-06 14:18] v0.3.6 - by claude
+
+About panel readability, and the docs site now carries the version it was released with.
+
+* About: give the modal its real width, and wrap paths at separators
+* release: build the docs site after the version bump, and let the clone push
+
+---
+
 ## [2026-09-06 14:06] v0.3.5 - by claude
 
 The app is findable again: real icon on the exe, shortcuts and taskbar, plus an About panel that names every folder it uses.
