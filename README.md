@@ -48,7 +48,6 @@ So this README describes a small app on purpose. What is here is finished.
   side-scrolling tab strip. It touches no note data, by design.
 - **Six seed notes** on first run, one per feature, so everything can be
   checked by hand.
-
 - **Three themes**, picked from a segmented control that shows which one is on:
   **Main**, a violet dark theme that is the app's own identity and the default;
   **Dark**, warm paper-and-ink inverted; **Light**, the same warm palette
@@ -92,8 +91,9 @@ detect the new version and open the download page instead. Same UI either way.
 **An update never touches a note.** Five independent layers stand in the way of
 losing one:
 
-1. **Separate profiles.** `npm run dev` runs on `<repo>/.dev-profile`, so
-   development cannot open — or delete — the notes you actually keep.
+1. **Separate vaults.** Installed, portable and development each keep their own
+   notes, so neither a build you are testing nor a portable copy on a USB stick
+   can open — or delete — the notes you actually keep.
 2. **The seed guard.** Sample notes are written only when the vault was read
    *successfully* and came back *empty*. An unreadable vault disables the disk
    mirror entirely, shows a red bar, and offers to open the folder.
@@ -149,7 +149,7 @@ happens between a keystroke and a file.
 npm install
 npm run preflight   # START HERE — version, phase, what changed, what is stale
 npm run dev         # dev app on its OWN profile
-npm test            # 61 unit tests
+npm test            # 66 unit tests
 npm run build && npm run smoke   # 24 checks against the real Electron app
 npm run check:versions           # every surface agrees with package.json
 npm run pack:win    # release/Nebula-Setup-*.exe + Nebula-portable-*.exe
