@@ -109,8 +109,9 @@ runLoud('npm', ['run', 'build']);
 console.log('\n> npm run smoke');
 runLoud('npm', ['run', 'smoke']);
 
-console.log('\n> npm run site');
-runLoud('npm', ['run', 'site']);
+// The docs site is NOT built here. It stamps the version from package.json, and
+// the bump happens below — building it now publishes a page that is one release
+// behind, every time. It is built after the tag instead.
 
 /* --------------------------------------------- did the tracking files keep up */
 // Log.md and memory.json are written below, so only tests.md is a judgement
@@ -203,9 +204,11 @@ console.log('  Installed copies of Nebula offer the update on their next check.\
 // a missing USB drive nor a network hiccup should read as a failed release.
 
 try {
+  // Rebuilt here so the published page carries the version that was just tagged.
+  runLoud('npm', ['run', 'site']);
   runLoud('node', [path.join(ROOT, 'scripts', 'publish-site.js')]);
 } catch {
-  console.warn('  (docs site not published — run `npm run publish-site` to retry)');
+  console.warn('  (docs site not published — run `npm run site && npm run publish-site` to retry)');
 }
 
 if (!skipFlash) {

@@ -45,6 +45,11 @@ try {
   console.log(`  cloning ${REPO}`);
   run('gh', ['repo', 'clone', REPO, work, '--', '--depth', '1'], { stdio: 'pipe' });
 
+  // A fresh clone has no credential helper, so the push would sit waiting for a
+  // username. Point this clone at the gh session we are already signed into —
+  // locally, so nothing is written to the machine's global git config.
+  run('git', ['config', '--local', 'credential.https://github.com.helper', '!gh auth git-credential'], { cwd: work });
+
   const gate = path.join(work, GATE_DIR);
   fs.mkdirSync(gate, { recursive: true });
   fs.copyFileSync(site, path.join(gate, 'index.html'));
