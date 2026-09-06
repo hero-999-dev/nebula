@@ -11,6 +11,16 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-07 00:04] v0.4.0 - by claude
+
+Editor pass: lists that stop cutting each other, an escapable inline format, real typeset equations, six more languages, sharper icons.
+
+* Editor: lists, inline formats, equations, languages, icons, menus
+* README: 69 unit tests
+
+---
+
 ## [2026-09-06 16:33] v0.3.9 - by claude
 
 A test build you can double-click, with its own name, icon and notes.
