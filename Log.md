@@ -10,6 +10,16 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-06 16:33] v0.3.9 - by claude
+
+A test build you can double-click, with its own name, icon and notes.
+
+* Add a test build you can double-click
+* README: 66 unit tests, and the vault separation covers portable too
+
+---
+
 ## [2026-09-06 16:10] v0.3.8 - by claude
 
 Portable builds keep their own notes; the repo's double-click files open the dev app, not a packed build.
