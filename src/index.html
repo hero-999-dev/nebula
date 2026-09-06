@@ -12,10 +12,14 @@
   <div id="app">
     <aside class="side" id="side">
       <div class="brand">
-        <!-- same mark as the app icon: crescent + sparkle -->
+        <!-- Same mark as the app icon: crescent + sparkle.
+             The crescent is ONE closed path — big arc out, small arc back. Two
+             overlapping circles with fill-rule="evenodd" does not work: the part
+             of the cutting circle that falls outside the big one is odd too, so
+             it fills, and the mark renders as a ring with a notch. -->
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path fill-rule="evenodd" d="M2.3 12a8.2 8.2 0 1 0 16.4 0 8.2 8.2 0 1 0-16.4 0zM8.4 11.4a7.2 7.2 0 1 0 14.4 0 7.2 7.2 0 1 0-14.4 0z"/>
-          <path d="M18 5l.7 2.8 2.8.7-2.8.7-.7 2.8-.7-2.8-2.8-.7 2.8-.7z"/>
+          <path d="M15.82 4.4A9 9 0 1 0 15.82 19.6A7.6 7.6 0 0 1 15.82 4.4Z"/>
+          <path d="M17.6 7.2l.85 1.55 1.55.85-1.55.85-.85 1.55-.85-1.55-1.55-.85 1.55-.85z"/>
         </svg>
         <span>Nebula</span>
       </div>
