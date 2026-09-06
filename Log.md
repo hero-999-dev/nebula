@@ -5,6 +5,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-06 09:31] v0.3.4 - by claude
+
+Sidebar logo was rendering as a ring instead of a crescent.
+
+* Sidebar mark: draw the crescent as one closed path
+
+---
+
 ## [2026-09-06 01:06] v0.3.3 - by claude
 
 No app changes; this release exists so the silent-install path can be verified from an installed 0.3.2.
