@@ -34,12 +34,20 @@ download page. A portable exe has no installer to hand an update to.
 
 ## Where your notes actually live
 
-Not next to the app. In your user profile:
+Not next to the app — unless you are running the portable build, which is the
+whole point of a portable build.
 
-| OS | Folder |
+| How you launched it | Notes folder |
 |---|---|
-| Windows | `%APPDATA%\nebula` |
-| macOS | `~/Library/Application Support/nebula` |
+| **Installed** (Windows) | `%APPDATA%\nebula` |
+| **Installed** (macOS) | `~/Library/Application Support/nebula` |
+| **Portable** (`Nebula-portable-*.exe`) | `Nebula-data`, beside the exe — put the exe on a USB stick and your notes go with it |
+
+These are separate vaults on purpose: the portable build cannot see or change
+the installed app's notes, and neither can a development build. The app tells
+you which one it is using — click the version at the bottom of the sidebar.
+
+Inside whichever folder applies:
 
 Inside it:
 

@@ -157,12 +157,29 @@ npm run site        # rebuild site/index.html (docs + mind maps)
 npm run icons       # rebuild build/icon.png + icon.ico from vector (Windows)
 ```
 
-### The dev app and the installed app are separate
+### Three ways to launch, three separate vaults
 
-Electron derives its profile from the package name, so without an override a
-dev run and the installed Nebula would share `%APPDATA%\nebula` — and
-`npm run reset` would delete the notes you use. `scripts/paths.js` is the single
-answer to "which profile am I touching":
+| Launched as | Notes live in |
+|---|---|
+| **Installed** | `%APPDATA%\nebula` |
+| **Portable** (`Nebula-portable-*.exe`) | `<folder of the exe>\Nebula-data` |
+| **Dev** (`npm run dev`) | `<repo>\.dev-profile` |
+
+Electron derives its profile from the package name, so all three would be the
+same directory if nothing intervened — and a portable build sitting in this
+repo's `release/` folder really was autosaving into the installed app's notes.
+`electron/user-data.js` decides; `tests/user-data.test.js` proves they never
+collide. The app tells you which one it is on: click the version in the sidebar.
+
+Double-click, from the repo root:
+
+| File | What it opens |
+|---|---|
+| `Open Nebula.bat` | the **dev** app, hot reload, on `.dev-profile` |
+| `Fresh Nebula.bat` | resets `.dev-profile`, then the dev app |
+| `Open portable build.bat` | the packed portable exe, on its own vault |
+
+None of them touch the installed app's notes.
 
 ```bash
 npm run fresh          # reset the DEV notes -> rebuild -> launch

@@ -55,6 +55,35 @@ Launch 3 — a vault that cannot be read (`storage/notes` created as a *file*, s
 
 ## Log
 
+### [2026-09-06] v0.3.8 — a portable build was writing to the installed app's notes
+
+**Added `tests/user-data.test.js` (5 tests). Unit suite 61 → 66.**
+
+The user double-clicked `Fresh Nebula.bat` expecting the development app and
+asked whether that was what it opened. It was not: the file built and launched
+the **portable** exe, and the portable exe was running on `%APPDATA%\nebula` —
+the installed app's vault. Asked directly, it said so:
+
+```
+channel   portable
+userData  C:\Users\<user>\AppData\Roaming\nebula
+```
+
+Electron derives `userData` from the package name, so an installed, a portable
+and a dev launch all resolve to the same directory unless something intervenes.
+`NEBULA_USER_DATA` covered dev; nothing covered portable. `electron/user-data.js`
+now decides for all three, and a portable build keeps its notes in `Nebula-data`
+beside its own exe — which is what "portable" should have meant anyway.
+
+The tests pin the property that matters: the three launches never resolve to the
+same directory, the override always wins, and an empty override is ignored
+rather than resolving to nowhere.
+
+**Verified against the real vault.** The six installed notes were hashed, the
+repacked portable exe was launched and asked for its paths, then the notes were
+hashed again: `identical: True`, and `release\Nebula-data\storage\notes` had six
+files of its own.
+
 ### [2026-09-06] v0.3.7 — three themes, a vector icon, and one version
 
 **Smoke 22 → 24.** The check that asserted the sidebar mark's path count is

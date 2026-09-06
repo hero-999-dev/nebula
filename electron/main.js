@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { initUpdater } from './updater.js';
+import { resolveUserData } from './user-data.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
@@ -22,11 +23,16 @@ function appChannel() {
   return 'installed';
 }
 
-// Set by `npm run dev` and the reset scripts so development can never open the
-// installed app's profile. Without it both would be <appData>/nebula and a
-// `npm run reset` would delete the notes of the app the user actually uses.
-if (process.env.NEBULA_USER_DATA) {
-  app.setPath('userData', process.env.NEBULA_USER_DATA);
+// Three ways to launch, three separate vaults — see electron/user-data.js.
+// Without this a portable exe (including the one the repo builds into release/)
+// runs on <appData>/nebula, which is the INSTALLED app's notes.
+{
+  const { dir } = resolveUserData({
+    override: process.env.NEBULA_USER_DATA,
+    portableDir: process.env.PORTABLE_EXECUTABLE_DIR,
+    defaultDir: app.getPath('userData'),
+  });
+  app.setPath('userData', dir);
 }
 
 /** Notes live here as one JSON file per note. This directory is the vault. */

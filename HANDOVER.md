@@ -113,9 +113,11 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 4. **Seeding** requires a vault that was read *successfully* and came back
    *empty*. `storage:list` separates ENOENT (a real first run) from any other
    error. Collapsing them once seeded sample notes over a live vault.
-5. **Profiles.** Electron derives `userData` from the package name; without
-   `NEBULA_USER_DATA` the dev app and the installed app share `%APPDATA%\nebula`.
-   `scripts/paths.js` is the single answer to "which profile am I touching".
+5. **Profiles.** Electron derives `userData` from the package name, so an
+   installed, a portable and a dev launch all resolve to `%APPDATA%\nebula`
+   unless something intervenes. `electron/user-data.js` is that something, and
+   `scripts/paths.js` is the same answer for the scripts. A portable exe built
+   into `release/` was writing to the installed app's vault until this landed.
 6. **`quitAndInstall(true, true)`** — the first argument must be `true`, or the
    NSIS wizard opens and waits for clicks after the app has already quit.
 7. **`npx asar extract-file`** writes into the current directory. Run it in a
@@ -128,15 +130,27 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 
 ## 7. Where things live at runtime
 
-| | Windows | macOS |
-|---|---|---|
-| Application | `%LOCALAPPDATA%\Programs\Nebula` | `/Applications/Nebula.app` |
-| Profile | `%APPDATA%\nebula` | `~/Library/Application Support/nebula` |
-| Notes | `<profile>\storage\notes\<id>.json` | same |
-| Backups | `<profile>\backups\` | same |
-| Dev profile | `<repo>\.dev-profile` | same |
+**Three ways to launch, three separate vaults** (`electron/user-data.js`):
 
-The app shows all of these itself: click the version in the sidebar footer.
+| Launched as | Notes live in |
+|---|---|
+| **Installed** — `%LOCALAPPDATA%\Programs\Nebula`, or `/Applications/Nebula.app` | `%APPDATA%\nebula` · `~/Library/Application Support/nebula` |
+| **Portable** — `Nebula-portable-*.exe` | `<folder of the exe>\Nebula-data` |
+| **Dev** — `npm run dev` | `<repo>\.dev-profile` (via `NEBULA_USER_DATA`) |
+
+Inside any of them: `storage\notes\<id>.json`, `storage\meta.json`, `backups\`.
+
+Electron derives `userData` from the package name, so **all three would be the
+same directory** if nothing intervened — and for a while the portable build in
+`release/` really was autosaving into the installed app's notes. `resolveUserData`
+is the one place that decides; `tests/user-data.test.js` proves the three never
+collide.
+
+The app shows which one it is on: click the version in the sidebar footer.
+
+The double-click files in the repo root say what they do:
+`Open Nebula.bat` and `Fresh Nebula.bat` run the **dev** app on `.dev-profile`;
+`Open portable build.bat` runs the packed portable exe on its own vault.
 
 ---
 

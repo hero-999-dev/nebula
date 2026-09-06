@@ -92,7 +92,7 @@ installs and runs while being wrong.
 | `electron-updater` bundling | Stays in `dependencies` **and** in `rollupOptions.external` in `vite.config.js`. Bundle it and updates silently stop working. |
 | `latest.yml` | Only generated because `build.publish` is configured. Remove that block and every installed copy stops seeing releases, with no error anywhere. CI asserts the file exists. |
 | Seeding | `NoteStore` may seed only when the vault was read successfully *and* came back empty. "The list is empty" is not enough — that is how a permission error used to overwrite someone's notes. |
-| Profiles | Electron derives `userData` from the package name. Without `NEBULA_USER_DATA`, dev and the installed app share `%APPDATA%\nebula`. |
+| Profiles | Electron derives `userData` from the package name, so **installed, portable and dev all resolve to the same directory** unless `electron/user-data.js` intervenes. A portable exe built into `release/` was autosaving into the installed app's notes. Never add a fourth way to launch without adding it there and to `tests/user-data.test.js`. |
 | `quitAndInstall(false, …)` | Opens the NSIS wizard and waits for clicks. Must be `true` — the user already consented by pressing the button. |
 | `evenodd` subtraction | Two overlapping circles do not subtract; the cutter's outside is odd too and fills. Draw a lune as one closed arc path. |
 | `npx asar extract-file` | Writes into the **current directory**. Run it in a temp folder — it once overwrote this repo's `package.json`. |
