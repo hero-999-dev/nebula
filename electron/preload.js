@@ -3,6 +3,10 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('nebula', {
   platform: process.platform,
   version: () => ipcRenderer.invoke('app:version'),
+  paths: () => ipcRenderer.invoke('app:paths'),
+  // Reveal takes a key ('exeDir' | 'userData' | 'storage' | 'backups'), not a
+  // path — the renderer cannot ask the main process to open anything else.
+  reveal: (key) => ipcRenderer.invoke('app:reveal', key),
   storage: {
     read: (rel) => ipcRenderer.invoke('storage:read', rel),
     write: (rel, content) => ipcRenderer.invoke('storage:write', rel, content),

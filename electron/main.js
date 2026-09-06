@@ -8,6 +8,20 @@ import { initUpdater } from './updater.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 
+// Windows groups taskbar buttons by AppUserModelID and takes the button's icon
+// from whatever that id resolves to. electron-builder stamps this same id on the
+// Start Menu and Desktop shortcuts, so setting it here is what makes the running
+// app share their identity — and their icon — instead of getting a second,
+// generic button. Must run before any window is created.
+if (process.platform === 'win32') app.setAppUserModelId('com.nebula.app');
+
+/** Which kind of build is running. Shown in About; also gates the updater. */
+function appChannel() {
+  if (!app.isPackaged) return 'dev';
+  if (process.env.PORTABLE_EXECUTABLE_DIR) return 'portable';
+  return 'installed';
+}
+
 // Set by `npm run dev` and the reset scripts so development can never open the
 // installed app's profile. Without it both would be <appData>/nebula and a
 // `npm run reset` would delete the notes of the app the user actually uses.
@@ -201,7 +215,42 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('app:version', () => app.getVersion());
 
+  // The four places a user ever needs to find: the program, their notes, the
+  // backups, and the profile that holds both. About renders them and can open
+  // each one — which is the whole answer to "where is this thing installed".
+  const appPaths = () => ({
+    version: app.getVersion(),
+    channel: appChannel(),
+    platform: process.platform,
+    exeDir: process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(app.getPath('exe')),
+    userData: app.getPath('userData'),
+    storage: storageRoot(),
+    backups: path.join(app.getPath('userData'), 'backups'),
+  });
+  ipcMain.handle('app:paths', () => appPaths());
+
+  // Reveal by KEY, never by a path from the renderer: the renderer can ask for
+  // "storage", not for an arbitrary directory.
+  ipcMain.handle('app:reveal', async (_e, key) => {
+    const paths = appPaths();
+    const target = { exeDir: paths.exeDir, userData: paths.userData, storage: paths.storage, backups: paths.backups }[key];
+    if (!target) return { ok: false };
+    await fs.mkdir(target, { recursive: true }).catch(() => {});
+    await shell.openPath(target);
+    return { ok: true, path: target };
+  });
+
   createWindow();
+
+  // Packaged macOS takes its Dock icon from the .app bundle's .icns; a dev run
+  // has no bundle and shows Electron's default until told otherwise.
+  if (process.platform === 'darwin' && !app.isPackaged && app.dock) {
+    try {
+      app.dock.setIcon(path.join(__dirname, '../build/icon.png'));
+    } catch (err) {
+      console.warn('[nebula] dock icon failed:', err.message);
+    }
+  }
 
   await initUpdater({
     getWindow: () => mainWindow,

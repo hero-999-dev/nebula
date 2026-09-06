@@ -12,6 +12,7 @@ import { initAiPanel } from './ai-panel.js';
 import { initDialog, askText } from './dialog.js';
 import { injectIcons } from './icons.js';
 import { initUpdater, showAppVersion } from './updater.js';
+import { initAbout } from './about.js';
 
 const $ = (id) => document.getElementById(id);
 const AUTOSAVE_MS = 400;
@@ -122,7 +123,11 @@ async function boot() {
   });
 
   initTheme($('btn-theme'));
-  initUpdater({ checkButton: $('btn-check-updates') });
+  // The update button lives inside About: one place that answers "which build
+  // is this, where is it, and is there a newer one".
+  const checkButton = $('btn-check-updates');
+  initUpdater({ checkButton });
+  initAbout({ trigger: $('app-version'), checkButton });
   showAppVersion($('app-version'));
   on('note-changed', () => renderList());
 

@@ -29,7 +29,7 @@
         <button class="btn primary" id="btn-new" type="button">New note</button>
         <button class="btn ghost" id="btn-theme" type="button" title="Toggle theme">Theme</button>
         <div class="side-meta">
-          <span class="app-version" id="app-version"></span>
+          <span class="app-version" id="app-version" title="About Nebula"></span>
           <button class="btn ghost btn-mini" id="btn-check-updates" type="button" title="Check for updates">Check for updates</button>
         </div>
       </div>
@@ -185,6 +185,16 @@
     <div class="uc-actions">
       <button class="btn ghost" id="uc-dismiss" type="button">Later</button>
       <button class="btn primary" id="uc-action" type="button" hidden></button>
+    </div>
+  </div>
+
+  <div class="overlay" id="ov-about" hidden>
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="about-title">
+      <p class="dlg-title" id="about-title">About Nebula</p>
+      <div id="about-body"></div>
+      <div class="dlg-actions" id="about-actions">
+        <button class="btn ghost" id="about-close" type="button">Close</button>
+      </div>
     </div>
   </div>
 

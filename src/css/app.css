@@ -86,7 +86,12 @@ body {
   font-size: 11px;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  border-radius: 5px;
+  padding: 2px 4px;
 }
+.app-version:hover { color: var(--ink-soft); background: var(--paper-raised); }
+.app-version:focus-visible { outline: 2px solid var(--clay); outline-offset: 1px; }
 .btn-mini {
   font-size: 11px;
   padding: 4px 6px;
@@ -226,6 +231,43 @@ body {
   gap: 6px;
 }
 .uc-actions .btn { font-size: 12px; padding: 6px 10px; }
+
+/* About panel — paths are long, so the modal is wider and they wrap. */
+.modal-wide { width: min(560px, 94vw); }
+
+.about-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.about-table th {
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+  padding: 6px 12px 6px 0;
+  font-weight: 500;
+  color: var(--ink-faint);
+  width: 1%;
+}
+.about-table td { padding: 6px 0; word-break: break-all; }
+.about-path {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+  text-align: left;
+  padding: 2px 5px;
+  margin: -2px -5px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.about-path:hover { background: var(--paper-sunken); border-color: var(--rule); color: var(--clay); }
+.about-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+#about-actions { align-items: center; }
+#about-actions .btn-mini { margin-right: auto; }
 
 .storage-error {
   background: var(--madder);

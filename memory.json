@@ -1,0 +1,71 @@
+{
+  "projectName": "Nebula",
+  "version": "0.3.4",
+  "lastUpdated": "2026-09-06",
+  "currentPhase": "v0.3.5 — findability and self-documentation: real exe icon, About panel, agent ritual, Electron smoke test, local docs site with mind maps, gated web mirror.",
+  "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, command palette, search, i18n.",
+  "repository": {
+    "url": "https://github.com/hero-999-dev/nebula",
+    "visibility": "public",
+    "whyPublic": "electron-updater reads latest.yml from the release page with no credentials; a private repo would mean compiling a GitHub token into every copy of the app.",
+    "releases": "https://github.com/hero-999-dev/nebula/releases/latest",
+    "site": "https://hero-999-dev.github.io/nebula-web/"
+  },
+  "paths": {
+    "repo": "<workspace>/Cursor X Antigravity/Nebula",
+    "installedApp": "%LOCALAPPDATA%\\Programs\\Nebula",
+    "installedProfile": "%APPDATA%\\nebula",
+    "notes": "%APPDATA%\\nebula\\storage\\notes\\<id>.json",
+    "backups": "%APPDATA%\\nebula\\backups",
+    "devProfile": "<repo>/.dev-profile",
+    "flashMirror": "<HeroAI64GB>:\\AcerSwift\\Cursor X Antigravity\\Nebula"
+  },
+  "workflow": {
+    "sessionStart": "npm run preflight",
+    "release": "npm run push",
+    "rules": "AGENTS.md",
+    "handover": "HANDOVER.md",
+    "recreate": "Prompt.md",
+    "testLog": "tests.md",
+    "changelog": "Log.md"
+  },
+  "quality": {
+    "unitTests": 61,
+    "smokeChecks": 22,
+    "unitCommand": "npm test",
+    "smokeCommand": "npm run build && npm run smoke"
+  },
+  "invariants": [
+    "The dev app and the installed app never share a profile — npm run dev sets NEBULA_USER_DATA to <repo>/.dev-profile.",
+    "Sample notes are seeded only when the vault was read successfully AND came back empty. An unreadable vault disables the disk mirror instead.",
+    "The vault is copied to backups/pre-update-<version>-<time> immediately before an update installs.",
+    "electron-updater stays in dependencies and external in vite.config.js; CI asserts both latest.yml and its presence in the asar.",
+    "win.signAndEditExecutable must stay unset — false also disables rcedit, which is what writes the exe's icon and version info."
+  ],
+  "history": [
+    {
+      "version": "0.3.5",
+      "date": "2026-09-06",
+      "by": "claude",
+      "what": "Exe icon and version metadata (rcedit re-enabled), AppUserModelId, About panel with build channel and folders, agent ritual (AGENTS/preflight/memory/Prompt/HANDOVER/tests), 22-check Electron smoke test, local docs site with six mind maps, gated nebula-web mirror published on every release."
+    },
+    {
+      "version": "0.3.4",
+      "date": "2026-09-06",
+      "by": "claude",
+      "what": "Sidebar mark drawn as one closed arc path — two circles with fill-rule evenodd cannot subtract and rendered a ring."
+    },
+    {
+      "version": "0.3.0-0.3.3",
+      "date": "2026-09-05",
+      "by": "claude",
+      "what": "First public release: GitHub Releases for Windows and macOS, in-app updates (silent install on Windows, notify+download elsewhere), and three data-loss fixes — shared dev/installed profile, seeding over an unreadable vault, no pre-update snapshot."
+    },
+    {
+      "version": "0.3.0",
+      "date": "2026-07-16",
+      "by": "claude",
+      "what": "Editor v3: movable editing bar, line icons, markdown code blocks with syntax colours, free-floating shapes, tabbed AI panel, six seed notes."
+    }
+  ]
+}

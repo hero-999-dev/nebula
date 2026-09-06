@@ -106,10 +106,48 @@ runLoud('npm', ['test']);
 console.log('\n> npm run build');
 runLoud('npm', ['run', 'build']);
 
+console.log('\n> npm run smoke');
+runLoud('npm', ['run', 'smoke']);
+
+console.log('\n> npm run site');
+runLoud('npm', ['run', 'site']);
+
+/* --------------------------------------------- did the tracking files keep up */
+// Log.md and memory.json are written below, so only tests.md is a judgement
+// call. A release whose code moved but whose test log did not is usually a
+// session that forgot to record what it proved.
+{
+  const since = tryGit('describe', '--tags', '--abbrev=0');
+  const changed = [
+    ...((since ? tryGit('diff', '--name-only', `${since}..HEAD`) : '') || '').split('\n'),
+    ...((tryGit('status', '--porcelain') || '').split('\n').map((l) => l.slice(3))),
+  ].filter(Boolean);
+
+  const codeMoved = changed.some((f) => /^(src|electron|tests|scripts)\//.test(f));
+  if (codeMoved && !changed.includes('tests.md')) {
+    console.warn('\n  ! tests.md has not changed since the last release, but code has.');
+    console.warn('    Record what the new or changed tests prove — see AGENTS.md.\n');
+  }
+}
+
 /* ---------------------------------------------------- version and changelog */
 
 pkg.version = version;
 fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
+
+// memory.json's version and date are mechanical — keep them in step here so the
+// only thing a session has to write by hand is what actually happened.
+const memoryPath = path.join(ROOT, 'memory.json');
+if (fs.existsSync(memoryPath)) {
+  try {
+    const memory = JSON.parse(fs.readFileSync(memoryPath, 'utf8'));
+    memory.version = version;
+    memory.lastUpdated = new Date().toISOString().slice(0, 10);
+    fs.writeFileSync(memoryPath, `${JSON.stringify(memory, null, 2)}\n`, 'utf8');
+  } catch (err) {
+    console.warn(`  ! memory.json could not be updated: ${err.message}`);
+  }
+}
 
 const lastTag = tryGit('describe', '--tags', '--abbrev=0');
 const range = lastTag ? `${lastTag}..HEAD` : null;
@@ -159,7 +197,16 @@ console.log(`  release:  https://github.com/${REPO}/releases/tag/${tag}`);
 console.log('\n  The Windows installer and the macOS DMG appear on the release page in ~10 minutes.');
 console.log('  Installed copies of Nebula offer the update on their next check.\n');
 
-/* -------------------------------------------------------------- usb mirror */
+/* ------------------------------------------------------ docs site + mirrors */
+
+// Both are best-effort: the release is already tagged and building, and neither
+// a missing USB drive nor a network hiccup should read as a failed release.
+
+try {
+  runLoud('node', [path.join(ROOT, 'scripts', 'publish-site.js')]);
+} catch {
+  console.warn('  (docs site not published — run `npm run publish-site` to retry)');
+}
 
 if (!skipFlash) {
   try {

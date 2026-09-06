@@ -9,6 +9,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "smoke": "node tests/e2e/smoke.mjs",
+    "preflight": "node scripts/preflight.js",
+    "site": "node scripts/build-site.js",
+    "publish-site": "node scripts/publish-site.js",
     "icons": "powershell -ExecutionPolicy Bypass -File build/make-icon.ps1",
     "kill": "node scripts/kill-nebula.js",
     "reset": "npm run kill && node scripts/reset-notes.js",
@@ -18,6 +22,7 @@
     "push": "node scripts/release.js",
     "sync-flash": "node scripts/sync-flash.js"
   },
+  "author": "hero-999-dev",
   "license": "MIT",
   "dependencies": {
     "electron-updater": "^6.3.9"
@@ -57,8 +62,7 @@
             "x64"
           ]
         }
-      ],
-      "signAndEditExecutable": false
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -121,6 +125,7 @@
     "electron": "^33.2.1",
     "electron-builder": "^25.1.8",
     "jsdom": "^25.0.1",
+    "playwright-core": "^1.49.0",
     "vite": "^6.0.3",
     "vite-plugin-electron": "^0.28.8",
     "vitest": "^2.1.8"

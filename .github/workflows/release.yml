@@ -30,6 +30,11 @@ jobs:
       - name: Build renderer + main
         run: npm run build
 
+      # Drives the real Electron app on throwaway profiles. Catches the class of
+      # bug jsdom cannot see: the preload bridge, the main process, the vault.
+      - name: Electron smoke test
+        run: npm run smoke
+
       - name: Package installer + portable
         run: npx electron-builder --win nsis portable --publish never
 

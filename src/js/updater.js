@@ -152,5 +152,7 @@ export function initUpdater({ checkButton = null } = {}) {
 export async function showAppVersion(el) {
   if (!el) return;
   const version = await window.nebula?.version?.().catch(() => null);
-  el.textContent = version ? `v${version}` : '';
+  // Keep a label even in a browser preview — this element opens About, and an
+  // empty span is an invisible, unclickable target.
+  el.textContent = version ? `v${version}` : 'About';
 }
