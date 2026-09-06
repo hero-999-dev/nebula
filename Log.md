@@ -9,6 +9,16 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-06 16:10] v0.3.8 - by claude
+
+Portable builds keep their own notes; the repo's double-click files open the dev app, not a packed build.
+
+* A portable build was writing to the installed app's notes
+* README: three themes, not two, and the current check counts
+
+---
+
 ## [2026-09-06 15:32] v0.3.7 - by claude
 
 Main violet theme, a crisp icon at every size, and the version now agrees everywhere.

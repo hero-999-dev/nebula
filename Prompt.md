@@ -112,7 +112,7 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.3.7)
+## Current implementation state (v0.3.8)
 
 **Working:** the whole editor described above — dock pad, two-row toolbar,
 mini toolbar, slash menu, code blocks with syntax colours, free-floating shapes,
