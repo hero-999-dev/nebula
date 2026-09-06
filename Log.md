@@ -6,6 +6,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-06 14:06] v0.3.5 - by claude
+
+The app is findable again: real icon on the exe, shortcuts and taskbar, plus an About panel that names every folder it uses.
+
+* Findability and self-documentation
+
+---
+
 ## [2026-09-06 09:31] v0.3.4 - by claude
 
 Sidebar logo was rendering as a ring instead of a crescent.
