@@ -232,8 +232,10 @@ body {
 }
 .uc-actions .btn { font-size: 12px; padding: 6px 10px; }
 
-/* About panel — paths are long, so the modal is wider and they wrap. */
-.modal-wide { width: min(560px, 94vw); }
+/* About panel — paths are long, so the modal is wider and they wrap.
+   `.modal.modal-wide`, not `.modal-wide`: editor.css sets .modal to 420px and
+   loads after this file, so a single class would lose on source order. */
+.modal.modal-wide { width: min(580px, 94vw); }
 
 .about-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .about-table th {
@@ -245,7 +247,8 @@ body {
   color: var(--ink-faint);
   width: 1%;
 }
-.about-table td { padding: 6px 0; word-break: break-all; }
+/* Wrap only when a path genuinely does not fit, and prefer a separator. */
+.about-table td { padding: 6px 0; overflow-wrap: anywhere; }
 .about-path {
   font: inherit;
   font-family: var(--mono);
@@ -266,8 +269,7 @@ body {
   line-height: 1.5;
   color: var(--ink-soft);
 }
-#about-actions { align-items: center; }
-#about-actions .btn-mini { margin-right: auto; }
+#about-actions { align-items: center; justify-content: space-between; }
 
 .storage-error {
   background: var(--madder);

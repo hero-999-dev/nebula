@@ -86,6 +86,13 @@ test of note switching.
 **Unit suite unchanged at 61.** The About panel and the icon fix are Electron-
 and packaging-level; covering them in jsdom would test a mock.
 
+**Two things only a screenshot caught.** The About modal rendered at 420 px
+instead of 580: `.modal-wide` and `.modal` are both single-class selectors, and
+`editor.css` loads after `app.css`, so source order won — the selector is now
+`.modal.modal-wide`. And the published docs page was always one release behind,
+because `npm run push` built the site *before* the version bump. Neither is
+visible to any assertion we have; both were found by looking at the output.
+
 ### [2026-09-06] v0.3.4 — sidebar mark
 
 No new tests; the fix is geometry. Verified by rendering the mark at 18, 22, 44
