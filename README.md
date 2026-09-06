@@ -49,8 +49,15 @@ So this README describes a small app on purpose. What is here is finished.
 - **Six seed notes** on first run, one per feature, so everything can be
   checked by hand.
 
-Two themes — **Paper** and **Ember dark** — one clay accent, serif content,
-sans chrome.
+- **Three themes**, picked from a segmented control that shows which one is on:
+  **Main**, a violet dark theme that is the app's own identity and the default;
+  **Dark**, warm paper-and-ink inverted; **Light**, the same warm palette
+  upright. Serif content, sans chrome, one accent each.
+
+The app icon is drawn from vector geometry at every size it ships — 16 through
+256 in a real multi-size `.ico` — so the title bar and the taskbar are as sharp
+as the app itself, and they are the Main accent, so the thing in your taskbar
+and the thing on your screen are obviously the same product.
 
 ---
 
@@ -143,10 +150,11 @@ npm install
 npm run preflight   # START HERE — version, phase, what changed, what is stale
 npm run dev         # dev app on its OWN profile
 npm test            # 61 unit tests
-npm run build && npm run smoke   # 22 checks against the real Electron app
+npm run build && npm run smoke   # 24 checks against the real Electron app
+npm run check:versions           # every surface agrees with package.json
 npm run pack:win    # release/Nebula-Setup-*.exe + Nebula-portable-*.exe
 npm run site        # rebuild site/index.html (docs + mind maps)
-npm run icons       # rebuild build/icon.png from build/source-mark.png (Windows)
+npm run icons       # rebuild build/icon.png + icon.ico from vector (Windows)
 ```
 
 ### The dev app and the installed app are separate
