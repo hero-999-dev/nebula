@@ -151,7 +151,125 @@ try {
   check('note files are unchanged across a restart', after === before);
   await app.close();
 
-  /* -------------------------- 3. an unreadable vault must NOT look like a first run */
+  /* ----------------------------------- 3. editor behaviour, on its own profile */
+  // A separate profile so writing in the editor cannot disturb the persistence
+  // checks above.
+  const scratch = newProfile();
+  app = await launch(scratch);
+  win = await app.firstWindow();
+  await win.waitForSelector('#app', { timeout: 20_000 });
+  await win.waitForFunction(() => document.querySelectorAll('.note-row').length > 0, undefined, { timeout: 10_000 });
+  await win.click('#btn-new');
+  await win.click('#editor');
+
+  // Lists: a numbered list started under a bulleted one must be its SIBLING.
+  // Chromium buries it in the last <li>; lists.js is what puts it back.
+  await win.type('#editor', 'one');
+  await win.click('[data-act="ul"]');
+  await win.keyboard.press('Enter');
+  await win.type('#editor', 'two');
+  await win.click('[data-act="ol"]');
+  const lists = await win.evaluate(() => {
+    const ed = document.getElementById('editor');
+    return {
+      ul: ed.querySelectorAll(':scope > ul').length,
+      ol: ed.querySelectorAll(':scope > ol').length,
+      buried: ed.querySelectorAll('li ol, li ul').length,
+    };
+  });
+  check('a numbered list under a bulleted one is a sibling, not nested',
+    lists.ul === 1 && lists.ol === 1 && lists.buried === 0, JSON.stringify(lists));
+
+  // Inline formats have to be escapable.
+  await win.evaluate(() => {
+    const ed = document.getElementById('editor');
+    ed.innerHTML = '<p>plain</p>';
+    const p = ed.querySelector('p');
+    const r = document.createRange();
+    r.setStart(p.firstChild, 0);
+    r.setEnd(p.firstChild, 5);
+    const s = getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+  });
+  await win.click('[data-act="code"]');
+  check('inline code wraps the selection',
+    await win.evaluate(() => !!document.querySelector('#editor .inline-code')));
+
+  await win.evaluate(() => {
+    // focus() before placing the caret — clicking the editor afterwards would
+    // move the caret to wherever the click landed and undo this.
+    const ed = document.getElementById('editor');
+    ed.focus();
+    const span = ed.querySelector('.inline-code');
+    const r = document.createRange();
+    r.setStart(span.firstChild, span.firstChild.length);
+    r.collapse(true);
+    const s = getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+  });
+  await win.keyboard.press('Enter');
+  await win.keyboard.type('after');
+  {
+    const state = await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      return {
+        ok: [...ed.querySelectorAll('.inline-code')].every((c) => !c.textContent.includes('after')),
+        html: ed.innerHTML,
+      };
+    });
+    check('Enter at the end of inline code starts a plain line', state.ok, state.ok ? '' : state.html);
+  }
+
+  // Equation: KaTeX, from source, surviving a reload.
+  await win.click('[data-act="eq"]');
+  await win.waitForSelector('#eq-pop:not([hidden])', { timeout: 5_000 });
+  check('the equation editor opens', true);
+  await win.fill('#eq-input', '\\frac{a}{b}');
+  check('it previews as you type',
+    await win.evaluate(() => !!document.querySelector('#eq-preview .katex')));
+  await win.press('#eq-input', 'Enter');
+  await win.waitForSelector('#editor .inline-eq .katex', { timeout: 5_000 });
+  check('the equation is typeset into the note',
+    await win.evaluate(() => document.querySelector('#editor .inline-eq')?.dataset.tex === '\\frac{a}{b}'));
+
+  // An equation survives leaving the note and coming back, because it is
+  // regenerated from data-tex rather than restored from saved markup.
+  await win.evaluate(() => {
+    const rows = [...document.querySelectorAll('.note-row')];
+    rows[rows.length - 1].click();
+  });
+  await win.waitForTimeout(400);
+  await win.evaluate(() => document.querySelectorAll('.note-row')[0].click());
+  await win.waitForTimeout(600);
+  check('the equation is still typeset after switching notes',
+    await win.evaluate(() => !!document.querySelector('#editor .inline-eq .katex')));
+
+  // The shape bar must not survive a note switch.
+  await win.click('[data-act="shape-rect"]');
+  await win.waitForSelector('#shape-bar:not([hidden])', { timeout: 5_000 });
+  check('selecting a shape opens its bar', true);
+  await win.evaluate(() => {
+    const rows = [...document.querySelectorAll('.note-row')];
+    rows[rows.length - 1].click();
+  });
+  await win.waitForTimeout(400);
+  check('the shape bar closes when the note changes',
+    await win.evaluate(() => document.getElementById('shape-bar').hidden));
+
+  // The languages the user asked for, read off the control they appear in.
+  await win.click('#editor');
+  await win.click('[data-act="codeblock"]');
+  await win.waitForSelector('#editor .blk-code .code-lang', { timeout: 5_000 });
+  const langs = await win.evaluate(() =>
+    [...document.querySelectorAll('#editor .blk-code .code-lang option')].map((o) => o.value));
+  check('C, C++, C#, Java, Dart and Ruby are offered',
+    ['c', 'cpp', 'csharp', 'java', 'dart', 'ruby'].every((l) => langs.includes(l)), `${langs.length} languages`);
+
+  await app.close();
+
+  /* -------------------------- 4. an unreadable vault must NOT look like a first run */
   // storage/notes as a FILE makes readdir fail with ENOTDIR - a real error that
   // is not ENOENT, which is exactly the case that used to seed over live data.
   const broken = newProfile();

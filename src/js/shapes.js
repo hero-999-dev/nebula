@@ -65,18 +65,28 @@ export function initShapes(editorEl) {
   function positionBar() {
     const bar = document.getElementById('shape-bar');
     if (!bar || !selected) return;
+    // Switching notes replaces the editor's innerHTML, so the selected shape can
+    // already be detached. Its rect is then 0,0 and the bar parks in the corner
+    // with nothing to act on.
+    if (!selected.isConnected) { select(null); return; }
     const r = selected.getBoundingClientRect();
     bar.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - 250))}px`;
     bar.style.top = `${Math.max(8, r.top - 42)}px`;
   }
 
+  // Deselect on ANY click that is not on a shape or on the bar itself. Listening
+  // only on the editor left the bar stuck open the moment you clicked the
+  // sidebar, the toolbar, or another note.
+  document.addEventListener('mousedown', (e) => {
+    if (!selected) return;
+    if (e.target.closest('.shape') || e.target.closest('#shape-bar')) return;
+    select(null);
+  });
+
   editorEl.addEventListener('mousedown', (e) => {
     const handle = e.target.closest('.shape-h');
     const shape = e.target.closest('.shape');
-    if (!shape) {
-      if (!e.target.closest('#shape-bar')) select(null);
-      return;
-    }
+    if (!shape) return; // the document listener above already deselected
     select(shape);
     if (e.target.closest('.shape-text') && !handle) return; // typing inside
     e.preventDefault();
@@ -149,6 +159,7 @@ export function initShapes(editorEl) {
   }
 
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && selected) { select(null); return; }
     if ((e.key === 'Delete' || e.key === 'Backspace') && selected &&
         !document.activeElement?.classList?.contains('shape-text')) {
       e.preventDefault();
@@ -158,5 +169,10 @@ export function initShapes(editorEl) {
     }
   });
 
-  return { addShape: (kind) => select(addShape(editorEl, kind)), select };
+  return {
+    addShape: (kind) => select(addShape(editorEl, kind)),
+    select,
+    /** Called when a note is opened: the previous note's shapes are gone. */
+    reset: () => select(null),
+  };
 }

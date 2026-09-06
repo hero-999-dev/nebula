@@ -8,6 +8,9 @@
 
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
+import { normalizeLists } from './lists.js';
+import { enterOutOfWrapper, backspaceOutOfWrapper } from './inline-format.js';
+import { initEquation } from './equation.js';
 
 export const TEXT_COLORS = [
   ['Default text', ''],
@@ -49,7 +52,7 @@ export function parseSize(raw) {
   return Math.min(400, Math.max(6, Math.round(n)));
 }
 
-export function initToolbar(editorEl, { onSave } = {}) {
+export function initToolbar(editorEl, { onSave, shapes } = {}) {
   const toolbar = document.getElementById('toolbar');
   const miniBar = document.getElementById('mini-bar');
   if (!toolbar || !editorEl) return null;
@@ -213,11 +216,27 @@ export function initToolbar(editorEl, { onSave } = {}) {
     }
   }
 
+  /**
+   * Chromium's list commands are only right in the simple case — a numbered
+   * list started under a bulleted one ends up nested inside its last item.
+   * normalizeLists puts the tree back; see lists.js.
+   */
+  function listCommand(name) {
+    editorEl.focus();
+    document.execCommand(name, false, null);
+    normalizeLists(editorEl);
+    dirty();
+  }
+
+  const insertShape = (kind) => (shapes ? shapes.addShape(kind) : addShape(editorEl, kind));
+
+  const equation = initEquation(editorEl, { dirty });
+
   const ACTIONS = {
     undo: () => cmd('undo'),
     redo: () => cmd('redo'),
-    ul: () => cmd('insertUnorderedList'),
-    ol: () => cmd('insertOrderedList'),
+    ul: () => listCommand('insertUnorderedList'),
+    ol: () => listCommand('insertOrderedList'),
     todo: makeTodo,
     indent: () => indent(1),
     outdent: () => indent(-1),
@@ -226,7 +245,10 @@ export function initToolbar(editorEl, { onSave } = {}) {
     cut: () => cmd('cut'),
     copy: () => cmd('copy'),
     paste: () => void pasteFromClipboard(),
-    'shape-rect': () => addShape(editorEl, 'rect'),
+    // Through the shapes controller when there is one, so a new shape arrives
+    // selected with its colour bar open — adding one and then having to hunt
+    // for it to recolour it is not the point of a shape button.
+    'shape-rect': () => insertShape('rect'),
     codeblock: () => insertCodeBlock(editorEl),
     divider: () => cmd('insertHTML', '<hr class="blk-hr"><p><br></p>'),
     bold: () => cmd('bold'),
@@ -234,7 +256,7 @@ export function initToolbar(editorEl, { onSave } = {}) {
     underline: () => applyUnderline('u-single'),
     strike: () => cmd('strikeThrough'),
     code: () => wrapSelection('inline-code'),
-    eq: () => wrapSelection('inline-eq'),
+    eq: () => equation?.open(),
     color: () => cmd('foreColor', lastColor),
     hilite: () => cmd('hiliteColor', lastHilite),
     al: () => cmd('justifyLeft'),
@@ -263,7 +285,7 @@ export function initToolbar(editorEl, { onSave } = {}) {
     if (ustyle) { applyUnderline(ustyle); closeMenus(); return; }
 
     const shapeKind = e.target.closest('[data-shape-add]')?.dataset.shapeAdd;
-    if (shapeKind) { addShape(editorEl, shapeKind); closeMenus(); }
+    if (shapeKind) { insertShape(shapeKind); closeMenus(); }
   });
 
   function closeMenus() {
@@ -284,7 +306,10 @@ export function initToolbar(editorEl, { onSave } = {}) {
       const chip = isHilite
         ? `<span class="swatch" style="background:${value || 'transparent'}"></span>`
         : `<span class="swatch swatch--a" style="color:${value || 'var(--ink)'}">A</span>`;
-      btn.innerHTML = `${chip}${name}`;
+      // The label is its own element so it occupies a real grid column; as a
+      // bare text node its box depended on the row's content and one row could
+      // sit off the line the others share.
+      btn.innerHTML = `${chip}<span class="label">${name}</span>`;
       btn.addEventListener('click', () => { apply(value); closeMenus(); });
       menu.appendChild(btn);
     }
@@ -385,6 +410,25 @@ export function initToolbar(editorEl, { onSave } = {}) {
     if (e.target.closest('.code-src')) return; // code blocks own their keys
     const mod = e.ctrlKey || e.metaKey;
     if (e.key === 'Tab') { e.preventDefault(); indent(e.shiftKey ? -1 : 1); return; }
+
+    // Getting out of an inline format. Enter at the end of one starts the next
+    // line plain; Backspace at the start of one takes the format off. Without
+    // these two, an inline-code or underline run is a trap — see inline-format.js.
+    if (!mod && e.key === 'Enter' && !e.shiftKey) {
+      if (enterOutOfWrapper(editorEl, window.getSelection())) {
+        e.preventDefault();
+        dirty();
+      }
+      return;
+    }
+    if (!mod && e.key === 'Backspace') {
+      if (backspaceOutOfWrapper(editorEl, window.getSelection())) {
+        e.preventDefault();
+        dirty();
+      }
+      return;
+    }
+
     if (!mod) return;
     const k = e.key.toLowerCase();
     if (k === 'e') { e.preventDefault(); ACTIONS.code(); }

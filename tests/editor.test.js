@@ -175,17 +175,20 @@ describe('icons', () => {
     expect(html).not.toContain('fill="#');
   });
 
-  it('has the toolbar set incl. 3-dot bullets and 1-2-3 numbers', () => {
+  it('has the toolbar set incl. 3-dot bullets and a 1-2 numbered mark', () => {
     for (const n of ['undo', 'redo', 'bold', 'italic', 'underline', 'strike', 'bullets', 'numbers',
       'todo', 'indent', 'outdent', 'code', 'equation', 'shapes', 'save', 'print', 'ai']) {
       expect(ICONS[n], n).toBeTruthy();
     }
     // bulleted list = three dots
     expect((ICONS.bullets.match(/<circle/g) || []).length).toBe(3);
-    // numbered list = 1, 2, 3
+    // Numbered list = "1" and "2" only. Three rows of digits in a 24-unit box
+    // came out ~4.5 device pixels tall and read as a smudge; two rows at 8.5
+    // are legible at the size the toolbar actually draws them.
     expect(ICONS.numbers).toContain('>1<');
     expect(ICONS.numbers).toContain('>2<');
-    expect(ICONS.numbers).toContain('>3<');
+    expect(ICONS.numbers).not.toContain('>3<');
+    expect(ICONS.numbers).toContain('font-size="8.5"');
   });
 
   it('unknown icon degrades to empty, never throws', () => {

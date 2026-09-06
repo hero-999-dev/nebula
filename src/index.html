@@ -87,14 +87,24 @@
           <div class="tb-row">
             <span class="tb-combo">
               <input id="tb-font" class="tb-input tb-input--font" list="font-list" placeholder="Font" title="Font — pick or type" />
+              <!-- A datalist cannot be styled, so options can't be shown in
+                   their own face; it is kept because it also accepts any font
+                   name typed by hand. -->
               <datalist id="font-list">
                 <option value="Charter, Georgia, serif">Serif</option>
                 <option value="Inter, 'Segoe UI', sans-serif">Sans</option>
                 <option value="Arial"></option>
-                <option value="Georgia"></option>
+                <option value="Calibri"></option>
+                <option value="Segoe UI"></option>
+                <option value="Verdana"></option>
+                <option value="Tahoma"></option>
+                <option value="Trebuchet MS"></option>
                 <option value="Times New Roman"></option>
-                <option value="Courier New"></option>
+                <option value="Georgia"></option>
+                <option value="Garamond"></option>
                 <option value="Comic Sans MS"></option>
+                <option value="Courier New"></option>
+                <option value="Consolas"></option>
                 <option value="Cascadia Code"></option>
               </datalist>
             </span>
@@ -173,6 +183,18 @@
 
   <div id="shape-bar" class="shape-bar" hidden></div>
   <div id="slash-menu" class="float-menu" hidden></div>
+
+  <!-- Equation editor: LaTeX in, typeset preview above it, Enter to insert. -->
+  <div id="eq-pop" class="eq-pop" hidden>
+    <div class="eq-preview" id="eq-preview"></div>
+    <input id="eq-input" type="text" spellcheck="false" autocomplete="off"
+           placeholder="\frac{a}{b}  ·  x^2  ·  \sqrt{n}" aria-label="LaTeX" />
+    <div class="eq-actions">
+      <span class="eq-hint">LaTeX · Enter inserts · Esc cancels</span>
+      <button class="btn ghost" id="eq-cancel" type="button">Cancel</button>
+      <button class="btn primary" id="eq-ok" type="button">Insert</button>
+    </div>
+  </div>
 
   <div class="update-card" id="update-card" role="status" aria-live="polite" hidden>
     <p class="uc-text" id="uc-text"></p>

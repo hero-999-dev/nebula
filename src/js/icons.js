@@ -4,15 +4,21 @@
  * never need a network request.
  */
 
+// stroke-width 1.75 in a 24-unit box drawn at 20px lands on ~1.46 device pixels.
+// At the old 1.6-in-18px it was 1.2, which is what made the whole set look
+// washed out — a stroke thinner than a pixel is antialiased into grey.
 const S = (body, vb = '0 0 24 24') =>
-  `<svg viewBox="${vb}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  `<svg viewBox="${vb}" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision" aria-hidden="true">${body}</svg>`;
 
 export const ICONS = {
   undo: S('<path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 0 14h-3"/>'),
   redo: S('<path d="m15 14 5-5-5-5"/><path d="M20 9h-9a7 7 0 0 0 0 14h3"/>'),
 
   bold: S('<path d="M7 5h6a3.5 3.5 0 0 1 0 7H7z"/><path d="M7 12h7a3.5 3.5 0 0 1 0 7H7z"/>'),
-  italic: S('<path d="M15 5h-6"/><path d="M15 19H9"/><path d="M14 5 10 19"/>'),
+  // The Word / LibreOffice italic: serif bars offset from each other (top
+  // right, bottom left) with a clearly slanted stem between them. The old one
+  // put both bars over the same x range, which read as a lopsided H.
+  italic: S('<path d="M10 5h8"/><path d="M6 19h8"/><path d="M15 5 9 19"/>'),
   underline: S('<path d="M7 4v6a5 5 0 0 0 10 0V4"/><path d="M5 20h14"/>'),
   strike: S('<path d="M5 12h14"/><path d="M8.5 8a3.5 3.5 0 0 1 3.5-3h1a3.5 3.5 0 0 1 3.5 3"/><path d="M8 16a3.5 3.5 0 0 0 3.5 3h1a3.5 3.5 0 0 0 3.5-3"/>'),
 
@@ -22,7 +28,12 @@ export const ICONS = {
   pen: S('<path d="M4 20h4l10-10a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5 17.5 10.5"/>'),
 
   bullets: S('<circle cx="5" cy="7" r="1.3" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="5" cy="17" r="1.3" fill="currentColor" stroke="none"/><path d="M10 7h10"/><path d="M10 12h10"/><path d="M10 17h10"/>'),
-  numbers: S('<path d="M10 7h10"/><path d="M10 12h10"/><path d="M10 17h10"/><text x="3" y="8.6" font-size="6" font-family="Inter, sans-serif" fill="currentColor" stroke="none">1</text><text x="3" y="13.8" font-size="6" font-family="Inter, sans-serif" fill="currentColor" stroke="none">2</text><text x="3" y="19" font-size="6" font-family="Inter, sans-serif" fill="currentColor" stroke="none">3</text>'),
+  // Two rows, not three: "1 2" is enough to say "numbered", and at 20px three
+  // rows of 6px digits were 4.5 device pixels tall — a grey smudge.
+  numbers: S(
+    '<path d="M10 8h10"/><path d="M10 16h10"/>'
+    + '<text x="2.6" y="11" font-size="8.5" font-weight="600" font-family="Inter, Segoe UI, sans-serif" fill="currentColor" stroke="none">1</text>'
+    + '<text x="2.6" y="19" font-size="8.5" font-weight="600" font-family="Inter, Segoe UI, sans-serif" fill="currentColor" stroke="none">2</text>'),
   todo: S('<rect x="3.5" y="4.5" width="7" height="7" rx="1.6"/><path d="m5 8 1.6 1.6L9.2 6.6"/><path d="M14 8h7"/><path d="M3.5 16.5h7"/><path d="M14 16h7"/>'),
 
   indent: S('<path d="M10 7h11"/><path d="M10 12h11"/><path d="M10 17h11"/><path d="m3 9 3 3-3 3"/>'),

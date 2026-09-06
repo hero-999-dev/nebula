@@ -8,6 +8,7 @@ import { initToolbar } from './toolbar.js';
 import { initSlashMenu } from './slash-menu.js';
 import { initShapes } from './shapes.js';
 import { initCodeBlocks, paintAllCode } from './codeblock.js';
+import { paintAllEquations } from './equation.js';
 import { initAiPanel } from './ai-panel.js';
 import { initDialog, askText } from './dialog.js';
 import { injectIcons } from './icons.js';
@@ -61,11 +62,14 @@ async function boot() {
 
   initDock();
   initAiPanel({ askText });
+  // Shapes first: the toolbar's shape buttons go through this controller so a
+  // new shape arrives selected, with its colour bar already open.
+  const shapes = initShapes(editorEl);
   initToolbar(editorEl, {
+    shapes,
     onSave: () => { editor.flush(); setSaveState('saved'); },
   });
   initSlashMenu(editorEl);
-  initShapes(editorEl);
   initCodeBlocks(editorEl);
 
   function renderList() {
@@ -93,7 +97,11 @@ async function boot() {
     const note = store.active();
     titleEl.value = note?.title ?? '';
     editor.load(note);
-    paintAllCode(editorEl); // colors come back after a reload
+    // Both are regenerated from their stored source, never trusted from the
+    // saved HTML — and the shape bar belongs to a note that is now gone.
+    paintAllCode(editorEl);
+    paintAllEquations(editorEl);
+    shapes?.reset();
     setSaveState('');
     renderList();
   }

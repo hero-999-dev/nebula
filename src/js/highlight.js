@@ -10,6 +10,12 @@ export const LANGS = {
   javascript: { label: 'JavaScript' },
   typescript: { label: 'TypeScript' },
   python: { label: 'Python' },
+  java: { label: 'Java' },
+  c: { label: 'C' },
+  cpp: { label: 'C++' },
+  csharp: { label: 'C#' },
+  dart: { label: 'Dart (Flutter)' },
+  ruby: { label: 'Ruby' },
   html: { label: 'HTML' },
   css: { label: 'CSS' },
   json: { label: 'JSON' },
@@ -18,12 +24,21 @@ export const LANGS = {
   markdown: { label: 'Markdown' },
 };
 
+/** C, C++, C#, Java and Dart share one tokenizer; only the words differ. */
+const C_FAMILY = new Set(['c', 'cpp', 'csharp', 'java', 'dart']);
+
 const KEYWORDS = {
   javascript: 'await async break case catch class const continue debugger default delete do else export extends finally for from function get if import in instanceof let new of return set static super switch this throw try typeof var void while yield',
   typescript: 'abstract any as asserts async await boolean break case catch class const continue declare default delete do else enum export extends false finally for from function get if implements import in infer instanceof interface is keyof let namespace never new null number of private protected public readonly return set static string super switch this throw true try type typeof undefined union unknown var void while yield',
   python: 'and as assert async await break class continue def del elif else except finally for from global if import in is lambda none nonlocal not or pass raise return self true false try while with yield',
   sql: 'select from where insert update delete create table drop alter add join left right inner outer on group by order having limit offset values set into as and or not null distinct count sum avg min max primary key foreign references index view union all case when then else end',
   bash: 'if then else elif fi for while do done case esac function return export local readonly echo cd ls mkdir rm cp mv cat grep sed awk curl git npm node sudo apt exit source',
+  c: 'auto break case char const continue default do double else enum extern float for goto if inline int long register restrict return short signed sizeof static struct switch typedef union unsigned void volatile while',
+  cpp: 'alignas auto bool break case catch char class const constexpr continue decltype default delete do double dynamic_cast else enum explicit export extern final float for friend goto if inline int long mutable namespace new noexcept operator override private protected public register return short signed sizeof static static_cast struct switch template this throw try typedef typename union unsigned using virtual void volatile while',
+  csharp: 'abstract as async await base bool break byte case catch char checked class const continue decimal default delegate do double else enum event explicit extern finally fixed float for foreach get goto if implicit in int interface internal is lock long nameof namespace new object operator out override params partial private protected public readonly record ref return sbyte sealed set short sizeof stackalloc static string struct switch this throw try typeof uint ulong unchecked unsafe ushort using var virtual void volatile while yield',
+  java: 'abstract assert boolean break byte case catch char class const continue default do double else enum extends final finally float for goto if implements import instanceof int interface long native new package permits private protected public record return sealed short static strictfp super switch synchronized this throw throws transient try var void volatile while yield',
+  dart: 'abstract as assert async await break case catch class const continue covariant default deferred do dynamic else enum export extends extension external factory final finally for get hide if implements import in interface is late library mixin new on operator part required rethrow return set show static super switch sync this throw try typedef var void while with yield',
+  ruby: 'alias and begin break case class def defined do else elsif end ensure for if in module next not or redo rescue retry return super then undef unless until when while yield require require_relative include extend attr_accessor attr_reader attr_writer raise lambda proc puts',
   css: '',
   html: '',
   json: '',
@@ -35,7 +50,14 @@ const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, 
 
 /** Ordered rules per language. First match wins, so comments/strings lead. */
 function rulesFor(lang) {
-  const kw = KEYWORDS[lang] ? new RegExp(`\\b(?:${KEYWORDS[lang].trim().split(/\s+/).join('|')})\\b`, 'i') : null;
+  // Only SQL is genuinely case-insensitive. Marking every keyword list with `i`
+  // made the WHOLE combined regex case-insensitive (see `combined`), so the
+  // `klass` rule /\b[A-Z]\w*\b/ matched lowercase identifiers too and painted
+  // ordinary variables as class names.
+  const kwFlags = lang === 'sql' ? 'i' : '';
+  const kw = KEYWORDS[lang]
+    ? new RegExp(`\\b(?:${KEYWORDS[lang].trim().split(/\s+/).join('|')})\\b`, kwFlags)
+    : null;
 
   const common = [];
   if (lang === 'javascript' || lang === 'typescript') {
@@ -61,6 +83,38 @@ function rulesFor(lang) {
       ['fn', /\b[A-Za-z_]\w*(?=\s*\()/],
       ['klass', /\b[A-Z]\w*\b/],
       ['punct', /[{}()[\];,.:]|[+\-*/%=<>!&|^~]+/],
+    );
+  } else if (C_FAMILY.has(lang)) {
+    common.push(
+      ['comment', /\/\/[^\n]*|\/\*[\s\S]*?\*\//],
+      // C# verbatim strings and Dart/Java triple quotes come first so their
+      // contents cannot be re-tokenized.
+      ['string', /@"(?:[^"]|"")*"|"""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/],
+      // C and C++ preprocessor lines, and Java / Dart / C# annotations.
+      ['atrule', /^[ \t]*#[ \t]*\w+/m],
+      ['decorator', /@[A-Za-z_]\w*/],
+      ['number', /\b0[xXbB][\da-fA-F_]+[uUlLfF]*\b|\b\d[\d_]*(?:\.\d+)?(?:[eE][+-]?\d+)?[fFdDlLuU]*\b/],
+      ['keyword', kw],
+      ['literal', /\b(?:true|false|null|nullptr|NULL)\b/],
+      ['fn', /\b[A-Za-z_]\w*(?=\s*\()/],
+      ['klass', /\b[A-Z]\w*\b/],
+      ['punct', /[{}()[\];,.]|->|::|=>|[+\-*/%=<>!&|?:~^]+/],
+    );
+  } else if (lang === 'ruby') {
+    common.push(
+      // Strings BEFORE the # comment rule, or "#{name}" inside a string would
+      // be read as a comment and eat the rest of the line.
+      ['comment', /^=begin[\s\S]*?^=end/m],
+      ['string', /"(?:\\.|#\{[^}]*\}|[^"\\])*"|'(?:\\.|[^'\\])*'|%[wiWIqQ]?[[({][^\])}]*[\])}]/],
+      ['comment', /#[^\n]*/],
+      ['regexp', /\/(?:\\.|[^/\\\n])+\/[imxo]*/],
+      ['decorator', /@@?[A-Za-z_]\w*|\$[A-Za-z_]\w*/],
+      ['number', /\b\d[\d_]*(?:\.\d+)?\b/],
+      ['keyword', kw],
+      ['literal', /\b(?:true|false|nil|self)\b/],
+      ['fn', /\b[a-z_]\w*[!?]?(?=\s*[({])/],
+      ['klass', /\b[A-Z]\w*\b|:[A-Za-z_]\w*[!?]?/],
+      ['punct', /[{}()[\];,.]|=>|::|\|\||[+\-*/%=<>!&|?:~^]+/],
     );
   } else if (lang === 'html') {
     common.push(

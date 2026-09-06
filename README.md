@@ -33,13 +33,13 @@ So this README describes a small app on purpose. What is here is finished.
   Shift+Tab) · save (`Ctrl+S`) · print (`Ctrl+P`) · cut/copy/paste · shapes ‖
   font · size, any number you type · text colour (`Ctrl+T`) · highlight
   (`Ctrl+H`) · **B I U** with five underline styles · strikethrough · inline
-  code (`Ctrl+E`) · equation (`Ctrl+Q`) · four alignments. The font and size
+  code (`Ctrl+E`) · **equations** typeset with KaTeX (`Ctrl+Q`) · four alignments. The font and size
   boxes show what the caret is actually in.
 - **Right-click a selection** for a compact mini toolbar.
 - **`/` opens a block menu** — headings, lists, to-do, quote, code, divider,
   shapes.
 - **Code blocks** are markdown-style with a language picker and syntax colours
-  for JS, TS, Python, HTML, CSS, JSON, SQL, Bash and Markdown.
+  for JS, TS, Python, Java, C, C++, C#, Dart (Flutter), Ruby, HTML, CSS, JSON, SQL, Bash and Markdown.
 - **Shapes float over the whole note.** Rectangles, ellipses and diamonds drag
   anywhere, resize from a corner, recolour from dots and hold editable text —
   above or behind the words, which never reflow.
@@ -149,8 +149,8 @@ happens between a keystroke and a file.
 npm install
 npm run preflight   # START HERE — version, phase, what changed, what is stale
 npm run dev         # dev app on its OWN profile
-npm test            # 69 unit tests
-npm run build && npm run smoke   # 24 checks against the real Electron app
+npm test            # 114 unit tests
+npm run build && npm run smoke   # 34 checks against the real Electron app
 npm run check:versions           # every surface agrees with package.json
 npm run pack:win    # release/Nebula-Setup-*.exe + Nebula-portable-*.exe
 npm run site        # rebuild site/index.html (docs + mind maps)

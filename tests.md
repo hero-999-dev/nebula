@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 61 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 22 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 114 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 34 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -54,6 +54,52 @@ Launch 3 — a vault that cannot be read (`storage/notes` created as a *file*, s
 ---
 
 ## Log
+
+### [2026-09-07] v0.4.0 — eight editor defects, and two more found while fixing them
+
+**Unit 69 → 114, smoke 24 → 34.** Three new suites: `lists.test.js` (13),
+`inline-format.test.js` (18), `highlight.test.js` (14).
+
+**Lists.** `execCommand('insertOrderedList')` on the line under a bulleted list
+does not create a sibling — it buries the `<ol>` inside the last `<li>` of the
+`<ul>`, which is why the two lists visibly cut into each other. `lists.js`
+hoists it back out, splitting the outer list when the buried one was not last so
+the order survives, merges genuinely-adjacent lists of the same kind, and leaves
+real nesting alone. The tests are written as the exact HTML Chromium produces.
+
+**Getting out of an inline format.** Moving the caret out of the wrapper before
+Enter was not enough — Chromium carries a typing style across the break and
+rebuilds the same element. Measured in the real app rather than assumed:
+
+```
+<p><span class="inline-code">plain</span></p>
+<p><span class="inline-code">after</span></p>    <- what it produced
+```
+
+So Enter at the end of a wrapper is now handled outright: the next block is
+built here and starts genuinely empty. Backspace at the start of a wrapper
+strips the format and keeps the text. Lists are left alone — `<li>` has its own
+Enter worth keeping.
+
+**A colouring bug nobody had reported.** Every keyword list was compiled with
+the `i` flag, and `combined()` applies `i` to the *whole* alternation if any
+rule carries it — so `klass` (`/\b[A-Z]\w*\b/`) matched lowercase identifiers
+and painted ordinary variables as class names. Only SQL is genuinely
+case-insensitive; the rest are now case-sensitive, and a test pins it.
+
+**Two things only the running app could show:**
+- The shape bar never opened from the toolbar at all. `toolbar.js` called the
+  imported `addShape` directly instead of the controller's, so the shape was
+  added but never selected. It now goes through the controller and arrives
+  selected, which is also what the button should have done from the start.
+- The first smoke attempt at the Enter fix failed because the test clicked the
+  editor after placing the caret, which moved it. `focus()` before setting the
+  range, no click.
+
+**Verified by looking:** the colour menu reports `scrollHeight > clientHeight`
+as **false** — ten rows, all aligned, no scrollbar. The equation `\frac{a}{b} =
+\sqrt{x^2+1}` is typeset in the note and still typeset after switching notes and
+back, because it is regenerated from `data-tex`.
 
 ### [2026-09-06] v0.3.9 — a test build you can actually click
 
