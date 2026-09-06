@@ -24,7 +24,7 @@ import path from 'node:path';
 import { ROOT } from './paths.js';
 
 const REPO = 'hero-999-dev/nebula-web';
-const GATE_DIR = 'p-c82ad9036a2892511d20';   // sha256("nebula:<shared gate password>")[:20]
+const GATE_DIR = 'p-0248cf16830a5399fd15';   // sha256("nebula:<shared gate password>")[:20]
 
 const dryRun = process.argv.includes('--dry-run');
 
