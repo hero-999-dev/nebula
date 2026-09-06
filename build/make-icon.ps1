@@ -28,6 +28,7 @@ param(
   [ValidateSet('violet', 'orchid', 'iris')]
   [string]$Palette = 'violet',
   [string]$Out,
+  [string]$Name = 'icon',
   [switch]$PreviewOnly
 )
 
@@ -230,19 +231,19 @@ function Write-Preview([int[]]$sizes, [string]$path) {
 
 $ICO_SIZES = @(16, 20, 24, 32, 40, 48, 64, 128, 256)
 
-Write-Preview $ICO_SIZES (Join-Path $Out 'icon-preview.png')
-Write-Host ("preview  {0}  palette={1}" -f (Join-Path $Out 'icon-preview.png'), $Palette)
+Write-Preview $ICO_SIZES (Join-Path $Out "$Name-preview.png")
+Write-Host ("preview  {0}  palette={1}" -f (Join-Path $Out "$Name-preview.png"), $Palette)
 
 if (-not $PreviewOnly) {
   $big = Render-Icon 1024
-  Save-Png $big (Join-Path $Out 'icon.png')
+  Save-Png $big (Join-Path $Out "$Name.png")
   $corner = $big.GetPixel(2, 2)
   $centre = $big.GetPixel(512, 512)
   $big.Dispose()
   if ($corner.A -ne 0) { throw "Corner is not transparent (A=$($corner.A)); the rounded mask failed." }
   if ($centre.A -ne 255) { throw "Centre is not opaque (A=$($centre.A)); the tile did not draw." }
-  Write-Host ("png      {0}  1024x1024  corner A=0" -f (Join-Path $Out 'icon.png'))
+  Write-Host ("png      {0}  1024x1024  corner A=0" -f (Join-Path $Out "$Name.png"))
 
-  $n = Write-Ico $ICO_SIZES (Join-Path $Out 'icon.ico')
-  Write-Host ("ico      {0}  {1} sizes: {2}" -f (Join-Path $Out 'icon.ico'), $n, ($ICO_SIZES -join ' '))
+  $n = Write-Ico $ICO_SIZES (Join-Path $Out "$Name.ico")
+  Write-Host ("ico      {0}  {1} sizes: {2}" -f (Join-Path $Out "$Name.ico"), $n, ($ICO_SIZES -join ' '))
 }

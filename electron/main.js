@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { initUpdater } from './updater.js';
-import { resolveUserData } from './user-data.js';
+import { resolveUserData, appChannel, canSelfUpdate } from './user-data.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
@@ -14,13 +14,36 @@ const isDev = !!process.env.VITE_DEV_SERVER_URL;
 // Start Menu and Desktop shortcuts, so setting it here is what makes the running
 // app share their identity — and their icon — instead of getting a second,
 // generic button. Must run before any window is created.
-if (process.platform === 'win32') app.setAppUserModelId('com.nebula.app');
+// (AppUserModelId is set below, once the packaged metadata has been read: the
+// test build declares its own so Windows gives it a separate taskbar button.)
 
-/** Which kind of build is running. Shown in About; also gates the updater. */
-function appChannel() {
-  if (!app.isPackaged) return 'dev';
-  if (process.env.PORTABLE_EXECUTABLE_DIR) return 'portable';
-  return 'installed';
+/**
+ * The packaged package.json, which is where electron-builder's extraMetadata
+ * lands. The test build sets `nebulaChannel` and `productName` there, so this
+ * is how one bundle knows which build it is.
+ */
+function appMeta() {
+  try {
+    return JSON.parse(fsSync.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+const META = appMeta();
+const CHANNEL = appChannel({
+  packaged: app.isPackaged,
+  metaChannel: META.nebulaChannel,
+  portableDir: process.env.PORTABLE_EXECUTABLE_DIR,
+});
+const APP_TITLE = META.productName ?? 'Nebula';
+
+// Windows groups taskbar buttons by AppUserModelID and takes the button's icon
+// from whatever that id resolves to. electron-builder stamps this same id on the
+// Start Menu and Desktop shortcuts, so setting it here is what makes the running
+// app share their identity — and their icon. The test build declares its own, so
+// it gets a separate button rather than merging with the installed app.
+if (process.platform === 'win32') {
+  app.setAppUserModelId(META.nebulaAppId ?? 'com.nebula.app');
 }
 
 // Three ways to launch, three separate vaults — see electron/user-data.js.
@@ -105,6 +128,12 @@ function stampVaultMeta() {
 
 let mainWindow = null;
 
+/** The test build carries its own mark so the two are told apart at a glance. */
+function windowIconPath() {
+  if (process.platform !== 'win32') return '../build/icon.png';
+  return CHANNEL === 'test' ? '../build/icon-test.ico' : '../build/icon.ico';
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
@@ -112,12 +141,12 @@ function createWindow() {
     minWidth: 720,
     minHeight: 480,
     show: false,
-    title: 'Nebula',
+    title: APP_TITLE,
     backgroundColor: '#17122A',
     // The .ico on Windows, not the 1024px PNG: the title bar draws at 16px, and
     // handing Electron one huge bitmap makes it downscale — which is what made
     // the title-bar and taskbar mark look mushy. The .ico carries a real 16px.
-    icon: path.join(__dirname, process.platform === 'win32' ? '../build/icon.ico' : '../build/icon.png'),
+    icon: path.join(__dirname, windowIconPath()),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -127,6 +156,13 @@ function createWindow() {
   });
 
   win.once('ready-to-show', () => win.show());
+
+  // index.html carries <title>Nebula</title>, and a loaded page's title wins
+  // over the BrowserWindow one. The test build would otherwise say "Nebula" in
+  // its title bar and Alt-Tab, which is exactly the confusion it exists to
+  // avoid, so the window keeps the name the build was packaged under.
+  win.on('page-title-updated', (event) => event.preventDefault());
+  win.setTitle(APP_TITLE);
 
   if (isDev) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -229,7 +265,7 @@ app.whenReady().then(async () => {
   // each one — which is the whole answer to "where is this thing installed".
   const appPaths = () => ({
     version: app.getVersion(),
-    channel: appChannel(),
+    channel: CHANNEL,
     platform: process.platform,
     exeDir: process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(app.getPath('exe')),
     userData: app.getPath('userData'),
@@ -262,6 +298,7 @@ app.whenReady().then(async () => {
   }
 
   await initUpdater({
+    canSelfUpdate: canSelfUpdate(CHANNEL),
     getWindow: () => mainWindow,
     beforeInstall: async () => {
       snapshotStorage({ label: `pre-update-${app.getVersion()}-${Date.now()}` });

@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
-import { resolveUserData, PORTABLE_DATA_DIR } from '../electron/user-data.js';
+import { resolveUserData, appChannel, canSelfUpdate, PORTABLE_DATA_DIR } from '../electron/user-data.js';
 
 const APPDATA = path.join('C:', 'Users', 'someone', 'AppData', 'Roaming', 'nebula');
 const REPO = path.join('C:', 'work', 'Nebula');
@@ -42,5 +42,29 @@ describe('resolveUserData', () => {
 
   it('an empty override is ignored rather than resolving to nowhere', () => {
     expect(resolveUserData({ override: '', defaultDir: APPDATA }).dir).toBe(APPDATA);
+  });
+});
+
+describe('appChannel', () => {
+  it('names each way of launching', () => {
+    expect(appChannel({ packaged: false })).toBe('dev');
+    expect(appChannel({ packaged: true, metaChannel: 'test', portableDir: 'C:\\x' })).toBe('test');
+    expect(appChannel({ packaged: true, portableDir: 'C:\\x' })).toBe('portable');
+    expect(appChannel({ packaged: true })).toBe('installed');
+  });
+
+  it('a test build is test even though it is packaged, on Windows and portable', () => {
+    // "packaged and win32 and not portable" was the old auto-update condition;
+    // a test build satisfies the first two, so the channel has to be explicit.
+    expect(appChannel({ packaged: true, metaChannel: 'test' })).toBe('test');
+  });
+});
+
+describe('canSelfUpdate', () => {
+  it('is true only for an installed build', () => {
+    expect(canSelfUpdate('installed')).toBe(true);
+    for (const channel of ['test', 'portable', 'dev']) {
+      expect(canSelfUpdate(channel), channel).toBe(false);
+    }
   });
 });

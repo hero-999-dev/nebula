@@ -132,7 +132,10 @@ export async function initUpdater(opts = {}) {
   getWindow = opts.getWindow ?? getWindow;
   beforeInstall = opts.beforeInstall ?? beforeInstall;
 
-  const wantsAuto = app.isPackaged && process.platform === 'win32' && !isPortable();
+  // Only an installed Windows build may replace itself. A test build is
+  // packaged and on Windows too, so "packaged and win32" is not enough.
+  const wantsAuto = opts.canSelfUpdate !== false
+    && app.isPackaged && process.platform === 'win32' && !isPortable();
   if (wantsAuto) {
     autoUpdater = await loadAutoUpdater();
     if (autoUpdater) {

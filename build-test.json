@@ -1,0 +1,27 @@
+{
+  "appId": "com.nebula.app.test",
+  "productName": "Nebula Test",
+  "icon": "build/icon-test.ico",
+  "directories": { "output": "test-build" },
+  "files": [
+    "dist/**/*",
+    "dist-electron/**/*",
+    "build/icon.png",
+    "build/icon.ico",
+    "build/icon-test.ico",
+    "package.json",
+    "node_modules/**/*"
+  ],
+  "extraMetadata": {
+    "productName": "Nebula Test",
+    "nebulaChannel": "test",
+    "nebulaAppId": "com.nebula.app.test"
+  },
+  "win": {
+    "icon": "build/icon-test.ico",
+    "target": [{ "target": "portable", "arch": ["x64"] }]
+  },
+  "portable": {
+    "artifactName": "Nebula-Test.exe"
+  }
+}

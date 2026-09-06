@@ -157,15 +157,30 @@ npm run site        # rebuild site/index.html (docs + mind maps)
 npm run icons       # rebuild build/icon.png + icon.ico from vector (Windows)
 ```
 
-### Three ways to launch, three separate vaults
+### Nebula Test.exe — the one to double-click
+
+```bash
+npm run pack:test
+```
+
+Builds **`Nebula Test.exe`** into the project root. Double-click it: same code,
+but its own name in the title bar and Alt-Tab, its own blue-violet icon, its own
+taskbar button, and its own notes in `Nebula-data` beside it. It cannot be
+mistaken for — or write into — the installed Nebula, and it never updates itself.
+
+Rebuild it after a change and double-click again. For a live-reload loop instead,
+use `npm run dev`.
+
+### Four ways to launch, four separate vaults
 
 | Launched as | Notes live in |
 |---|---|
-| **Installed** | `%APPDATA%\nebula` |
-| **Portable** (`Nebula-portable-*.exe`) | `<folder of the exe>\Nebula-data` |
-| **Dev** (`npm run dev`) | `<repo>\.dev-profile` |
+| **Installed** — from Releases, into `%LOCALAPPDATA%\Programs\Nebula` | `%APPDATA%\nebula` |
+| **Test** — `Nebula Test.exe` in the project root | `<repo>\Nebula-data` |
+| **Portable** — `Nebula-portable-*.exe` from a release | `<folder of the exe>\Nebula-data` |
+| **Dev** — `npm run dev` | `<repo>\.dev-profile` |
 
-Electron derives its profile from the package name, so all three would be the
+Electron derives its profile from the package name, so all four would be the
 same directory if nothing intervened — and a portable build sitting in this
 repo's `release/` folder really was autosaving into the installed app's notes.
 `electron/user-data.js` decides; `tests/user-data.test.js` proves they never
@@ -175,6 +190,7 @@ Double-click, from the repo root:
 
 | File | What it opens |
 |---|---|
+| `Nebula Test.exe` | the **test build** — no terminal, own icon, own notes |
 | `Open Nebula.bat` | the **dev** app, hot reload, on `.dev-profile` |
 | `Fresh Nebula.bat` | resets `.dev-profile`, then the dev app |
 | `Open portable build.bat` | the packed portable exe, on its own vault |

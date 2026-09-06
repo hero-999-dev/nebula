@@ -37,6 +37,7 @@ Skipping preflight means the next agent — possibly you, next week — starts b
 | `npm run dev` | Hot-reload dev app **on its own profile** (`.dev-profile`) |
 | `npm test` | Unit tests — after every logic change |
 | `npm run build && npm run smoke` | Electron smoke — after anything touching `electron/`, the preload bridge, or boot |
+| `npm run pack:test` | `Nebula Test.exe` in the project root — the build to actually click |
 | `npm run pack:win` | Local installer + portable exe |
 | `npm run site` | Rebuild the local docs site |
 

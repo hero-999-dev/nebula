@@ -14,11 +14,12 @@
     "check:versions": "node scripts/versions.js",
     "site": "node scripts/build-site.js",
     "publish-site": "node scripts/publish-site.js",
-    "icons": "powershell -ExecutionPolicy Bypass -File build/make-icon.ps1",
+    "icons": "powershell -ExecutionPolicy Bypass -File build/make-icon.ps1 && powershell -ExecutionPolicy Bypass -File build/make-icon.ps1 -Palette iris -Name icon-test",
     "kill": "node scripts/kill-nebula.js",
     "reset": "npm run kill && node scripts/reset-notes.js",
     "pack:win": "npm run kill && npm run build && electron-builder --win nsis portable --publish never",
     "pack:mac": "npm run build && electron-builder --mac dmg zip --universal --publish never",
+    "pack:test": "npm run kill && npm run build && electron-builder --config build-test.json --publish never && node scripts/place-test-exe.js",
     "fresh": "npm run reset && npm run pack:win",
     "push": "node scripts/release.js",
     "sync-flash": "node scripts/sync-flash.js"

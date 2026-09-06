@@ -112,6 +112,17 @@ Update button, rather than offering a path that would fail.
 
 ---
 
+## Trying a build before releasing it
+
+```bash
+npm run pack:test
+```
+
+`Nebula Test.exe` appears in the project root. It is the same code with its own
+name, icon, taskbar button and notes (`Nebula-data` beside it), so you can run
+it next to the installed Nebula without either one touching the other. It never
+self-updates — `canSelfUpdate` allows that for the installed channel only.
+
 ## Checklist for a release you are not sure about
 
 ```bash

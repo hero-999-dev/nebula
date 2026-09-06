@@ -14,13 +14,15 @@ const $ = (id) => document.getElementById(id);
 
 const CHANNEL_LABEL = {
   installed: 'Installed',
+  test: 'Test build',
   portable: 'Portable',
   dev: 'Development',
 };
 
 const CHANNEL_NOTE = {
   installed: 'Updates itself from GitHub Releases.',
-  portable: 'Runs from a folder. Tells you about new versions but cannot install them.',
+  test: 'A build for trying things out. Its own name, icon and notes — the installed Nebula is a separate app and is untouched.',
+  portable: 'Runs from a folder and keeps its notes beside itself. Tells you about new versions but cannot install them.',
   dev: 'Running from source, on a separate profile — the installed app is untouched.',
 };
 

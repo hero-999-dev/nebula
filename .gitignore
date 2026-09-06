@@ -2,7 +2,14 @@ node_modules/
 dist/
 dist-electron/
 release/
+test-build/
 .dev-profile/
+
+# The test build, and the vault it keeps beside itself. Built on demand with
+# `npm run pack:test`; never committed.
+Nebula Test.exe
+Nebula-data/
+
 *.log
 .DS_Store
 Thumbs.db

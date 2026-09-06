@@ -55,6 +55,39 @@ Launch 3 — a vault that cannot be read (`storage/notes` created as a *file*, s
 
 ## Log
 
+### [2026-09-06] v0.3.9 — a test build you can actually click
+
+**Unit suite 66 → 69.** `appChannel` and `canSelfUpdate` are now functions with
+tests rather than an `if` chain inside `main.js`, because the test build breaks
+the assumption the old chain encoded: it *is* packaged, it *is* on Windows, and
+it *is* portable, so "packaged and win32 and not portable" no longer identifies
+the app that may replace itself. `canSelfUpdate` returns true for exactly one
+channel, and the test asserts the other three are false by name.
+
+**What the build actually is.** `npm run pack:test` produces `Nebula Test.exe`
+in the project root: same code, packaged through `build-test.json` with its own
+`productName`, `appId`, icon (iris rather than violet) and — being portable —
+its own vault at `<repo>\Nebula-data`.
+
+**One thing only a running window revealed.** `BrowserWindow({ title })` is
+overwritten the moment the page loads, because `index.html` carries
+`<title>Nebula</title>`. The test build's title bar therefore said "Nebula",
+which is the single confusion the build exists to prevent. Windows was asked
+rather than assumed:
+
+```
+ProcessName   MainWindowTitle
+Nebula Test   Nebula            <- before
+Nebula Test   Nebula Test       <- after page-title-updated is preventDefault'd
+```
+
+**Isolation verified against the real vault**, again: the six installed notes
+were hashed, `Nebula Test.exe` was launched and asked for its paths
+(`channel: test`, `userData: <repo>\Nebula-data`), and the notes were hashed
+again — `identical: True`, with six notes of its own in the test vault. Both
+apps were then run at once: two windows, two titles, two icons, two taskbar
+buttons.
+
 ### [2026-09-06] v0.3.8 — a portable build was writing to the installed app's notes
 
 **Added `tests/user-data.test.js` (5 tests). Unit suite 61 → 66.**

@@ -75,6 +75,7 @@ everyone else. Nothing reads the DOM to find out what a note contains.
 | `npm run dev` | Dev app on `<repo>/.dev-profile` — cannot see the installed app's notes |
 | `npm test` | Unit tests |
 | `npm run build && npm run smoke` | Drives the real Electron app on throwaway profiles |
+| `npm run pack:test` | **`Nebula Test.exe`** in the project root — double-click, own icon, own notes |
 | `npm run pack:win` | `release/Nebula-Setup-*.exe` + `Nebula-portable-*.exe` |
 | `npm run icons` | Regenerate `build/icon.png` from `build/source-mark.png` (Windows) |
 | `npm run site` | Rebuild `site/index.html` (docs + mind maps) |
@@ -130,27 +131,32 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 
 ## 7. Where things live at runtime
 
-**Three ways to launch, three separate vaults** (`electron/user-data.js`):
+**Four ways to launch, four separate vaults** (`electron/user-data.js`):
 
-| Launched as | Notes live in |
-|---|---|
-| **Installed** — `%LOCALAPPDATA%\Programs\Nebula`, or `/Applications/Nebula.app` | `%APPDATA%\nebula` · `~/Library/Application Support/nebula` |
-| **Portable** — `Nebula-portable-*.exe` | `<folder of the exe>\Nebula-data` |
-| **Dev** — `npm run dev` | `<repo>\.dev-profile` (via `NEBULA_USER_DATA`) |
+| Launched as | Channel | Notes live in |
+|---|---|---|
+| **Installed** — `%LOCALAPPDATA%\Programs\Nebula`, `/Applications/Nebula.app` | `installed` | `%APPDATA%\nebula` · `~/Library/Application Support/nebula` |
+| **Test** — `Nebula Test.exe`, built by `npm run pack:test` | `test` | `<repo>\Nebula-data` |
+| **Portable** — `Nebula-portable-*.exe` from a release | `portable` | `<folder of the exe>\Nebula-data` |
+| **Dev** — `npm run dev` | `dev` | `<repo>\.dev-profile` (via `NEBULA_USER_DATA`) |
 
 Inside any of them: `storage\notes\<id>.json`, `storage\meta.json`, `backups\`.
 
-Electron derives `userData` from the package name, so **all three would be the
+Electron derives `userData` from the package name, so **all four would be the
 same directory** if nothing intervened — and for a while the portable build in
 `release/` really was autosaving into the installed app's notes. `resolveUserData`
-is the one place that decides; `tests/user-data.test.js` proves the three never
-collide.
+is the one place that decides; `tests/user-data.test.js` proves they never
+collide, and `canSelfUpdate` is why only the installed build ever replaces itself.
+
+The test build is the one to hand someone who says "how do I open the dev
+version": no terminal, its own name and icon, and `build-test.json` gives it a
+separate `appId` so Windows does not merge its taskbar button with the real app.
 
 The app shows which one it is on: click the version in the sidebar footer.
 
-The double-click files in the repo root say what they do:
-`Open Nebula.bat` and `Fresh Nebula.bat` run the **dev** app on `.dev-profile`;
-`Open portable build.bat` runs the packed portable exe on its own vault.
+Double-click files in the repo root: `Nebula Test.exe` (test build),
+`Open Nebula.bat` and `Fresh Nebula.bat` (**dev** app on `.dev-profile`),
+`Open portable build.bat` (the packed portable exe on its own vault).
 
 ---
 

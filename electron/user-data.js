@@ -31,3 +31,24 @@ export function resolveUserData({ override, portableDir, defaultDir }) {
   if (portableDir) return { dir: path.join(portableDir, PORTABLE_DATA_DIR), channel: 'portable' };
   return { dir: defaultDir, channel: 'installed' };
 }
+
+/**
+ * What this build calls itself. `test` is the packaged build meant for trying
+ * things out: same code, its own name, icon, taskbar button and vault, so it
+ * can never be mistaken for — or write into — the installed app.
+ *
+ * @param {object} opts
+ * @param {boolean} opts.packaged        app.isPackaged
+ * @param {string} [opts.metaChannel]    nebulaChannel from the packaged package.json
+ * @param {string} [opts.portableDir]    PORTABLE_EXECUTABLE_DIR
+ * @returns {'dev'|'test'|'portable'|'installed'}
+ */
+export function appChannel({ packaged, metaChannel, portableDir }) {
+  if (!packaged) return 'dev';
+  if (metaChannel === 'test') return 'test';
+  if (portableDir) return 'portable';
+  return 'installed';
+}
+
+/** Only an installed build may replace itself in place. */
+export const canSelfUpdate = (channel) => channel === 'installed';
