@@ -8,7 +8,8 @@ const code = (src, lang) =>
   `<div class="blk-code" data-block-type="code" data-lang="${lang}" data-code="${encodeURIComponent(src)}" contenteditable="false">` +
   `<div class="code-head"><select class="code-lang" title="Code language"></select>` +
   `<span class="code-hint">markdown-style block · click the code to edit</span>` +
-  `<button type="button" class="code-copy" title="Copy code">Copy</button></div>` +
+  `<button type="button" class="code-copy" title="Copy code">Copy</button>` +
+  `<button type="button" class="code-del" title="Delete this code block" aria-label="Delete this code block">✕</button></div>` +
   `<pre class="code-body"><code class="code-src" contenteditable="true" spellcheck="false"></code></pre></div>`;
 
 const JS_SRC = `// JavaScript — strings, numbers, keywords, regex
@@ -279,7 +280,7 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '0.4.3';
+export const GUIDE_VERSION = '0.6.0';
 
 export const GUIDE_NOTE = {
   title: 'Welcome to Nebula Guide',

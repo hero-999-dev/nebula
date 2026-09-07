@@ -20,7 +20,7 @@ import { initFind } from './find.js';
 import { initHistory } from './history.js';
 import { initNoteActions } from './note-actions.js';
 import { initAppMenu } from './app-menu.js';
-import { initPalette, initShortcuts } from './palette.js';
+import { initPalette, initShortcuts, initBlocks } from './palette.js';
 
 const $ = (id) => document.getElementById(id);
 const AUTOSAVE_MS = 400;
@@ -77,7 +77,6 @@ async function boot() {
   const editor = bindEditor(editorEl, store, setSaveState);
 
   initDock();
-  initAiPanel({ askText });
   // The app's own undo stack. Everything that edits the note by script
   // announces itself to this first; Chromium's stack cannot see any of it.
   const history = initHistory(editorEl, {
@@ -98,6 +97,15 @@ async function boot() {
     shapes,
     history,
     onSave: () => { editor.flush(); setSaveState('saved'); },
+    noteTitle: () => store.active()?.title ?? '',
+    // An imported file becomes a new note, never an edit to the open one.
+    onImport: ({ title, content }) => {
+      editor.flush();
+      const note = store.createNote(title || 'Imported note');
+      store.updateActive({ content });
+      renderList();
+      openNote(note.id);
+    },
   });
   // Typing is coalesced into one step; Enter, deletes and pastes each start
   // their own, the way they do in every other editor.
@@ -105,8 +113,8 @@ async function boot() {
     const separate = e.inputType !== 'insertText';
     history?.typed({ separate });
   });
-  initSlashMenu(editorEl);
-  initCodeBlocks(editorEl);
+  initSlashMenu(editorEl, { history, shapes });
+  initCodeBlocks(editorEl, { history });
   const find = initFind(editorEl);
 
   function renderList() {
@@ -213,6 +221,7 @@ async function boot() {
   // File / Edit / View / Window / Help, beside the logo. The same definitions
   // are the only list the command palette reads.
   const shortcuts = initShortcuts();
+  const blocks = initBlocks();
   let menu = null;
   const palette = initPalette(() => menu?.commands ?? []);
   menu = initAppMenu({
@@ -222,6 +231,7 @@ async function boot() {
     find,
     palette,
     shortcuts,
+    blocks,
     newNote: () => $('btn-new').click(),
     toggleSide: () => side?.toggle(),
     toggleBar: () => document.querySelector('[data-pad="hide"]')?.click(),
@@ -265,6 +275,23 @@ async function boot() {
   on('note-changed', () => renderList());
 
   openNote(store.activeId);
+
+  // Last, and guarded: this is the only part of the app that loads third-party
+  // pages, and a throw in it used to abort the rest of boot() — leaving no
+  // toolbar, no notes and only a console line to say why.
+  try {
+    const ai = initAiPanel({ askText });
+    if (ai) {
+      // Attach the guest when the panel is actually visible, never while it is
+      // display:none — that detaches it and forces a reload.
+      const aiPanel = $('ai-panel');
+      new MutationObserver(() => { if (!aiPanel.hidden) ai.open(); })
+        .observe(aiPanel, { attributes: true, attributeFilter: ['hidden'] });
+      if (!aiPanel.hidden) ai.open();
+    }
+  } catch (err) {
+    console.error('[nebula] AI panel failed to start', err);
+  }
 }
 
 boot().catch((err) => console.error('[nebula] boot failed', err));

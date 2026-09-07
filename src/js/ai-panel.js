@@ -43,7 +43,7 @@ export function initAiPanel({ askText } = {}) {
   const panel = document.getElementById('ai-panel');
   const tabsEl = document.getElementById('ai-tabs');
   const body = document.getElementById('ai-body');
-  if (!panel || !tabsEl || !body) return;
+  if (!panel || !tabsEl || !body) return null;
 
   const isElectron = !!window.nebula;
   const views = new Map();
@@ -67,6 +67,28 @@ export function initAiPanel({ askText } = {}) {
       .join('') + '<button class="ai-tab ai-add" id="ai-add" type="button" title="Add a site">+</button>';
   }
 
+  /**
+   * A view is built only while the panel is actually on screen.
+   *
+   * It used to be built during boot, when `#ai-panel` still had `hidden` —
+   * i.e. `display: none`, which is precisely the state that detaches an
+   * Electron guest and makes it reload. That is also the most likely source of
+   * the crash reported on the AI toggle, and because `initAiPanel` ran before
+   * the editor was wired, a throw in here took the rest of boot with it.
+   */
+  const isVisible = () => !panel.hidden;
+
+  function showError(message) {
+    let box = body.querySelector('.ai-error');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'ai-view ai-fallback ai-error on';
+      body.appendChild(box);
+    }
+    box.textContent = `This chat could not be opened: ${message}`;
+    box.classList.add('on');
+  }
+
   function show(id) {
     const service = all()[id];
     if (!service) return;
@@ -80,6 +102,8 @@ export function initAiPanel({ askText } = {}) {
     body.querySelectorAll('.ai-view').forEach((el) => el.classList.remove('on'));
 
     if (isElectron) {
+      // Nothing to attach to yet — the panel is closed. `open()` calls back in.
+      if (!isVisible()) return;
       let wv = views.get(id);
       if (!wv) {
         wv = document.createElement('webview');
@@ -90,6 +114,14 @@ export function initAiPanel({ askText } = {}) {
         wv.setAttribute('partition', `persist:ai-${id}`);
         wv.setAttribute('allowpopups', '');
         wv.setAttribute('useragent', chromeUserAgent());
+        // A guest that dies must say so in the panel, not in a console nobody
+        // is reading. None of these were listened for before.
+        wv.addEventListener('did-fail-load', (ev) => {
+          if (ev.errorCode === -3) return;   // an aborted navigation is normal
+          showError(ev.errorDescription || `load failed (${ev.errorCode})`);
+        });
+        wv.addEventListener('crashed', () => showError('the page crashed'));
+        wv.addEventListener('render-process-gone', () => showError('the page stopped'));
         body.appendChild(wv);
         views.set(id, wv);
       }
@@ -130,6 +162,7 @@ export function initAiPanel({ askText } = {}) {
       if (!url?.trim()) return;
       url = url.trim();
       if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+      try { new URL(url); } catch { return; }   // a malformed src is not a site
       const entry = { id: generateId('ai'), name: name.trim(), url, dot: '#C15F3C' };
       custom.push(entry);
       saveJson(CUSTOM_KEY, custom);
@@ -166,5 +199,14 @@ export function initAiPanel({ askText } = {}) {
   }
 
   renderTabs();
-  show(active);
+
+  /**
+   * Called by the dock when the panel is opened, so the guest is attached to a
+   * visible container rather than to a `display: none` one.
+   */
+  function open() {
+    try { show(active); } catch (err) { showError(err.message); }
+  }
+
+  return { open, show: (id) => { try { show(id); } catch (err) { showError(err.message); } } };
 }

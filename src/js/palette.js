@@ -6,6 +6,8 @@
  * arrow-key navigation follow the same shape as the slash menu.
  */
 import { filterCommands } from './app-menu.js';
+import { SLASH_ITEMS } from './slash-menu.js';
+import { icon } from './icons.js';
 
 export const SHORTCUTS = [
   ['Notes', [
@@ -146,6 +148,63 @@ export function initShortcuts() {
   const close = () => { overlay.hidden = true; };
   overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
   document.getElementById('shortcuts-close')?.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  return { open, close };
+}
+
+
+/**
+ * What `/` offers, listed from SLASH_ITEMS itself.
+ *
+ * The slash menu had no reference anywhere — you had to already know what was
+ * in it. Reading the same array the menu is built from means this sheet cannot
+ * fall behind it, the way the command palette reads the app menus.
+ */
+export const BLOCK_HELP = {
+  text: 'Plain paragraph',
+  h1: 'Big heading',
+  h2: 'Medium heading',
+  h3: 'Small heading',
+  bullet: 'Bulleted list — Enter on an empty item leaves it',
+  numbered: 'Numbered list — Enter on an empty item leaves it',
+  todo: 'A line with a checkbox; the button toggles it back',
+  quote: 'Indented quote',
+  code: 'Code block with a language picker and colours',
+  divider: 'A horizontal rule',
+  shape: 'A floating shape you can drag anywhere',
+};
+
+export function initBlocks() {
+  const overlay = document.getElementById('ov-blocks');
+  const body = document.getElementById('blocks-body');
+  if (!overlay || !body) return null;
+
+  body.innerHTML = '';
+  const intro = document.createElement('p');
+  intro.className = 'sc-intro';
+  intro.textContent = 'Type / at the start of a line, or after a space, then keep typing to filter.';
+  body.appendChild(intro);
+
+  const table = document.createElement('table');
+  table.className = 'sc-table blocks-table';
+  for (const item of SLASH_ITEMS) {
+    const tr = document.createElement('tr');
+    const ic = document.createElement('td');
+    ic.className = 'bl-ic';
+    ic.innerHTML = icon(item.ic);
+    const name = document.createElement('th');
+    name.textContent = `/${item.id}`;
+    const what = document.createElement('td');
+    what.textContent = BLOCK_HELP[item.id] ?? item.label;
+    tr.append(ic, name, what);
+    table.appendChild(tr);
+  }
+  body.appendChild(table);
+
+  const open = () => { overlay.hidden = false; };
+  const close = () => { overlay.hidden = true; };
+  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
+  document.getElementById('blocks-close')?.addEventListener('click', close);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
   return { open, close };
 }

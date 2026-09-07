@@ -6,14 +6,14 @@ import { icon } from './icons.js';
 
 export const SLASH_ITEMS = [
   { id: 'text', ic: 'text', label: 'Text' },
-  { id: 'h1', ic: 'heading', label: 'Heading 1' },
-  { id: 'h2', ic: 'heading', label: 'Heading 2' },
-  { id: 'h3', ic: 'heading', label: 'Heading 3' },
+  { id: 'h1', ic: 'h1', label: 'Heading 1' },
+  { id: 'h2', ic: 'h2', label: 'Heading 2' },
+  { id: 'h3', ic: 'h3', label: 'Heading 3' },
   { id: 'bullet', ic: 'bullets', label: 'Bulleted list' },
   { id: 'numbered', ic: 'numbers', label: 'Numbered list' },
   { id: 'todo', ic: 'todo', label: 'To-do' },
   { id: 'quote', ic: 'quote', label: 'Quote' },
-  { id: 'code', ic: 'code', label: 'Code block' },
+  { id: 'code', ic: 'codeblock', label: 'Code block' },
   { id: 'divider', ic: 'divider', label: 'Divider' },
   { id: 'shape', ic: 'shapes', label: 'Shape' },
 ];
@@ -30,7 +30,7 @@ export function filterSlash(query) {
   return SLASH_ITEMS.filter((it) => it.label.toLowerCase().includes(q) || it.id.includes(q));
 }
 
-export function initSlashMenu(editorEl) {
+export function initSlashMenu(editorEl, { history, shapes } = {}) {
   const menu = document.getElementById('slash-menu');
   if (!menu || !editorEl) return;
 
@@ -84,7 +84,12 @@ export function initSlashMenu(editorEl) {
     removeSlashText();
     hide();
     editorEl.focus();
-    const exec = (n, v = null) => document.execCommand(n, false, v);
+    // Every block this menu inserts is one undo step. Nothing here used to touch
+  // history at all — the module did not even import it — so `/` could add a
+  // code block, a divider or a shape and Ctrl+Z would skip straight past it to
+  // whatever was typed before.
+  history?.push();
+  const exec = (n, v = null) => document.execCommand(n, false, v);
     switch (id) {
       case 'text': exec('formatBlock', 'p'); break;
       case 'h1': exec('formatBlock', 'h1'); break;
@@ -95,8 +100,9 @@ export function initSlashMenu(editorEl) {
       case 'numbered': exec('insertOrderedList'); break;
       case 'todo': exec('insertHTML', '<div class="blk-todo"><br></div>'); break;
       case 'divider': exec('insertHTML', '<hr class="blk-hr"><p><br></p>'); break;
-      case 'code': insertCodeBlock(editorEl); break;
-      case 'shape': addShape(editorEl, 'rect'); break;
+      case 'code': insertCodeBlock(editorEl, 'javascript', history); break;
+      // Through the controller, so it arrives selected like the toolbar's does.
+    case 'shape': shapes ? shapes.addShape('rect') : addShape(editorEl, 'rect', history); break;
     }
     dirty();
   }

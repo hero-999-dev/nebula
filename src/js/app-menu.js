@@ -17,7 +17,7 @@
 export function buildMenus(ctx) {
   const {
     actions = {}, store, openNote, newNote, find, palette, shortcuts,
-    about, checkUpdates, guide, toggleSide, toggleBar, toggleAi, history,
+    about, checkUpdates, guide, toggleSide, toggleBar, toggleAi, history, blocks,
   } = ctx;
   const shell = typeof window !== 'undefined' ? window.nebula : null;
 
@@ -29,6 +29,12 @@ export function buildMenus(ctx) {
         { id: 'file.save', label: 'Save now', hint: 'Ctrl+S', run: () => actions.save?.() },
         { separator: true },
         { id: 'file.print', label: 'Print…', hint: 'Ctrl+P', run: () => actions.print?.() },
+        { separator: true },
+        { id: 'file.exportmd', label: 'Export as Markdown', run: () => actions['export-md']?.() },
+        { id: 'file.exporthtml', label: 'Export as HTML', run: () => actions['export-html']?.() },
+        { id: 'file.exportpdf', label: 'Export as PDF', run: () => actions['export-pdf']?.() },
+        { id: 'file.import', label: 'Import a note…', run: () => actions.import?.() },
+        { separator: true },
         { id: 'file.folder', label: 'Open notes folder', run: () => shell?.reveal?.('storage') },
         { separator: true },
         { id: 'file.quit', label: 'Quit Nebula', run: () => shell?.quit?.() },
@@ -82,6 +88,7 @@ export function buildMenus(ctx) {
         { id: 'help.guide', label: 'Guide page', run: () => guide?.() },
         { separator: true },
         { id: 'help.shortcuts', label: 'Keyboard shortcuts', run: () => shortcuts?.open() },
+        { id: 'help.blocks', label: 'Blocks (the / menu)', run: () => blocks?.open() },
         { id: 'help.palette', label: 'Command palette', hint: 'Ctrl+K', run: () => palette?.open() },
         { separator: true },
         { id: 'help.updates', label: 'Check for updates', run: () => checkUpdates?.() },

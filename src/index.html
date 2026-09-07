@@ -37,20 +37,18 @@
       </div>
 
       <div class="side-foot">
-        <!-- Archive and Trash open UPWARD, over the list, so the button you
-             pressed does not move out from under the pointer. -->
-        <section class="drawer" id="drawer-archive">
-          <div class="drawer-body" id="archive-list" hidden></div>
-          <button type="button" class="drawer-toggle" data-drawer="archive" aria-expanded="false">
-            <span class="drawer-caret">▴</span><span>Archive</span><span class="drawer-count" id="archive-count">0</span>
+        <!-- One panel, opening UPWARD over the list so the button you pressed
+             does not move out from under the pointer, and two buttons side by
+             side under it — Archive left, Trash right. -->
+        <div class="drawer-body" id="drawer-body" hidden></div>
+        <div class="drawer-tabs">
+          <button type="button" class="btn drawer-tab" data-drawer="archive" aria-expanded="false">
+            Archive<span class="drawer-count" id="archive-count">0</span>
           </button>
-        </section>
-        <section class="drawer" id="drawer-trash">
-          <div class="drawer-body" id="trash-list" hidden></div>
-          <button type="button" class="drawer-toggle" data-drawer="trash" aria-expanded="false">
-            <span class="drawer-caret">▴</span><span>Trash</span><span class="drawer-count" id="trash-count">0</span>
+          <button type="button" class="btn drawer-tab" data-drawer="trash" aria-expanded="false">
+            Trash<span class="drawer-count" id="trash-count">0</span>
           </button>
-        </section>
+        </div>
         <button class="btn primary" id="btn-new" type="button">New note</button>
         <div class="theme-pick" id="theme-pick" role="group" aria-label="Theme">
           <button type="button" data-theme="main" title="Main — violet">Main</button>
@@ -102,6 +100,11 @@
             <span class="tb-sep"></span>
             <button type="button" class="tb" data-act="save" title="Save now (Ctrl+S)"><span data-icon="save"></span></button>
             <button type="button" class="tb" data-act="print" title="Print (Ctrl+P)"><span data-icon="print"></span></button>
+            <span class="tb-wrap">
+              <button type="button" class="tb" data-menu="menu-export" title="Export this note"><span data-icon="download"></span></button>
+              <div class="tb-menu tb-menu--export" id="menu-export" hidden></div>
+            </span>
+            <button type="button" class="tb" data-act="import" title="Import a note (.md or .html)"><span data-icon="upload"></span></button>
             <button type="button" class="tb" data-act="cut" title="Cut (Ctrl+X)"><span data-icon="cut"></span></button>
             <button type="button" class="tb" data-act="copy" title="Copy (Ctrl+C)"><span data-icon="copy"></span></button>
             <button type="button" class="tb" data-act="paste" title="Paste (Ctrl+V)"><span data-icon="paste"></span></button>
@@ -113,9 +116,10 @@
                 <button type="button" data-shape-add="rect">▭ Rectangle</button>
                 <button type="button" data-shape-add="ellipse">◯ Ellipse</button>
                 <button type="button" data-shape-add="diamond">◇ Diamond</button>
+                <button type="button" data-shape-add="triangle">△ Triangle</button>
               </div>
             </span>
-            <button type="button" class="tb" data-act="codeblock" title="Code block (with language)"><span data-icon="code"></span></button>
+            <button type="button" class="tb" data-act="codeblock" title="Code block (with language)"><span data-icon="codeblock"></span></button>
             <button type="button" class="tb" data-act="divider" title="Divider"><span data-icon="divider"></span></button>
           </div>
 
@@ -242,6 +246,16 @@
     <div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">
       <input id="palette-input" type="text" placeholder="Type a command…" autocomplete="off" spellcheck="false" />
       <div class="palette-list" id="palette-list"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="ov-blocks" hidden>
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="blocks-title">
+      <p class="dlg-title" id="blocks-title">Blocks — the / menu</p>
+      <div id="blocks-body"></div>
+      <div class="dlg-actions">
+        <button class="btn ghost" id="blocks-close" type="button">Close</button>
+      </div>
     </div>
   </div>
 

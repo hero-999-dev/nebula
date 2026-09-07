@@ -282,68 +282,73 @@ body {
 }
 .note-menu button:hover { background: var(--paper-sunken); }
 
-/* Archive and Trash. The body sits ABOVE the toggle in the DOM so the drawer
-   opens upward without any measuring. */
-.drawer { display: flex; flex-direction: column; }
-.drawer-toggle {
+/* Archive and Trash: one panel above two buttons, in the New note button's own
+   visual language. The panel is before them in the DOM, so it grows upward over
+   the note list rather than pushing the buttons down under the pointer. */
+.drawer-tabs { display: flex; gap: 6px; }
+.drawer-tab {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 7px;
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--ink-soft);
-  font: inherit;
+  justify-content: center;
+  gap: 6px;
   font-size: 12.5px;
-  cursor: pointer;
+  padding: 7px 6px;
 }
-.drawer-toggle:hover { background: var(--paper-raised); border-color: var(--rule); color: var(--ink); }
-.drawer-caret { font-size: 9px; transition: transform 120ms ease; }
-.drawer-toggle[aria-expanded="true"] .drawer-caret { transform: rotate(180deg); }
+.drawer-tab[aria-expanded="true"] {
+  background: var(--clay-soft);
+  border-color: var(--clay);
+  color: var(--ink);
+}
 .drawer-count {
-  margin-left: auto;
   font-size: 11px;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
+.drawer-tab[aria-expanded="true"] .drawer-count { color: var(--ink-soft); }
+
 .drawer-body {
-  max-height: 30vh;
+  max-height: 42vh;
   overflow-y: auto;
   overflow-x: hidden;
-  margin-bottom: 4px;
-}
-.drawer-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 6px;
-  font-size: 12.5px;
-  color: var(--ink-soft);
-}
-.drawer-row .dr-title {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.drawer-row button {
-  padding: 2px 6px;
+  margin-bottom: 7px;
+  padding: 5px;
   border: 1px solid var(--rule);
-  border-radius: 5px;
+  border-radius: 9px;
+  background: var(--paper-sunken);
+}
+.drawer-head {
+  padding: 2px 6px 6px;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+}
+/* The same note block as the list above, so the column reads as one thing. */
+.drawer-item .note-row { cursor: default; }
+.drawer-item .note-row:hover { background: transparent; }
+.drawer-actions { display: flex; gap: 5px; padding: 0 10px 6px; }
+.drawer-actions button {
+  padding: 3px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
   background: transparent;
   color: var(--ink-soft);
   font: inherit;
+  font-family: var(--sans);
   font-size: 11px;
   cursor: pointer;
-  flex-shrink: 0;
 }
-.drawer-row button:hover { color: var(--ink); border-color: var(--clay); }
-.drawer-empty { padding: 6px 8px; font-size: 12px; color: var(--ink-faint); }
-#app.side-collapsed .drawer-toggle span:not(.drawer-caret) { display: none; }
+.drawer-actions button:hover { color: var(--ink); border-color: var(--clay); }
+.drawer-divider { height: 1px; margin: 5px 8px; background: var(--rule); }
+.drawer-empty { padding: 8px 10px; font-size: 12px; color: var(--ink-faint); }
 #app.side-collapsed .drawer-body { display: none; }
+#app.side-collapsed .drawer-tabs { flex-direction: column; }
+#app.side-collapsed .drawer-tab { font-size: 0; padding: 6px 0; }
+#app.side-collapsed .drawer-tab::before { content: attr(data-drawer); font-size: 9px; }
+#app.side-collapsed .drawer-count { display: none; }
 .note-row.active { background: var(--paper-raised); border-color: var(--rule); }
 .note-row .nr-title {
   font-family: var(--serif);
@@ -705,3 +710,9 @@ body {
   vertical-align: top;
 }
 .sc-table td { padding: 3px 0; color: var(--ink-soft); }
+
+/* The / block reference, same shape as the shortcut sheet. */
+.sc-intro { margin: 0 0 12px; font-family: var(--sans); font-size: 12.5px; color: var(--ink-soft); }
+.blocks-table th { width: 92px; }
+.blocks-table .bl-ic { width: 28px; padding: 3px 8px 3px 0; color: var(--clay); }
+.blocks-table .bl-ic svg { width: 17px; height: 17px; }

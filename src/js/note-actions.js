@@ -1,10 +1,15 @@
+import { plainSnippet } from './notes.js';
 /**
  * The per-note ⋯ menu and the Archive / Trash drawers.
  *
  * One menu element, moved to whichever row asked for it — a menu per row would
  * be a hundred hidden elements in a long list, and they would all need keeping
- * in sync. The drawers put their body ABOVE their toggle in the DOM, so they
- * open upward without anything having to be measured.
+ * in sync.
+ *
+ * Archive and Trash share ONE panel with a button each, side by side under it.
+ * The panel sits above the buttons in the DOM, so it opens upward over the note
+ * list without anything having to be measured, and the rows inside it are the
+ * same `.note-item` blocks the sidebar itself draws.
  */
 
 const LABELS = {
@@ -14,18 +19,15 @@ const LABELS = {
 
 export function initNoteActions({ store, onChanged, openNote }) {
   const menu = document.getElementById('note-menu');
-  const drawers = {
-    archive: {
-      body: document.getElementById('archive-list'),
-      count: document.getElementById('archive-count'),
-      toggle: document.querySelector('[data-drawer="archive"]'),
-    },
-    trash: {
-      body: document.getElementById('trash-list'),
-      count: document.getElementById('trash-count'),
-      toggle: document.querySelector('[data-drawer="trash"]'),
-    },
+  const drawerBody = document.getElementById('drawer-body');
+  const tabs = [...document.querySelectorAll('.drawer-tab')];
+  const counts = {
+    archive: document.getElementById('archive-count'),
+    trash: document.getElementById('trash-count'),
   };
+  /** Which drawer is showing, or null. Only ever one. */
+  let openDrawer = null;
+
   if (!menu) return null;
 
   let forId = null;
@@ -89,68 +91,102 @@ export function initNoteActions({ store, onChanged, openNote }) {
     return btn;
   }
 
+  /**
+   * The archive and the trash, in the sidebar's own note-row shape.
+   *
+   * They used to be two stacked strips with their own miniature rows. The list
+   * above uses `.note-item` / `.note-row`, and these are the same kind of
+   * thing, so they are drawn the same way and read as part of the same column.
+   */
+  const SETS = {
+    archive: {
+      empty: 'Nothing archived',
+      notes: () => store.archived(),
+      actions: [
+        ['Open', (id) => { store.unarchive(id); openNote?.(id); }],
+        ['Unarchive', (id) => store.unarchive(id)],
+      ],
+    },
+    trash: {
+      empty: 'Trash is empty',
+      notes: () => store.trashed(),
+      // No confirm on Delete: the note is already in the trash, and that was
+      // the confirm.
+      actions: [
+        ['Restore', (id) => store.restore(id)],
+        ['Delete', (id) => store.destroy(id)],
+      ],
+    },
+  };
+
   function drawerRow(note, actions) {
+    const item = document.createElement('div');
+    item.className = 'note-item drawer-item';
+
     const row = document.createElement('div');
-    row.className = 'drawer-row';
-    const title = document.createElement('span');
-    title.className = 'dr-title';
-    title.textContent = note.title || 'Untitled';
-    title.title = note.title || 'Untitled';
-    row.appendChild(title);
+    row.className = 'note-row';
+    row.innerHTML = '<div class="nr-title"></div><div class="nr-meta"></div>';
+    const title = note.title || 'Untitled';
+    row.children[0].textContent = title;
+    row.children[0].dataset.initial = title.trim().charAt(0).toUpperCase() || 'U';
+    row.children[1].textContent = plainSnippet(note.content, 44) || 'Empty';
+    row.title = title;
+
+    const bar = document.createElement('div');
+    bar.className = 'drawer-actions';
     for (const [label, run] of actions) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = label;
       btn.addEventListener('click', () => { run(note.id); onChanged?.(); });
-      row.appendChild(btn);
+      bar.appendChild(btn);
     }
-    return row;
+    item.append(row, bar);
+    return item;
   }
 
   function renderDrawers() {
-    const sets = {
-      archive: {
-        notes: store.archived(),
-        empty: 'Nothing archived',
-        actions: [
-          ['Open', (id) => { store.unarchive(id); openNote?.(id); }],
-          ['Unarchive', (id) => store.unarchive(id)],
-        ],
-      },
-      trash: {
-        notes: store.trashed(),
-        empty: 'Trash is empty',
-        actions: [
-          ['Restore', (id) => store.restore(id)],
-          // No confirm: the note is already in the trash, which IS the confirm.
-          ['Delete', (id) => store.destroy(id)],
-        ],
-      },
-    };
-
-    for (const [name, drawer] of Object.entries(drawers)) {
-      if (!drawer.body) continue;
-      const { notes, empty, actions } = sets[name];
-      drawer.count.textContent = String(notes.length);
-      drawer.body.innerHTML = '';
-      if (!notes.length) {
-        const none = document.createElement('div');
-        none.className = 'drawer-empty';
-        none.textContent = empty;
-        drawer.body.appendChild(none);
-      } else {
-        for (const note of notes) drawer.body.appendChild(drawerRow(note, actions));
-      }
+    for (const [name, set] of Object.entries(SETS)) {
+      if (counts[name]) counts[name].textContent = String(set.notes().length);
     }
+    if (!drawerBody) return;
+
+    if (!openDrawer) { drawerBody.hidden = true; drawerBody.innerHTML = ''; return; }
+    const set = SETS[openDrawer];
+    const notes = set.notes();
+    drawerBody.hidden = false;
+    drawerBody.innerHTML = '';
+
+    const head = document.createElement('div');
+    head.className = 'drawer-head';
+    head.textContent = openDrawer === 'archive' ? 'Archived' : 'In the trash';
+    drawerBody.appendChild(head);
+
+    if (!notes.length) {
+      const none = document.createElement('div');
+      none.className = 'drawer-empty';
+      none.textContent = set.empty;
+      drawerBody.appendChild(none);
+      return;
+    }
+    notes.forEach((note, i) => {
+      if (i) {
+        // A divider between note blocks, as asked for.
+        const hr = document.createElement('div');
+        hr.className = 'drawer-divider';
+        drawerBody.appendChild(hr);
+      }
+      drawerBody.appendChild(drawerRow(note, set.actions));
+    });
   }
 
-  for (const [name, drawer] of Object.entries(drawers)) {
-    drawer.toggle?.addEventListener('click', () => {
-      const open = drawer.body.hidden;
-      drawer.body.hidden = !open;
-      drawer.toggle.setAttribute('aria-expanded', String(open));
+  for (const tab of tabs) {
+    tab.addEventListener('click', () => {
+      const name = tab.dataset.drawer;
+      openDrawer = openDrawer === name ? null : name;   // only one at a time
+      for (const t of tabs) t.setAttribute('aria-expanded', String(t.dataset.drawer === openDrawer));
+      renderDrawers();
     });
-    void name;
   }
 
   return { moreButton, renderDrawers, close };

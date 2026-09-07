@@ -37,6 +37,14 @@ contextBridge.exposeInMainWorld('nebula', {
     devtools: () => ipcRenderer.invoke('view:devtools'),
   },
   quit: () => ipcRenderer.invoke('app:quit'),
+  // Export writes where the user points in the save dialog; the renderer never
+  // names a path. Import only reads bytes back — parsing and sanitising happen
+  // in the renderer, where the note format is understood.
+  note: {
+    export: (payload) => ipcRenderer.invoke('note:export', payload),
+    pdf: (payload) => ipcRenderer.invoke('note:pdf', payload),
+    import: () => ipcRenderer.invoke('note:import'),
+  },
   updates: {
     state: () => ipcRenderer.invoke('update:state'),
     check: () => ipcRenderer.invoke('update:check'),

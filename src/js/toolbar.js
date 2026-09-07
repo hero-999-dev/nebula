@@ -12,6 +12,8 @@ import { normalizeLists, exitListOnEmptyItem } from './lists.js';
 import { enterOutOfWrapper, backspaceOutOfWrapper } from './inline-format.js';
 import { initEquation } from './equation.js';
 import { on } from './bus.js';
+import { toMarkdown, toHtml, safeFileName, FORMATS } from './export.js';
+import { noteFromFile } from './import.js';
 
 /**
  * Colours are CLASSES, not values written into the note.
@@ -103,7 +105,7 @@ export function parseSize(raw) {
   return Math.min(400, Math.max(6, Math.round(n)));
 }
 
-export function initToolbar(editorEl, { onSave, shapes, history } = {}) {
+export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onImport } = {}) {
   const toolbar = document.getElementById('toolbar');
   const miniBar = document.getElementById('mini-bar');
   if (!toolbar || !editorEl) return null;
@@ -131,11 +133,40 @@ export function initToolbar(editorEl, { onSave, shapes, history } = {}) {
     dirty();
   }
 
+  /**
+   * The last selection that was inside the editor.
+   *
+   * The toolbar's mousedown handler preventDefaults to keep the selection —
+   * except over `input` and `select`, which have to be able to take focus to be
+   * usable. Focusing them is exactly what clears the document selection, so
+   * every control that is a field rather than a button lost the text it was
+   * meant to act on: picking a size with words selected did *nothing at all*,
+   * silently, because `selectionInEditor()` returned null and the action
+   * returned early. Remembered here, restored by `withSelection` below.
+   */
+  let savedRange = null;
+
   function selectionInEditor() {
     const sel = window.getSelection();
     if (!sel || !sel.rangeCount) return null;
     const range = sel.getRangeAt(0);
     return editorEl.contains(range.commonAncestorContainer) ? range : null;
+  }
+
+  /** Put the remembered selection back, for actions driven from a field. */
+  function restoreSelection() {
+    if (selectionInEditor()) return true;          // still there, nothing to do
+    if (!savedRange || !editorEl.contains(savedRange.commonAncestorContainer)) return false;
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(savedRange);
+    return true;
+  }
+
+  /** Run an action with the editor's own selection in place. */
+  function withSelection(fn) {
+    restoreSelection();
+    return fn();
   }
 
   function reselect(node) {
@@ -331,8 +362,14 @@ export function initToolbar(editorEl, { onSave, shapes, history } = {}) {
     editorEl.focus();
     document.execCommand('styleWithCSS', false, true);
     document.execCommand('fontSize', false, '7');
+    // Only what the command just marked, and only inside the new selection:
+    // sweeping the whole editor for `xxx-large` also resized anything that
+    // already carried it, which is a local action reaching across the note.
+    const marked = selectionInEditor();
     editorEl.querySelectorAll('[style*="xxx-large"], font[size="7"]').forEach((el) => {
+      if (marked && !marked.intersectsNode(el)) return;
       el.style.fontSize = `${px}px`;
+      el.removeAttribute('size');
     });
     dirty();
   }
@@ -355,12 +392,77 @@ export function initToolbar(editorEl, { onSave, shapes, history } = {}) {
   function listCommand(name) {
     editorEl.focus();
     history?.push();
+    // A to-do is a <div class="blk-todo">, and Chromium's list commands do not
+    // know what to do with one — pressing bulleted or numbered on a to-do line
+    // did nothing at all. Handing it a plain paragraph instead was not enough
+    // either: it produced `<p><ul><li>…</li></ul></p>`, a list nested inside a
+    // paragraph. So the list is built here, and the command is skipped.
+    const block = blockOf();
+    if (block?.classList.contains('blk-todo')) {
+      const list = document.createElement(name === 'insertOrderedList' ? 'ol' : 'ul');
+      const li = document.createElement('li');
+      li.innerHTML = block.innerHTML || '<br>';
+      list.appendChild(li);
+      if (block.dataset.ind) list.dataset.ind = block.dataset.ind;
+      block.replaceWith(list);
+      placeCaretEnd(li);
+      normalizeLists(editorEl);   // merge with a list already next to it
+      dirty();
+      return;
+    }
     document.execCommand(name, false, null);
     normalizeLists(editorEl);
     dirty();
   }
 
   const insertShape = (kind) => (shapes ? shapes.addShape(kind) : addShape(editorEl, kind));
+
+  /**
+   * Export the open note.
+   *
+   * Markdown and HTML are built here and handed over as bytes; PDF is produced
+   * by the main process through Chromium's own writer, because a PDF made from
+   * the OS print dialog is a picture of the window rather than a document.
+   */
+  async function exportNote(format) {
+    const api = window.nebula?.note;
+    const title = noteTitle?.() || 'Untitled';
+    if (!api) { window.print(); return; }          // browser preview: no dialogs
+    if (format === 'pdf') {
+      await api.pdf({ suggested: safeFileName(title, 'pdf') });
+      return;
+    }
+    const content = format === 'html' ? toHtml(editorEl.innerHTML, title) : toMarkdown(editorEl.innerHTML, title);
+    await api.export({ suggested: safeFileName(title, format), content, format });
+  }
+
+  async function importNote() {
+    const api = window.nebula?.note;
+    if (!api) return;
+    const res = await api.import();
+    if (!res?.ok) return;
+    // Parsed and sanitised HERE: the main process only ever read bytes, and an
+    // imported file is not allowed to bring markup the editor did not ask for.
+    onImport?.(noteFromFile(res.name, res.text));
+  }
+
+  function buildExportMenu() {
+    const menu = document.getElementById('menu-export');
+    if (!menu) return;
+    menu.innerHTML = '<div class="tb-menu__label">Export this note</div>';
+    for (const fmt of FORMATS) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.format = fmt.id;
+      const label = document.createElement('span');
+      label.className = 'label';
+      label.textContent = fmt.label;
+      btn.appendChild(label);
+      btn.addEventListener('click', () => { closeMenus(); void exportNote(fmt.id); });
+      menu.appendChild(btn);
+    }
+  }
+  buildExportMenu();
 
   const equation = initEquation(editorEl, { dirty });
 
@@ -376,6 +478,10 @@ export function initToolbar(editorEl, { onSave, shapes, history } = {}) {
     outdent: () => indent(-1),
     save: () => onSave?.(),
     print: () => window.print(),
+    import: () => void importNote(),
+    'export-md': () => void exportNote('md'),
+    'export-html': () => void exportNote('html'),
+    'export-pdf': () => void exportNote('pdf'),
     cut: () => cmd('cut'),
     copy: () => cmd('copy'),
     paste: () => void pasteFromClipboard(),
@@ -383,7 +489,7 @@ export function initToolbar(editorEl, { onSave, shapes, history } = {}) {
     // selected with its colour bar open — adding one and then having to hunt
     // for it to recolour it is not the point of a shape button.
     'shape-rect': () => insertShape('rect'),
-    codeblock: () => insertCodeBlock(editorEl),
+    codeblock: () => insertCodeBlock(editorEl, 'javascript', history),
     divider: () => cmd('insertHTML', '<hr class="blk-hr"><p><br></p>'),
     bold: () => cmd('bold'),
     italic: () => cmd('italic'),
@@ -476,7 +582,9 @@ export function initToolbar(editorEl, { onSave, shapes, history } = {}) {
   // ----- outline / font / size -----
   const outlineSel = document.getElementById('tb-outline');
   outlineSel?.addEventListener('change', (e) => {
-    cmd('formatBlock', e.target.value === 'p' ? 'p' : e.target.value);
+    // A <select> has to take focus to be used, which drops the editor's
+    // selection — same trap as the size field.
+    withSelection(() => cmd('formatBlock', e.target.value === 'p' ? 'p' : e.target.value));
   });
 
   const fontBtn = document.getElementById('tb-font');
@@ -541,7 +649,7 @@ export function initToolbar(editorEl, { onSave, shapes, history } = {}) {
 
   function applySize() {
     const px = parseSize(sizeInput.value);
-    if (px) { sizeInput.value = String(px); applyFontSize(px); }
+    if (px) { sizeInput.value = String(px); withSelection(() => applyFontSize(px)); }
   }
   sizeInput?.addEventListener('change', applySize);
   sizeInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applySize(); } });
@@ -576,7 +684,12 @@ export function initToolbar(editorEl, { onSave, shapes, history } = {}) {
     });
   }
   document.addEventListener('selectionchange', () => {
-    if (selectionInEditor()) syncState();
+    const range = selectionInEditor();
+    if (!range) return;
+    // Cloned: the live range keeps moving, and what is wanted is the selection
+    // as it was before focus went to a toolbar field.
+    savedRange = range.cloneRange();
+    syncState();
   });
 
   // ----- todo tick -----

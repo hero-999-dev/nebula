@@ -77,6 +77,7 @@ export const ICONS = {
   spell: S('<path d="M3 16 7 6l4 10"/><path d="M4.4 13h5.2"/><path d="m13.5 15 2.5 2.5 5-5.5"/>'),
   preview: S('<path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8z"/><path d="M14 3.5V10h5"/><circle cx="12" cy="14.5" r="2"/><path d="M8 14.5c1.4-2 6.6-2 8 0-1.4 2-6.6 2-8 0z"/>'),
   download: S('<path d="M12 4v10"/><path d="m7.5 10 4.5 4 4.5-4"/><path d="M4.5 19h15"/>'),
+  upload: S('<path d="M12 20V10"/><path d="m7.5 14 4.5-4 4.5 4"/><path d="M4.5 5h15"/>'),
   print: S('<path d="M7 9V4.5h10V9"/><rect x="4" y="9" width="16" height="7" rx="2"/><path d="M7 14h10v5.5H7z"/>'),
   cut: S('<circle cx="6.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/><path d="M8.3 15.7 19 4"/><path d="M15.7 15.7 5 4"/>'),
   copy: S('<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 5.5H6a1.5 1.5 0 0 0-1.5 1.5v9.5"/>'),
@@ -86,6 +87,17 @@ export const ICONS = {
   quote: S('<path d="M9 6.5c-2.6 0-4.5 2-4.5 4.5S6.2 15 8 15c.9 0 1.5-.3 1.9-.7-.2 2-1.6 3.3-3.4 3.9"/><path d="M19 6.5c-2.6 0-4.5 2-4.5 4.5S16.2 15 18 15c.9 0 1.5-.3 1.9-.7-.2 2-1.6 3.3-3.4 3.9"/>'),
   divider: S('<path d="M3 12h18"/><path d="M6 7h12" opacity=".35"/><path d="M6 17h12" opacity=".35"/>'),
   heading: S('<path d="M5 5v14"/><path d="M13 5v14"/><path d="M5 12h8"/><path d="M17 19V9l3-1.5"/>'),
+  // The three headings used one icon between them, so H1, H2 and H3 were three
+  // identical rows in the / menu telling you apart only by their label. An H
+  // with its own number, and the H shrinks as the level does.
+  h1: S('<path d="M3 5.5v13"/><path d="M11 5.5v13"/><path d="M3 12h8"/>'
+    + '<text x="14" y="18.5" font-size="10" font-weight="700" font-family="Inter, Segoe UI, sans-serif" fill="currentColor" stroke="none">1</text>'),
+  h2: S('<path d="M3.5 7v10"/><path d="M10.5 7v10"/><path d="M3.5 12h7"/>'
+    + '<text x="14" y="18" font-size="9" font-weight="700" font-family="Inter, Segoe UI, sans-serif" fill="currentColor" stroke="none">2</text>'),
+  h3: S('<path d="M4 8.5v7"/><path d="M10 8.5v7"/><path d="M4 12h6"/>'
+    + '<text x="13.5" y="17.5" font-size="8" font-weight="700" font-family="Inter, Segoe UI, sans-serif" fill="currentColor" stroke="none">3</text>'),
+  // A framed block, so it is not the same `<>` as inline code in the same bar.
+  codeblock: S('<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="m9.5 10-2 2 2 2"/><path d="m14.5 10 2 2-2 2"/>'),
   text: S('<path d="M5 5h14"/><path d="M12 5v14"/><path d="M9.5 19h5"/>'),
   ai: S('<path d="m12 3 1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M18 15.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>'),
   up: S('<path d="M12 19V5"/><path d="m6 11 6-6 6 6"/>'),

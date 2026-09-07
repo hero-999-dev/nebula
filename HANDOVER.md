@@ -57,6 +57,8 @@ src/js/
   toolbar.js  dock.js  slash-menu.js  shapes.js  codeblock.js  highlight.js
   side-toggle.js     folds the note list away; remembers the choice
   find.js            Ctrl+F; paints matches, never edits the note
+  export.js          a note as Markdown or one standalone HTML file
+  import.js          a .md/.html file back into a note, sanitised
   history.js         the editor's own undo/redo; every scripted edit pushes
   app-menu.js        File/Edit/View/Window/Help; also the palette's source
   palette.js         Ctrl+K, and the keyboard-shortcut sheet
@@ -162,7 +164,14 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 14. **A search must never mark up the note.** Wrapping hits would dirty it,
    autosave it and land on the undo stack; `find.js` paints ranges with the CSS
    Custom Highlight API instead.
-15. **The editor's undo is `history.js`, not Chromium's.** Anything that edits
+15. **A toolbar control that takes focus loses the selection.** The mousedown
+   preventDefault skips `input` and `select` so they can be used, and focusing
+   them clears the document selection — so the action finds nothing and returns
+   in silence. Anything driven from a field must go through `withSelection`.
+16. **An imported file is hostile.** A note is loaded with `innerHTML` and
+   mirrored to disk, so `import.js` must sanitise before anything reaches the
+   store: scripts, styles, frames, handlers, `javascript:` URLs, unknown classes.
+17. **The editor's undo is `history.js`, not Chromium's.** Anything that edits
    note content by script must call `history.push()` FIRST. Chromium's stack
    cannot see scripted DOM edits, so `execCommand('undo')` rolls back the wrong
    thing; and do not reach for `insertHTML` to get around it - it rewrites the

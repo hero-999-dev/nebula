@@ -80,13 +80,24 @@ export const TYPING_COALESCE_MS = 600;
 export const DEFAULT_LIMIT = 100;
 
 /**
+ * A ceiling on what the stack may hold, in characters of HTML.
+ *
+ * A step is a whole copy of the note. The guide alone is 85 KB, so a hundred
+ * steps of it is 8 MB — survivable. Paste something large into a note and the
+ * same hundred steps become hundreds of megabytes, on a machine that has
+ * already been killing releases for want of memory. The step count is not
+ * enough on its own; the size has to be bounded too.
+ */
+export const DEFAULT_MAX_CHARS = 8_000_000;
+
+/**
  * @param {HTMLElement} editorEl
  * @param {object} [opts]
  * @param {(html: string) => void} [opts.onRestore] called after a state is put
  *   back, so code blocks and equations can be repainted and the note saved.
  * @param {number} [opts.limit] steps kept per note
  */
-export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT } = {}) {
+export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxChars = DEFAULT_MAX_CHARS } = {}) {
   if (!editorEl) return null;
 
   let past = [];
@@ -108,6 +119,12 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT } = {})
     if (current.html === present.html) { present = current; return false; }
     past.push(present);
     if (past.length > limit) past.shift();
+    // ...and drop from the far end until the stack fits in memory. One step is
+    // always kept: undoing once has to remain possible however big the note.
+    let held = past.reduce((n, step) => n + step.html.length, 0);
+    while (past.length > 1 && held > maxChars) {
+      held -= past.shift().html.length;
+    }
     future = [];
     present = current;
     return true;
@@ -173,6 +190,7 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT } = {})
     canUndo: () => past.length > 0 || editorEl.innerHTML !== present.html,
     canRedo: () => future.length > 0,
     depth: () => ({ past: past.length, future: future.length }),
+    bytes: () => past.reduce((n, step) => n + step.html.length, 0),
     isRestoring: () => restoring,
   };
 }

@@ -17,6 +17,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-08 00:05] v0.6.0 - by claude
+
+Export a note as Markdown, HTML or a real PDF, import one back, and fourteen fixes from the bug report — including a code block you can finally delete and a size box that actually changes the text you selected.
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-07 20:30] v0.5.0 - by claude
 
 The editor gets its own undo stack, notes gain pin, archive and trash, and the app draws File, Edit, View, Window and Help beside an enlarged logo with a Ctrl+K command palette.

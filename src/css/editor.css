@@ -128,6 +128,19 @@
   padding: 0 6px;
 }
 .tb-select { max-width: 118px; }
+/* A native <select> draws its own arrow, and it is far bigger than the 8px
+   carets on the font, colour, underline and shape menus. Same mark, same size,
+   drawn by us. */
+.tb-select, .code-lang {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 11px) calc(50% + 1px), calc(100% - 7px) calc(50% + 1px);
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  padding-right: 22px;
+}
 .tb-select:focus, .tb-input:focus { border-color: var(--clay); }
 .tb-combo { display: inline-flex; }
 .tb-input--size { width: 58px; }
@@ -241,9 +254,11 @@
 .editor { flex: 1; position: relative; }
 
 /* ---------- blocks ---------- */
-.editor h1 { font-size: 26px; margin: 14px 0 6px; }
-.editor h2 { font-size: 21px; margin: 12px 0 5px; }
-.editor h3 { font-size: 18px; margin: 10px 0 4px; }
+/* Body text is 17px, so h3 at 18 was a heading nobody could see. Opened out:
+   each level is clearly above the one below it and above the paragraph. */
+.editor h1 { font-size: 31px; line-height: 1.25; margin: 16px 0 7px; }
+.editor h2 { font-size: 24.5px; line-height: 1.3; margin: 13px 0 5px; }
+.editor h3 { font-size: 20px; line-height: 1.35; margin: 11px 0 4px; }
 .editor blockquote {
   border-left: 3px solid var(--clay);
   margin: 6px 0;
@@ -475,14 +490,18 @@
   align-items: center;
   justify-content: center;
   cursor: grab;
-  font-family: var(--sans);
-  font-size: 13px;
+  /* The note's own face, so text in a shape matches the text around it. */
+  font-family: var(--serif);
+  font-size: 14px;
   color: #201E1A;
 }
 .shape:active { cursor: grabbing; }
 .shape.sel { box-shadow: 0 0 0 2.5px var(--clay); }
 .shape.ellipse { border-radius: 50%; }
 .shape.diamond { border: none; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.shape.triangle { border: none; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.shape.triangle .shape-text { max-width: 60%; margin-top: 18%; }
+.shape.triangle .shape-h { right: 2px; bottom: 2px; }
 .shape.diamond .shape-text { max-width: 55%; }
 /* No opacity trick: a shape behind the text is fully opaque, it is simply
    painted first. Fading it was the old way of pretending. */
@@ -731,16 +750,60 @@ body.resizing webview { pointer-events: none; }
 #dlg-input:focus { border-color: var(--clay); }
 .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 
-/* ---------- print: only the note ---------- */
+/* ---------- print: only the note, on paper ----------
+   The old block hid the sidebar and the toolbar but not the title strip, the
+   menus, the find bar, the update card or any of the overlays — and it never
+   flattened the theme, so a dark note printed as dark ink on dark paper (or,
+   with backgrounds off, as invisible light text). This is a document now:
+   black on white, one column, sensible breaks. */
+@page { size: A4; margin: 18mm 16mm; }
+
 @media print {
-  .side, .pad, .toolbar, .ai-panel, .demo-banner, .mini-bar, .float-menu,
-  .savestate, .shape-bar, .code-head { display: none !important; }
-  body, #app, .main { overflow: visible !important; height: auto !important; display: block !important; }
+  .titlebar, #app-menu, .side, .pad, .toolbar, .ai-panel, .demo-banner,
+  .mini-bar, .float-menu, .savestate, .shape-bar, .code-head, .find-bar,
+  .update-card, .overlay, .note-menu, .eq-pop { display: none !important; }
+
+  body, #app, .main {
+    overflow: visible !important;
+    height: auto !important;
+    display: block !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
   .edit-shell { display: block; padding: 0; }
-  .editor-frame { border: none; outline: none; display: block; margin: 0; }
-  .editor { overflow: visible; }
-  .page-head { border-bottom: none; }
-  .blk-code { break-inside: avoid; }
+  .editor-frame {
+    border: none; outline: none; display: block; margin: 0;
+    background: #fff !important; box-shadow: none !important;
+  }
+  .editor {
+    overflow: visible !important;
+    max-height: none !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .page-head { border-bottom: none; padding: 0 0 6mm; }
+  .title-input { color: #000 !important; font-size: 24pt; }
+
+  /* Colours a reader chose are part of the note; the app's chrome is not.
+     print-color-adjust keeps them when the browser would drop them to save ink. */
+  .editor [class^="c-"], .editor [class^="h-"], .blk-code, .shape {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .blk-code {
+    break-inside: avoid;
+    border: 1px solid #ccc !important;
+    background: #f6f6f4 !important;
+    color: #111 !important;
+  }
+  .blk-code .code-src, .blk-code .code-body { color: #111 !important; }
+
+  h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
+  p, li, blockquote { orphans: 2; widows: 2; }
+  .blk-hr { border-color: #bbb !important; }
+  /* A shape is positioned over the text; on paper it stays where it was. */
+  .shape-layer { position: absolute !important; }
 }
 
 /* ---------- note colours ----------
@@ -850,3 +913,37 @@ body.resizing webview { pointer-events: none; }
 }
 :root[data-theme="light"] ::highlight(nebula-find-current),
 :root[data-theme="white"] ::highlight(nebula-find-current) { color: #fff; }
+
+/* The code block's own delete. Chromium will not remove a contenteditable=false
+   island with Backspace, so without this there was no way to get rid of one. */
+.code-del {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  margin-left: 4px;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.code-del:hover { color: var(--madder); border-color: var(--madder); }
+
+
+/* The shape bar carries two rows of swatches now — fill, then ink. */
+.shape-bar__sep { width: 1px; align-self: stretch; margin: 2px 3px; background: var(--rule); }
+.dot--ink {
+  display: grid;
+  place-items: center;
+  background: #F4F1EA;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 10px;
+  line-height: 1;
+}
+
+
+/* Like the font menu: a label is the whole row, no swatch column. */
+.tb-menu--export { min-width: 210px; }
+.tb-menu--export button { grid-template-columns: 1fr; }

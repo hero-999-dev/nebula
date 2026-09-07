@@ -15,7 +15,8 @@ export function codeBlockHtml(code = '', lang = 'javascript') {
     `<div class="blk-code" data-block-type="code" data-lang="${lang}" data-code="${encodeURIComponent(code)}" contenteditable="false">` +
     `<div class="code-head"><select class="code-lang" title="Code language">${options}</select>` +
     `<span class="code-hint">markdown-style block · click the code to edit</span>` +
-    `<button type="button" class="code-copy" title="Copy code">Copy</button></div>` +
+    `<button type="button" class="code-copy" title="Copy code">Copy</button>` +
+  `<button type="button" class="code-del" title="Delete this code block" aria-label="Delete this code block">✕</button></div>` +
     `<pre class="code-body"><code class="code-src" contenteditable="true" spellcheck="false"></code></pre>` +
     `</div><p><br></p>`
   );
@@ -61,16 +62,30 @@ export function paintAllCode(root) {
   });
 }
 
-export function insertCodeBlock(editorEl, lang = 'javascript') {
+export function insertCodeBlock(editorEl, lang = 'javascript', history = null) {
   editorEl.focus();
-  document.execCommand('insertHTML', false, codeBlockHtml('', lang));
-  const block = editorEl.querySelector('.blk-code:not([data-ready])');
+  history?.push();
+
+  // The inserted block is found by a marker of its own, not by
+  // `.blk-code:not([data-ready])`.
+  //
+  // That selector returned the first unpainted block in DOCUMENT order, and the
+  // guide's seeded blocks carry no `data-ready` — so inserting a code block
+  // anywhere in that note stamped, repainted and focused the note's FIRST code
+  // block instead. The caret jumped to the top, the editor scrolled with it,
+  // and the block that was actually inserted was left unpainted.
+  const mark = `cb${Math.random().toString(36).slice(2, 9)}`;
+  document.execCommand('insertHTML', false, codeBlockHtml('', lang).replace('class="blk-code"', `class="blk-code ${mark}"`));
+
+  const block = editorEl.querySelector(`.${mark}`);
   if (block) {
+    block.classList.remove(mark);
     block.dataset.ready = '1';
     paintCode(block);
     block.querySelector('.code-src')?.focus();
   }
   editorEl.dispatchEvent(new Event('input', { bubbles: true }));
+  return block;
 }
 
 /** Caret offset within a code element, counted in plain characters. */
@@ -108,7 +123,7 @@ function setCaret(codeEl, offset) {
   sel.addRange(range);
 }
 
-export function initCodeBlocks(editorEl) {
+export function initCodeBlocks(editorEl, { history } = {}) {
   if (!editorEl) return;
   const dirty = () => editorEl.dispatchEvent(new Event('input', { bubbles: true }));
   let repaintTimer = null;
@@ -136,6 +151,7 @@ export function initCodeBlocks(editorEl) {
     const sel = e.target.closest('.code-lang');
     if (!sel) return;
     const block = sel.closest('.blk-code');
+    history?.push();
     block.dataset.lang = sel.value;
     paintCode(block);
     dirty();
@@ -168,8 +184,77 @@ export function initCodeBlocks(editorEl) {
   }, true);
 
   // repaint when focus leaves a code block
+  /**
+   * Repaint when the caret has really left the block — never while it is
+   * leaving.
+   *
+   * This used to rewrite `src.innerHTML` straight from `focusout`, i.e. while
+   * the browser was still placing the caret in whatever came next. Destroying
+   * those nodes mid-move makes Chromium give up and collapse the selection to
+   * the top of the editable root, scrolling there — which is what "pressing the
+   * down arrow throws the screen up" was. Waiting a frame, and only acting if
+   * the caret really is elsewhere, leaves the move alone.
+   */
   editorEl.addEventListener('focusout', (e) => {
     const src = e.target.closest?.('.code-src');
-    if (src) paintCode(src.closest('.blk-code'));
+    if (!src) return;
+    requestAnimationFrame(() => {
+      if (!src.isConnected || src.contains(document.activeElement) || src === document.activeElement) return;
+      const block = src.closest('.blk-code');
+      if (block) paintCode(block);
+    });
   });
+
+  /**
+   * A code block can be removed.
+   *
+   * It is `contenteditable="false"`, so Chromium will not delete it: Backspace
+   * after it and Delete before it both simply do nothing, and there was no
+   * button either — once a block was in a note there was no way at all to get
+   * rid of it.
+   */
+  editorEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.code-del');
+    if (!btn) return;
+    const block = btn.closest('.blk-code');
+    if (!block) return;
+    history?.push();
+    block.remove();
+    dirty();
+  });
+
+  editorEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+    if (e.target.closest?.('.code-src')) return;      // editing the source
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
+    const range = sel.getRangeAt(0);
+    if (!editorEl.contains(range.startContainer)) return;
+
+    // The block on the side the key is pointing at, when the caret sits at the
+    // very edge of the text next to it.
+    const atStart = range.startOffset === 0;
+    const node = range.startContainer;
+    const atEnd = node.nodeType === Node.TEXT_NODE
+      ? range.startOffset === node.nodeValue.length
+      : range.startOffset === node.childNodes.length;
+    let block = null;
+    if (e.key === 'Backspace' && atStart) {
+      block = blockOf(node)?.previousElementSibling;
+    } else if (e.key === 'Delete' && atEnd) {
+      block = blockOf(node)?.nextElementSibling;
+    }
+    if (!block?.classList?.contains('blk-code')) return;
+    e.preventDefault();
+    history?.push();
+    block.remove();
+    dirty();
+  });
+
+  /** The direct child of the editor that contains a node. */
+  function blockOf(node) {
+    let el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    while (el && el.parentElement !== editorEl) el = el.parentElement;
+    return el && el !== editorEl ? el : null;
+  }
 }

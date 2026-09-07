@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, shell, ipcMain, session } from 'electron';
+import { app, BrowserWindow, Menu, dialog, shell, ipcMain, session } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
@@ -335,6 +335,88 @@ function registerShellHandlers() {
     return true;
   });
   ipcMain.handle('app:quit', () => { app.quit(); return true; });
+
+  /**
+   * Saving a note out, and reading one in.
+   *
+   * These are the only writes in the app that go OUTSIDE the vault, and they go
+   * exactly where the user pointed in the save dialog — the renderer names a
+   * suggested filename and hands over the bytes, never a path. `storage:write`
+   * and its path guard are untouched.
+   */
+  ipcMain.handle('note:export', async (e, { suggested, content, format }) => {
+    const win = from(e);
+    if (!win || typeof content !== 'string') return { ok: false };
+    const filters = format === 'html'
+      ? [{ name: 'HTML', extensions: ['html'] }]
+      : [{ name: 'Markdown', extensions: ['md'] }];
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: 'Export note',
+      defaultPath: String(suggested ?? 'Untitled'),
+      filters,
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    try {
+      await fs.writeFile(filePath, content, 'utf8');
+      return { ok: true, path: filePath };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  /**
+   * A real PDF, from Chromium's own writer.
+   *
+   * `window.print()` hands the whole window to the OS print dialog; the user's
+   * try.pdf came out of "Microsoft: Print To PDF" and read like a photograph of
+   * the app. This is the same Skia writer Notion's export goes through, so the
+   * text stays text and stays selectable.
+   */
+  ipcMain.handle('note:pdf', async (e, { suggested } = {}) => {
+    const win = from(e);
+    if (!win) return { ok: false };
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: 'Export as PDF',
+      defaultPath: String(suggested ?? 'Untitled.pdf'),
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    try {
+      // printBackground: the note's own frame and code-block fills are part of
+      // how it reads; the print stylesheet already flattens the theme to paper.
+      const data = await win.webContents.printToPDF({
+        printBackground: true,
+        margins: { marginType: 'default' },
+        pageSize: 'A4',
+      });
+      await fs.writeFile(filePath, data);
+      return { ok: true, path: filePath, bytes: data.length };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('note:import', async (e) => {
+    const win = from(e);
+    if (!win) return { ok: false };
+    const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      title: 'Import a note',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Notes', extensions: ['md', 'markdown', 'html', 'htm', 'txt'] },
+        { name: 'All files', extensions: ['*'] },
+      ],
+    });
+    if (canceled || !filePaths?.length) return { ok: false, canceled: true };
+    try {
+      const file = filePaths[0];
+      const text = await fs.readFile(file, 'utf8');
+      // The renderer parses and sanitises it; the main process only reads bytes.
+      return { ok: true, name: path.basename(file), text };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
 }
 
 app.whenReady().then(async () => {

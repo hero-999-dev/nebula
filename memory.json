@@ -1,8 +1,8 @@
 {
   "projectName": "Nebula",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "lastUpdated": "2026-09-07",
-  "currentPhase": "v0.5.0 - the editor has its own undo stack (Chromium's cannot see scripted edits), notes gained pin/archive/trash, and the app draws its own File/Edit/View/Window/Help beside the logo in a custom title strip.",
+  "currentPhase": "v0.6.0 - export (Markdown, standalone HTML, real PDF via printToPDF) and import, a proper print stylesheet, and the fourteen defects from the user's Bug Report note.",
   "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, command palette, search, i18n.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
@@ -31,8 +31,8 @@
     "releasePolicy": "Standing instruction (2026-09-07): release finished work with npm run push without being asked, and never ask which platforms to build - the repo is public, so Actions is free on both Windows and macOS runners. npm run push also refreshes Nebula Test.exe in the project root."
   },
   "quality": {
-    "unitTests": 201,
-    "smokeChecks": 92,
+    "unitTests": 238,
+    "smokeChecks": 116,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
@@ -51,7 +51,10 @@
     "Scripted edits to note content must go through a real edit command (insertHTML, styleWithCSS+fontName). Replacing an element execCommand just inserted breaks Chromium's undo stack and Ctrl+Z leaves duplicated text.",
     "Searching never marks up the note: find.js paints ranges with the CSS Custom Highlight API, so a search cannot dirty, autosave or enter the undo stack.",
     "Any scripted edit to note content must call history.push() first. Chromium's undo stack cannot see scripted DOM edits, and insertHTML is not the way round it - it rewrites surrounding spaces as &nbsp;.",
-    "The app draws its own menu bar (app-menu.js) and Menu.setApplicationMenu(null) removes Electron's. The menu definitions are the only source the Ctrl+K palette reads."
+    "The app draws its own menu bar (app-menu.js) and Menu.setApplicationMenu(null) removes Electron's. The menu definitions are the only source the Ctrl+K palette reads.",
+    "Toolbar controls that take focus (input, select) clear the editor's selection; field-driven actions must restore it via withSelection or they silently do nothing.",
+    "Imported files are sanitised in import.js before they reach the store - a note is loaded with innerHTML and mirrored to disk.",
+    "Note export goes through export.js (pure functions) and printToPDF; window.print() only prints, and the print stylesheet must hide all app chrome."
   ],
   "history": [
     {

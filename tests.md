@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 201 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 92 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 238 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 116 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -31,7 +31,9 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/history.test.js` | 21 | The editor's own undo stack |
 | `tests/notes-archive.test.js` | 14 | Pin, archive, trash and restore |
 | `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
-| `tests/e2e/smoke.mjs` | 92 | The real app, six launches |
+| `tests/export.test.js` | 18 | A note as Markdown or as a standalone HTML file |
+| `tests/import.test.js` | 18 | A Markdown or HTML file read back as a note, sanitised |
+| `tests/e2e/smoke.mjs` | 116 | The real app, six launches |
 
 ---
 
@@ -80,6 +82,100 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-07] v0.6.0 - export, and the fourteen things in the bug report
+
+**Unit 201 -> 238, smoke 92 -> 116.** Two new suites: `export.test.js` (18),
+`import.test.js` (18).
+
+The user wrote a Bug Report note in the test build and put Notion's export of
+the same document - PDF, HTML and Markdown - in a Feedback folder beside a
+`try.pdf` of their own. `try.pdf`'s producer is **"Microsoft: Print To PDF"**;
+Notion's is **Skia/PDF**. That is the whole complaint in two lines of metadata:
+`window.print()` hands the window to the OS dialog, so the output is a picture
+of the app rather than a document.
+
+**Everything here was reproduced in the running app before it was changed**, and
+three of the causes were not what reading the code suggested.
+
+**Changing the size of selected text did nothing at all** - not a scoping
+subtlety, nothing. The toolbar's mousedown preventDefaults to keep the
+selection, *except* over `input` and `select`, which have to take focus to be
+usable - and focusing them is what clears the document selection. So
+`selectionInEditor()` returned null and `applyFontSize` returned early, in
+silence. The same trap had the outline dropdown. The last selection inside the
+editor is remembered now and put back before a field-driven action runs.
+
+**Nothing in the slash menu could be undone.** `slash-menu.js` never imported
+`history` at all, and `insertCodeBlock` never pushed a step either, so `/code`,
+`/divider`, `/shape` and the rest were invisible to Ctrl+Z - it skipped past
+them to whatever was typed before. That is both "code block does not go back"
+and "it got stuck here, I cannot undo".
+
+**A code block could not be deleted.** Not by a button - there wasn't one - and
+not by keyboard: the block is `contenteditable="false"`, so Chromium's Backspace
+and Delete both simply decline. Nothing anywhere in `src/` called `remove()` on
+a `.blk-code`. There is a ✕ in the block's header now, and Backspace/Delete at
+the edge next to one removes it.
+
+**And the code block insert had a second bug behind it:** the newly inserted
+block was found with `.blk-code:not([data-ready])`, which returns the first
+unpainted block in DOCUMENT order - and the guide's seeded blocks carry no
+`data-ready`. So inserting a code block in the guide stamped, repainted and
+focused the note's **first** block instead: the caret jumped to the top and the
+editor scrolled with it, while the block actually inserted was left unpainted.
+It is found by its own marker now.
+
+**The down arrow threw the screen up** because leaving a code block fired
+`focusout`, which rewrote `src.innerHTML` *while the browser was still placing
+the caret*. Destroying those nodes mid-move makes Chromium collapse the
+selection to the top of the editable root and scroll there. The repaint waits a
+frame and only runs if the caret really did leave.
+
+**Headings** were ordered correctly (26/21/18px) but body text is 17px, so h3
+was a heading nobody could see; the scale is 31/24.5/20 now. The `/` menu drew
+all three with the same icon - H1, H2 and H3 were three identical rows. They
+have their own marks, and the code-block entry no longer shares the inline-code
+`<>`.
+
+**A to-do would not become a list.** Handing the command a plain paragraph first
+was not enough either: it produced `<p><ul><li>…</li></ul></p>`, a list nested
+inside a paragraph. The list is built directly now, and merges with a list
+already next to it.
+
+**Export, at last.** `toMarkdown` and `toHtml` are pure functions over a parsed
+document; PDF goes through `webContents.printToPDF`, the same Skia writer
+Notion's export uses. Markdown writes the title once (not twice, when the note
+opens with its own title as an h1), takes code from `data-code` rather than the
+highlighted spans, writes an equation as its LaTeX, skips shape layers, and
+escapes only what would change meaning - escaping the whole punctuation set
+turned "A sentence." into "A sentence\.". Import reads a `.md` or `.html` file
+into a NEW note, sanitised: scripts, styles, frames, event handlers,
+`javascript:` URLs and unknown classes are all stripped, because an imported
+file otherwise becomes part of the vault. No CSV: Notion's CSV is for database
+views and there is no table block here.
+
+**The print stylesheet** now also hides the title strip, the menus, the find
+bar, the update card and the overlays, flattens the theme to black on white,
+sets `@page`, and keeps headings with the text under them.
+
+**Two more:** the AI panel built its `<webview>` during boot while the panel was
+still `hidden` - i.e. `display: none`, the exact state that detaches an Electron
+guest - with no `try/catch` anywhere and `initAiPanel` running *before* the
+editor was wired, so a throw there would abort the rest of `boot()` and leave no
+toolbar and no notes. It is built when the panel becomes visible, guarded, with
+`did-fail-load` and `crashed` reported in the panel; and it starts last. And
+`history.js` kept 100 full copies of the note - fine for the 85 KB guide, not
+fine after a large paste on a machine that has been killing releases for want of
+memory. There is a byte ceiling on the stack now as well as a step count.
+
+**Archive and Trash** are one panel with two buttons side by side under it, in
+the New note button's visual language, opening upward with the sidebar's own
+note blocks and a divider between them.
+
+**Help -> Blocks** lists the eleven `/` blocks, built from `SLASH_ITEMS` itself
+so it cannot fall behind the menu - the same arrangement the command palette has
+with the app menus.
 
 ### [2026-09-07] v0.5.0 - the editor gets its own undo, and the app gets a menu bar
 

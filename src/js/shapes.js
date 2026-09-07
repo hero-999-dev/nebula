@@ -6,7 +6,11 @@
  */
 
 export const SHAPE_COLORS = ['#E8CDBD', '#D6E4D0', '#D3E0EA', '#E2D7E8', '#F0D2CE', '#EFE8D8'];
-export const SHAPE_KINDS = ['rect', 'ellipse', 'diamond'];
+
+/** Ink for the text inside a shape. The fills are always pale, so these are
+ *  all dark enough to read on any of them. */
+export const SHAPE_INKS = ['#201E1A', '#7A2E22', '#1F4B6E', '#2F5D3A', '#5B2D6E', '#8A6D07'];
+export const SHAPE_KINDS = ['rect', 'ellipse', 'diamond', 'triangle'];
 
 /**
  * Two overlays, created lazily as the note's first children: one painted under
@@ -237,7 +241,10 @@ export function initShapes(editorEl, { history } = {}) {
   const bar = document.getElementById('shape-bar');
   if (bar) {
     bar.innerHTML =
-      SHAPE_COLORS.map((c) => `<span class="dot" data-color="${c}" style="background:${c}" title="Color"></span>`).join('') +
+      SHAPE_COLORS.map((c) => `<span class="dot" data-color="${c}" style="background:${c}" title="Fill"></span>`).join('') +
+      '<span class="shape-bar__sep"></span>' +
+      SHAPE_INKS.map((c) => `<span class="dot dot--ink" data-ink="${c}" style="color:${c}" title="Text colour">A</span>`).join('') +
+      '<span class="shape-bar__sep"></span>' +
       '<button type="button" data-shape="back" title="Send behind text">▾</button>' +
       '<button type="button" data-shape="front" title="Bring above text">▴</button>' +
       '<button type="button" data-shape="del" title="Delete shape">✕</button>';
@@ -246,6 +253,8 @@ export function initShapes(editorEl, { history } = {}) {
       if (!selected) return;
       const color = e.target.closest('.dot')?.dataset.color;
       if (color) { history?.push(); selected.style.background = color; dirty(); return; }
+      const ink = e.target.closest('[data-ink]')?.dataset.ink;
+      if (ink) { history?.push(); selected.style.color = ink; dirty(); return; }
       const act = e.target.closest('[data-shape]')?.dataset.shape;
       // Deleting a shape has to be undoable: it is a scripted DOM removal, and
       // Chromium's undo has never known about those.

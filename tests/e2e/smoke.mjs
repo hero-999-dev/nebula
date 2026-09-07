@@ -368,7 +368,157 @@ try {
       await win.evaluate(() => !document.getElementById('ov-shortcuts').hidden
         && document.querySelectorAll('#shortcuts-body .sc-table th').length > 15));
     await win.keyboard.press('Escape');
+
+    // The / menu had no reference anywhere — you had to already know it existed.
+    await menuItem('Help', 'Blocks');
+    await win.waitForTimeout(250);
+    check('Help -> Blocks lists every block the / menu offers, from the same source',
+      await win.evaluate(() => {
+        const rows = document.querySelectorAll('#blocks-body .blocks-table tr');
+        const icons = document.querySelectorAll('#blocks-body .bl-ic svg');
+        return !document.getElementById('ov-blocks').hidden && rows.length === 11 && icons.length === 11;
+      }));
+    await win.keyboard.press('Escape');
   }
+
+  // Export and import. The dialogs are native, so they are stubbed in the MAIN
+  // process — everything either side of them is the real path.
+  {
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nebula-export-'));
+    await app.evaluate(({ dialog }, { dir, sep }) => {
+      dialog.showSaveDialog = async (_w, opts) => ({ canceled: false, filePath: dir + sep + (opts.defaultPath || 'out') });
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [dir + sep + 'incoming.md'] });
+    }, { dir: outDir, sep: path.sep });
+    fs.writeFileSync(path.join(outDir, 'incoming.md'), [
+      '# Imported title', '', '## Section', '', '- one', '- two', '',
+      '```js', 'let a = 1;', '```', '', '> quoted', '',
+    ].join(String.fromCharCode(10)));
+
+    // Its own note, not the guide: setting #title renames whatever is open, and
+    // the checks after this one know the guide by name.
+    await press(win, '#btn-new');
+    await win.waitForTimeout(400);
+    await win.evaluate(() => {
+      const src = encodeURIComponent('print("hi")');
+      document.getElementById('editor').innerHTML =
+        '<h1>My Report</h1><p>A sentence. And <strong>bold</strong>.</p><ul><li>one</li><li>two</li></ul>'
+        + `<div class="blk-code" data-block-type="code" data-lang="python" data-code="${src}" contenteditable="false">`
+        + '<div class="code-head"></div><pre class="code-body"><code class="code-src">painted</code></pre></div>'
+        + '<blockquote>quoted</blockquote><hr class="blk-hr">';
+      document.getElementById('editor').dispatchEvent(new Event('input', { bubbles: true }));
+      const t = document.getElementById('title');
+      t.value = 'My Report';
+      t.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await win.waitForTimeout(700);
+
+    for (const fmt of ['md', 'html', 'pdf']) {
+      await win.evaluate((f) => {
+        document.querySelector('[data-menu="menu-export"]').click();
+        [...document.querySelectorAll('#menu-export button')].find((b) => b.dataset.format === f).click();
+      }, fmt);
+      await win.waitForTimeout(1600);
+    }
+
+    const written = fs.readdirSync(outDir).filter((f) => f !== 'incoming.md').sort();
+    check('export writes a file in each of the three formats',
+      written.join(',') === 'My Report.html,My Report.md,My Report.pdf', written.join(','));
+
+    const md = fs.readFileSync(path.join(outDir, 'My Report.md'), 'utf8');
+    const NL = String.fromCharCode(10);
+    check('the Markdown carries the title once, the list, and the code SOURCE',
+      md.startsWith('# My Report' + NL + NL + 'A sentence.')
+        && md.includes('- one' + NL + '- two')
+        && md.includes('```python' + NL + 'print("hi")' + NL + '```')
+        && !md.includes('painted'),
+      JSON.stringify(md.slice(0, 60)));
+
+    // The complaint that started this: printing produced a picture of the app,
+    // because it went through the OS dialog. This is Chromium's own writer.
+    const pdf = fs.readFileSync(path.join(outDir, 'My Report.pdf'));
+    check('the PDF is a real PDF from the app, not a screenshot of the window',
+      pdf.subarray(0, 5).toString() === '%PDF-' && pdf.length > 2000, `${pdf.length} bytes`);
+
+    const html = fs.readFileSync(path.join(outDir, 'My Report.html'), 'utf8');
+    check('the HTML is one self-contained file with nothing to fetch',
+      html.startsWith('<!doctype html>') && html.includes('<style>') && !/<link|src="http/.test(html));
+
+    const notesBefore = await win.evaluate(() => document.querySelectorAll('.note-row').length);
+    await press(win, '[data-act="import"]');
+    await win.waitForTimeout(1400);
+    check('import makes the file a new note, parsed into real blocks',
+      await win.evaluate((before) => ({
+        title: document.getElementById('title').value,
+        h2: !!document.querySelector('#editor h2'),
+        items: document.querySelectorAll('#editor ul li').length,
+        code: document.querySelectorAll('#editor .blk-code').length,
+        quote: !!document.querySelector('#editor blockquote'),
+        added: document.querySelectorAll('.note-row').length === before + 1,
+      }), notesBefore).then((r) => r.title === 'Imported title' && r.h2 && r.items === 2 && r.code === 1 && r.quote && r.added));
+
+    // Put the vault back: the checks after this one count the notes, and an
+    // imported note left lying around would fail them for the wrong reason.
+    await win.evaluate(() => {
+      const row = [...document.querySelectorAll('.note-item')]
+        .find((el) => el.querySelector('.nr-title')?.textContent === 'Imported title');
+      row?.querySelector('.nr-more')?.click();
+    });
+    await win.waitForSelector('#note-menu:not([hidden])', { timeout: 5_000 });
+    await press(win, '#note-menu [data-note-act="trash"]');
+    await win.waitForTimeout(300);
+    await press(win, '[data-drawer="trash"]');
+    await win.waitForTimeout(300);
+    await win.evaluate(() => {
+      const item = [...document.querySelectorAll('#drawer-body .drawer-item')]
+        .find((el) => el.querySelector('.nr-title')?.textContent === 'Imported title');
+      [...(item?.querySelectorAll('.drawer-actions button') ?? [])]
+        .find((b) => b.textContent === 'Delete')?.click();
+    });
+    await win.waitForTimeout(400);
+    await press(win, '[data-drawer="trash"]');
+    await win.waitForTimeout(250);
+    check('the imported note can be deleted for good again',
+      await win.evaluate(() => ![...document.querySelectorAll('.nr-title')]
+        .some((e) => e.textContent === 'Imported title')));
+
+    // ...and the scratch note this block wrote into.
+    await win.evaluate(() => {
+      const row = [...document.querySelectorAll('.note-item')]
+        .find((el) => el.querySelector('.nr-title')?.textContent === 'My Report');
+      row?.querySelector('.nr-more')?.click();
+    });
+    await win.waitForSelector('#note-menu:not([hidden])', { timeout: 5_000 });
+    await press(win, '#note-menu [data-note-act="trash"]');
+    await win.waitForTimeout(300);
+    await press(win, '[data-drawer="trash"]');
+    await win.waitForTimeout(300);
+    await win.evaluate(() => {
+      const item = [...document.querySelectorAll('#drawer-body .drawer-item')]
+        .find((el) => el.querySelector('.nr-title')?.textContent === 'My Report');
+      [...(item?.querySelectorAll('.drawer-actions button') ?? [])]
+        .find((b) => b.textContent === 'Delete')?.click();
+    });
+    await win.waitForTimeout(400);
+    await press(win, '[data-drawer="trash"]');
+    await win.waitForTimeout(250);
+    check('the vault is back to just the guide afterwards',
+      await win.evaluate(() => {
+        const titles = [...document.querySelectorAll('.note-row .nr-title')].map((e) => e.textContent);
+        return titles.length === 1 && titles[0] === 'Welcome to Nebula Guide';
+      }),
+      await win.evaluate(() => [...document.querySelectorAll('.note-row .nr-title')].map((e) => e.textContent).join(' | ')));
+  }
+
+  // Printing has to put the note on the page, and nothing else.
+  check('the print stylesheet hides every piece of app chrome',
+    await win.evaluate(() => {
+      const printRules = [...document.styleSheets]
+        .flatMap((sheet) => { try { return [...sheet.cssRules]; } catch { return []; } })
+        .filter((r) => r.media?.mediaText === 'print')
+        .flatMap((r) => [...r.cssRules]);
+      return ['.titlebar', '#app-menu', '.side', '.toolbar', '.update-card', '.overlay']
+        .every((sel) => printRules.some((r) => r.selectorText?.includes(sel) && r.style.display === 'none'));
+    }));
 
   // Pin, archive, trash — and the guide coming back from Help after deleting it.
   {
@@ -411,14 +561,43 @@ try {
         left.length === 0 && count === '1', `${left.length} left, trash ${count}`);
     }
 
-    await press(win, '[data-drawer="trash"]');
-    await win.waitForTimeout(250);
-    check('the trash drawer opens upward, over the list',
+    // Archive and Trash sit side by side under one panel, in the New note
+    // button's own visual language, and the panel grows upward over the list.
+    check('Archive and Trash are two buttons side by side',
       await win.evaluate(() => {
-        const body = document.getElementById('trash-list');
-        const toggle = document.querySelector('[data-drawer="trash"]');
-        return !body.hidden && body.getBoundingClientRect().top < toggle.getBoundingClientRect().top;
+        const tabs = [...document.querySelectorAll('.drawer-tab')];
+        if (tabs.length !== 2) return false;
+        const [a, b] = tabs.map((t) => t.getBoundingClientRect());
+        return Math.abs(a.top - b.top) < 2 && a.left < b.left;
       }));
+
+    await press(win, '[data-drawer="trash"]');
+    await win.waitForTimeout(300);
+    check('opening one grows the panel upward, over the note list',
+      await win.evaluate(() => {
+        const body = document.getElementById('drawer-body');
+        const tabs = document.querySelector('.drawer-tabs');
+        return !body.hidden && body.getBoundingClientRect().top < tabs.getBoundingClientRect().top;
+      }));
+    check('and it shows the trashed note as a note block, not a strip',
+      await win.evaluate(() => {
+        const rows = document.querySelectorAll('#drawer-body .drawer-item .note-row .nr-title');
+        return rows.length === 1 && rows[0].textContent === 'Welcome to Nebula Guide';
+      }));
+
+    // Only one at a time: opening the other closes this one.
+    await press(win, '[data-drawer="archive"]');
+    await win.waitForTimeout(300);
+    check('opening the other closes the first',
+      await win.evaluate(() => {
+        const on = [...document.querySelectorAll('.drawer-tab')]
+          .filter((t) => t.getAttribute('aria-expanded') === 'true');
+        return on.length === 1 && on[0].dataset.drawer === 'archive';
+      }));
+    await press(win, '[data-drawer="archive"]');
+    await win.waitForTimeout(250);
+    check('and pressing it again closes the panel',
+      await win.evaluate(() => document.getElementById('drawer-body').hidden));
 
     // Help -> Guide page has to work when the guide is in the trash: that is
     // the whole reason it is the first item in the menu.
@@ -970,6 +1149,142 @@ try {
     await win.waitForTimeout(250);
     check('and Ctrl+Y redoes it',
       await win.evaluate(() => document.getElementById('editor').innerHTML) === wrapped);
+  }
+
+  // Headings: the order was right but h3 (18px) sat 1px above body text, so
+  // "1 should be biggest and 3 smallest" read as broken.
+  {
+    const sizes = await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<h1>a</h1><h2>b</h2><h3>c</h3><p>d</p>';
+      const px = (s) => parseFloat(getComputedStyle(ed.querySelector(s)).fontSize);
+      return { h1: px('h1'), h2: px('h2'), h3: px('h3'), p: px('p') };
+    });
+    check('h1 > h2 > h3 > body text, with room between each',
+      sizes.h1 > sizes.h2 && sizes.h2 > sizes.h3 && sizes.h3 - sizes.p >= 2,
+      JSON.stringify(sizes));
+  }
+
+  // The / menu drew all three headings with the same icon.
+  {
+    await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p>x</p>'; ed.focus();
+      const r = document.createRange();
+      r.selectNodeContents(ed.querySelector('p')); r.collapse(false);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    });
+    await win.keyboard.type(' /head');
+    await win.waitForTimeout(300);
+    const icons = await win.evaluate(() =>
+      [...document.querySelectorAll('#slash-menu button .fm-ic svg')].map((s) => s.outerHTML));
+    check('the three headings in the / menu have three different marks',
+      icons.length === 3 && new Set(icons).size === 3, `${icons.length} rows, ${new Set(icons).size} distinct`);
+    await win.keyboard.press('Escape');
+  }
+
+  // A code block could not be removed from the UI at all — nothing anywhere
+  // called remove() on one, and Chromium will not delete a contenteditable=false
+  // island with Backspace.
+  {
+    const twoBlocks = () => win.evaluate(() => {
+      const src = encodeURIComponent('print("hi")');
+      document.getElementById('editor').innerHTML =
+        `<div class="blk-code" data-block-type="code" data-lang="python" data-code="${src}" contenteditable="false">`
+        + '<div class="code-head"><button type="button" class="code-del">x</button></div>'
+        + '<pre class="code-body"><code class="code-src"></code></pre></div><p>tail</p>';
+    });
+    await twoBlocks();
+    await win.evaluate(() => {
+      const ed = document.getElementById('editor'); ed.focus();
+      const r = document.createRange();
+      r.selectNodeContents(ed.querySelector('p')); r.collapse(false);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    });
+    const scrollBefore = await win.evaluate(() => document.getElementById('editor').scrollTop);
+    await press(win, '[data-act="codeblock"]');
+    await win.waitForTimeout(400);
+    const inserted = await win.evaluate(() => {
+      const blocks = [...document.querySelectorAll('#editor .blk-code')];
+      return {
+        count: blocks.length,
+        focused: blocks.findIndex((b) => b.contains(document.activeElement)),
+        scroll: document.getElementById('editor').scrollTop,
+      };
+    });
+    // The old lookup grabbed the first unpainted block in the document, so
+    // inserting one in the guide focused the guide's FIRST block and scrolled
+    // the note to the top.
+    check('a new code block is the one that gets focus, not the first in the note',
+      inserted.count === 2 && inserted.focused === 1 && inserted.scroll === scrollBefore,
+      JSON.stringify(inserted));
+    await focusEditor(win);
+    await win.keyboard.press('Control+z');
+    await win.waitForTimeout(300);
+    check('and Ctrl+Z takes the new block back out',
+      await win.evaluate(() => document.querySelectorAll('#editor .blk-code').length) === 1);
+
+    await press(win, '#editor .code-del');
+    await win.waitForTimeout(250);
+    check('the ✕ on a code block deletes it',
+      await win.evaluate(() => document.querySelectorAll('#editor .blk-code').length) === 0);
+    await focusEditor(win);
+    await win.keyboard.press('Control+z');
+    await win.waitForTimeout(300);
+    check('and Ctrl+Z brings it back',
+      await win.evaluate(() => document.querySelectorAll('#editor .blk-code').length) === 1);
+
+    await win.evaluate(() => {
+      const ed = document.getElementById('editor'); ed.focus();
+      const r = document.createRange();
+      r.setStart(ed.querySelector('p').firstChild, 0); r.collapse(true);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    });
+    await win.keyboard.press('Backspace');
+    await win.waitForTimeout(250);
+    check('Backspace at the start of the line after a block removes it too',
+      await win.evaluate(() => document.querySelectorAll('#editor .blk-code').length) === 0);
+  }
+
+  // Every / block is one undo step. Nothing in slash-menu.js touched history.
+  {
+    for (const [typed, marker] of [[' /div', 'blk-hr'], [' /cod', 'blk-code'], [' /to', 'blk-todo']]) {
+      await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>line</p>'; });
+      await win.evaluate(() => {
+        const ed = document.getElementById('editor'); ed.focus();
+        const r = document.createRange();
+        r.selectNodeContents(ed.querySelector('p')); r.collapse(false);
+        const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+        ed.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await win.waitForTimeout(750);
+      await win.keyboard.type(typed);
+      await win.waitForTimeout(300);
+      await win.keyboard.press('Enter');
+      await win.waitForTimeout(400);
+      const added = await win.evaluate((m) => document.getElementById('editor').innerHTML.includes(m), marker);
+      await focusEditor(win);
+      await win.keyboard.press('Control+z');
+      await win.waitForTimeout(400);
+      const gone = await win.evaluate((m) => !document.getElementById('editor').innerHTML.includes(m), marker);
+      check(`${typed.trim()} inserts and one Ctrl+Z takes it back`, added && gone, `added ${added}, undone ${gone}`);
+    }
+  }
+
+  // Pressing a list button on a to-do line did nothing; handing the command a
+  // plain paragraph instead produced `<p><ul>…</ul></p>`.
+  {
+    const out = await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<div class="blk-todo">task</div>'; ed.focus();
+      const r = document.createRange();
+      r.selectNodeContents(ed.querySelector('.blk-todo')); r.collapse(false);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      document.querySelector('[data-act="ul"]').click();
+      return ed.innerHTML;
+    });
+    check('a to-do turns into a real list, not a list inside a paragraph',
+      out === '<ul><li>task</li></ul>', out);
   }
 
   // The languages the user asked for, read off the control they appear in.
