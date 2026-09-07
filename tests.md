@@ -110,6 +110,15 @@ existing note file is byte-identical afterwards, and a second launch adds
 nothing. The unreadable-vault launch still ends with **0 notes** — `ensureGuide`
 is gated on the same `disk.ok` as seeding.
 
+**Two things the release itself hit.** `pack:test` was killed mid-package when
+the machine ran out of memory, so the tag and the GitHub build were fine but the
+three post-tag steps were not — they are best-effort by design and each printed
+how to retry, which is what happened. Then the retry lost a race: `npm run kill`
+runs at the *start* of `pack:test`, packaging takes about two minutes, and the
+app was opened again inside that window, so the final copy hit EBUSY and the
+whole refresh was thrown away at the last step. `place-test-exe.js` now closes a
+copy that appeared during the build and retries once before giving up.
+
 **The guide's own checks:** every sample decodes, highlights, and produces at
 least one token in the running app (a language whose rules fail to load paints
 nothing and reads as flat grey — which is what the user would see); all five
