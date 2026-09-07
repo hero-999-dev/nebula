@@ -11,32 +11,47 @@ import { insertCodeBlock } from './codeblock.js';
 import { normalizeLists, exitListOnEmptyItem } from './lists.js';
 import { enterOutOfWrapper, backspaceOutOfWrapper } from './inline-format.js';
 import { initEquation } from './equation.js';
+import { on } from './bus.js';
 
+/**
+ * Colours are CLASSES, not values written into the note.
+ *
+ * They used to be hex literals handed to `execCommand('foreColor')`, picked to
+ * look right on the warm light paper. Open the same note on the violet or the
+ * dark theme and a "yellow background" was a pale pastel under light ink —
+ * highlight and text ran straight into each other. A class resolves through
+ * tokens.css, so one note reads correctly in all three themes.
+ *
+ * `[label, class]`; the empty class is "clear it".
+ */
 export const TEXT_COLORS = [
   ['Default text', ''],
-  ['Gray text', '#8A8371'],
-  ['Brown text', '#8B5E3C'],
-  ['Orange text', '#C96F2E'],
-  ['Yellow text', '#A98A2D'],
-  ['Green text', '#6E8B6A'],
-  ['Blue text', '#4A6B8A'],
-  ['Purple text', '#7C5D8A'],
-  ['Pink text', '#B0607F'],
-  ['Red text', '#9E3B32'],
+  ['Gray text', 'c-gray'],
+  ['Brown text', 'c-brown'],
+  ['Orange text', 'c-orange'],
+  ['Yellow text', 'c-yellow'],
+  ['Green text', 'c-green'],
+  ['Blue text', 'c-blue'],
+  ['Purple text', 'c-purple'],
+  ['Pink text', 'c-pink'],
+  ['Red text', 'c-red'],
 ];
 
 export const HILITE_COLORS = [
   ['No background', ''],
-  ['Gray background', '#E3DED2'],
-  ['Brown background', '#E0CDB8'],
-  ['Orange background', '#F2D4BC'],
-  ['Yellow background', '#EFE3C0'],
-  ['Green background', '#D6E4D0'],
-  ['Blue background', '#D3E0EA'],
-  ['Purple background', '#E2D7E8'],
-  ['Pink background', '#F0D2CE'],
-  ['Red background', '#EFC4BE'],
+  ['Gray background', 'h-gray'],
+  ['Brown background', 'h-brown'],
+  ['Orange background', 'h-orange'],
+  ['Yellow background', 'h-yellow'],
+  ['Green background', 'h-green'],
+  ['Blue background', 'h-blue'],
+  ['Purple background', 'h-purple'],
+  ['Pink background', 'h-pink'],
+  ['Red background', 'h-red'],
 ];
+
+/** Every class in a family, for stripping before applying another one. */
+export const colorClasses = (rows) => rows.map(([, cls]) => cls).filter(Boolean);
 
 export const U_STYLES = ['u-single', 'u-double', 'u-bold', 'u-wavy', 'u-dash'];
 
@@ -96,14 +111,18 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
   const miniBar = document.getElementById('mini-bar');
   if (!toolbar || !editorEl) return null;
 
-  let lastColor = '#9E3B32';
-  let lastHilite = '#EFE3C0';
+  // What the A and H buttons apply when pressed directly — a class, not a hex.
+  let lastColor = 'c-red';
+  let lastHilite = 'h-yellow';
   const colorBar = document.getElementById('color-bar');
   const hiliteBar = document.getElementById('hilite-bar');
-  if (colorBar) colorBar.style.background = lastColor;
-  if (hiliteBar) hiliteBar.style.background = lastHilite;
 
-  const ink = () => getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+  /** The bars under A and H show the real colour of the theme that is on. */
+  function paintColorBars() {
+    if (colorBar) colorBar.style.background = lastColor ? tokenValue(lastColor, 'color') : 'var(--ink)';
+    if (hiliteBar) hiliteBar.style.background = lastHilite ? tokenValue(lastHilite, 'backgroundColor') : 'transparent';
+  }
+
   const dirty = () => editorEl.dispatchEvent(new Event('input', { bubbles: true }));
 
   function cmd(name, value = null) {
@@ -140,39 +159,45 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
     return span;
   }
 
-  /** Remove every underline wrapper touching the selection (keeps the text). */
-  function stripUnderlines() {
+  /**
+   * Remove every wrapper of one family touching the selection, keeping the
+   * text. A family is a set of classes only one of which may apply at a time:
+   * the five underline styles, the nine text colours, the nine highlights.
+   */
+  function stripFamily(classes) {
+    const sel = classes.map((c) => `.${c}`).join(',');
     const range = selectionInEditor();
-    if (!range) return;
-    const frag = range.cloneContents();
-    const hasInside = frag.querySelector?.(U_STYLES.map((c) => `.${c}`).join(','));
+    if (!range || !sel) return;
     // wrappers fully inside the selection
-    if (hasInside) {
+    if (range.cloneContents().querySelector?.(sel)) {
       const span = document.createElement('span');
       span.appendChild(range.extractContents());
-      span.querySelectorAll(U_STYLES.map((c) => `.${c}`).join(',')).forEach((el) => el.replaceWith(...el.childNodes));
+      span.querySelectorAll(sel).forEach((el) => el.replaceWith(...el.childNodes));
       range.insertNode(span);
       span.replaceWith(...span.childNodes);
     }
     // an ancestor wrapper around the selection
     let node = range.commonAncestorContainer;
     if (node.nodeType !== Node.ELEMENT_NODE) node = node.parentElement;
-    const anc = node?.closest?.(U_STYLES.map((c) => `.${c}`).join(','));
+    const anc = node?.closest?.(sel);
     if (anc && editorEl.contains(anc)) anc.replaceWith(...anc.childNodes);
     editorEl.normalize();
   }
 
-  /** Underline styles are exclusive — never nested. */
-  function applyUnderline(cls) {
+  /**
+   * One class from `classes`, replacing whichever one was already there — never
+   * nesting them. An empty `cls` just clears the family.
+   */
+  function applyExclusive(classes, cls) {
     const range = selectionInEditor();
     if (!range || range.collapsed) return;
     const text = range.toString();
-    stripUnderlines();
-    if (cls === 'none') { dirty(); return; }
+    stripFamily(classes);
+    if (!cls) { dirty(); return; }
     // re-find the same text after stripping, then wrap it once
     const sel = window.getSelection();
     if (sel.isCollapsed && text) {
-      // selection may have been dropped by the strip — restore by content search
+      // the strip can drop the selection — restore it by content search
       const walker = document.createTreeWalker(editorEl, NodeFilter.SHOW_TEXT);
       let n;
       while ((n = walker.nextNode())) {
@@ -188,6 +213,22 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
       }
     }
     wrapSelection(cls);
+  }
+
+  const applyUnderline = (cls) => applyExclusive(U_STYLES, cls === 'none' ? '' : cls);
+  const applyTextColor = (cls) => applyExclusive(colorClasses(TEXT_COLORS), cls);
+  const applyHilite = (cls) => applyExclusive(colorClasses(HILITE_COLORS), cls);
+
+  /** What a colour class actually paints in the theme that is on right now. */
+  function tokenValue(cls, prop) {
+    const probe = document.createElement('span');
+    probe.className = cls;
+    probe.style.position = 'absolute';
+    probe.style.visibility = 'hidden';
+    document.body.appendChild(probe);
+    const value = getComputedStyle(probe)[prop];
+    probe.remove();
+    return value;
   }
 
   function blockOf() {
@@ -299,8 +340,8 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
     strike: () => cmd('strikeThrough'),
     code: () => wrapSelection('inline-code'),
     eq: () => equation?.open(),
-    color: () => cmd('foreColor', lastColor),
-    hilite: () => cmd('hiliteColor', lastHilite),
+    color: () => applyTextColor(lastColor),
+    hilite: () => applyHilite(lastHilite),
     al: () => cmd('justifyLeft'),
     ac: () => cmd('justifyCenter'),
     ar: () => cmd('justifyRight'),
@@ -338,48 +379,48 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
   });
 
   // ----- color menus (Notion-style names + swatches) -----
+  // The swatch shows the class rendered in the theme that is on, so the menu
+  // and the note can never disagree. The custom picker is gone: a hand-picked
+  // hex is exactly the frozen value this release stopped writing, and it is
+  // what made a highlight unreadable on the other two themes.
   function buildColorMenu(id, colors, apply, isHilite) {
     const menu = document.getElementById(id);
     if (!menu) return;
     menu.innerHTML = `<div class="tb-menu__label">${isHilite ? 'Background color' : 'Text color'}</div>`;
-    for (const [name, value] of colors) {
+    for (const [name, cls] of colors) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      const chip = isHilite
-        ? `<span class="swatch" style="background:${value || 'transparent'}"></span>`
-        : `<span class="swatch swatch--a" style="color:${value || 'var(--ink)'}">A</span>`;
+      btn.dataset.colorClass = cls;
+      const swatch = document.createElement('span');
+      swatch.className = isHilite ? `swatch ${cls}` : `swatch swatch--a ${cls}`;
+      if (isHilite && !cls) swatch.style.background = 'transparent';
+      if (!isHilite) swatch.textContent = 'A';
       // The label is its own element so it occupies a real grid column; as a
       // bare text node its box depended on the row's content and one row could
       // sit off the line the others share.
-      btn.innerHTML = `${chip}<span class="label">${name}</span>`;
-      btn.addEventListener('click', () => { apply(value); closeMenus(); });
+      const label = document.createElement('span');
+      label.className = 'label';
+      label.textContent = name;
+      btn.append(swatch, label);
+      btn.addEventListener('click', () => { apply(cls); closeMenus(); });
       menu.appendChild(btn);
     }
-    const row = document.createElement('div');
-    row.className = 'custom-row';
-    const input = document.createElement('input');
-    input.type = 'color';
-    input.value = isHilite ? '#EFE3C0' : '#9E3B32';
-    input.addEventListener('input', () => apply(input.value));
-    row.append(input, document.createTextNode('Custom'));
-    menu.appendChild(row);
   }
 
-  buildColorMenu('menu-color', TEXT_COLORS, (v) => {
-    lastColor = v || ink();
-    if (colorBar) colorBar.style.background = lastColor;
-    cmd('foreColor', lastColor);
+  buildColorMenu('menu-color', TEXT_COLORS, (cls) => {
+    lastColor = cls;
+    paintColorBars();
+    applyTextColor(cls);
   }, false);
 
-  buildColorMenu('menu-hilite', HILITE_COLORS, (v) => {
-    if (v) {
-      lastHilite = v;
-      if (hiliteBar) hiliteBar.style.background = v;
-      cmd('hiliteColor', v);
-    } else {
-      cmd('hiliteColor', 'transparent');
-    }
+  buildColorMenu('menu-hilite', HILITE_COLORS, (cls) => {
+    lastHilite = cls;
+    paintColorBars();
+    applyHilite(cls);
   }, true);
+
+  paintColorBars();
+  on('theme-changed', paintColorBars);
 
   // ----- outline / font / size -----
   const outlineSel = document.getElementById('tb-outline');

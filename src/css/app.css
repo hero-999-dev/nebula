@@ -37,8 +37,40 @@ body {
   font-size: 19px;
   letter-spacing: 0.02em;
   padding: 2px 6px 8px;
+  color: var(--ink);
 }
-.brand { color: var(--ink); }
+
+/* Collapse the note list. The button stays put — it is the one control that
+   must still be reachable once the panel it hides is gone. */
+.side-toggle {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.side-toggle:hover { background: var(--paper-raised); border-color: var(--rule); color: var(--ink); }
+.side-toggle .ic { width: 17px; height: 17px; }
+
+/* Collapsed: only the toggle is left, and the editor takes the space. A width
+   transition rather than display:none, so it slides instead of jumping. */
+.side {
+  transition: width 140ms ease;
+}
+#app.side-collapsed .side {
+  width: 52px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+#app.side-collapsed .side > *:not(.brand) { display: none; }
+#app.side-collapsed .brand { padding: 2px 0 0; }
+#app.side-collapsed .brand-name { display: none; }
 
 .side input[type="search"] {
   width: 100%;

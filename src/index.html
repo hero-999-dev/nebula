@@ -13,7 +13,10 @@
     <aside class="side" id="side">
       <!-- No mark here: the window's own title bar already shows the icon a few
            pixels above this line, and two of them side by side read as clutter. -->
-      <div class="brand"><span>Nebula</span></div>
+      <div class="brand">
+        <button type="button" class="side-toggle" id="side-toggle" title="Hide the note list" aria-label="Hide the note list" aria-expanded="true"><span data-icon="menu"></span></button>
+        <span class="brand-name">Nebula</span>
+      </div>
       <input id="side-filter" type="search" placeholder="Filter notes…" aria-label="Filter notes" />
       <nav class="note-list" id="note-list" aria-label="Notes"></nav>
       <div class="side-foot">

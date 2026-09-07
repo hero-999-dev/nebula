@@ -14,6 +14,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-07 14:43] v0.4.3 - by claude
+
+Colours are stored as names, so a note reads correctly on all three themes; AI tabs no longer reload and log you out; shapes drag from anywhere; the note list folds away.
+
+* Refresh the test exe even if it is reopened mid-build
+
+---
+
 ## [2026-09-07 06:31] v0.4.2 - by claude
 
 One starter note: Welcome to Nebula Guide covers every feature on a single page, with a working code sample for all fifteen languages — and an existing vault is given a copy.

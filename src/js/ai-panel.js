@@ -56,31 +56,38 @@ export function initAiPanel({ askText } = {}) {
     active = id;
     localStorage.setItem(ACTIVE_KEY, id);
     renderTabs();
-    body.querySelectorAll('webview, .ai-fallback').forEach((el) => { el.hidden = true; });
+    // NOT `hidden`. A <webview> with display:none is detached from its guest and
+    // reloads when it comes back, which logs you out of the site you had just
+    // signed into. Every view stays laid out; only one is visible. See the
+    // .ai-view rules in editor.css.
+    body.querySelectorAll('.ai-view').forEach((el) => el.classList.remove('on'));
 
     if (isElectron) {
       let wv = views.get(id);
       if (!wv) {
         wv = document.createElement('webview');
+        wv.className = 'ai-view';
         wv.setAttribute('src', service.url);
+        // persist: is what keeps a login across restarts; one partition per
+        // service so signing into one is not signing into another.
         wv.setAttribute('partition', `persist:ai-${id}`);
         wv.setAttribute('allowpopups', '');
         body.appendChild(wv);
         views.set(id, wv);
       }
-      wv.hidden = false;
+      wv.classList.add('on');
     } else {
       let fb = body.querySelector(`.ai-fallback[data-ai="${id}"]`);
       if (!fb) {
         fb = document.createElement('div');
-        fb.className = 'ai-fallback';
+        fb.className = 'ai-view ai-fallback';
         fb.dataset.ai = id;
         fb.innerHTML = `<p><strong>${esc(service.name)}</strong></p>
           <p>Embedded chat needs the desktop app.</p>
           <p><a href="${esc(service.url)}" target="_blank" rel="noopener">Open ${esc(service.name)} ↗</a></p>`;
         body.appendChild(fb);
       }
-      fb.hidden = false;
+      fb.classList.add('on');
     }
     // keep the active tab in view when the strip scrolls horizontally
     tabsEl.querySelector('.ai-tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });

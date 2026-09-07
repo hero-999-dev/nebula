@@ -62,6 +62,7 @@ export function initShapes(editorEl) {
 
   function select(el) {
     editorEl.querySelectorAll('.shape.sel').forEach((s) => s.classList.remove('sel'));
+    if (!el) editorEl.querySelectorAll('.shape.editing').forEach((s) => s.classList.remove('editing'));
     selected = el ?? null;
     selected?.classList.add('sel');
     document.getElementById('shape-bar')?.toggleAttribute('hidden', !selected);
@@ -93,8 +94,16 @@ export function initShapes(editorEl) {
     const handle = e.target.closest('.shape-h');
     const shape = e.target.closest('.shape');
     if (!shape) return; // the document listener above already deselected
+    // Leaving edit mode on any other shape, so the next click grabs it rather
+    // than landing in its text.
+    editorEl.querySelectorAll('.shape.editing').forEach((s) => {
+      if (s !== shape) s.classList.remove('editing');
+    });
     select(shape);
-    if (e.target.closest('.shape-text') && !handle) return; // typing inside
+    // Only a shape that is BEING EDITED gives its click to the text. Otherwise
+    // the whole body of the shape is a drag handle — the text used to cover it
+    // completely, so a drag could only start from the 1.6px border.
+    if (shape.classList.contains('editing') && e.target.closest('.shape-text') && !handle) return;
     e.preventDefault();
     drag = {
       el: shape,
@@ -132,6 +141,7 @@ export function initShapes(editorEl) {
   editorEl.addEventListener('dblclick', (e) => {
     const shape = e.target.closest('.shape');
     if (!shape) return;
+    shape.classList.add('editing'); // now the text takes clicks, and drags stop
     const text = shape.querySelector('.shape-text');
     text?.focus();
     if (text) {

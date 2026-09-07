@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 138 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 50 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 141 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 59 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -19,7 +19,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | File | Tests | Proves |
 |---|---|---|
 | `tests/notes.test.js` | 13 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body, and adds the guide to an older vault exactly once without touching what is there |
-| `tests/editor.test.js` | 39 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and the guide note's completeness |
+| `tests/editor.test.js` | 42 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and the guide note's completeness |
 | `tests/lists.test.js` | 23 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
 | `tests/inline-format.test.js` | 18 | Enter and Backspace out of an inline wrapper |
 | `tests/highlight.test.js` | 14 | Per-language tokens, and that only SQL is case-insensitive |
@@ -27,7 +27,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/seed-guard.test.js` | 10 | The distinction between an empty vault and an unreadable one |
 | `tests/user-data.test.js` | 8 | Which vault each build channel gets, and which one may replace itself |
 | `tests/version-compare.test.js` | 7 | `0.3.10 > 0.3.9`, `v` prefixes, pre-releases, unparseable tags refuse rather than guess |
-| `tests/e2e/smoke.mjs` | 50 | The real app, six launches |
+| `tests/e2e/smoke.mjs` | 59 | The real app, six launches |
 
 ---
 
@@ -76,6 +76,57 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-07] v0.4.3 — colours that survive a theme, and four things that were simply hard to use
+
+**Unit 138 -> 141, smoke 50 -> 59.**
+
+**Colours were frozen values.** `execCommand('foreColor')` writes a hex literal
+into the note, and the palette was chosen against the warm light paper. Open the
+same note on Main or Dark and a "yellow background" was a pale pastel sitting
+under light ink — the highlight and the text ran into each other and neither
+could be read. A colour is a **class** now (`c-red`, `h-yellow`), resolved
+through three palettes in `tokens.css`: on the dark themes text is a bright tint
+and a highlight is a deep block with light ink forced on it, so text colour and
+background can never be chosen into an unreadable pair. `applyUnderline` was
+already an exclusive-wrapper apply; it generalised to `applyExclusive(family,
+class)` and the two colour families use it, so colours cannot nest either. The
+custom hex picker is gone — it was exactly the frozen value this removes. Old
+notes keep their inline colours and get a readability rule instead.
+
+The smoke check reads the *computed* background and ink of a highlight in all
+three themes and asserts both that the value changes and that the two stay far
+apart in luminance — 0.68 / 0.68 / 0.77 against a floor of 0.35.
+
+**Switching AI tabs logged you out.** The panel set `hidden` on the view you
+were leaving, i.e. `display: none` — and an Electron `<webview>` that is
+display:none is detached from its guest and comes back **reloaded**. That is why
+sessions vanished, and why several mid-attach views looked like they were piling
+up. Every view is now absolutely positioned in the same box and switching flips
+`visibility`, so no guest is ever detached. The check asserts both views survive
+a switch, exactly one is visible, none is display:none, and each keeps its own
+`persist:` partition.
+
+**Shapes were hard to grab.** `.shape-text` filled the whole shape and took the
+press, so a drag could only start from the 1.6px border. The text is
+`pointer-events: none` until a double-click puts the shape in `.editing`; the
+body of the shape is a drag handle the rest of the time. The check drags from
+the centre and asserts the shape actually moved 60x40. Their border was
+`var(--ink)` — a pale outline around a pale fill with dark text inside it, three
+values that never agreed; a shape fill is always one of six light pastels, so
+the border and the ink are fixed dark tones and the check asserts the luminance
+gap.
+
+**The note list folds away** behind three lines beside "Nebula"
+(`side-toggle.js`), remembered across restarts. The button is inside the panel
+it hides, so `#app.side-collapsed .side > *:not(.brand)` is what keeps it
+reachable — the check asserts the list reaches width 0 while the toggle does
+not.
+
+**The test vault was still full of the old notes.** Seeding never re-runs, so
+`<repo>/Nebula-data` still held the six pre-0.4.2 `Test ·` notes next to the
+guide. The whole vault was copied to `backups/before-guide-cleanup-<stamp>/`
+first, then only those six were removed.
 
 ### [2026-09-07] v0.4.2 — one note, and a sample for every language
 

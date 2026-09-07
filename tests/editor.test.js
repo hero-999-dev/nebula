@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { nextLayout, SIDES } from '../src/js/dock.js';
-import { stepIndent, parseSize, TEXT_COLORS, HILITE_COLORS, U_STYLES, FONTS, FONT_MARK, firstFamily, fontLabelFor } from '../src/js/toolbar.js';
+import { stepIndent, parseSize, TEXT_COLORS, HILITE_COLORS, colorClasses, U_STYLES, FONTS, FONT_MARK, firstFamily, fontLabelFor } from '../src/js/toolbar.js';
 import { detectSlash, filterSlash, SLASH_ITEMS } from '../src/js/slash-menu.js';
 import { makeShape, SHAPE_COLORS, SHAPE_KINDS } from '../src/js/shapes.js';
 import { highlight, LANGS } from '../src/js/highlight.js';
@@ -329,6 +329,40 @@ describe('the guide note', () => {
   it('includes the fonts the user named', () => {
     for (const face of ['Arial', 'Calibri', 'Times New Roman', 'Comic Sans MS']) {
       expect(GUIDE_NOTE.content, face).toContain(face);
+    }
+  });
+});
+
+/**
+ * Colours have to survive a theme change. Stored as hex they could not: a
+ * "yellow background" picked on the light paper became a pale pastel under
+ * light ink on Main and Dark, and the highlight and the text ran together.
+ */
+describe('note colours are classes, not frozen values', () => {
+  it('every palette entry is a class name, never a colour value', () => {
+    // Both families lead with a "clear it" row, which is deliberately empty.
+    for (const [label, cls] of [...TEXT_COLORS, ...HILITE_COLORS].filter(([, c]) => c)) {
+      expect(cls, label).toMatch(/^[ch]-[a-z]+$/);
+      expect(cls, label).not.toMatch(/#|rgb/);
+    }
+  });
+
+  it('the two families lead with a clear entry and do not overlap', () => {
+    expect(TEXT_COLORS[0][1]).toBe('');
+    expect(HILITE_COLORS[0][1]).toBe('');
+    const text = colorClasses(TEXT_COLORS);
+    const hilite = colorClasses(HILITE_COLORS);
+    expect(text).toHaveLength(9);
+    expect(hilite).toHaveLength(9);
+    expect(text.every((c) => c.startsWith('c-'))).toBe(true);
+    expect(hilite.every((c) => c.startsWith('h-'))).toBe(true);
+    expect(text.filter((c) => hilite.includes(c))).toEqual([]);
+  });
+
+  it('the guide writes classes, so it reads on every theme', () => {
+    expect(GUIDE_NOTE.content).not.toMatch(/style="[^"]*(?:background-)?color:\s*#/);
+    for (const cls of ['c-red', 'c-blue', 'h-yellow', 'h-green']) {
+      expect(GUIDE_NOTE.content, cls).toContain(`class="${cls}"`);
     }
   });
 });

@@ -55,6 +55,7 @@ src/js/
   bus.js             note-changed / note-opened
   editor.js          contenteditable + debounced autosave
   toolbar.js  dock.js  slash-menu.js  shapes.js  codeblock.js  highlight.js
+  side-toggle.js     folds the note list away; remembers the choice
   lists.js           repairs what execCommand's list commands leave behind
   inline-format.js   Enter/Backspace out of an inline wrapper
   equation.js        KaTeX, rendered from data-tex on every load
@@ -145,6 +146,15 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 11. **Quotes inside a `style=""` attribute end it.** Font stacks contain
    `"Segoe UI"`, so building a row as `style="font-family:${stack}"` left it
    with no font at all. Assign `el.style.fontFamily` as a property.
+12. **An Electron `<webview>` with `display: none` is detached from its guest**
+   and reloads when it comes back — which logs the user out of whatever they
+   just signed into. Never hide one with `hidden`/`display`. Stack them and
+   switch `visibility` (see `.ai-view` in editor.css).
+13. **A colour written into a note is frozen.** `execCommand('foreColor')` puts
+   a hex literal in the markup, and the app has three themes — a value picked
+   against one background is unreadable on the other two. Colours are classes
+   (`c-*`, `h-*`) resolved through `tokens.css`, and a highlight sets its own
+   ink so the pair can never be chosen badly.
 
 ---
 

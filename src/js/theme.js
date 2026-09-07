@@ -6,6 +6,8 @@
  * is read. Only a non-default choice needs the attribute set.
  */
 
+import { emit } from './bus.js';
+
 const KEY = 'nebula:theme';
 export const THEMES = ['main', 'dark', 'light'];
 const DEFAULT = 'main';
@@ -25,6 +27,9 @@ function apply(theme, buttons) {
     btn.classList.toggle('on', btn.dataset.theme === theme);
     btn.setAttribute('aria-pressed', String(btn.dataset.theme === theme));
   }
+  // Anything that has READ a token rather than referencing it has to repaint —
+  // the toolbar's colour bars sample the palette to show what they will apply.
+  emit('theme-changed', { theme });
 }
 
 /**

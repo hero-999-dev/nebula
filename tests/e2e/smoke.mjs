@@ -151,6 +151,81 @@ try {
   check('every sample is painted, none left flat grey',
     guideLangs.flat.length === 0, guideLangs.flat.join(', '));
 
+  // Colours must survive a theme change. As hex written into the note they
+  // could not: a pastel highlight ended up under light ink on the dark themes
+  // and the two ran together.
+  {
+    const readAt = (theme) => win.evaluate((t) => {
+      document.querySelector(`#theme-pick [data-theme="${t}"]`).click();
+      const hi = document.querySelector('#editor .h-yellow');
+      const cs = getComputedStyle(hi);
+      const px = (c) => c.match(/\d+/g).slice(0, 3).map(Number);
+      const lum = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      return { bg: cs.backgroundColor, fg: cs.color, contrast: Math.abs(lum(px(cs.backgroundColor)) - lum(px(cs.color))) };
+    }, theme);
+    const main = await readAt('main');
+    const dark = await readAt('dark');
+    const light = await readAt('light');
+    await win.evaluate(() => document.querySelector('#theme-pick [data-theme="main"]').click());
+    check('a highlight repaints for the theme it is read in',
+      main.bg !== light.bg && dark.bg !== light.bg,
+      `${main.bg} / ${dark.bg} / ${light.bg}`);
+    check('and its ink stays well clear of its background in all three',
+      [main, dark, light].every((t) => t.contrast > 0.35),
+      [main, dark, light].map((t) => t.contrast.toFixed(2)).join(' / '));
+  }
+
+  // Switching AI tabs must not unload the one you were on. `hidden` (i.e.
+  // display:none) detaches an Electron <webview> from its guest, so it reloads
+  // when it comes back and the login you had just completed is gone.
+  {
+    await win.click('[data-pad="ai"]');
+    await win.waitForSelector('#ai-panel:not([hidden])', { timeout: 5_000 });
+    await win.waitForSelector('#ai-body .ai-view', { timeout: 10_000 });
+    await win.click('.ai-tab[data-ai="gemini"]');
+    await win.waitForTimeout(400);
+    await win.click('.ai-tab[data-ai="claude"]');
+    await win.waitForTimeout(400);
+    const views = await win.evaluate(() => {
+      const els = [...document.querySelectorAll('#ai-body .ai-view')];
+      return {
+        count: els.length,
+        on: els.filter((el) => el.classList.contains('on')).length,
+        none: els.filter((el) => getComputedStyle(el).display === 'none').length,
+        stacked: els.every((el) => getComputedStyle(el).position === 'absolute'),
+        partitions: els.map((el) => el.getAttribute('partition')),
+      };
+    });
+    check('both AI views stay alive across a tab switch, one visible',
+      views.count === 2 && views.on === 1, JSON.stringify(views));
+    check('none is display:none, so no guest is detached and reloaded',
+      views.none === 0 && views.stacked, `${views.none} hidden`);
+    check('each service keeps its own persistent session',
+      views.partitions.every((p) => p?.startsWith('persist:ai-'))
+        && new Set(views.partitions).size === views.partitions.length,
+      views.partitions.join(', '));
+    await win.click('[data-pad="ai"]');
+  }
+
+  // The note list folds away behind the three lines beside "Nebula".
+  {
+    const wide = await win.evaluate(() => document.getElementById('side').getBoundingClientRect().width);
+    await win.click('#side-toggle');
+    await win.waitForTimeout(250);
+    const narrow = await win.evaluate(() => ({
+      width: document.getElementById('side').getBoundingClientRect().width,
+      list: document.getElementById('note-list').getBoundingClientRect().width,
+      toggle: document.getElementById('side-toggle').getBoundingClientRect().width,
+    }));
+    check('the sidebar collapses and the toggle stays reachable',
+      narrow.width < wide / 2 && narrow.list === 0 && narrow.toggle > 0,
+      `${wide} -> ${narrow.width}`);
+    await win.click('#side-toggle');
+    await win.waitForTimeout(250);
+    check('and comes back',
+      await win.evaluate(() => document.getElementById('note-list').getBoundingClientRect().width > 100));
+  }
+
   const before = onDisk.slice().sort().join(',');
   await app.close();
 
@@ -432,6 +507,36 @@ try {
     });
     check('the ✕ deletes the shape and really closes the bar',
       state.hidden && state.display === 'none' && state.shapes === 0, JSON.stringify(state));
+  }
+
+  // A shape is a drag handle everywhere, not just on its 1.6px border: the
+  // text used to cover the whole body and swallow the press.
+  {
+    await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>shape drag test</p>'; });
+    await win.click('[data-act="shape-rect"]');
+    await win.waitForSelector('#editor .shape', { timeout: 5_000 });
+    const box = await win.evaluate(() => {
+      const r = document.querySelector('#editor .shape').getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2, left: r.left, top: r.top };
+    });
+    await win.mouse.move(box.x, box.y);
+    await win.mouse.down();
+    await win.mouse.move(box.x + 60, box.y + 40, { steps: 6 });
+    await win.mouse.up();
+    const moved = await win.evaluate(() => {
+      const r = document.querySelector('#editor .shape').getBoundingClientRect();
+      return { left: r.left, top: r.top };
+    });
+    check('a shape drags from its middle, not only from its border',
+      Math.round(moved.left - box.left) > 40 && Math.round(moved.top - box.top) > 25,
+      `moved ${Math.round(moved.left - box.left)},${Math.round(moved.top - box.top)}`);
+    check('and its ink is dark against its always-light fill',
+      await win.evaluate(() => {
+        const cs = getComputedStyle(document.querySelector('#editor .shape'));
+        const lum = (c) => { const [r, g, b] = c.match(/\d+/g).slice(0, 3).map(Number); return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; };
+        return lum(cs.backgroundColor) - lum(cs.color) > 0.4;
+      }));
+    await win.keyboard.press('Escape');
   }
 
   // The languages the user asked for, read off the control they appear in.

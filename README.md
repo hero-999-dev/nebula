@@ -4,7 +4,7 @@ Calm notes with a real editor. An Electron desktop app for **Windows and macOS**
 that keeps every note as a plain JSON file in your own profile, and updates
 itself without ever touching them.
 
-**Version v0.4.2** ·
+**Version v0.4.3** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 
@@ -37,6 +37,9 @@ So this README describes a small app on purpose. What is here is finished.
   (`Ctrl+E`) · **equations** typeset with KaTeX (`Ctrl+Q`) · four alignments.
   The font button and the size box show what the caret is actually in; with
   nothing selected, a font applies to the whole line.
+- **Colours are stored as names, not values**, so a note written on one theme
+  stays readable on the other two — and a highlight always sets its own ink.
+- **The note list folds away** behind the three lines beside "Nebula".
 - **Right-click a selection** for a compact mini toolbar.
 - **`/` opens a block menu** — headings, lists, to-do, quote, code, divider,
   shapes.
@@ -48,7 +51,9 @@ So this README describes a small app on purpose. What is here is finished.
   above or behind the words, which never reflow.
 - **An AI panel** of embedded chat webviews (Claude, Gemini, ChatGPT, Mistral,
   DeepSeek, Copilot, Perplexity, plus any site you add), resizable, with a
-  side-scrolling tab strip. It touches no note data, by design.
+  side-scrolling tab strip. Each service keeps its own persistent session and a
+  tab switch never reloads it, so a login survives. It touches no note data, by
+  design.
 - **Lists you can leave.** Enter or Backspace on an empty item ends the list
   rather than adding another one or merging into the line above, and the to-do
   button toggles a line both ways.
@@ -157,8 +162,8 @@ happens between a keystroke and a file.
 npm install
 npm run preflight   # START HERE — version, phase, what changed, what is stale
 npm run dev         # dev app on its OWN profile
-npm test            # 138 unit tests
-npm run build && npm run smoke   # 50 checks against the real Electron app
+npm test            # 141 unit tests
+npm run build && npm run smoke   # 59 checks against the real Electron app
 npm run check:versions           # every surface agrees with package.json
 npm run pack:win    # release/Nebula-Setup-*.exe + Nebula-portable-*.exe
 npm run site        # rebuild site/index.html (docs + mind maps)

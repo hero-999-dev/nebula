@@ -27,6 +27,40 @@
   --sans: "Inter", "Segoe UI", system-ui, sans-serif;
   --mono: "Cascadia Code", "Consolas", monospace;
 
+
+  /* Note colours, per theme.
+   *
+   * These used to be hard-coded hex values written straight into the note by
+   * execCommand, chosen against the warm light paper. On the dark themes a
+   * "yellow background" was therefore a pale pastel sitting under light ink —
+   * the highlight and the text ran into each other and neither could be read.
+   * The note stores a CLASS now, and the class resolves through these, so the
+   * same note is legible in all three themes.
+   *
+   * Dark themes: text is a bright tint, a highlight is a deep block with light
+   * ink on it. Light theme overrides both sets below. */
+  --c-gray: #A9A2B8;
+  --c-brown: #C79A72;
+  --c-orange: #F0A868;
+  --c-yellow: #E8CE72;
+  --c-green: #9AD1A6;
+  --c-blue: #8FB8E8;
+  --c-purple: #C4A6F0;
+  --c-pink: #F09CBE;
+  --c-red: #F08078;
+
+  --h-gray: #3A3446;
+  --h-brown: #4A3524;
+  --h-orange: #5A3A1E;
+  --h-yellow: #514420;
+  --h-green: #2C4433;
+  --h-blue: #26384F;
+  --h-purple: #3C2C57;
+  --h-pink: #4E2739;
+  --h-red: #4E2723;
+  /* The ink a highlight forces, so text colour and highlight can never fight. */
+  --h-ink: #F5F0E8;
+
   /* Scrollbars, focus rings, caret and any control we have not styled follow
      the theme. Without this the browser keeps its light-mode defaults and a
      dark theme gets black text on grey widgets. */
@@ -46,6 +80,26 @@
   --fern: #6E8B6A;
   --madder: #9E3B32;
   --shadow: rgba(60, 50, 30, 0.12);
+  --c-gray: #8A8371;
+  --c-brown: #8B5E3C;
+  --c-orange: #C96F2E;
+  --c-yellow: #A98A2D;
+  --c-green: #6E8B6A;
+  --c-blue: #4A6B8A;
+  --c-purple: #7C5D8A;
+  --c-pink: #B0607F;
+  --c-red: #9E3B32;
+
+  --h-gray: #E3DED2;
+  --h-brown: #E0CDB8;
+  --h-orange: #F2D4BC;
+  --h-yellow: #EFE3C0;
+  --h-green: #D6E4D0;
+  --h-blue: #D3E0EA;
+  --h-purple: #E2D7E8;
+  --h-pink: #F0D2CE;
+  --h-red: #EFC4BE;
+  --h-ink: #201E1A;
   color-scheme: light;
 }
 

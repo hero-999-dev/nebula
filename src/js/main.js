@@ -15,6 +15,7 @@ import { initDialog, askText } from './dialog.js';
 import { injectIcons } from './icons.js';
 import { initUpdater, showAppVersion } from './updater.js';
 import { initAbout } from './about.js';
+import { initSideToggle } from './side-toggle.js';
 
 const $ = (id) => document.getElementById(id);
 const AUTOSAVE_MS = 400;
@@ -141,6 +142,7 @@ async function boot() {
   });
 
   initTheme($('theme-pick'));
+  initSideToggle($('side-toggle'));
   // The update button lives inside About: one place that answers "which build
   // is this, where is it, and is there a newer one".
   const checkButton = $('btn-check-updates');

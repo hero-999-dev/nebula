@@ -461,12 +461,16 @@
 /* Everything the user writes sits above the back layer and below the front one.
    z-index needs a position; relative moves nothing. */
 .editor > *:not(.shape-layer) { position: relative; z-index: 2; }
+/* A shape's fill is always one of six light pastels, so its border and its text
+   are fixed dark tones rather than var(--ink): on the dark themes an --ink
+   border was a pale outline around a pale fill with dark text inside it, three
+   values that never agreed with each other. */
 .shape {
   position: absolute;
   pointer-events: auto;
   min-width: 48px;
   min-height: 34px;
-  border: 1.6px solid var(--ink);
+  border: 1.6px solid rgba(28, 26, 22, 0.62);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -483,13 +487,25 @@
 /* No opacity trick: a shape behind the text is fully opaque, it is simply
    painted first. Fading it was the old way of pretending. */
 .shape.behind { z-index: auto; }
+/* The text is not a click target until the shape is being edited. It filled the
+   whole shape, so a plain click landed on it and a drag had to start from the
+   1.6px border — which is what made shapes so hard to grab. Double-click turns
+   pointer events back on (shapes.js adds .editing) and then it behaves like a
+   text box. */
 .shape-text {
   outline: none;
   text-align: center;
   max-width: 88%;
   overflow: hidden;
+  pointer-events: none;
   cursor: text;
+  color: inherit;
 }
+.shape.editing { cursor: default; }
+.shape.editing .shape-text { pointer-events: auto; }
+/* A wider grab edge, so the pointer does not have to find 1.6 pixels. */
+.shape.sel { box-shadow: 0 0 0 2.5px var(--clay); }
+.shape.sel .shape-h { width: 14px; height: 14px; }
 .shape-h {
   position: absolute;
   right: -1px; bottom: -1px;
@@ -654,9 +670,26 @@ body.resizing webview { pointer-events: none; }
 .ai-x { padding: 4px 6px; flex-shrink: 0; }
 .ai-x .ic { width: 14px; height: 14px; }
 
-.ai-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.ai-body webview { flex: 1; border: none; }
-.ai-fallback { padding: 18px; font-size: 13.5px; color: var(--ink-soft); line-height: 1.8; }
+/* Every view is stacked in the same box and only one is visible.
+ *
+ * Switching used to set `hidden` on the others, i.e. `display: none` — and an
+ * Electron <webview> that is display:none is detached from its guest: it comes
+ * back reloaded and logged out, which is why moving between tabs "lost the
+ * session" and, while several were mid-attach, why they appeared to pile up.
+ * visibility keeps every guest alive and attached, so a tab switch is instant
+ * and a login survives it. */
+.ai-body { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+.ai-view {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  visibility: hidden;
+  pointer-events: none;
+}
+.ai-view.on { visibility: visible; pointer-events: auto; }
+.ai-fallback { padding: 18px; font-size: 13.5px; color: var(--ink-soft); line-height: 1.8; overflow-y: auto; }
 .ai-fallback a { color: var(--clay); }
 
 /* ---------- dialog ---------- */
@@ -704,3 +737,45 @@ body.resizing webview { pointer-events: none; }
   .page-head { border-bottom: none; }
   .blk-code { break-inside: avoid; }
 }
+
+/* ---------- note colours ----------
+   A colour is a CLASS, not a frozen hex: the same note has to be readable on
+   the violet, the dark and the light theme, and a value written into the note
+   in one theme cannot know about the other two. tokens.css holds the three
+   palettes. */
+.c-gray   { color: var(--c-gray); }
+.c-brown  { color: var(--c-brown); }
+.c-orange { color: var(--c-orange); }
+.c-yellow { color: var(--c-yellow); }
+.c-green  { color: var(--c-green); }
+.c-blue   { color: var(--c-blue); }
+.c-purple { color: var(--c-purple); }
+.c-pink   { color: var(--c-pink); }
+.c-red    { color: var(--c-red); }
+
+/* A highlight sets its own ink. Text colour and background could otherwise be
+   chosen independently into an unreadable pair — light-on-light was exactly
+   what the guide looked like on the dark themes. */
+.h-gray, .h-brown, .h-orange, .h-yellow, .h-green,
+.h-blue, .h-purple, .h-pink, .h-red {
+  color: var(--h-ink);
+  border-radius: 3px;
+  padding: 0 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.h-gray   { background: var(--h-gray); }
+.h-brown  { background: var(--h-brown); }
+.h-orange { background: var(--h-orange); }
+.h-yellow { background: var(--h-yellow); }
+.h-green  { background: var(--h-green); }
+.h-blue   { background: var(--h-blue); }
+.h-purple { background: var(--h-purple); }
+.h-pink   { background: var(--h-pink); }
+.h-red    { background: var(--h-red); }
+
+/* Notes written before 0.4.3 carry an inline background-color chosen against
+   the light paper. Nothing can retint those, but they can at least be made
+   readable: whatever the theme, put dark ink on them. */
+.editor [style*="background-color"],
+.editor [style*="background:"] { color: #201E1A; }

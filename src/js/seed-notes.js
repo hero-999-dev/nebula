@@ -279,7 +279,7 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '0.4.2';
+export const GUIDE_VERSION = '0.4.3';
 
 export const GUIDE_NOTE = {
   title: 'Welcome to Nebula Guide',
@@ -328,11 +328,15 @@ export const GUIDE_NOTE = {
     '<span style="font-family:Georgia, serif">Georgia</span> · ' +
     '<span style="font-family:Verdana, Geneva, sans-serif">Verdana</span> · ' +
     '<span style="font-family:Consolas, monospace">Consolas</span></p>' +
+    // Colours are classes, so this paragraph reads correctly on all three
+    // themes. Written as hex it was a pastel highlight under light ink on the
+    // dark ones — unreadable, and the reason this changed.
     '<p><span style="font-size:22px">22px</span> · <span style="font-size:11px">11px</span> · ' +
-    '<span style="color:#9E3B32">red text</span> · <span style="color:#4A6B8A">blue text</span> · ' +
-    '<span style="background-color:#EFE3C0">yellow background</span> · <span style="background-color:#D6E4D0">green background</span></p>' +
+    '<span class="c-red">red text</span> · <span class="c-blue">blue text</span> · <span class="c-green">green text</span> · ' +
+    '<span class="h-yellow">yellow background</span> · <span class="h-green">green background</span> · <span class="h-purple">purple background</span></p>' +
     '<p><strong>Try it:</strong> the <strong>Font</strong> menu shows every face in its own typeface. With text selected it restyles the selection; with only a caret it restyles the whole line. The button always names the font under the caret. <strong>Size</strong> accepts any number you type, not just the listed ones — try 37.</p>' +
-    '<p><strong>Try it:</strong> <em>A</em> applies the last text colour and <em>H</em> the last highlight; each <em>▾</em> opens the full list plus a custom picker. Every row lines up and the list fits without scrolling.</p>' +
+    '<p><strong>Try it:</strong> <em>A</em> applies the last text colour and <em>H</em> the last highlight; each <em>▾</em> opens the full list. Every row lines up and the list fits without scrolling.</p>' +
+    '<p><strong>Try it:</strong> switch between <strong>Main</strong>, <strong>Dark</strong> and <strong>Light</strong> with that paragraph in view. Every colour repaints for the theme and stays readable — a colour is stored as a name, not as a fixed value picked against one background.</p>' +
 
     '<h2>4 · Lists, to-dos and indent</h2>' +
     '<h3>Bulleted</h3><ul><li>first</li><li>second</li><li>third</li></ul>' +

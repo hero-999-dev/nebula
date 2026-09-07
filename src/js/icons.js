@@ -27,6 +27,9 @@ export const ICONS = {
   hilite: S('<path d="M6 18h4"/><path d="M8 4h4a3 3 0 0 1 0 6H8z"/><path d="M8 10h5a3 3 0 0 1 0 6H8z" opacity=".55"/>'),
   pen: S('<path d="M4 20h4l10-10a2.8 2.8 0 0 0-4-4L4 16z"/><path d="M13.5 6.5 17.5 10.5"/>'),
 
+  // Three lines — the universally understood "collapse this panel".
+  menu: S('<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>'),
+
   bullets: S('<circle cx="5" cy="7" r="1.3" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="5" cy="17" r="1.3" fill="currentColor" stroke="none"/><path d="M10 7h10"/><path d="M10 12h10"/><path d="M10 17h10"/>'),
   // Two rows, not three: "1 2" is enough to say "numbered", and at 20px three
   // rows of 6px digits were 4.5 device pixels tall — a grey smudge.
