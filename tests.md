@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 135 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 44 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 138 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 50 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -18,8 +18,8 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 
 | File | Tests | Proves |
 |---|---|---|
-| `tests/notes.test.js` | 8 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body |
-| `tests/editor.test.js` | 41 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and which starter notes each build gets |
+| `tests/notes.test.js` | 13 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body, and adds the guide to an older vault exactly once without touching what is there |
+| `tests/editor.test.js` | 39 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and the guide note's completeness |
 | `tests/lists.test.js` | 23 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
 | `tests/inline-format.test.js` | 18 | Enter and Backspace out of an inline wrapper |
 | `tests/highlight.test.js` | 14 | Per-language tokens, and that only SQL is case-insensitive |
@@ -27,26 +27,27 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/seed-guard.test.js` | 10 | The distinction between an empty vault and an unreadable one |
 | `tests/user-data.test.js` | 8 | Which vault each build channel gets, and which one may replace itself |
 | `tests/version-compare.test.js` | 7 | `0.3.10 > 0.3.9`, `v` prefixes, pre-releases, unparseable tags refuse rather than guess |
-| `tests/e2e/smoke.mjs` | 44 | The real app, four launches |
+| `tests/e2e/smoke.mjs` | 50 | The real app, six launches |
 
 ---
 
 ## The smoke test, check by check
 
-**Launch 1 — a fresh, healthy vault (1-19).**
+**Launch 1 — a fresh, healthy vault (1-20).**
 The window opens and is titled · the preload bridge exposes `storage`,
 `updates`, `paths` + `reveal` · the theme picker offers main / dark / light,
-starts on main, and repaints both ways · a fresh vault seeds the starter notes
-and they reach disk · `storage/meta.json` is stamped · path-traversal reads are
+starts on main, and repaints both ways · a fresh vault seeds exactly one note
+and it reaches disk · `storage/meta.json` is stamped · path-traversal reads are
 rejected through the real IPC handler · the updater reports a mode without
 crashing · `paths` reports the build channel and honours `NEBULA_USER_DATA` ·
 About lists all six folders · toolbar, slash menu, shapes and AI panel are
-wired · opening the code-blocks note renders a highlighted block.
+wired · **the guide is the starter note, it carries a sample for every language
+the picker offers, and none of them renders flat grey**.
 
-**Launch 2 — the same profile again (20-21).**
+**Launch 2 — the same profile again (21-22).**
 The same notes, not a second seeding, and the note files are byte-identical.
 
-**Launch 3 — a scratch profile, driving the editor (22-41).**
+**Launch 3 — a scratch profile, driving the editor (23-42).**
 A numbered list started under a bulleted one is its sibling, not buried in its
 last item · Enter on an empty list item ends the list · Backspace on one leaves
 the list instead of merging up · the to-do button toggles a line on and back
@@ -61,14 +62,59 @@ full opacity, bring-above returns it, and ✕ deletes it and really closes the b
 (computed `display`, not just the attribute) · C, C++, C#, Java, Dart and Ruby
 are offered in the language list.
 
-**Launch 4 — a vault that cannot be read (42-44)**, `storage/notes` created as a
+**Launches 4 and 5 — a vault that predates the guide (43-46).**
+A profile holding one hand-written note file. The guide is added and is what
+opens; the note that was already there is byte-identical afterwards; a second
+launch adds nothing. This is the path that runs on a machine already using
+Nebula, where seeding never fires because the vault is not empty.
+
+**Launch 6 — a vault that cannot be read (47-50)**, `storage/notes` created as a
 *file* so `readdir` fails with ENOTDIR — a real error that is not ENOENT:
-the red storage-error banner appears · **nothing is seeded** · the vault is left
-exactly as it was.
+the red storage-error banner appears · **nothing is seeded and no guide is
+added** · the vault is left exactly as it was.
 
 ---
 
 ## Log
+
+### [2026-09-07] v0.4.2 — one note, and a sample for every language
+
+**Unit 135 -> 138, smoke 44 -> 50.**
+
+**One starter note.** There were six or seven `Test ·` notes for the test build
+and a different two-note set for an installed one. Two problems, both reported:
+whatever you were looking for was in the note you had not opened, and the two
+sets drifted apart. There is now a single `Welcome to Nebula Guide` — welcome,
+then eight numbered sections, each with something to try — and **every build
+seeds the same one**. `seedFor` and `HELP_NOTES` are gone.
+
+**"I still don't see examples for all the code languages."** Two causes, and
+only one of them was the note:
+
+1. **TypeScript and Bash had no sample.** Thirteen of the fifteen languages did.
+   The unit test asserted `blocks.length >= 7` and that each language appeared
+   once — which fifteen-minus-two satisfies perfectly. It now compares the set
+   of samples against `Object.keys(LANGS)`, so a language added without a sample
+   fails immediately, and the smoke test does the same against the `<select>`
+   the user actually sees.
+2. **Seeding only ever happens on an empty vault** — the rule that stops a
+   failed read from looking like a first run. Anyone already using Nebula was
+   therefore never going to see any of this, in any release. `ensureGuide` fixes
+   that: on a vault that was read successfully it ADDS the guide, once per
+   `GUIDE_VERSION`, opens it, and touches nothing else. Deleting the guide keeps
+   it deleted until the guide itself changes.
+
+Two smoke launches were added for exactly that path: a profile with one
+hand-written note file gets the guide added, the guide is what opens, the
+existing note file is byte-identical afterwards, and a second launch adds
+nothing. The unreadable-vault launch still ends with **0 notes** — `ensureGuide`
+is gated on the same `disk.ok` as seeding.
+
+**The guide's own checks:** every sample decodes, highlights, and produces at
+least one token in the running app (a language whose rules fail to load paints
+nothing and reads as flat grey — which is what the user would see); all five
+underline styles appear; every equation carries `data-tex` rather than a frozen
+rendering; the behind-shape is on the behind *layer*, not just wearing the class.
 
 ### [2026-09-07] v0.4.1 — the eight things 0.4.0 still got wrong
 

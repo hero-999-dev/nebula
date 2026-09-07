@@ -117,13 +117,13 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.4.1)
+## Current implementation state (v0.4.2)
 
 **Working:** the whole editor described above — dock pad, two-row toolbar,
 mini toolbar, slash menu, code blocks with syntax colours, free-floating shapes,
-AI panel with tabs and custom sites, the Main/Dark/Light theme picker, and
-starter notes chosen by build — a seven-note per-feature checklist in the test
-and dev builds, a welcome note plus one help page in an installed copy.
+AI panel with tabs and custom sites, the Main/Dark/Light theme picker, and one
+starter note - `Welcome to Nebula Guide`, the same page in every build, with a
+working sample for every code language.
 
 **Identity:** the icon is drawn from vector geometry at every size that ships
 (16 → 256 in a real multi-size `.ico`), not downscaled from one large bitmap,
@@ -138,7 +138,7 @@ stamp, and a dev profile at `<repo>/.dev-profile` that development cannot escape
 on Windows and notify-and-download elsewhere; `npm run push` is the whole
 release ritual.
 
-**Quality:** 135 unit tests, 44 Electron smoke checks against the real app
+**Quality:** 138 unit tests, 50 Electron smoke checks against the real app
 (including "an unreadable vault seeds nothing", verified by breaking the guard
 on purpose and watching the suite go red).
 

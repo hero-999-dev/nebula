@@ -1,6 +1,6 @@
 import { initDiskStorage } from './disk-store.js';
 import { NoteStore, plainSnippet, relativeTime } from './notes.js';
-import { seedFor } from './seed-notes.js';
+import { GUIDE_NOTE, GUIDE_VERSION } from './seed-notes.js';
 import { bindEditor } from './editor.js';
 import { initTheme } from './theme.js';
 import { on } from './bus.js';
@@ -44,13 +44,17 @@ async function boot() {
   injectIcons();
   initDialog();
 
-  // Seed the sample notes only for a vault we know is genuinely empty. Which
-  // set depends on the build: the test app gets the per-feature checklist, an
-  // installed app gets one help page. The channel is only asked for when there
-  // is actually going to be a seed.
-  const allowSeed = disk.ok && disk.empty;
-  const channel = allowSeed ? (await window.nebula?.paths?.().catch(() => null))?.channel : null;
-  const store = new NoteStore({ allowSeed, seed: seedFor(channel) });
+  // Seed the guide only for a vault we know is genuinely empty. A vault that
+  // already has notes gets the guide ADDED instead — once per guide version,
+  // never overwriting anything — so an existing copy is not left without it.
+  // Both need a vault that was read successfully; an unreadable one is written
+  // to under no circumstances.
+  const store = new NoteStore({ allowSeed: disk.ok && disk.empty });
+  // When the guide is genuinely new to this vault, open it — otherwise the one
+  // note the user was told to look at is the one they never see.
+  if (disk.ok && store.ensureGuide(GUIDE_NOTE, GUIDE_VERSION)) {
+    store.setActive(store.notes[0].id);
+  }
   const titleEl = $('title');
   const saveEl = $('savestate');
   const listEl = $('note-list');

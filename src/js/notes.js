@@ -4,6 +4,7 @@ import { SEED_NOTES } from './seed-notes.js';
 
 const STORAGE_KEY_NOTES = 'nebula:notes';
 const STORAGE_KEY_ACTIVE = 'nebula:active-note';
+const STORAGE_KEY_GUIDE = 'nebula:guide-version';
 
 export function plainSnippet(html, max = 80) {
   const text = String(html ?? '')
@@ -30,16 +31,15 @@ export class NoteStore {
    *   successfully AND came back genuinely empty — an unreadable vault looks
    *   identical to a first run from in here, and seeding over someone's notes
    *   because a read failed is the one mistake this store must not make.
-   * @param {Array<{title: string, content: string}>} [opts.seed=SEED_NOTES] Which
-   *   starter notes to write. The test build gets the per-feature checklist;
-   *   an installed app gets the single help page (see seedFor).
+   * @param {Array<{title: string, content: string}>} [opts.seed=SEED_NOTES] The
+   *   starter notes to write — one guide page, the same in every build.
    */
   constructor({ allowSeed = true, seed = SEED_NOTES } = {}) {
     this.notes = loadJson(STORAGE_KEY_NOTES, []);
     this.activeId = localStorage.getItem(STORAGE_KEY_ACTIVE);
 
     if (this.notes.length === 0 && allowSeed) {
-      // one note per feature category, so everything can be checked by hand.
+      // One guide page covering every feature, the same in every build.
       // Built in memory and saved ONCE — createNote() saves on every call.
       const now = Date.now();
       this.notes = seed.map((note, i) => ({
@@ -57,6 +57,41 @@ export class NoteStore {
     if (!this.activeId || !this.get(this.activeId)) {
       this.activeId = this.notes[0]?.id ?? null;
     }
+  }
+
+  /**
+   * Add the guide to a vault that predates this version of it — once.
+   *
+   * Seeding only ever happens on an empty vault, and that rule is not up for
+   * negotiation: it is what stops a failed read from looking like a first run.
+   * But it also means anyone who already had notes never saw the guide, and
+   * never saw anything added to it afterwards. This closes that gap the way an
+   * app normally does: it only ever ADDS a note, never edits or removes one,
+   * and it remembers the version it added so deleting the guide keeps it gone.
+   *
+   * @param {{title: string, content: string}} note the guide
+   * @param {string} version bumped whenever the guide's content changes
+   * @returns {boolean} whether a note was added
+   */
+  ensureGuide(note, version) {
+    if (!note || !version) return false;
+    if (localStorage.getItem(STORAGE_KEY_GUIDE) === version) return false;
+
+    // A fresh vault was just seeded with it; only stamp the version.
+    const already = this.notes.some((n) => n.title === note.title);
+    if (!already) {
+      const now = Date.now();
+      this.notes.unshift({
+        id: generateId('n'),
+        title: note.title,
+        content: note.content,
+        createdAt: now,
+        updatedAt: now,
+      });
+      this.save();
+    }
+    localStorage.setItem(STORAGE_KEY_GUIDE, version);
+    return !already;
   }
 
   get(id) {

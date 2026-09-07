@@ -117,6 +117,11 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 4. **Seeding** requires a vault that was read *successfully* and came back
    *empty*. `storage:list` separates ENOENT (a real first run) from any other
    error. Collapsing them once seeded sample notes over a live vault.
+   The corollary bit later: an existing vault therefore never sees a new
+   starter note, in any release. `NoteStore.ensureGuide` is the only sanctioned
+   way round it — it ADDS the guide once per `GUIDE_VERSION`, never edits or
+   removes anything, and is gated on the same `disk.ok`. Do not relax the
+   seeding rule to solve that problem.
 5. **Profiles.** Electron derives `userData` from the package name, so an
    installed, a portable and a dev launch all resolve to `%APPDATA%\nebula`
    unless something intervenes. `electron/user-data.js` is that something, and

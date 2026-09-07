@@ -4,7 +4,7 @@ Calm notes with a real editor. An Electron desktop app for **Windows and macOS**
 that keeps every note as a plain JSON file in your own profile, and updates
 itself without ever touching them.
 
-**Version v0.4.1** ·
+**Version v0.4.2** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 
@@ -41,7 +41,8 @@ So this README describes a small app on purpose. What is here is finished.
 - **`/` opens a block menu** — headings, lists, to-do, quote, code, divider,
   shapes.
 - **Code blocks** are markdown-style with a language picker and syntax colours
-  for JS, TS, Python, Java, C, C++, C#, Dart (Flutter), Ruby, HTML, CSS, JSON, SQL, Bash and Markdown.
+  for JS, TS, Python, Java, C, C++, C#, Dart (Flutter), Ruby, HTML, CSS, JSON,
+  SQL, Bash and Markdown — every one of them with a sample in the guide.
 - **Shapes float over the whole note.** Rectangles, ellipses and diamonds drag
   anywhere, resize from a corner, recolour from dots and hold editable text —
   above or behind the words, which never reflow.
@@ -51,9 +52,10 @@ So this README describes a small app on purpose. What is here is finished.
 - **Lists you can leave.** Enter or Backspace on an empty item ends the list
   rather than adding another one or merging into the line above, and the to-do
   button toggles a line both ways.
-- **Starter notes that suit the build.** An installed copy gets a welcome note
-  and one help page; the test and dev builds get a seven-note per-feature
-  checklist instead.
+- **One starter note, the same in every build.** `Welcome to Nebula Guide` is
+  the whole product on one page: eight sections, each with something to try, and
+  a working code sample for all fifteen languages. A vault that predates it is
+  given a copy — added, never overwriting anything already there.
 - **Three themes**, picked from a segmented control that shows which one is on:
   **Main**, a violet dark theme that is the app's own identity and the default;
   **Dark**, warm paper-and-ink inverted; **Light**, the same warm palette
@@ -155,8 +157,8 @@ happens between a keystroke and a file.
 npm install
 npm run preflight   # START HERE — version, phase, what changed, what is stale
 npm run dev         # dev app on its OWN profile
-npm test            # 135 unit tests
-npm run build && npm run smoke   # 44 checks against the real Electron app
+npm test            # 138 unit tests
+npm run build && npm run smoke   # 50 checks against the real Electron app
 npm run check:versions           # every surface agrees with package.json
 npm run pack:win    # release/Nebula-Setup-*.exe + Nebula-portable-*.exe
 npm run site        # rebuild site/index.html (docs + mind maps)

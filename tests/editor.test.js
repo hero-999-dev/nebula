@@ -6,7 +6,7 @@ import { makeShape, SHAPE_COLORS, SHAPE_KINDS } from '../src/js/shapes.js';
 import { highlight, LANGS } from '../src/js/highlight.js';
 import { codeBlockHtml, getCode } from '../src/js/codeblock.js';
 import { ICONS, icon } from '../src/js/icons.js';
-import { SEED_NOTES, HELP_NOTES, seedFor } from '../src/js/seed-notes.js';
+import { SEED_NOTES, GUIDE_NOTE, GUIDE_VERSION } from '../src/js/seed-notes.js';
 import { AI_SERVICES } from '../src/js/ai-panel.js';
 
 describe('editing-bar layout (the pad moves the BAR, not the note)', () => {
@@ -226,46 +226,6 @@ describe('AI services', () => {
   });
 });
 
-describe('seed notes (one per feature category)', () => {
-  it('covers every category with real content', () => {
-    const titles = SEED_NOTES.map((n) => n.title);
-    expect(titles[0]).toBe('Welcome to Nebula');
-    for (const t of ['Code blocks', 'Text formatting', 'Lists, to-dos & indent', 'Shapes (free movement)', 'Editing bar & AI panel']) {
-      expect(titles.some((x) => x.includes(t)), t).toBe(true);
-    }
-  });
-
-  it('the code note has blocks in many languages, all decodable', () => {
-    const note = SEED_NOTES.find((n) => n.title.includes('Code blocks'));
-    const div = document.createElement('div');
-    div.innerHTML = note.content;
-    const blocks = [...div.querySelectorAll('.blk-code')];
-    expect(blocks.length).toBeGreaterThanOrEqual(7);
-    const langs = blocks.map((b) => b.dataset.lang);
-    expect(new Set(langs).size).toBe(blocks.length); // each language once
-    for (const b of blocks) {
-      expect(LANGS[b.dataset.lang], b.dataset.lang).toBeTruthy();
-      const code = getCode(b);
-      expect(code.length).toBeGreaterThan(10);
-      expect(() => highlight(code, b.dataset.lang)).not.toThrow();
-    }
-  });
-
-  it('the shapes note seeds free-floating shapes on a layer', () => {
-    const note = SEED_NOTES.find((n) => n.title.includes('Shapes'));
-    const div = document.createElement('div');
-    div.innerHTML = note.content;
-    expect(div.querySelector('.shape-layer')).toBeTruthy();
-    expect(div.querySelectorAll('.shape').length).toBe(3);
-    expect(div.querySelector('.shape.behind')).toBeTruthy();
-  });
-
-  it('the formatting note demonstrates each underline style once', () => {
-    const note = SEED_NOTES.find((n) => n.title.includes('Text formatting'));
-    for (const u of U_STYLES) expect(note.content).toContain(u);
-  });
-});
-
 describe('font picker', () => {
   it('offers the faces the user asked for, each with a generic fallback', () => {
     const labels = FONTS.map(([l]) => l);
@@ -303,57 +263,72 @@ describe('font picker', () => {
   });
 });
 
-describe('starter notes per build', () => {
-  it('the builds you check things in get the per-feature checklist', () => {
-    for (const channel of ['test', 'dev']) expect(seedFor(channel), channel).toBe(SEED_NOTES);
-    expect(SEED_NOTES.length).toBeGreaterThan(2);
-  });
-
-  it('an installed build gets the welcome note and one help page', () => {
-    for (const channel of ['installed', 'portable', undefined, null]) {
-      expect(seedFor(channel), String(channel)).toBe(HELP_NOTES);
-    }
-    expect(HELP_NOTES).toHaveLength(2);
-    expect(HELP_NOTES[0].title).toBe('Welcome to Nebula');
-    // One page, so no per-note checklist language in it.
-    expect(HELP_NOTES[1].content).not.toContain('Check:');
-  });
-
-  it('the help page still covers every feature area', () => {
-    const html = HELP_NOTES[1].content;
-    for (const topic of ['Font', 'Equations', 'Shapes', 'to-do', 'Dart', 'theme']) {
-      expect(html.toLowerCase(), topic).toContain(topic.toLowerCase());
-    }
-  });
-
-  it('the code note carries the six languages added in 0.4.0', () => {
-    const note = SEED_NOTES.find((n) => n.title.includes('Code blocks'));
+/**
+ * The starter note. It was six or seven separate "Test ·" notes plus a second
+ * set for installed copies; the thing you wanted was always in the note you had
+ * not opened, and the two sets drifted. One page now, identical in every build.
+ */
+describe('the guide note', () => {
+  const doc = () => {
     const div = document.createElement('div');
-    div.innerHTML = note.content;
-    const langs = [...div.querySelectorAll('.blk-code')].map((b) => b.dataset.lang);
-    for (const lang of ['c', 'cpp', 'csharp', 'java', 'dart', 'ruby']) {
-      expect(langs, lang).toContain(lang);
+    div.innerHTML = GUIDE_NOTE.content;
+    return div;
+  };
+
+  it('is the only starter note, and is what every build seeds', () => {
+    expect(SEED_NOTES).toEqual([GUIDE_NOTE]);
+    expect(GUIDE_NOTE.title).toBe('Welcome to Nebula Guide');
+    expect(GUIDE_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it('opens with the welcome, then covers every feature area', () => {
+    const div = doc();
+    expect(div.querySelector('h1').textContent).toBe('Welcome to Nebula');
+    const headings = [...div.querySelectorAll('h2')].map((h) => h.textContent);
+    for (const area of ['window', 'Writing', 'Fonts', 'Lists', 'Equations', 'Shapes', 'Code blocks', 'notes live']) {
+      expect(headings.some((h) => h.includes(area)), area).toBe(true);
     }
   });
 
-  it('seeded equations carry LaTeX source, not a frozen rendering', () => {
-    for (const note of [...SEED_NOTES, ...HELP_NOTES]) {
-      const div = document.createElement('div');
-      div.innerHTML = note.content;
-      for (const eq of div.querySelectorAll('.inline-eq')) {
-        expect(eq.dataset.tex, note.title).toBeTruthy();
-      }
+  it('has a sample for EVERY language the picker offers', () => {
+    // The user's report was "I still do not see examples for all the code
+    // languages" — TypeScript and Bash had none. Anything added to LANGS from
+    // now on fails here until it has one.
+    const langs = [...doc().querySelectorAll('.blk-code')].map((b) => b.dataset.lang);
+    const expected = Object.keys(LANGS).filter((l) => l !== 'plain');
+    expect([...langs].sort()).toEqual([...expected].sort());
+  });
+
+  it('every sample decodes and highlights without throwing', () => {
+    for (const block of doc().querySelectorAll('.blk-code')) {
+      const src = getCode(block);
+      expect(src.length, block.dataset.lang).toBeGreaterThan(20);
+      expect(() => highlight(src, block.dataset.lang)).not.toThrow();
+      expect(highlight(src, block.dataset.lang), block.dataset.lang).toContain('tok-');
     }
   });
 
-  it('the shapes note puts a behind-shape on the behind layer', () => {
-    // A single overlay could only fake "behind" with opacity; the shape has to
-    // physically live under the text.
-    const note = SEED_NOTES.find((n) => n.title.includes('Shapes'));
-    const div = document.createElement('div');
-    div.innerHTML = note.content;
+  it('demonstrates every underline style', () => {
+    for (const u of U_STYLES) expect(GUIDE_NOTE.content).toContain(u);
+  });
+
+  it('carries equations as LaTeX source, not a frozen rendering', () => {
+    const eqs = [...doc().querySelectorAll('.inline-eq')];
+    expect(eqs.length).toBeGreaterThanOrEqual(4);
+    for (const eq of eqs) expect(eq.dataset.tex).toBeTruthy();
+  });
+
+  it('puts the behind-shape on the behind layer, not just in a class', () => {
+    const div = doc();
+    expect(div.querySelectorAll('.shape-layer').length).toBe(2);
+    expect(div.querySelectorAll('.shape').length).toBe(3);
     const behind = div.querySelector('.shape.behind');
     expect(behind.closest('.shape-layer').classList.contains('shape-layer--behind')).toBe(true);
-    expect(div.querySelectorAll('.shape-layer').length).toBe(2);
+  });
+
+  it('includes the fonts the user named', () => {
+    for (const face of ['Arial', 'Calibri', 'Times New Roman', 'Comic Sans MS']) {
+      expect(GUIDE_NOTE.content, face).toContain(face);
+    }
   });
 });

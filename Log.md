@@ -13,6 +13,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-07 06:31] v0.4.2 - by claude
+
+One starter note: Welcome to Nebula Guide covers every feature on a single page, with a working code sample for all fifteen languages — and an existing vault is given a copy.
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-07 05:45] v0.4.1 - by claude
 
 Eight fixes from the test build: lists you can leave, a to-do you can undo, a font menu that works, equations in a frame, and shapes that really go behind the text.

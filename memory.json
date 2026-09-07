@@ -1,8 +1,8 @@
 {
   "projectName": "Nebula",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "lastUpdated": "2026-09-07",
-  "currentPhase": "v0.4.x - editor polish driven by defect reports from the test build: lists that stop cutting each other and can be left, an escapable inline format, KaTeX equations, six more code languages, a real font menu, and shapes that genuinely go behind the text.",
+  "currentPhase": "v0.4.x - editor polish driven by defect reports from the test build, and one starter note: 'Welcome to Nebula Guide' covers every feature on a single page with a sample for all fifteen code languages, and is the same in every build.",
   "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, command palette, search, i18n.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
@@ -31,8 +31,8 @@
     "releasePolicy": "Standing instruction (2026-09-07): release finished work with npm run push without being asked, and never ask which platforms to build - the repo is public, so Actions is free on both Windows and macOS runners. npm run push also refreshes Nebula Test.exe in the project root."
   },
   "quality": {
-    "unitTests": 135,
-    "smokeChecks": 44,
+    "unitTests": 138,
+    "smokeChecks": 50,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
@@ -44,8 +44,8 @@
     "win.signAndEditExecutable must stay unset — false also disables rcedit, which is what writes the exe's icon and version info.",
     "The `hidden` attribute is only a UA display:none - any author `display` rule beats it. app.css carries [hidden]{display:none!important}; assert computed display in tests, never el.hidden.",
     "Shapes live on two layers (.shape-layer and .shape-layer--behind). 'Send behind text' moves the node between them; a class alone cannot cross a stacking context.",
-    "Starter notes depend on the build channel: seedFor('test'|'dev') gives the per-feature checklist, everything else gets the welcome note plus one help page.",
-    "npm run kill closes Nebula.exe, Nebula Test.exe and the versioned portable; pack:test runs it first, so the test build refreshes without anyone closing a window."
+    "npm run kill closes Nebula.exe, Nebula Test.exe and the versioned portable; pack:test runs it first, so the test build refreshes without anyone closing a window.",
+    "Every build seeds the SAME single guide note. Seeding still only happens on an empty, successfully-read vault; NoteStore.ensureGuide adds the guide to an older vault once per GUIDE_VERSION, adding only - never editing or deleting."
   ],
   "history": [
     {

@@ -21,9 +21,8 @@ if (!fs.existsSync(mainJs)) {
   process.exit(1);
 }
 
-// The dev profile seeds the per-feature checklist (seedFor in seed-notes.js);
-// an installed copy gets the two-note help set instead.
-const SEEDED = 7;
+// One guide note, the same in every build (seed-notes.js).
+const SEEDED = 1;
 
 const results = [];
 const check = (name, ok, extra = '') => {
@@ -127,18 +126,30 @@ try {
   check('toolbar, slash menu, shapes and AI panel are wired',
     surfaces.toolbar && surfaces.slash && surfaces.shapes && surfaces.ai);
 
-  // Code blocks live in one seed note, so the note has to be opened first —
-  // the boot note is the welcome one.
-  const openedCode = await win.evaluate(() => {
-    const row = [...document.querySelectorAll('.note-row')]
-      .find((el) => el.querySelector('.nr-title')?.textContent.includes('Code blocks'));
-    row?.click();
-    return !!row;
-  });
-  check('the code-blocks seed note is in the list', openedCode);
+  // The guide is the only starter note, and it is what boots.
+  const bootTitle = await win.evaluate(() => document.querySelector('.note-row .nr-title')?.textContent);
+  check('the guide is the starter note', bootTitle === 'Welcome to Nebula Guide', bootTitle);
+
   await win.waitForSelector('#editor .blk-code', { timeout: 5_000 });
-  check('opening it renders a highlighted code block',
-    await win.evaluate(() => !!document.querySelector('#editor .blk-code .code-src')));
+  // Every language the picker offers must have a sample IN the guide — the
+  // user reported still not seeing examples for all of them, and TypeScript
+  // and Bash genuinely had none.
+  const guideLangs = await win.evaluate(() => ({
+    inNote: [...document.querySelectorAll('#editor .blk-code')].map((b) => b.dataset.lang),
+    offered: [...document.querySelectorAll('#editor .blk-code .code-lang option')].map((o) => o.value),
+    // A block whose rules failed to load paints no tokens at all and reads as
+    // flat grey text — which is exactly what the user would see.
+    flat: [...document.querySelectorAll('#editor .blk-code')]
+      .filter((b) => !b.querySelector('.code-src [class^="tok-"]'))
+      .map((b) => b.dataset.lang),
+  }));
+  const missing = [...new Set(guideLangs.offered)]
+    .filter((l) => l !== 'plain' && !guideLangs.inNote.includes(l));
+  check('the guide has a code sample for every language offered',
+    missing.length === 0 && guideLangs.inNote.length >= 15,
+    missing.length ? `missing: ${missing.join(', ')}` : `${guideLangs.inNote.length} samples`);
+  check('every sample is painted, none left flat grey',
+    guideLangs.flat.length === 0, guideLangs.flat.join(', '));
 
   const before = onDisk.slice().sort().join(',');
   await app.close();
@@ -434,7 +445,48 @@ try {
 
   await app.close();
 
-  /* -------------------------- 4. an unreadable vault must NOT look like a first run */
+  /* ------------------- 4. a vault that predates the guide gets it, and keeps its notes */
+  // This is the path that runs on a machine that has been using Nebula: seeding
+  // only ever happens on an EMPTY vault, so without `ensureGuide` an existing
+  // copy would never see the guide at all — which is exactly what the user hit
+  // ("I still don't see examples for all the languages"). It must ADD, never
+  // overwrite, and it must not run twice.
+  const existing = newProfile();
+  const notesDir = path.join(existing, 'storage', 'notes');
+  fs.mkdirSync(notesDir, { recursive: true });
+  const mine = { id: 'n_mine', title: 'My own note', content: '<p>do not touch</p>', createdAt: 1, updatedAt: 1 };
+  fs.writeFileSync(path.join(notesDir, 'n_mine.json'), JSON.stringify(mine), 'utf8');
+
+  app = await launch(existing);
+  win = await app.firstWindow();
+  await win.waitForSelector('#app', { timeout: 20_000 });
+  await win.waitForFunction(() => document.querySelectorAll('.note-row').length > 1, undefined, { timeout: 10_000 });
+  await win.waitForTimeout(1200);
+
+  {
+    const state = await win.evaluate(() => ({
+      titles: [...document.querySelectorAll('.note-row .nr-title')].map((el) => el.textContent),
+      open: document.querySelector('#title')?.value,
+    }));
+    check('an existing vault is given the guide',
+      state.titles.includes('Welcome to Nebula Guide'), state.titles.join(' | '));
+    check('and the guide is what opens, so it is actually seen',
+      state.open === 'Welcome to Nebula Guide', state.open);
+    check('the note that was already there is untouched',
+      JSON.stringify(JSON.parse(fs.readFileSync(path.join(notesDir, 'n_mine.json'), 'utf8'))) === JSON.stringify(mine));
+  }
+  await app.close();
+
+  app = await launch(existing);
+  win = await app.firstWindow();
+  await win.waitForSelector('#app', { timeout: 20_000 });
+  await win.waitForTimeout(1500);
+  check('a second launch does not add it again',
+    await win.evaluate(() => [...document.querySelectorAll('.note-row .nr-title')]
+      .filter((el) => el.textContent === 'Welcome to Nebula Guide').length) === 1);
+  await app.close();
+
+  /* -------------------------- 5. an unreadable vault must NOT look like a first run */
   // storage/notes as a FILE makes readdir fail with ENOTDIR - a real error that
   // is not ENOENT, which is exactly the case that used to seed over live data.
   const broken = newProfile();
