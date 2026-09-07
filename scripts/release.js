@@ -48,6 +48,17 @@ function runLoud(cmd, cmdArgs) {
   execFileSync(cmd, cmdArgs, { cwd: ROOT, stdio: 'inherit', shell: needsShell });
 }
 
+/** Like runLoud, but hands back the exit code instead of throwing. */
+function runSoft(cmd, cmdArgs) {
+  const needsShell = process.platform === 'win32' && (cmd === 'npm' || cmd === 'npx');
+  try {
+    execFileSync(cmd, cmdArgs, { cwd: ROOT, stdio: 'inherit', shell: needsShell });
+    return 0;
+  } catch (err) {
+    return err.status ?? 1;
+  }
+}
+
 function git(...gitArgs) {
   return run('git', gitArgs);
 }
@@ -112,8 +123,22 @@ runLoud('npm', ['test']);
 console.log('\n> npm run build');
 runLoud('npm', ['run', 'build']);
 
+// The smoke suite reports 2 when the RUN could not finish — a Playwright wait
+// that timed out because the window stopped being composited, which is what a
+// machine short of memory does, and this runs straight after the unit tests and
+// a full build. That says nothing about the code, so it gets one more attempt.
+// Exit 1 is a check that actually failed, and stops the release immediately.
 console.log('\n> npm run smoke');
-runLoud('npm', ['run', 'smoke']);
+{
+  const first = runSoft('npm', ['run', 'smoke']);
+  if (first === 1) fail('Smoke checks failed. Nothing was committed.');
+  if (first !== 0) {
+    console.warn(`\n  ! the smoke run could not finish (exit ${first}) — retrying once.\n`);
+    const second = runSoft('npm', ['run', 'smoke']);
+    if (second === 1) fail('Smoke checks failed. Nothing was committed.');
+    if (second !== 0) fail('Smoke could not complete twice. Nothing was committed.');
+  }
+}
 
 // The docs site is NOT built here. It stamps the version from package.json, and
 // the bump happens below — building it now publishes a page that is one release

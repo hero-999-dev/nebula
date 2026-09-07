@@ -45,7 +45,8 @@ export function makeShape(kind = 'rect', color = SHAPE_COLORS[0], at = null) {
   return el;
 }
 
-export function addShape(editorEl, kind) {
+export function addShape(editorEl, kind, history) {
+  history?.push();
   const layer = ensureLayer(editorEl);
   const shape = makeShape(kind, SHAPE_COLORS[0], { left: 40 + cascade * 28, top: (editorEl.scrollTop || 0) + 40 + cascade * 24 });
   layer.appendChild(shape);
@@ -53,7 +54,7 @@ export function addShape(editorEl, kind) {
   return shape;
 }
 
-export function initShapes(editorEl) {
+export function initShapes(editorEl, { history } = {}) {
   if (!editorEl) return null;
   let drag = null;
   let selected = null;
@@ -77,8 +78,14 @@ export function initShapes(editorEl) {
     // with nothing to act on.
     if (!selected.isConnected) { select(null); return; }
     const r = selected.getBoundingClientRect();
-    bar.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - 250))}px`;
-    bar.style.top = `${Math.max(8, r.top - 42)}px`;
+    const w = bar.offsetWidth || 250;
+    const h = bar.offsetHeight || 34;
+    // Above the shape by default, below it when the shape is near the top, and
+    // never off the window: a bar parked outside the viewport takes its buttons
+    // — including the one that deletes the shape — out of reach.
+    const top = r.top - h - 8 >= 8 ? r.top - h - 8 : Math.min(r.bottom + 8, window.innerHeight - h - 8);
+    bar.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - w - 8))}px`;
+    bar.style.top = `${Math.max(8, top)}px`;
   }
 
   /**
@@ -121,15 +128,18 @@ export function initShapes(editorEl) {
     let shape = e.target.closest('.shape');
     if (!shape) {
       // Nothing was hit directly. Before letting the click place a caret, check
-      // whether a shape is sitting under the text at this point — but only take
-      // the click if that shape is not already selected. So: one click picks up
-      // the buried shape, a second click goes through to the text, and a large
-      // shape never makes the paragraph over it permanently unclickable.
-      const under = behindShapeAt(e.clientX, e.clientY);
-      if (under && under !== selected) shape = under;
+      // whether a shape is sitting under the text at this point.
+      //
+      // 0.4.4 only took the click when that shape was NOT already selected,
+      // which meant every press after the first one fell through — and since a
+      // drag begins with a press, a shape behind the text could be selected but
+      // never moved. The press always goes to the shape now; reaching the text
+      // underneath is handled on mouseUP instead, below.
+      shape = behindShapeAt(e.clientX, e.clientY);
     }
     if (!shape) return; // the document listener above already deselected
     claimed.add(e); // ...and it must not undo what happens next
+    const wasSelected = shape === selected;
     // Leaving edit mode on any other shape, so the next click grabs it rather
     // than landing in its text.
     editorEl.querySelectorAll('.shape.editing').forEach((s) => {
@@ -141,7 +151,13 @@ export function initShapes(editorEl) {
     // completely, so a drag could only start from the 1.6px border.
     if (shape.classList.contains('editing') && e.target.closest('.shape-text') && !handle) return;
     e.preventDefault();
+    // One snapshot for the whole gesture, taken before the first pixel moves.
+    history?.push();
     drag = {
+      wasSelected,
+      moved: false,
+      downX: e.clientX,
+      downY: e.clientY,
       el: shape,
       kind: handle ? 'resize' : 'move',
       startX: e.clientX,
@@ -157,6 +173,7 @@ export function initShapes(editorEl) {
     if (!drag) return;
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
+    if (Math.abs(e.clientX - drag.downX) > 2 || Math.abs(e.clientY - drag.downY) > 2) drag.moved = true;
     if (drag.kind === 'move') {
       // free movement across the whole note — only kept out of negative space
       drag.el.style.left = `${Math.max(0, drag.left + dx)}px`;
@@ -168,26 +185,52 @@ export function initShapes(editorEl) {
     positionBar();
   });
 
-  window.addEventListener('mouseup', () => {
-    if (drag) { drag = null; dirty(); }
+  window.addEventListener('mouseup', (e) => {
+    if (!drag) return;
+    const { el, moved, wasSelected } = drag;
+    drag = null;
+    if (moved) { dirty(); return; }
+
+    // A press that never moved is a click. On a shape that was ALREADY
+    // selected it means "let me at what is here": the shape's own text if the
+    // pointer is over it, otherwise the paragraph underneath — which is the
+    // only way to reach text that a behind-shape is covering.
+    if (!wasSelected) return;
+    if (e.target.closest('.shape-text')) { startEditing(el); return; }
+    if (el.classList.contains('behind')) {
+      select(null);
+      const range = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+      if (range && editorEl.contains(range.startContainer)) {
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        editorEl.focus();
+      }
+    }
   });
 
   editorEl.addEventListener('scroll', () => { if (selected) positionBar(); });
 
-  editorEl.addEventListener('dblclick', (e) => {
-    const shape = e.target.closest('.shape');
+  /** Hand the shape's text over to the caret. Double-click, or a second click. */
+  function startEditing(shape) {
     if (!shape) return;
     shape.classList.add('editing'); // now the text takes clicks, and drags stop
     const text = shape.querySelector('.shape-text');
-    text?.focus();
-    if (text) {
-      const r = document.createRange();
-      r.selectNodeContents(text);
-      r.collapse(false);
-      const s = window.getSelection();
-      s.removeAllRanges();
-      s.addRange(r);
-    }
+    if (!text) return;
+    text.focus();
+    const r = document.createRange();
+    r.selectNodeContents(text);
+    r.collapse(false);
+    const s = window.getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+  }
+
+  editorEl.addEventListener('dblclick', (e) => {
+    const shape = e.target.closest('.shape') ?? behindShapeAt(e.clientX, e.clientY);
+    if (!shape) return;
+    select(shape);
+    startEditing(shape);
   });
 
   // floating shape toolbar (colors + delete + send back/front)
@@ -202,10 +245,13 @@ export function initShapes(editorEl) {
     bar.addEventListener('click', (e) => {
       if (!selected) return;
       const color = e.target.closest('.dot')?.dataset.color;
-      if (color) { selected.style.background = color; dirty(); return; }
+      if (color) { history?.push(); selected.style.background = color; dirty(); return; }
       const act = e.target.closest('[data-shape]')?.dataset.shape;
-      if (act === 'del') { selected.remove(); select(null); dirty(); }
+      // Deleting a shape has to be undoable: it is a scripted DOM removal, and
+      // Chromium's undo has never known about those.
+      if (act === 'del') { history?.push(); selected.remove(); select(null); dirty(); }
       else if (act === 'back' || act === 'front') {
+        history?.push();
         const behind = act === 'back';
         selected.classList.toggle('behind', behind);
         // Actually move it: the class alone cannot cross a stacking context.
@@ -221,6 +267,7 @@ export function initShapes(editorEl) {
     if ((e.key === 'Delete' || e.key === 'Backspace') && selected &&
         !document.activeElement?.classList?.contains('shape-text')) {
       e.preventDefault();
+      history?.push();
       selected.remove();
       select(null);
       dirty();
@@ -228,7 +275,7 @@ export function initShapes(editorEl) {
   });
 
   return {
-    addShape: (kind) => select(addShape(editorEl, kind)),
+    addShape: (kind) => select(addShape(editorEl, kind, history)),
     select,
     /** Called when a note is opened: the previous note's shapes are gone. */
     reset: () => select(null),

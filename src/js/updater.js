@@ -113,12 +113,15 @@ function render(status) {
 export function initUpdater({ checkButton = null } = {}) {
   api = window.nebula?.updates ?? null;
   card = $('update-card');
-  if (!card) return false;
+  // The caller always gets a usable handle: Help -> Check for updates should
+  // say "not available here", not throw.
+  const inert = { checkForUpdates: async () => null };
+  if (!card) return inert;
 
   if (!api) {
     // Browser preview — there is nothing to update.
     checkButton?.remove();
-    return false;
+    return inert;
   }
 
   textEl = $('uc-text');
@@ -134,19 +137,22 @@ export function initUpdater({ checkButton = null } = {}) {
 
   api.onStatus((status) => render(status));
 
-  checkButton?.addEventListener('click', async () => {
+  /** A check the user can see the result of, however it turns out. */
+  async function checkForUpdates() {
     userAsked = true;
     try {
-      render(await api.check());
+      return render(await api.check());
     } finally {
       // Later background checks stay silent again.
       setTimeout(() => { userAsked = false; }, 1000);
     }
-  });
+  }
+
+  checkButton?.addEventListener('click', () => { void checkForUpdates(); });
 
   // Pick up a status that arrived before this module was wired up.
   api.state().then((status) => { if (status && status.state !== 'none') render(status); }).catch(() => {});
-  return true;
+  return { checkForUpdates };
 }
 
 export async function showAppVersion(el) {

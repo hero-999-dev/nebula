@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 156 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 71 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 201 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 92 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -18,7 +18,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 
 | File | Tests | Proves |
 |---|---|---|
-| `tests/notes.test.js` | 22 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body, and adds the guide to an older vault exactly once without touching what is there |
+| `tests/notes.test.js` | 20 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body, and adds the guide to an older vault exactly once without touching what is there |
 | `tests/editor.test.js` | 41 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and the guide note's completeness |
 | `tests/lists.test.js` | 23 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
 | `tests/inline-format.test.js` | 18 | Enter and Backspace out of an inline wrapper |
@@ -28,7 +28,10 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/user-data.test.js` | 8 | Which vault each build channel gets, and which one may replace itself |
 | `tests/version-compare.test.js` | 7 | `0.3.10 > 0.3.9`, `v` prefixes, pre-releases, unparseable tags refuse rather than guess |
 | `tests/find.test.js` | 9 | Finding text in a note without editing it |
-| `tests/e2e/smoke.mjs` | 71 | The real app, six launches |
+| `tests/history.test.js` | 21 | The editor's own undo stack |
+| `tests/notes-archive.test.js` | 14 | Pin, archive, trash and restore |
+| `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
+| `tests/e2e/smoke.mjs` | 92 | The real app, six launches |
 
 ---
 
@@ -77,6 +80,91 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-07] v0.5.0 - the editor gets its own undo, and the app gets a menu bar
+
+**Unit 156 -> 201, smoke 71 -> 92.** Three new suites: `history.test.js` (21),
+`notes-archive.test.js` (14), `app-menu.test.js` (10).
+
+**Three fixes from 0.4.x never actually worked. They were reproduced in the
+running app before anything was changed this time**, and two of the three had a
+different cause than the code review suggested:
+
+- **A colour with only a caret did nothing.** Not a CSS or theme problem at all:
+  `applyExclusive` returns early on a collapsed selection, and the caret
+  fallback the font picker grew in 0.4.4 was never given to the colours. Proved
+  by driving the real menu in all four themes - with a *selection* the colour
+  applied correctly every time, which is why reading the code had not found it.
+- **Formatting quietly corrupted the text.** 0.4.4 routed `wrapSelection`
+  through `execCommand('insertHTML')` to get onto Chromium's undo stack. It
+  worked, and it rewrote the spaces on either side of the selection:
+  `<p>colour&nbsp;<span class="c-red">this</span>&nbsp;word</p>`. Every
+  formatting action, every time.
+- **A shape behind the text could be selected but never moved.** The
+  `under !== selected` guard added in 0.4.4 dropped every mousedown after the
+  first, and a drag begins with a mousedown.
+
+**The editor now has its own undo stack** (`history.js`). Chromium's knows only
+about edits Chromium made, and this app makes a lot by script - shapes, list
+repair, equations, wrappers - so `execCommand('undo')` was always rolling back
+the wrong thing. Snapshots of the note plus a path-based caret, typing coalesced
+into one step at 600 ms, everything else its own step, 100 per note, cleared
+when another note opens. `wrapSelection` went back to precise node surgery,
+because there is nothing left to buy from the browser's command.
+
+Deleting a shape and pressing Ctrl+Z now brings it back **with its position and
+its colour** - the check asserts both, not merely that a shape exists.
+
+**Notes gained pin, archive and trash.** The old `deleteActive` refused to
+remove the last note because nothing could bring it back; the trash is that way
+back, so the guard is gone and the guide can be deleted and re-added from Help.
+Archiving deliberately does not touch `updatedAt` - it is not editing.
+
+**Two bugs the new checks caught in the new code:**
+- The document-level shape deselect bubbles last, so it cleared the selection
+  microseconds after a buried shape was picked up. Claimed events are skipped.
+- `renderList` returned early on an empty list, before redrawing the archive and
+  trash counts - and trashing the last note is exactly when they change. The
+  trash showed 0 with a note in it.
+
+**The app draws its own File / Edit / View / Window / Help**, beside an enlarged
+logo, in a title strip the window no longer draws itself (`titleBarStyle:
+'hidden'` plus `titleBarOverlay`, `hiddenInset` on macOS). `Menu.setApplicationMenu(null)`
+removes the stock bar. The same definitions are the only list the Ctrl+K palette
+reads, so a command cannot exist in one and not the other - a unit test pins
+that. Zoom works and is remembered: it acts on the window rather than on
+whatever `webContents` has focus, which is why the stock View roles appeared
+dead with the AI panel in front.
+
+**Window state** - size, position and maximised - is remembered, and Maximize is
+in the Window menu.
+
+**Updates are checked on every launch in every channel**, two seconds in rather
+than ten and no longer only when packaged.
+
+**The smoke suite could not be released with.** It passed three times in a row
+standalone and then failed inside `npm run push` — which runs it after the unit
+tests and a build, on a loaded machine. `page.click` waits for an element to be
+"stable", and it decides that with `requestAnimationFrame`; rAF stops firing
+when the window is not being composited, so a button sitting perfectly still
+timed out after thirty seconds and took the release with it. (Measured: the
+button's box was identical across fourteen samples over five seconds.)
+
+There are no `page.click` calls left. Fixture steps — "put the app in this
+state" — call the handler directly; a mousedown listener gets a real mousedown;
+and the shape bar, where hit-testing genuinely is the thing under test, is
+clicked through `win.mouse` at the element's centre after asserting that the
+element is what sits at that point. That last one is a **stronger** check than
+`page.click` was, and it is what the position:fixed bar needed.
+
+Three consecutive clean runs before the release was retried — and it failed
+again, this time killed outright for low memory. So the suite now says which
+kind of failure it had: **exit 1 is a check that failed, exit 2 is a run that
+could not finish** (a Playwright wait timing out, a closed target). `npm run
+push` stops immediately on a 1 and gives a 2 one more attempt, which is the
+honest split — a real regression fails both times. A throw also leaves an
+Electron instance alive, and this suite starts six of them, so the teardown is
+in a `finally` now.
 
 ### [2026-09-07] v0.4.4 - ten things reported from the test build
 

@@ -103,7 +103,7 @@ export function parseSize(raw) {
   return Math.min(400, Math.max(6, Math.round(n)));
 }
 
-export function initToolbar(editorEl, { onSave, shapes } = {}) {
+export function initToolbar(editorEl, { onSave, shapes, history } = {}) {
   const toolbar = document.getElementById('toolbar');
   const miniBar = document.getElementById('mini-bar');
   if (!toolbar || !editorEl) return null;
@@ -124,6 +124,9 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
 
   function cmd(name, value = null) {
     editorEl.focus();
+    // Even the browser's own commands are snapshotted: the app's undo is the
+    // only one now, so it has to know about every edit, not just ours.
+    history?.push();
     document.execCommand(name, false, value);
     dirty();
   }
@@ -144,26 +147,28 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
   }
 
   /**
-   * Wrap the selection in a classed span — through `insertHTML`, not by moving
-   * nodes.
+   * Wrap the selection in a classed span.
    *
-   * Chromium's undo stack only knows about edits IT made. A scripted
-   * extractContents/insertNode is invisible to it, so Ctrl+Z would undo some
-   * older edit while the scripted one stayed, and the two states together came
-   * out as duplicated text. `insertHTML` is a real edit command, so one Ctrl+Z
-   * takes the whole wrap back off.
+   * Precise node surgery, deliberately. 0.4.4 routed this through
+   * `execCommand('insertHTML')` to get onto Chromium's undo stack, and it
+   * worked — but insertHTML re-serialises the fragment and rewrote the spaces
+   * on either side of the selection as `&nbsp;`:
+   *
+   *     <p>colour&nbsp;<span class="c-red">this</span>&nbsp;word</p>
+   *
+   * Every formatting action quietly corrupted the text that way. Undo comes
+   * from history.js now, so there is nothing to buy by going through the
+   * browser's own command.
    */
   function wrapSelection(cls) {
     const range = selectionInEditor();
     if (!range || range.collapsed) return null;
-    const holder = document.createElement('div');
-    holder.appendChild(range.cloneContents());
-    const mark = `nb${Math.random().toString(36).slice(2, 9)}`;
-    editorEl.focus();
-    document.execCommand('insertHTML', false, `<span class="${cls} ${mark}">${holder.innerHTML}</span>`);
-    const span = editorEl.querySelector(`.${mark}`);
-    if (!span) { dirty(); return null; }
-    span.classList.remove(mark);
+    history?.push();
+    const span = document.createElement('span');
+    span.className = cls;
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+    editorEl.normalize();
     reselect(span);
     dirty();
     return span;
@@ -178,6 +183,7 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
     const sel = classes.map((c) => `.${c}`).join(',');
     const range = selectionInEditor();
     if (!range || !sel) return;
+    history?.push();
     // wrappers fully inside the selection
     if (range.cloneContents().querySelector?.(sel)) {
       const span = document.createElement('span');
@@ -225,9 +231,28 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
     wrapSelection(cls);
   }
 
-  const applyUnderline = (cls) => applyExclusive(U_STYLES, cls === 'none' ? '' : cls);
-  const applyTextColor = (cls) => applyExclusive(colorClasses(TEXT_COLORS), cls);
-  const applyHilite = (cls) => applyExclusive(colorClasses(HILITE_COLORS), cls);
+  /**
+   * With nothing selected, apply to the whole block.
+   *
+   * `applyExclusive` returns early on a collapsed selection, so putting the
+   * caret in a line and picking a colour did *nothing at all* — which is
+   * exactly what was reported. The font picker grew this fallback in 0.4.4 and
+   * the colours never did.
+   */
+  function applyToBlockOrSelection(classes, cls) {
+    const range = selectionInEditor();
+    if (range && !range.collapsed) { applyExclusive(classes, cls); return; }
+    const block = blockOf();
+    if (!block) return;
+    history?.push();
+    block.classList.remove(...classes);
+    if (cls) block.classList.add(cls);
+    dirty();
+  }
+
+  const applyUnderline = (cls) => applyToBlockOrSelection(U_STYLES, cls === 'none' ? '' : cls);
+  const applyTextColor = (cls) => applyToBlockOrSelection(colorClasses(TEXT_COLORS), cls);
+  const applyHilite = (cls) => applyToBlockOrSelection(colorClasses(HILITE_COLORS), cls);
 
   /** What a colour class actually paints in the theme that is on right now. */
   function tokenValue(cls, prop) {
@@ -253,6 +278,7 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
   function indent(delta) {
     const el = blockOf();
     if (!el) return;
+    history?.push();
     const next = stepIndent(el.dataset.ind, delta);
     if (next === 0) delete el.dataset.ind;
     else el.dataset.ind = String(next);
@@ -275,6 +301,7 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
   function makeTodo() {
     const el = blockOf();
     if (!el) { cmd('insertHTML', '<div class="blk-todo"><br></div>'); return; }
+    history?.push();
     const isTodo = el.classList.contains('blk-todo');
     const next = document.createElement(isTodo ? 'p' : 'div');
     if (!isTodo) next.className = 'blk-todo';
@@ -292,6 +319,7 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
    * them inside its own undo entry instead of replacing them wholesale.
    */
   function applyFontSize(px) {
+    history?.push();
     const range = selectionInEditor();
     if (!range || range.collapsed) {
       const block = blockOf();
@@ -326,6 +354,7 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
    */
   function listCommand(name) {
     editorEl.focus();
+    history?.push();
     document.execCommand(name, false, null);
     normalizeLists(editorEl);
     dirty();
@@ -336,8 +365,10 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
   const equation = initEquation(editorEl, { dirty });
 
   const ACTIONS = {
-    undo: () => cmd('undo'),
-    redo: () => cmd('redo'),
+    // Not execCommand('undo'): Chromium's stack cannot see the edits this app
+    // makes by script, so it would roll back the wrong thing. See history.js.
+    undo: () => { if (history?.undo()) dirty(); },
+    redo: () => { if (history?.redo()) dirty(); },
     ul: () => listCommand('insertUnorderedList'),
     ol: () => listCommand('insertOrderedList'),
     todo: makeTodo,
@@ -468,6 +499,7 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
   function applyFont(stack) {
     const range = selectionInEditor();
     editorEl.focus();
+    history?.push();
     if (!range || range.collapsed) {
       const block = blockOf();
       if (!block) return;
@@ -593,6 +625,8 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
 
     if (!mod) return;
     const k = e.key.toLowerCase();
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); ACTIONS.undo(); return; }
+    if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); ACTIONS.redo(); return; }
     if (k === 'e') { e.preventDefault(); ACTIONS.code(); }
     else if (k === 'q') { e.preventDefault(); ACTIONS.eq(); }
     else if (k === 't') { e.preventDefault(); ACTIONS.color(); }

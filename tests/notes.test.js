@@ -40,11 +40,15 @@ describe('NoteStore', () => {
     expect(store.active().content).toContain('World');
   });
 
-  it('will not delete the last note', () => {
+  it('lets the last note go to the trash, because the trash is a way back', () => {
+    // The old guard refused to remove the last note — there was nowhere to
+    // recover it from. There is now, and the user has to be able to delete the
+    // guide from their own list.
     const store = new NoteStore();
-    while (store.notes.length > 1) store.deleteActive();
-    expect(store.deleteActive()).toBe(false);
-    expect(store.notes.length).toBe(1);
+    for (const note of [...store.live()]) store.trash(note.id);
+    expect(store.live()).toEqual([]);
+    expect(store.trashed()).toHaveLength(1);
+    expect(store.activeId).toBeNull();
   });
 
   it('filters by title and body', () => {

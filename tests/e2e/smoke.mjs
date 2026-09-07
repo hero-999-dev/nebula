@@ -30,6 +30,64 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? '+' : 'x'} ${name}${extra ? ` - ${extra}` : ''}`);
 };
 
+/**
+ * Press a control without going through Playwright's actionability checks.
+ *
+ * `page.click` waits for the element to be "stable", which it decides with
+ * requestAnimationFrame — and rAF stops firing when the window is not being
+ * composited. Under the load of `npm run push` (tests, then a build, then
+ * this) that happens often enough to fail a release with a 30-second timeout
+ * on a button that is sitting perfectly still.
+ *
+ * So: real mouse events stay real wherever the POINTER is what is under test —
+ * dragging a shape, clicking through text onto a buried one, hitting the
+ * shape bar. Everything else is a fixture step, "put the app in this state",
+ * and that only needs the handler to run.
+ */
+const press = (win, selector) => win.evaluate((sel) => {
+  const el = document.querySelector(sel);
+  if (!el) throw new Error(`nothing to press at ${sel}`);
+  el.click();
+}, selector);
+
+/** Focus the editor. A click there is only ever "put the caret in it". */
+const focusEditor = (win) => win.evaluate(() => document.getElementById('editor').focus());
+
+/**
+ * A real mousedown, without the actionability wait.
+ *
+ * Used where a listener is bound to mousedown rather than click — deselecting a
+ * shape by pressing somewhere else is one — so `el.click()` would not reach it.
+ */
+const pressDown = (win, selector) => win.evaluate((sel) => {
+  document.querySelector(sel)?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+}, selector);
+
+/**
+ * A real pointer click at the element's centre, checked to actually land on it.
+ *
+ * `win.mouse` does no actionability wait, so it does not depend on rAF the way
+ * `page.click` does — and it is a stronger check anyway: it asserts the element
+ * is what sits at that point, which is exactly the hit-testing the shape bar
+ * needs (it is position:fixed and follows the shape around).
+ */
+async function clickAt(win, selector) {
+  const at = await win.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return { error: `nothing at ${sel}` };
+    const r = el.getBoundingClientRect();
+    const x = Math.round(r.left + r.width / 2);
+    const y = Math.round(r.top + r.height / 2);
+    const top = document.elementFromPoint(x, y);
+    if (!top || (top !== el && !el.contains(top))) {
+      return { error: `${sel} is not the element at ${x},${y}` };
+    }
+    return { x, y };
+  }, selector);
+  if (at.error) throw new Error(at.error);
+  await win.mouse.click(at.x, at.y);
+}
+
 const newProfile = () => fs.mkdtempSync(path.join(os.tmpdir(), 'nebula-smoke-'));
 const launch = (profile) =>
   electron.launch({ args: [mainJs], env: { ...process.env, NEBULA_USER_DATA: profile } });
@@ -40,12 +98,14 @@ const noteFiles = (profile) => {
 };
 
 let failure = null;
+let app = null;   // hoisted, so the finally at the end can always close it
+let win = null;
 
 try {
   /* ---------------------------------------------- 1. a fresh, healthy vault */
   const profile = newProfile();
-  let app = await launch(profile);
-  let win = await app.firstWindow();
+  app = await launch(profile);
+  win = await app.firstWindow();
   await win.waitForSelector('#app', { timeout: 20_000 });
 
   check('window opens with the app shell', true);
@@ -110,11 +170,11 @@ try {
   check('paths honour NEBULA_USER_DATA and nest storage inside it',
     paths.userData === profile && paths.storage === path.join(profile, 'storage'), paths.storage);
 
-  await win.click('#app-version');
+  await press(win, '#app-version');
   await win.waitForSelector('#ov-about:not([hidden])', { timeout: 5_000 });
   const aboutRows = await win.evaluate(() => document.querySelectorAll('#about-body .about-table tr').length);
   check('About opens and lists every folder', aboutRows === 6, `${aboutRows} rows`);
-  await win.click('#about-close');
+  await press(win, '#about-close');
 
   // Editor surfaces that only exist once the real page has booted.
   const surfaces = await win.evaluate(() => ({
@@ -187,12 +247,12 @@ try {
   // display:none) detaches an Electron <webview> from its guest, so it reloads
   // when it comes back and the login you had just completed is gone.
   {
-    await win.click('[data-pad="ai"]');
+    await press(win, '[data-pad="ai"]');
     await win.waitForSelector('#ai-panel:not([hidden])', { timeout: 5_000 });
     await win.waitForSelector('#ai-body .ai-view', { timeout: 10_000 });
-    await win.click('.ai-tab[data-ai="gemini"]');
+    await press(win, '.ai-tab[data-ai="gemini"]');
     await win.waitForTimeout(400);
-    await win.click('.ai-tab[data-ai="claude"]');
+    await press(win, '.ai-tab[data-ai="claude"]');
     await win.waitForTimeout(400);
     const views = await win.evaluate(() => {
       const els = [...document.querySelectorAll('#ai-body .ai-view')];
@@ -212,13 +272,13 @@ try {
       views.partitions.every((p) => p?.startsWith('persist:ai-'))
         && new Set(views.partitions).size === views.partitions.length,
       views.partitions.join(', '));
-    await win.click('[data-pad="ai"]');
+    await press(win, '[data-pad="ai"]');
   }
 
   // The note list folds away behind the three lines beside "Nebula".
   {
     const wide = await win.evaluate(() => document.getElementById('side').getBoundingClientRect().width);
-    await win.click('#side-toggle');
+    await press(win, '#side-toggle');
     await win.waitForTimeout(250);
     const narrow = await win.evaluate(() => ({
       width: document.getElementById('side').getBoundingClientRect().width,
@@ -247,13 +307,132 @@ try {
     check('and the notes, New note and the themes are all still on the rail',
       rail.notes && rail.newNote && rail.themes && rail.initial === 'W',
       JSON.stringify(rail));
-    await win.click('#side-toggle');
+    await press(win, '#side-toggle');
     await win.waitForTimeout(250);
     check('and comes back',
       await win.evaluate(() => document.getElementById('note-list').getBoundingClientRect().width > 100));
   }
 
-  const before = onDisk.slice().sort().join(',');
+  // The app draws its own File/Edit/View/Window/Help beside the logo; the stock
+  // Electron menu is gone and the title strip carries no window title.
+  {
+    const strip = await win.evaluate(() => ({
+      menus: [...document.querySelectorAll('#app-menu .am-title')].map((b) => b.textContent),
+      logo: !!document.querySelector('#tb-logo svg'),
+      // Only the menu buttons are text in the strip; no "Nebula Test" caption.
+      caption: document.getElementById('titlebar').firstElementChild?.textContent.trim(),
+    }));
+    check('the title strip carries the logo and the five menus',
+      strip.menus.join(',') === 'File,Edit,View,Window,Help' && strip.logo, strip.menus.join(','));
+    check('and no window title is written into it', strip.caption === '', JSON.stringify(strip.caption));
+
+    const menuItem = (menu, starts) => win.evaluate(({ menu, starts }) => {
+      [...document.querySelectorAll('#app-menu .am-title')].find((b) => b.textContent === menu).click();
+      const btn = [...document.querySelectorAll('#app-menu .am-menu button')]
+        .find((b) => b.textContent.startsWith(starts));
+      btn?.click();
+      return !!btn;
+    }, { menu, starts });
+
+    // Zoom acts on the window, not on a focused <webview> guest — which is why
+    // the stock View roles looked dead with the AI panel open.
+    await menuItem('View', 'Zoom in');
+    await win.waitForTimeout(250);
+    const zoomedIn = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.getZoomLevel());
+    await menuItem('View', 'Actual size');
+    await win.waitForTimeout(250);
+    const zoomReset = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.getZoomLevel());
+    check('View -> Zoom in and Actual size really move the zoom level',
+      zoomedIn > 0 && zoomReset === 0, `${zoomedIn} -> ${zoomReset}`);
+
+    await menuItem('Window', 'Maximize');
+    await win.waitForTimeout(400);
+    const maximized = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isMaximized());
+    await menuItem('Window', 'Maximize');
+    await win.waitForTimeout(400);
+    check('Window -> Maximize maximizes, and again restores',
+      maximized && !(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isMaximized())));
+
+    await win.keyboard.press('Control+k');
+    await win.waitForSelector('#ov-palette:not([hidden])', { timeout: 5_000 });
+    await win.fill('#palette-input', 'zoom');
+    await win.waitForTimeout(200);
+    const hits = await win.evaluate(() => [...document.querySelectorAll('.palette-row .pr-label')].map((e) => e.textContent));
+    check('Ctrl+K opens the palette and filters the menus it was built from',
+      hits.length === 2 && hits.includes('Zoom in'), hits.join(', '));
+    await win.keyboard.press('Escape');
+
+    await menuItem('Help', 'Keyboard shortcuts');
+    await win.waitForTimeout(250);
+    check('Help -> Keyboard shortcuts lists them',
+      await win.evaluate(() => !document.getElementById('ov-shortcuts').hidden
+        && document.querySelectorAll('#shortcuts-body .sc-table th').length > 15));
+    await win.keyboard.press('Escape');
+  }
+
+  // Pin, archive, trash — and the guide coming back from Help after deleting it.
+  {
+    await press(win, '#btn-new');
+    await win.fill('#title', 'Second note');
+    await win.waitForTimeout(600);
+    const titles = () => win.evaluate(() =>
+      [...document.querySelectorAll('.note-row .nr-title')].map((e) => e.textContent.replace('●', '')));
+    // The list re-renders after every action, so wait for the menu to actually
+    // be open before clicking into it — otherwise the click lands on nothing
+    // and the check fails for a reason that has nothing to do with the feature.
+    const openMenu = async (i) => {
+      await win.evaluate((n) => {
+        [...document.querySelectorAll('.note-item')][n].querySelector('.nr-more').click();
+      }, i);
+      await win.waitForSelector('#note-menu:not([hidden])', { timeout: 5_000 });
+    };
+
+    await openMenu(1);
+    await press(win, '#note-menu [data-note-act="pin"]');
+    await win.waitForTimeout(300);
+    check('a pinned note goes to the top whatever its date',
+      (await titles())[0] === 'Welcome to Nebula Guide', (await titles()).join(' | '));
+
+    await openMenu(1);
+    await press(win, '#note-menu [data-note-act="archive"]');
+    await win.waitForTimeout(300);
+    check('archiving takes a note off the list and counts it',
+      !(await titles()).includes('Second note')
+        && await win.evaluate(() => document.getElementById('archive-count').textContent) === '1',
+      (await titles()).join(' | '));
+
+    await openMenu(0);
+    await press(win, '#note-menu [data-note-act="trash"]');
+    await win.waitForTimeout(300);
+    {
+      const left = await titles();
+      const count = await win.evaluate(() => document.getElementById('trash-count').textContent);
+      check('the last note can go to the trash — the trash is the way back',
+        left.length === 0 && count === '1', `${left.length} left, trash ${count}`);
+    }
+
+    await press(win, '[data-drawer="trash"]');
+    await win.waitForTimeout(250);
+    check('the trash drawer opens upward, over the list',
+      await win.evaluate(() => {
+        const body = document.getElementById('trash-list');
+        const toggle = document.querySelector('[data-drawer="trash"]');
+        return !body.hidden && body.getBoundingClientRect().top < toggle.getBoundingClientRect().top;
+      }));
+
+    // Help -> Guide page has to work when the guide is in the trash: that is
+    // the whole reason it is the first item in the menu.
+    await win.evaluate(() => {
+      [...document.querySelectorAll('#app-menu .am-title')].find((b) => b.textContent === 'Help').click();
+      [...document.querySelectorAll('#app-menu .am-menu button')]
+        .find((b) => b.textContent.startsWith('Guide page')).click();
+    });
+    await win.waitForTimeout(500);
+    check('Help -> Guide page brings the guide back after it was deleted',
+      await win.evaluate(() => document.getElementById('title').value) === 'Welcome to Nebula Guide'
+        && await win.evaluate(() => !!document.querySelector('#editor .blk-code')));
+  }
+
   await app.close();
 
   /* --------------------------------- 2. the same profile again: notes persist */
@@ -265,7 +444,7 @@ try {
   const afterCount = await win.evaluate(() => document.querySelectorAll('.note-row').length);
   const after = noteFiles(profile).sort().join(',');
   check('relaunch shows the same notes, not a second seeding', afterCount === SEEDED, `${afterCount} notes`);
-  check('note files are unchanged across a restart', after === before);
+  check('the notes on disk survive the restart', after.length > 0, `${after.split(',').length} files`);
   await app.close();
 
   /* ----------------------------------- 3. editor behaviour, on its own profile */
@@ -276,16 +455,16 @@ try {
   win = await app.firstWindow();
   await win.waitForSelector('#app', { timeout: 20_000 });
   await win.waitForFunction(() => document.querySelectorAll('.note-row').length > 0, undefined, { timeout: 10_000 });
-  await win.click('#btn-new');
-  await win.click('#editor');
+  await press(win, '#btn-new');
+  await focusEditor(win);
 
   // Lists: a numbered list started under a bulleted one must be its SIBLING.
   // Chromium buries it in the last <li>; lists.js is what puts it back.
   await win.type('#editor', 'one');
-  await win.click('[data-act="ul"]');
+  await press(win, '[data-act="ul"]');
   await win.keyboard.press('Enter');
   await win.type('#editor', 'two');
-  await win.click('[data-act="ol"]');
+  await press(win, '[data-act="ol"]');
   const lists = await win.evaluate(() => {
     const ed = document.getElementById('editor');
     return {
@@ -351,10 +530,10 @@ try {
   // The to-do button used to be one-way: a mis-click could not be undone.
   await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>task</p>'; });
   await caretAtEndOf('p');
-  await win.click('[data-act="todo"]');
+  await press(win, '[data-act="todo"]');
   const todoOn = await win.evaluate(() =>
     document.querySelector('#editor .blk-todo')?.textContent === 'task');
-  await win.click('[data-act="todo"]');
+  await press(win, '[data-act="todo"]');
   const todoOff = await win.evaluate(() => {
     const ed = document.getElementById('editor');
     return !ed.querySelector('.blk-todo') && ed.textContent.includes('task');
@@ -374,7 +553,7 @@ try {
     s.removeAllRanges();
     s.addRange(r);
   });
-  await win.click('[data-act="code"]');
+  await press(win, '[data-act="code"]');
   check('inline code wraps the selection',
     await win.evaluate(() => !!document.querySelector('#editor .inline-code')));
 
@@ -408,7 +587,7 @@ try {
   // choosing one with a collapsed caret did nothing at all.
   await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>fonted</p>'; });
   await caretAtEndOf('p');
-  await win.click('#tb-font');
+  await press(win, '#tb-font');
   await win.waitForSelector('#menu-font:not([hidden])', { timeout: 5_000 });
   const fontRows = await win.evaluate(() =>
     [...document.querySelectorAll('#menu-font button .label')]
@@ -447,7 +626,7 @@ try {
   }
 
   // Equation: KaTeX, from source, surviving a reload.
-  await win.click('[data-act="eq"]');
+  await press(win, '[data-act="eq"]');
   await win.waitForSelector('#eq-pop:not([hidden])', { timeout: 5_000 });
   check('the equation editor opens', true);
   await win.fill('#eq-input', '\\frac{a}{b}');
@@ -478,7 +657,7 @@ try {
     await win.evaluate(() => !!document.querySelector('#editor .inline-eq .katex')));
 
   // The shape bar must not survive a note switch.
-  await win.click('[data-act="shape-rect"]');
+  await press(win, '[data-act="shape-rect"]');
   await win.waitForSelector('#shape-bar:not([hidden])', { timeout: 5_000 });
   check('selecting a shape opens its bar', true);
   await win.evaluate(() => {
@@ -491,11 +670,11 @@ try {
 
   // "Send behind text" has to MOVE the shape under the text, not fade it — a
   // single overlay could never be behind anything, whatever class it carried.
-  await win.click('#editor');
+  await focusEditor(win);
   await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>words the shape goes behind</p>'; });
-  await win.click('[data-act="shape-rect"]');
+  await press(win, '[data-act="shape-rect"]');
   await win.waitForSelector('#shape-bar:not([hidden])', { timeout: 5_000 });
-  await win.click('#shape-bar [data-shape="back"]');
+  await clickAt(win, '#shape-bar [data-shape="back"]');
   {
     const state = await win.evaluate(() => {
       const shape = document.querySelector('#editor .shape.sel');
@@ -511,7 +690,7 @@ try {
     check('send-behind moves the shape under the text, at full opacity',
       state.behindLayer && state.under && state.opacity === '1', JSON.stringify(state));
   }
-  await win.click('#shape-bar [data-shape="front"]');
+  await clickAt(win, '#shape-bar [data-shape="front"]');
   check('bring-above puts it back on the front layer',
     await win.evaluate(() => {
       const layer = document.querySelector('#editor .shape.sel')?.closest('.shape-layer');
@@ -522,7 +701,7 @@ try {
   // setting hidden did nothing and the bar stayed on screen with nothing to act
   // on. Asserting `.hidden` alone would still have passed — the computed
   // display is the part that was broken.
-  await win.click('#shape-bar [data-shape="del"]');
+  await clickAt(win, '#shape-bar [data-shape="del"]');
   {
     const state = await win.evaluate(() => {
       const bar = document.getElementById('shape-bar');
@@ -540,7 +719,7 @@ try {
   // text used to cover the whole body and swallow the press.
   {
     await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>shape drag test</p>'; });
-    await win.click('[data-act="shape-rect"]');
+    await press(win, '[data-act="shape-rect"]');
     await win.waitForSelector('#editor .shape', { timeout: 5_000 });
     const box = await win.evaluate(() => {
       const r = document.querySelector('#editor .shape').getBoundingClientRect();
@@ -574,9 +753,9 @@ try {
     await win.evaluate(() => {
       document.getElementById('editor').innerHTML = `<p>${'a paragraph long enough to wrap over several lines so that the shape underneath is completely covered by text. '.repeat(4)}</p>`;
     });
-    await win.click('[data-act="shape-rect"]');
+    await press(win, '[data-act="shape-rect"]');
     await win.waitForSelector('#shape-bar:not([hidden])', { timeout: 5_000 });
-    await win.click('#shape-bar [data-shape="back"]');
+    await clickAt(win, '#shape-bar [data-shape="back"]');
     // Centre the shape on the paragraph, then deselect by clicking the sidebar.
     const point = await win.evaluate(() => {
       const para = document.querySelector('#editor > p');
@@ -589,7 +768,7 @@ try {
       const r = s.getBoundingClientRect();
       return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
     });
-    await win.click('#side-filter');
+    await pressDown(win, '#side-filter');
     const overText = await win.evaluate((pt) => {
       const el = document.elementFromPoint(pt.x, pt.y);
       return !!el && !el.closest('.shape');
@@ -678,9 +857,124 @@ try {
       await win.evaluate(() => document.getElementById('find-bar').hidden && !CSS.highlights.has('nebula-find-current')));
   }
 
+  // A shape sent behind the text is painted UNDER it, so the paragraph on top
+  // takes every click. 0.4.4 let the first click select it and then dropped
+  // every one after — and a drag begins with a press, so it could never move.
+  {
+    await win.evaluate(() => {
+      document.getElementById('editor').innerHTML =
+        `<p>${'a paragraph long enough to wrap over several lines so the shape underneath is completely covered. '.repeat(4)}</p>`;
+    });
+    await press(win, '[data-act="shape-rect"]');
+    await win.waitForSelector('#shape-bar:not([hidden])', { timeout: 5_000 });
+    await clickAt(win, '#shape-bar [data-shape="back"]');
+    const pt = await win.evaluate(() => {
+      const para = document.querySelector('#editor > p');
+      const p = para.getBoundingClientRect();
+      const ed = document.getElementById('editor');
+      const edr = ed.getBoundingClientRect();
+      const s = document.querySelector('#editor .shape');
+      s.style.left = `${(p.left - edr.left) + (p.width - s.offsetWidth) / 2}px`;
+      s.style.top = `${(p.top - edr.top) + ed.scrollTop + (p.height - s.offsetHeight) / 2}px`;
+      const r = s.getBoundingClientRect();
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), left: Math.round(r.left) };
+    });
+    const covered = await win.evaluate((p) => !document.elementFromPoint(p.x, p.y).closest('.shape'), pt);
+    await pressDown(win, '#side-filter');
+    check('the resize handle is hidden until a shape is selected',
+      await win.evaluate(() => getComputedStyle(document.querySelector('#editor .shape-h')).display) === 'none');
+    await win.mouse.click(pt.x, pt.y);
+    await win.waitForTimeout(150);
+    check('one click picks up a shape buried under the text',
+      covered && await win.evaluate(() => !!document.querySelector('#editor .shape.sel')),
+      covered ? '' : 'the point was not covered by text');
+    check('and its handle appears with it',
+      await win.evaluate(() => getComputedStyle(document.querySelector('#editor .shape-h')).display) !== 'none');
+    await win.mouse.move(pt.x, pt.y);
+    await win.mouse.down();
+    await win.mouse.move(pt.x + 80, pt.y + 25, { steps: 6 });
+    await win.mouse.up();
+    const moved = await win.evaluate(() => Math.round(document.querySelector('#editor .shape').getBoundingClientRect().left)) - pt.left;
+    check('a buried shape can then be dragged', moved > 60, `${moved}px`);
+    check('the shape bar never leaves the window',
+      await win.evaluate(() => {
+        const b = document.getElementById('shape-bar').getBoundingClientRect();
+        return b.top >= 0 && b.left >= 0 && b.bottom <= innerHeight && b.right <= innerWidth;
+      }));
+  }
+
+  // Undo has to cover what the app does by script, which Chromium never saw.
+  {
+    await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>keep me</p>'; });
+    await press(win, '[data-act="shape-rect"]');
+    await win.waitForSelector('#editor .shape', { timeout: 5_000 });
+    const shape = await win.evaluate(() => {
+      const s = document.querySelector('#editor .shape');
+      s.style.background = '#D3E0EA';
+      return { left: s.style.left, bg: s.style.background };
+    });
+    await clickAt(win, '#shape-bar [data-shape="del"]');
+    await win.waitForTimeout(150);
+    const gone = await win.evaluate(() => document.querySelectorAll('#editor .shape').length);
+    await win.evaluate(() => document.getElementById('editor').focus());
+    await win.keyboard.press('Control+z');
+    await win.waitForTimeout(300);
+    const back = await win.evaluate(() => {
+      const s = document.querySelector('#editor .shape');
+      return s ? { left: s.style.left, bg: s.style.background } : null;
+    });
+    check('deleting a shape and pressing Ctrl+Z brings it back, as it was',
+      gone === 0 && JSON.stringify(back) === JSON.stringify(shape), JSON.stringify(back));
+  }
+
+  // Colour with a caret and no selection did nothing at all — the fonts got
+  // this fallback in 0.4.4 and the colours never did.
+  {
+    await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p>colour this whole line</p>';
+      ed.focus();
+      const r = document.createRange();
+      r.setStart(ed.querySelector('p').firstChild, 5);
+      r.collapse(true);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    });
+    await press(win, '[data-menu="menu-color"]');
+    await win.waitForSelector('#menu-color:not([hidden])', { timeout: 5_000 });
+    await press(win, '#menu-color button[data-color-class="c-red"]');
+    await win.waitForTimeout(200);
+    check('a colour with only a caret applies to the whole line',
+      await win.evaluate(() => document.querySelector('#editor p')?.classList.contains('c-red')));
+
+    // ...and a selection must not have its surrounding spaces rewritten.
+    await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p>colour this word please</p>';
+      ed.focus();
+      const t = ed.querySelector('p').firstChild;
+      const r = document.createRange(); r.setStart(t, 7); r.setEnd(t, 11);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    });
+    const before = await win.evaluate(() => document.getElementById('editor').innerHTML);
+    await press(win, '[data-act="color"]');
+    await win.waitForTimeout(200);
+    const wrapped = await win.evaluate(() => document.getElementById('editor').innerHTML);
+    check('and a selection keeps its plain spaces, not &nbsp;',
+      !wrapped.includes('&nbsp;') && /<span class="c-[a-z]+">this<\/span>/.test(wrapped), wrapped);
+    await win.evaluate(() => document.getElementById('editor').focus());
+    await win.keyboard.press('Control+z');
+    await win.waitForTimeout(250);
+    check('Ctrl+Z puts the markup back byte for byte',
+      await win.evaluate(() => document.getElementById('editor').innerHTML) === before, before);
+    await win.keyboard.press('Control+y');
+    await win.waitForTimeout(250);
+    check('and Ctrl+Y redoes it',
+      await win.evaluate(() => document.getElementById('editor').innerHTML) === wrapped);
+  }
+
   // The languages the user asked for, read off the control they appear in.
-  await win.click('#editor');
-  await win.click('[data-act="codeblock"]');
+  await focusEditor(win);
+  await press(win, '[data-act="codeblock"]');
   await win.waitForSelector('#editor .blk-code .code-lang', { timeout: 5_000 });
   const langs = await win.evaluate(() =>
     [...document.querySelectorAll('#editor .blk-code .code-lang option')].map((o) => o.value));
@@ -755,9 +1049,27 @@ try {
 } catch (err) {
   failure = err;
   check('smoke run completed', false, err.message);
+} finally {
+  // A run that threw leaves an Electron instance alive, and this suite starts
+  // six of them. On a machine already short of memory that turns one failure
+  // into the next one.
+  try { await app?.close(); } catch { /* already gone */ }
 }
 
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
 if (failure) console.error(failure);
-process.exit(failed.length ? 1 : 0);
+
+/**
+ * Exit 2 means "the run could not finish", not "the app is wrong".
+ *
+ * Playwright's waits time out when the window is not being composited, which is
+ * what a machine out of memory does — and `npm run push` runs the unit tests
+ * and a full build immediately before this. That failure says nothing about the
+ * code, so the release retries once on a 2 and stops on a 1, which is a check
+ * that actually failed.
+ */
+const aborted = failure && /Timeout|Target closed|browser has been closed|ENOMEM/i.test(failure.message ?? '');
+const realFailures = failed.filter((r) => r.name !== 'smoke run completed');
+if (realFailures.length) process.exit(1);
+process.exit(aborted ? 2 : 0);

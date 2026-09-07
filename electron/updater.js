@@ -24,7 +24,7 @@ export const REPO_NAME = 'nebula';
 const RELEASES_PAGE = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest`;
 const API_LATEST = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`;
 
-const FIRST_CHECK_MS = 10_000;      // let the window paint before touching the network
+const FIRST_CHECK_MS = 2_000;      // let the window paint before touching the network
 const RECHECK_MS = 6 * 60 * 60 * 1000;
 
 /** Portable builds set this; there is no installer for an update to replace. */
@@ -185,10 +185,11 @@ export async function initUpdater(opts = {}) {
 
   // Automatic checks only in a real installed app; in dev the user can still
   // press the button, but nothing nags.
-  if (app.isPackaged) {
-    setTimeout(() => { runCheck().catch(() => {}); }, FIRST_CHECK_MS).unref?.();
-    setInterval(() => { runCheck().catch(() => {}); }, RECHECK_MS).unref?.();
-  }
+  // A check on every launch, in every channel. It used to be packaged builds
+  // only, so a dev run never checked and nobody could see the path working;
+  // and ten seconds was long enough that the launch check looked like no check.
+  setTimeout(() => { runCheck().catch(() => {}); }, FIRST_CHECK_MS).unref?.();
+  setInterval(() => { runCheck().catch(() => {}); }, RECHECK_MS).unref?.();
 
   return { mode };
 }

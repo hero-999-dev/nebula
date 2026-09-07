@@ -1,6 +1,6 @@
 import { initDiskStorage } from './disk-store.js';
 import { NoteStore, plainSnippet, relativeTime } from './notes.js';
-import { GUIDE_NOTE, GUIDE_VERSION } from './seed-notes.js';
+import { GUIDE_NOTE, GUIDE_VERSION, addGuide } from './seed-notes.js';
 import { bindEditor } from './editor.js';
 import { initTheme } from './theme.js';
 import { on } from './bus.js';
@@ -17,6 +17,10 @@ import { initUpdater, showAppVersion } from './updater.js';
 import { initAbout } from './about.js';
 import { initSideToggle } from './side-toggle.js';
 import { initFind } from './find.js';
+import { initHistory } from './history.js';
+import { initNoteActions } from './note-actions.js';
+import { initAppMenu } from './app-menu.js';
+import { initPalette, initShortcuts } from './palette.js';
 
 const $ = (id) => document.getElementById(id);
 const AUTOSAVE_MS = 400;
@@ -74,12 +78,32 @@ async function boot() {
 
   initDock();
   initAiPanel({ askText });
+  // The app's own undo stack. Everything that edits the note by script
+  // announces itself to this first; Chromium's stack cannot see any of it.
+  const history = initHistory(editorEl, {
+    onRestore: () => {
+      // A restored snapshot is just markup — code blocks and equations are
+      // painted from their stored source, the same as when a note opens.
+      paintAllCode(editorEl);
+      paintAllEquations(editorEl);
+      shapes?.reset();
+      editor.flush();
+      renderList();
+    },
+  });
   // Shapes first: the toolbar's shape buttons go through this controller so a
   // new shape arrives selected, with its colour bar already open.
-  const shapes = initShapes(editorEl);
-  initToolbar(editorEl, {
+  const shapes = initShapes(editorEl, { history });
+  const toolbar = initToolbar(editorEl, {
     shapes,
+    history,
     onSave: () => { editor.flush(); setSaveState('saved'); },
+  });
+  // Typing is coalesced into one step; Enter, deletes and pastes each start
+  // their own, the way they do in every other editor.
+  editorEl.addEventListener('beforeinput', (e) => {
+    const separate = e.inputType !== 'insertText';
+    history?.typed({ separate });
   });
   initSlashMenu(editorEl);
   initCodeBlocks(editorEl);
@@ -89,24 +113,47 @@ async function boot() {
     const notes = store.filter(listFilter);
     listEl.innerHTML = '';
     if (!notes.length) {
-      listEl.innerHTML = '<div class="note-list-empty">No notes match</div>';
+      // NOT an early return: the archive and trash counts have to be redrawn
+      // too, and trashing the last note is exactly when they change. Returning
+      // here left the trash showing 0 with a note in it.
+      const empty = document.createElement('div');
+      empty.className = 'note-list-empty';
+      empty.textContent = listFilter ? 'No notes match' : 'No notes yet';
+      listEl.appendChild(empty);
+      noteActions?.renderDrawers();
       return;
     }
     for (const note of notes) {
+      // The row is a <button>; the ⋯ has to be a sibling, not a child — a
+      // button inside a button is invalid and never receives the click.
+      const item = document.createElement('div');
+      item.className = 'note-item';
+
       const row = document.createElement('button');
       row.type = 'button';
       row.className = `note-row${note.id === store.activeId ? ' active' : ''}`;
       row.innerHTML = '<div class="nr-title"></div><div class="nr-meta"></div>';
       const title = note.title || 'Untitled';
       row.children[0].textContent = title;
+      if (note.pinned) {
+        const pin = document.createElement('span');
+        pin.className = 'nr-pin';
+        pin.textContent = '●';
+        pin.title = 'Pinned';
+        row.children[0].prepend(pin);
+      }
       // The collapsed rail shows only this; CSS cannot take a first letter out
       // of an inline box reliably, so it is handed over explicitly.
       row.children[0].dataset.initial = title.trim().charAt(0).toUpperCase() || 'U';
       row.title = title; // the full name is still readable as a tooltip
       row.children[1].textContent = `${relativeTime(note.updatedAt)} · ${plainSnippet(note.content, 48) || 'Empty'}`;
       row.addEventListener('click', () => openNote(note.id));
-      listEl.appendChild(row);
+
+      item.append(row);
+      if (noteActions) item.append(noteActions.moreButton(note.id));
+      listEl.appendChild(item);
     }
+    noteActions?.renderDrawers();
   }
 
   function openNote(id) {
@@ -114,13 +161,15 @@ async function boot() {
     store.setActive(id);
     const note = store.active();
     titleEl.value = note?.title ?? '';
+    titleEl.disabled = !note;
     editor.load(note);
     // Both are regenerated from their stored source, never trusted from the
     // saved HTML — and the shape bar belongs to a note that is now gone.
     paintAllCode(editorEl);
     paintAllEquations(editorEl);
     shapes?.reset();
-    find?.close(); // its ranges point into the note that just closed
+    history?.reset(); // this note's history is not the next note's
+    find?.close();    // its ranges point into the note that just closed
     setSaveState('');
     renderList();
   }
@@ -149,12 +198,68 @@ async function boot() {
     titleEl.select();
   });
 
+  // Which OS, so the title strip can leave room for macOS's traffic lights.
+  document.documentElement.dataset.platform = window.nebula?.platform ?? 'web';
+
+  const noteActions = initNoteActions({
+    store,
+    onChanged: () => { renderList(); openNote(store.activeId); },
+    openNote: (id) => openNote(id),
+  });
+
   initTheme($('theme-pick'));
-  initSideToggle($('side-toggle'));
+  const side = initSideToggle($('side-toggle'));
+
+  // File / Edit / View / Window / Help, beside the logo. The same definitions
+  // are the only list the command palette reads.
+  const shortcuts = initShortcuts();
+  let menu = null;
+  const palette = initPalette(() => menu?.commands ?? []);
+  menu = initAppMenu({
+    actions: toolbar?.actions ?? {},
+    history,
+    store,
+    find,
+    palette,
+    shortcuts,
+    newNote: () => $('btn-new').click(),
+    toggleSide: () => side?.toggle(),
+    toggleBar: () => document.querySelector('[data-pad="hide"]')?.click(),
+    toggleAi: () => document.querySelector('[data-pad="ai"]')?.click(),
+    about: () => $('app-version').click(),
+    checkUpdates: () => checkForUpdates(),
+    // Works even when the note was deleted — that is the whole point of it.
+    guide: () => { const id = addGuide(store); renderList(); openNote(id); },
+  });
+
+  // The native window buttons are painted by Windows, so their colours have to
+  // be handed over whenever the theme changes.
+  function paintTitleBar() {
+    const css = getComputedStyle(document.documentElement);
+    window.nebula?.window?.overlay?.({
+      color: css.getPropertyValue('--paper-sunken').trim(),
+      symbolColor: css.getPropertyValue('--ink').trim(),
+    });
+  }
+  paintTitleBar();
+  on('theme-changed', paintTitleBar);
+
+  // The two accelerators the menus advertise but nothing else owns. The rest
+  // live with the feature they belong to (Ctrl+F in find.js, Ctrl+K in
+  // palette.js, the formatting keys in toolbar.js).
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n' && !e.shiftKey) {
+      e.preventDefault();
+      $('btn-new').click();
+    } else if (e.key === 'F11') {
+      e.preventDefault();
+      window.nebula?.window?.fullscreen?.();
+    }
+  });
   // The update button lives inside About: one place that answers "which build
   // is this, where is it, and is there a newer one".
   const checkButton = $('btn-check-updates');
-  initUpdater({ checkButton });
+  const { checkForUpdates } = initUpdater({ checkButton });
   initAbout({ trigger: $('app-version'), checkButton });
   showAppVersion($('app-version'));
   on('note-changed', () => renderList());

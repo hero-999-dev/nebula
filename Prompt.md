@@ -117,7 +117,7 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.4.4)
+## Current implementation state (v0.5.0)
 
 **Working:** the whole editor described above — dock pad, two-row toolbar,
 mini toolbar, slash menu, code blocks with syntax colours, free-floating shapes,
@@ -138,7 +138,7 @@ stamp, and a dev profile at `<repo>/.dev-profile` that development cannot escape
 on Windows and notify-and-download elsewhere; `npm run push` is the whole
 release ritual.
 
-**Quality:** 156 unit tests, 71 Electron smoke checks against the real app
+**Quality:** 201 unit tests, 92 Electron smoke checks against the real app
 (including "an unreadable vault seeds nothing", verified by breaking the guard
 on purpose and watching the suite go red).
 

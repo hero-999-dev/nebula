@@ -15,6 +15,28 @@ contextBridge.exposeInMainWorld('nebula', {
     reveal: (rel) => ipcRenderer.invoke('storage:reveal', rel),
     root: () => ipcRenderer.invoke('storage:root'),
   },
+  // The app draws its own File/Edit/View/Window/Help beside the logo, so it
+  // needs what the native menu roles used to do. Each call acts on the window
+  // that sent it — the renderer cannot name another one.
+  window: {
+    minimize: () => ipcRenderer.invoke('window:minimize'),
+    maximize: () => ipcRenderer.invoke('window:maximize'),
+    close: () => ipcRenderer.invoke('window:close'),
+    fullscreen: () => ipcRenderer.invoke('window:fullscreen'),
+    state: () => ipcRenderer.invoke('window:state'),
+    overlay: (colors) => ipcRenderer.invoke('window:overlay', colors),
+    onChanged: (fn) => {
+      const handler = (_e, state) => fn(state);
+      ipcRenderer.on('window:changed', handler);
+      return () => ipcRenderer.off('window:changed', handler);
+    },
+  },
+  view: {
+    // 'in' | 'out' | 'reset'; always this window, never a focused webview guest.
+    zoom: (how) => ipcRenderer.invoke('view:zoom', how),
+    devtools: () => ipcRenderer.invoke('view:devtools'),
+  },
+  quit: () => ipcRenderer.invoke('app:quit'),
   updates: {
     state: () => ipcRenderer.invoke('update:state'),
     check: () => ipcRenderer.invoke('update:check'),

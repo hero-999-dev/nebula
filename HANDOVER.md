@@ -57,6 +57,10 @@ src/js/
   toolbar.js  dock.js  slash-menu.js  shapes.js  codeblock.js  highlight.js
   side-toggle.js     folds the note list away; remembers the choice
   find.js            Ctrl+F; paints matches, never edits the note
+  history.js         the editor's own undo/redo; every scripted edit pushes
+  app-menu.js        File/Edit/View/Window/Help; also the palette's source
+  palette.js         Ctrl+K, and the keyboard-shortcut sheet
+  note-actions.js    the per-note menu and the archive/trash drawers
   lists.js           repairs what execCommand's list commands leave behind
   inline-format.js   Enter/Backspace out of an inline wrapper
   equation.js        KaTeX, rendered from data-tex on every load
@@ -158,7 +162,14 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 14. **A search must never mark up the note.** Wrapping hits would dirty it,
    autosave it and land on the undo stack; `find.js` paints ranges with the CSS
    Custom Highlight API instead.
-15. **A colour written into a note is frozen.** `execCommand('foreColor')` puts
+15. **The editor's undo is `history.js`, not Chromium's.** Anything that edits
+   note content by script must call `history.push()` FIRST. Chromium's stack
+   cannot see scripted DOM edits, so `execCommand('undo')` rolls back the wrong
+   thing; and do not reach for `insertHTML` to get around it - it rewrites the
+   spaces around the selection as `&nbsp;`.
+16. **`renderList` redraws the archive and trash counts.** Any early return in
+   it must redraw them too - trashing the last note is exactly when they change.
+17. **A colour written into a note is frozen.** `execCommand('foreColor')` puts
    a hex literal in the markup, and the app has three themes — a value picked
    against one background is unreadable on the other two. Colours are classes
    (`c-*`, `h-*`) resolved through `tokens.css`, and a highlight sets its own

@@ -16,6 +16,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-07 20:30] v0.5.0 - by claude
+
+The editor gets its own undo stack, notes gain pin, archive and trash, and the app draws File, Edit, View, Window and Help beside an enlarged logo with a Ctrl+K command palette.
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-07 16:20] v0.4.4 - by claude
 
 Ctrl+Z no longer duplicates text, Ctrl+F finds inside a note, the sidebar filter searches whole notes, buried shapes are selectable again, the collapsed rail keeps everything, plus a White theme and a Chrome user agent for the AI views.

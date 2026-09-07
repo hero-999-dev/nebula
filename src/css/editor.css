@@ -506,6 +506,11 @@
 /* A wider grab edge, so the pointer does not have to find 1.6 pixels. */
 .shape.sel { box-shadow: 0 0 0 2.5px var(--clay); }
 .shape.sel .shape-h { width: 14px; height: 14px; }
+.shape.sel .shape-h:hover { background: var(--ink); }
+/* Only on the selected shape. It used to sit on every shape all the time,
+   which made a note with three shapes in it look like a form. */
+.shape-h { display: none; }
+.shape.sel .shape-h { display: block; }
 .shape-h {
   position: absolute;
   right: -1px; bottom: -1px;

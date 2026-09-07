@@ -391,5 +391,23 @@ export const GUIDE_NOTE = {
     '<p>An update replaces the application folder only. The vault is copied into Backups before anything installs, and <strong>nothing in it is ever deleted</strong>. The installed app, the portable copy, the test build and the dev build each keep their own separate notes.</p>',
 };
 
+/**
+ * Put the guide back, whatever the vault remembers.
+ *
+ * `NoteStore.ensureGuide` deliberately adds it only once per GUIDE_VERSION, so
+ * deleting it keeps it gone. Help -> Guide page is the way to ask for it again,
+ * and that has to work even when the version stamp says "already done".
+ */
+export function addGuide(store) {
+  const existing = store.notes.find((n) => n.title === GUIDE_NOTE.title && !n.deletedAt);
+  if (existing) {
+    if (existing.archivedAt) store.unarchive(existing.id);
+    return existing.id;
+  }
+  const note = store.createNote(GUIDE_NOTE.title);
+  store.updateActive({ content: GUIDE_NOTE.content });
+  return note.id;
+}
+
 /** Every build starts with the same single page. */
 export const SEED_NOTES = [GUIDE_NOTE];

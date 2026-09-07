@@ -9,6 +9,14 @@
   <link rel="stylesheet" href="./css/editor.css" />
 </head>
 <body>
+  <!-- The window's own strip. Electron draws no title bar (titleBarStyle
+       'hidden'), so this is it: the logo, then the menus. The native
+       minimise / maximise / close sit at the right through titleBarOverlay. -->
+  <div class="titlebar" id="titlebar">
+    <span class="tb-logo" id="tb-logo" data-icon="logo" aria-hidden="true"></span>
+    <nav class="app-menu" id="app-menu" aria-label="Main menu"></nav>
+  </div>
+
   <div id="app">
     <aside class="side" id="side">
       <!-- No mark here: the window's own title bar already shows the icon a few
@@ -19,7 +27,30 @@
       </div>
       <input id="side-filter" type="search" placeholder="Filter notes…" aria-label="Filter notes" />
       <nav class="note-list" id="note-list" aria-label="Notes"></nav>
+
+      <!-- Per-note menu: pin, archive, delete. One menu, moved to whichever
+           row asked for it, rather than one per row. -->
+      <div class="note-menu" id="note-menu" hidden>
+        <button type="button" data-note-act="pin"></button>
+        <button type="button" data-note-act="archive"></button>
+        <button type="button" data-note-act="trash">Move to trash</button>
+      </div>
+
       <div class="side-foot">
+        <!-- Archive and Trash open UPWARD, over the list, so the button you
+             pressed does not move out from under the pointer. -->
+        <section class="drawer" id="drawer-archive">
+          <div class="drawer-body" id="archive-list" hidden></div>
+          <button type="button" class="drawer-toggle" data-drawer="archive" aria-expanded="false">
+            <span class="drawer-caret">▴</span><span>Archive</span><span class="drawer-count" id="archive-count">0</span>
+          </button>
+        </section>
+        <section class="drawer" id="drawer-trash">
+          <div class="drawer-body" id="trash-list" hidden></div>
+          <button type="button" class="drawer-toggle" data-drawer="trash" aria-expanded="false">
+            <span class="drawer-caret">▴</span><span>Trash</span><span class="drawer-count" id="trash-count">0</span>
+          </button>
+        </section>
         <button class="btn primary" id="btn-new" type="button">New note</button>
         <div class="theme-pick" id="theme-pick" role="group" aria-label="Theme">
           <button type="button" data-theme="main" title="Main — violet">Main</button>
@@ -204,6 +235,23 @@
     <div class="uc-actions">
       <button class="btn ghost" id="uc-dismiss" type="button">Later</button>
       <button class="btn primary" id="uc-action" type="button" hidden></button>
+    </div>
+  </div>
+
+  <div class="overlay" id="ov-palette" hidden>
+    <div class="palette" role="dialog" aria-modal="true" aria-label="Command palette">
+      <input id="palette-input" type="text" placeholder="Type a command…" autocomplete="off" spellcheck="false" />
+      <div class="palette-list" id="palette-list"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="ov-shortcuts" hidden>
+    <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
+      <p class="dlg-title" id="shortcuts-title">Keyboard shortcuts</p>
+      <div id="shortcuts-body"></div>
+      <div class="dlg-actions">
+        <button class="btn ghost" id="shortcuts-close" type="button">Close</button>
+      </div>
     </div>
   </div>
 

@@ -95,8 +95,9 @@ export class NoteStore {
       this.save();
     }
 
-    if (!this.activeId || !this.get(this.activeId)) {
-      this.activeId = this.notes[0]?.id ?? null;
+    const active = this.get(this.activeId);
+    if (!active || active.deletedAt || active.archivedAt) {
+      this.activeId = this.sorted()[0]?.id ?? this.notes[0]?.id ?? null;
     }
   }
 
@@ -144,6 +145,12 @@ export class NoteStore {
   }
 
   setActive(id) {
+    if (id === null) {
+      this.activeId = null;
+      localStorage.removeItem(STORAGE_KEY_ACTIVE);
+      emit('note-opened', { id: null });
+      return;
+    }
     if (!this.get(id)) return;
     this.activeId = id;
     localStorage.setItem(STORAGE_KEY_ACTIVE, id);
@@ -175,27 +182,34 @@ export class NoteStore {
     emit('note-changed', { id: note.id });
   }
 
-  deleteActive() {
-    if (this.notes.length <= 1) return false;
-    const idx = this.notes.findIndex((n) => n.id === this.activeId);
-    if (idx < 0) return false;
-    const [removed] = this.notes.splice(idx, 1);
-    this.activeId = this.notes[Math.min(idx, this.notes.length - 1)]?.id ?? null;
-    if (this.activeId) localStorage.setItem(STORAGE_KEY_ACTIVE, this.activeId);
-    else localStorage.removeItem(STORAGE_KEY_ACTIVE);
-    this.save();
-    emit('note-changed', { id: removed.id, deleted: true });
-    return true;
+  /** Notes on the main list: not archived, not in the trash. */
+  live() {
+    return this.notes.filter((n) => !n.archivedAt && !n.deletedAt);
   }
 
+  archived() {
+    return this.notes.filter((n) => n.archivedAt && !n.deletedAt)
+      .sort((a, b) => b.archivedAt - a.archivedAt);
+  }
+
+  trashed() {
+    return this.notes.filter((n) => n.deletedAt)
+      .sort((a, b) => b.deletedAt - a.deletedAt);
+  }
+
+  /** Pinned first, then most recently touched. */
   sorted() {
-    return [...this.notes].sort((a, b) => b.updatedAt - a.updatedAt);
+    return this.live().sort((a, b) => {
+      if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
+      return b.updatedAt - a.updatedAt;
+    });
   }
 
   /**
    * Title AND the whole body. It used to search `plainSnippet(content, 500)` —
    * the first 500 characters — so a word further down a long note simply could
-   * not be found from the sidebar.
+   * not be found from the sidebar. Archived and trashed notes are not searched;
+   * they have their own sections.
    */
   filter(query) {
     const q = query.trim().toLowerCase();
@@ -204,6 +218,59 @@ export class NoteStore {
       const hay = `${n.title} ${noteText(n.content)}`.toLowerCase();
       return hay.includes(q);
     });
+  }
+
+  /** Flip one flag on one note and save. Returns the note, or null. */
+  #mark(id, patch) {
+    const note = this.get(id);
+    if (!note) return null;
+    Object.assign(note, patch);
+    // `updatedAt` is deliberately NOT touched: archiving a note is not editing
+    // it, and bumping it would reorder the list for no reason.
+    this.save();
+    emit('note-changed', { id });
+    return note;
+  }
+
+  togglePin(id) {
+    const note = this.get(id);
+    return note ? this.#mark(id, { pinned: !note.pinned }) : null;
+  }
+
+  archive(id) {
+    return this.#mark(id, { archivedAt: Date.now(), pinned: false });
+  }
+
+  unarchive(id) {
+    return this.#mark(id, { archivedAt: null });
+  }
+
+  /**
+   * To the trash, not gone. The old `deleteActive()` refused to remove the last
+   * note because there was no way back; there is one now, and the user has to
+   * be able to delete the guide.
+   */
+  trash(id) {
+    const note = this.#mark(id, { deletedAt: Date.now(), pinned: false });
+    if (note && this.activeId === id) this.setActive(this.sorted()[0]?.id ?? null);
+    return note;
+  }
+
+  restore(id) {
+    return this.#mark(id, { deletedAt: null, archivedAt: null });
+  }
+
+  /** Actually gone: the note leaves the store, and the mirror deletes its file. */
+  destroy(id) {
+    const idx = this.notes.findIndex((n) => n.id === id);
+    if (idx < 0) return false;
+    this.notes.splice(idx, 1);
+    if (this.activeId === id) this.activeId = this.sorted()[0]?.id ?? null;
+    if (this.activeId) localStorage.setItem(STORAGE_KEY_ACTIVE, this.activeId);
+    else localStorage.removeItem(STORAGE_KEY_ACTIVE);
+    this.save();
+    emit('note-changed', { id, deleted: true });
+    return true;
   }
 
   save() {

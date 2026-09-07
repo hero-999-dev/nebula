@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, session } from 'electron';
+import { app, BrowserWindow, Menu, shell, ipcMain, session } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
@@ -126,12 +126,70 @@ function stampVaultMeta() {
   }
 }
 
+/**
+ * Window geometry and zoom, remembered between launches.
+ *
+ * Kept beside the vault rather than in it: it is about this machine's window,
+ * not about the notes, and it must never look like a note file to the mirror.
+ */
+function prefsFile() {
+  return path.join(app.getPath('userData'), 'window.json');
+}
+
+function readPrefs() {
+  try {
+    return JSON.parse(fsSync.readFileSync(prefsFile(), 'utf8'));
+  } catch {
+    return {}; // no file, or a corrupt one: defaults are fine here
+  }
+}
+
+function writePrefs(patch) {
+  try {
+    fsSync.mkdirSync(path.dirname(prefsFile()), { recursive: true });
+    fsSync.writeFileSync(prefsFile(), JSON.stringify({ ...readPrefs(), ...patch }, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('[nebula] window prefs write failed:', err.message);
+  }
+}
+
+const saveZoom = (level) => writePrefs({ zoom: level });
+
+/** Only a plausible rectangle: a saved size from another monitor must not win. */
+function savedBounds() {
+  const { bounds } = readPrefs();
+  if (!bounds) return null;
+  const ok = ['x', 'y', 'width', 'height'].every((k) => Number.isFinite(bounds[k]));
+  if (!ok || bounds.width < 720 || bounds.height < 480) return null;
+  return bounds;
+}
+
 let mainWindow = null;
 
 /** The test build carries its own mark so the two are told apart at a glance. */
 function windowIconPath() {
   if (process.platform !== 'win32') return '../build/icon.png';
   return CHANNEL === 'test' ? '../build/icon-test.ico' : '../build/icon.ico';
+}
+
+/**
+ * The window's own frame, minus the strip Windows draws.
+ *
+ * `titleBarStyle: 'hidden'` keeps the resize borders and the native
+ * minimise / maximise / close buttons (through `titleBarOverlay`) but hands the
+ * left of the strip to the page, which is where the logo and the File / Edit /
+ * View / Window / Help menus now live. The overlay colours follow the theme —
+ * the renderer re-sends them through `window:overlay` when it changes.
+ *
+ * macOS keeps its traffic lights on the left; `hiddenInset` insets them, and
+ * the page adds matching padding so nothing sits underneath.
+ */
+function titleBarOptions() {
+  if (process.platform === 'darwin') return { titleBarStyle: 'hiddenInset' };
+  return {
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#17122A', symbolColor: '#EDE7F7', height: 38 },
+  };
 }
 
 function createWindow() {
@@ -143,6 +201,7 @@ function createWindow() {
     show: false,
     title: APP_TITLE,
     backgroundColor: '#17122A',
+    ...titleBarOptions(),
     // The .ico on Windows, not the 1024px PNG: the title bar draws at 16px, and
     // handing Electron one huge bitmap makes it downscale — which is what made
     // the title-bar and taskbar mark look mushy. The .ico carries a real 16px.
@@ -155,7 +214,38 @@ function createWindow() {
     },
   });
 
+  const restored = savedBounds();
+  if (restored) win.setBounds(restored);
+  if (readPrefs().maximized) win.maximize();
+
   win.once('ready-to-show', () => win.show());
+
+  // Zoom is restored once the page exists, or it is applied to nothing.
+  win.webContents.on('did-finish-load', () => {
+    const { zoom } = readPrefs();
+    if (Number.isFinite(zoom)) win.webContents.setZoomLevel(zoom);
+  });
+
+  const remember = () => {
+    if (win.isDestroyed() || win.isMinimized() || win.isFullScreen()) return;
+    writePrefs({ bounds: win.getNormalBounds(), maximized: win.isMaximized() });
+  };
+  win.on('resize', remember);
+  win.on('move', remember);
+  win.on('maximize', remember);
+  win.on('unmaximize', remember);
+  win.on('close', remember);
+
+  // The page's own title bar needs to know, so its maximise button can show
+  // the right icon.
+  for (const ev of ['maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen']) {
+    win.on(ev, () => {
+      win.webContents.send('window:changed', {
+        maximized: win.isMaximized(),
+        fullScreen: win.isFullScreen(),
+      });
+    });
+  }
 
   // index.html carries <title>Nebula</title>, and a loaded page's title wins
   // over the BrowserWindow one. The test build would otherwise say "Nebula" in
@@ -180,7 +270,77 @@ function createWindow() {
   return win;
 }
 
+/**
+ * Window and view controls for the in-page menus.
+ *
+ * The app draws its own File/Edit/View/Window/Help, so the renderer needs to be
+ * able to do what the native menu roles used to. Every handler acts on the
+ * window that sent the message, never on an arbitrary one.
+ */
+function registerShellHandlers() {
+  const from = (event) => BrowserWindow.fromWebContents(event.sender);
+
+  ipcMain.handle('window:minimize', (e) => { from(e)?.minimize(); return true; });
+  ipcMain.handle('window:close', (e) => { from(e)?.close(); return true; });
+  ipcMain.handle('window:maximize', (e) => {
+    const win = from(e);
+    if (!win) return false;
+    if (win.isMaximized()) win.unmaximize(); else win.maximize();
+    return win.isMaximized();
+  });
+  ipcMain.handle('window:state', (e) => {
+    const win = from(e);
+    return { maximized: !!win?.isMaximized(), fullScreen: !!win?.isFullScreen() };
+  });
+  ipcMain.handle('window:fullscreen', (e) => {
+    const win = from(e);
+    if (!win) return false;
+    win.setFullScreen(!win.isFullScreen());
+    return win.isFullScreen();
+  });
+  ipcMain.handle('window:overlay', (e, colors) => {
+    const win = from(e);
+    if (!win || process.platform === 'darwin' || !colors) return false;
+    try {
+      win.setTitleBarOverlay({
+        color: String(colors.color ?? '#17122A'),
+        symbolColor: String(colors.symbolColor ?? '#EDE7F7'),
+        height: 38,
+      });
+      return true;
+    } catch {
+      return false; // an older Windows without the overlay is not an error
+    }
+  });
+
+  // Zoom applies to THIS window, never to a focused <webview> guest — which is
+  // why the default View roles looked like they did nothing while the AI panel
+  // had focus. The level is remembered across launches.
+  const ZOOM_MIN = -3;
+  const ZOOM_MAX = 5;
+  ipcMain.handle('view:zoom', (e, how) => {
+    const win = from(e);
+    if (!win) return 0;
+    const wc = win.webContents;
+    const current = wc.getZoomLevel();
+    const next = how === 'reset' ? 0
+      : how === 'in' ? Math.min(ZOOM_MAX, current + 0.5)
+        : Math.max(ZOOM_MIN, current - 0.5);
+    wc.setZoomLevel(next);
+    saveZoom(next);
+    return next;
+  });
+  ipcMain.handle('view:devtools', (e) => {
+    from(e)?.webContents.toggleDevTools();
+    return true;
+  });
+  ipcMain.handle('app:quit', () => { app.quit(); return true; });
+}
+
 app.whenReady().then(async () => {
+  // The app draws its own menus beside the logo, so the native bar goes.
+  Menu.setApplicationMenu(null);
+  registerShellHandlers();
   // Webviews load arbitrary sites — allow only what chat UIs legitimately need.
   const ALLOWED_PERMISSIONS = new Set([
     'media', 'notifications', 'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'openExternal',

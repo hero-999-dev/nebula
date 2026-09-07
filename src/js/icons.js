@@ -30,6 +30,18 @@ export const ICONS = {
   // Three lines — the universally understood "collapse this panel".
   menu: S('<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>'),
 
+  /**
+   * The app's own mark: a crescent and a sparkle, filled rather than stroked.
+   *
+   * The crescent is ONE closed arc lune. Two overlapping circles with
+   * fill-rule="evenodd" cannot subtract — the part of the cutter outside the
+   * base is odd too, so it fills, and the mark came out as a ring.
+   */
+  logo: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">'
+    + '<path d="M15.82 4.4A9 9 0 1 0 15.82 19.6A7.6 7.6 0 0 1 15.82 4.4Z"/>'
+    + '<path d="M17.6 7.2l.85 1.55 1.55.85-1.55.85-.85 1.55-.85-1.55-1.55-.85 1.55-.85z"/>'
+    + '</svg>',
+
   bullets: S('<circle cx="5" cy="7" r="1.3" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="5" cy="17" r="1.3" fill="currentColor" stroke="none"/><path d="M10 7h10"/><path d="M10 12h10"/><path d="M10 17h10"/>'),
   // Two rows, not three: "1 2" is enough to say "numbered", and at 20px three
   // rows of 6px digits were 4.5 device pixels tall — a grey smudge.
