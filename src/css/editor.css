@@ -27,7 +27,7 @@
 .pad button .ic { width: 15px; height: 15px; }
 .pad button:hover { border-color: var(--clay); color: var(--clay); }
 .pad button.on { background: var(--clay); border-color: var(--clay); color: #fff; }
-:root:not([data-theme="light"]) .pad button.on { color: var(--paper-sunken); }
+:root:not([data-theme="light"]):not([data-theme="white"]) .pad button.on { color: var(--paper-sunken); }
 
 /* ---------- the editing shell: bar can sit on any side ---------- */
 .edit-shell {
@@ -662,7 +662,7 @@ body.resizing webview { pointer-events: none; }
 }
 .ai-tab:hover { border-color: var(--clay); color: var(--ink); }
 .ai-tab.active { background: var(--clay); border-color: var(--clay); color: #fff; }
-:root:not([data-theme="light"]) .ai-tab.active { color: var(--paper-sunken); }
+:root:not([data-theme="light"]):not([data-theme="white"]) .ai-tab.active { color: var(--paper-sunken); }
 .ai-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); flex-shrink: 0; }
 .ai-tab__x { margin-left: 2px; opacity: 0.6; font-size: 13px; }
 .ai-tab__x:hover { opacity: 1; }
@@ -779,3 +779,69 @@ body.resizing webview { pointer-events: none; }
    readable: whatever the theme, put dark ink on them. */
 .editor [style*="background-color"],
 .editor [style*="background:"] { color: #201E1A; }
+
+
+/* ---------- find in note (Ctrl+F) ---------- */
+.find-bar {
+  position: absolute;
+  top: 8px;
+  right: 22px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 6px;
+  background: var(--paper-raised);
+  border: 1.4px solid var(--ink);
+  border-radius: 9px;
+  box-shadow: 0 8px 22px var(--shadow);
+}
+.find-bar .find-ic { display: grid; place-items: center; color: var(--ink-faint); }
+.find-bar .find-ic .ic { width: 15px; height: 15px; }
+#find-input {
+  font: inherit;
+  font-family: var(--sans);
+  font-size: 13px;
+  width: 190px;
+  padding: 4px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--paper);
+  color: var(--ink);
+  outline: none;
+}
+#find-input:focus { border-color: var(--clay); }
+.find-count {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  min-width: 62px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.find-count.find-none { color: var(--madder); }
+.find-btn {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.find-btn:hover { border-color: var(--rule); background: var(--paper-sunken); color: var(--ink); }
+
+/* Painted, not marked up — the note's HTML is never touched by a search. */
+::highlight(nebula-find) {
+  background: var(--clay-soft);
+  color: var(--ink);
+}
+::highlight(nebula-find-current) {
+  background: var(--clay);
+  color: var(--paper-sunken);
+}
+:root[data-theme="light"] ::highlight(nebula-find-current),
+:root[data-theme="white"] ::highlight(nebula-find-current) { color: #fff; }

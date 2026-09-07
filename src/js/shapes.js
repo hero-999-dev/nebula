@@ -81,19 +81,55 @@ export function initShapes(editorEl) {
     bar.style.top = `${Math.max(8, r.top - 42)}px`;
   }
 
+  /**
+   * Mousedowns the editor handler has already taken for a shape.
+   *
+   * The document listener below bubbles LAST, so without this it would look at
+   * a click that had just picked up a buried shape, see that its target is a
+   * paragraph rather than a shape, and deselect it again — the selection would
+   * exist for microseconds and nothing would appear to happen.
+   */
+  const claimed = new WeakSet();
+
   // Deselect on ANY click that is not on a shape or on the bar itself. Listening
   // only on the editor left the bar stuck open the moment you clicked the
   // sidebar, the toolbar, or another note.
   document.addEventListener('mousedown', (e) => {
-    if (!selected) return;
+    if (!selected || claimed.has(e)) return;
     if (e.target.closest('.shape') || e.target.closest('#shape-bar')) return;
     select(null);
   });
 
+  /**
+   * The topmost shape whose box contains a point, ignoring what is painted over
+   * it. A shape sent behind the text is painted UNDER it, so the paragraph on
+   * top receives every click and the shape cannot be selected at all — it is
+   * "completely buried". Front shapes get their clicks the ordinary way; this
+   * is only consulted for the ones behind.
+   */
+  function behindShapeAt(x, y) {
+    let hit = null;
+    for (const s of editorEl.querySelectorAll('.shape-layer--behind .shape')) {
+      const r = s.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) hit = s; // last = topmost
+    }
+    return hit;
+  }
+
   editorEl.addEventListener('mousedown', (e) => {
     const handle = e.target.closest('.shape-h');
-    const shape = e.target.closest('.shape');
+    let shape = e.target.closest('.shape');
+    if (!shape) {
+      // Nothing was hit directly. Before letting the click place a caret, check
+      // whether a shape is sitting under the text at this point — but only take
+      // the click if that shape is not already selected. So: one click picks up
+      // the buried shape, a second click goes through to the text, and a large
+      // shape never makes the paragraph over it permanently unclickable.
+      const under = behindShapeAt(e.clientX, e.clientY);
+      if (under && under !== selected) shape = under;
+    }
     if (!shape) return; // the document listener above already deselected
+    claimed.add(e); // ...and it must not undo what happens next
     // Leaving edit mode on any other shape, so the next click grabs it rather
     // than landing in its text.
     editorEl.querySelectorAll('.shape.editing').forEach((s) => {

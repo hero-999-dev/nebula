@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 141 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 59 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 156 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 71 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -18,8 +18,8 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 
 | File | Tests | Proves |
 |---|---|---|
-| `tests/notes.test.js` | 13 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body, and adds the guide to an older vault exactly once without touching what is there |
-| `tests/editor.test.js` | 42 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and the guide note's completeness |
+| `tests/notes.test.js` | 22 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body, and adds the guide to an older vault exactly once without touching what is there |
+| `tests/editor.test.js` | 41 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and the guide note's completeness |
 | `tests/lists.test.js` | 23 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
 | `tests/inline-format.test.js` | 18 | Enter and Backspace out of an inline wrapper |
 | `tests/highlight.test.js` | 14 | Per-language tokens, and that only SQL is case-insensitive |
@@ -27,13 +27,14 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/seed-guard.test.js` | 10 | The distinction between an empty vault and an unreadable one |
 | `tests/user-data.test.js` | 8 | Which vault each build channel gets, and which one may replace itself |
 | `tests/version-compare.test.js` | 7 | `0.3.10 > 0.3.9`, `v` prefixes, pre-releases, unparseable tags refuse rather than guess |
-| `tests/e2e/smoke.mjs` | 59 | The real app, six launches |
+| `tests/find.test.js` | 9 | Finding text in a note without editing it |
+| `tests/e2e/smoke.mjs` | 71 | The real app, six launches |
 
 ---
 
 ## The smoke test, check by check
 
-**Launch 1 — a fresh, healthy vault (1-20).**
+**Launch 1 — a fresh, healthy vault (1-25).**
 The window opens and is titled · the preload bridge exposes `storage`,
 `updates`, `paths` + `reveal` · the theme picker offers main / dark / light,
 starts on main, and repaints both ways · a fresh vault seeds exactly one note
@@ -44,10 +45,10 @@ About lists all six folders · toolbar, slash menu, shapes and AI panel are
 wired · **the guide is the starter note, it carries a sample for every language
 the picker offers, and none of them renders flat grey**.
 
-**Launch 2 — the same profile again (21-22).**
+**Launch 2 — the same profile again (26-27).**
 The same notes, not a second seeding, and the note files are byte-identical.
 
-**Launch 3 — a scratch profile, driving the editor (23-42).**
+**Launch 3 — a scratch profile, driving the editor (28-63).**
 A numbered list started under a bulleted one is its sibling, not buried in its
 last item · Enter on an empty list item ends the list · Backspace on one leaves
 the list instead of merging up · the to-do button toggles a line on and back
@@ -62,13 +63,13 @@ full opacity, bring-above returns it, and ✕ deletes it and really closes the b
 (computed `display`, not just the attribute) · C, C++, C#, Java, Dart and Ruby
 are offered in the language list.
 
-**Launches 4 and 5 — a vault that predates the guide (43-46).**
+**Launches 4 and 5 — a vault that predates the guide (64-67).**
 A profile holding one hand-written note file. The guide is added and is what
 opens; the note that was already there is byte-identical afterwards; a second
 launch adds nothing. This is the path that runs on a machine already using
 Nebula, where seeding never fires because the vault is not empty.
 
-**Launch 6 — a vault that cannot be read (47-50)**, `storage/notes` created as a
+**Launch 6 — a vault that cannot be read (68-71)**, `storage/notes` created as a
 *file* so `readdir` fails with ENOTDIR — a real error that is not ENOENT:
 the red storage-error banner appears · **nothing is seeded and no guide is
 added** · the vault is left exactly as it was.
@@ -76,6 +77,67 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-07] v0.4.4 - ten things reported from the test build
+
+**Unit 141 -> 156, smoke 59 -> 71.** One new suite, `find.test.js`.
+
+**Ctrl+Z put the text back twice.** Chromium's undo stack only knows about edits
+Chromium made. `applyFont` let `execCommand('fontName')` insert a `<font face>`
+and then **replaced that element** with a span of its own - invisible to the
+undo stack, so Ctrl+Z rolled back a different edit and the two states together
+read as duplicated text. `styleWithCSS` makes the browser write the
+`font-family` itself, so there is nothing left to rewrite. `wrapSelection` (all
+the colours, inline code, the underline styles) had the same shape and now goes
+through `insertHTML`, which is a real edit command. The check asserts the
+editor's HTML after undo is **byte-identical to what it was before**, not merely
+that the styling is gone - the duplication would have passed the weaker test.
+
+**Ctrl+F did nothing.** `find.js` plus a bar in the note frame. Matches are
+painted with the CSS Custom Highlight API rather than wrapped in `<mark>`:
+marking them up would edit the note, dirty it, reach the autosave and land on
+the undo stack. The check confirms the note's HTML is unchanged while eight
+matches are lit.
+
+**The sidebar filter only searched the first 500 characters** - it ran over
+`plainSnippet(content, 500)`, so a word further down a long note could not be
+found from the sidebar at all. It searches the whole body now.
+
+**A shape's text became every note's preview.** Shape layers are the note's
+first children, so "Heyoooo... drag me anywhere" was what the sidebar showed for
+any note with a shape on it. `noteText` drops the layers - parsed with
+DOMParser, not regexed, because `.shape-layer` holds nested divs and a pattern
+matching a closing tag across them picks the wrong one. Two defects fell out of
+writing it: `textContent` joins blocks with nothing at all, so a heading ran
+straight into the paragraph under it ("Welcome to NebulaA calm place"), and a
+long unbroken word widened the whole panel and put a sideways scrollbar under
+the note list.
+
+**A shape sent behind the text could not be picked up again** - it is painted
+under the paragraph, so the paragraph took every click. `behindShapeAt`
+hit-tests the back layer before the click becomes a caret. One click picks the
+shape up, a second goes through to the text, so a large shape never makes the
+paragraph over it permanently unclickable. **The check found a second bug in the
+fix:** the document-level deselect handler bubbles last, saw a target that was
+not a shape, and cleared the selection microseconds after it was made. Claimed
+events are skipped now.
+
+**The collapsed sidebar hid everything.** It kept only the toggle, which made
+the narrow state useless - it is meant to give the page width, not take the app
+away. The rail keeps the notes (as their initial, full title on hover), New note
+as **+**, and all four themes.
+
+**DeepSeek refused the embedded view** with "Abnormal usage environment". The UA
+said `Electron/33`; the engine is the same Chromium those sites are built for,
+so the views now report Chrome's own string with the Electron and Nebula tokens
+removed.
+
+**A fourth theme, White** - a plain white sheet with black ink, for checking a
+note against what it will look like printed on A4. The highlight-contrast check
+covers all four.
+
+**Scrollbars** are thin and painted from the theme tokens; the browser default
+was a light-mode grey stripe down the edge of a dark page.
 
 ### [2026-09-07] v0.4.3 — colours that survive a theme, and four things that were simply hard to use
 

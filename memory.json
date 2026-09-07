@@ -1,6 +1,6 @@
 {
   "projectName": "Nebula",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "lastUpdated": "2026-09-07",
   "currentPhase": "v0.4.x - editor polish driven by defect reports from the test build, and one starter note: 'Welcome to Nebula Guide' covers every feature on a single page with a sample for all fifteen code languages, and is the same in every build.",
   "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, command palette, search, i18n.",
@@ -31,8 +31,8 @@
     "releasePolicy": "Standing instruction (2026-09-07): release finished work with npm run push without being asked, and never ask which platforms to build - the repo is public, so Actions is free on both Windows and macOS runners. npm run push also refreshes Nebula Test.exe in the project root."
   },
   "quality": {
-    "unitTests": 141,
-    "smokeChecks": 59,
+    "unitTests": 156,
+    "smokeChecks": 71,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
@@ -47,7 +47,9 @@
     "npm run kill closes Nebula.exe, Nebula Test.exe and the versioned portable; pack:test runs it first, so the test build refreshes without anyone closing a window.",
     "Every build seeds the SAME single guide note. Seeding still only happens on an empty, successfully-read vault; NoteStore.ensureGuide adds the guide to an older vault once per GUIDE_VERSION, adding only - never editing or deleting.",
     "Note colours are CLASSES (c-*, h-*) resolved per theme in tokens.css, never hex written into the note - three themes make any frozen value unreadable on two of them. A highlight forces its own ink.",
-    "Never hide an Electron <webview> with hidden/display:none: the guest is detached and reloads, losing the session. Stack the views and switch visibility (.ai-view)."
+    "Never hide an Electron <webview> with hidden/display:none: the guest is detached and reloads, losing the session. Stack the views and switch visibility (.ai-view).",
+    "Scripted edits to note content must go through a real edit command (insertHTML, styleWithCSS+fontName). Replacing an element execCommand just inserted breaks Chromium's undo stack and Ctrl+Z leaves duplicated text.",
+    "Searching never marks up the note: find.js paints ranges with the CSS Custom Highlight API, so a search cannot dirty, autosave or enter the undo stack."
   ],
   "history": [
     {

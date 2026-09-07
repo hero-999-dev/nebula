@@ -66,8 +66,8 @@ try {
     const btns = [...document.querySelectorAll('#theme-pick [data-theme]')];
     return { names: btns.map((b) => b.dataset.theme), on: btns.filter((b) => b.classList.contains('on')).map((b) => b.dataset.theme) };
   });
-  check('theme picker offers main, dark and light',
-    themes.names.join(',') === 'main,dark,light', themes.names.join(','));
+  check('theme picker offers main, dark, light and white',
+    themes.names.join(',') === 'main,dark,light,white', themes.names.join(','));
   check('main is the theme on a fresh profile',
     themes.on.length === 1 && themes.on[0] === 'main', themes.on.join(','));
 
@@ -161,18 +161,26 @@ try {
       const cs = getComputedStyle(hi);
       const px = (c) => c.match(/\d+/g).slice(0, 3).map(Number);
       const lum = ([r, g, b]) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-      return { bg: cs.backgroundColor, fg: cs.color, contrast: Math.abs(lum(px(cs.backgroundColor)) - lum(px(cs.color))) };
+      return {
+        bg: cs.backgroundColor,
+        fg: cs.color,
+        paper: getComputedStyle(document.body).backgroundColor,
+        contrast: Math.abs(lum(px(cs.backgroundColor)) - lum(px(cs.color))),
+      };
     }, theme);
     const main = await readAt('main');
     const dark = await readAt('dark');
     const light = await readAt('light');
+    const white = await readAt('white');
+    check('white is a plain sheet — the note as it would print',
+      white.paper === 'rgb(255, 255, 255)', white.paper);
     await win.evaluate(() => document.querySelector('#theme-pick [data-theme="main"]').click());
     check('a highlight repaints for the theme it is read in',
       main.bg !== light.bg && dark.bg !== light.bg,
       `${main.bg} / ${dark.bg} / ${light.bg}`);
-    check('and its ink stays well clear of its background in all three',
-      [main, dark, light].every((t) => t.contrast > 0.35),
-      [main, dark, light].map((t) => t.contrast.toFixed(2)).join(' / '));
+    check('and its ink stays well clear of its background in all four',
+      [main, dark, light, white].every((t) => t.contrast > 0.35),
+      [main, dark, light, white].map((t) => t.contrast.toFixed(2)).join(' / '));
   }
 
   // Switching AI tabs must not unload the one you were on. `hidden` (i.e.
@@ -218,8 +226,27 @@ try {
       toggle: document.getElementById('side-toggle').getBoundingClientRect().width,
     }));
     check('the sidebar collapses and the toggle stays reachable',
-      narrow.width < wide / 2 && narrow.list === 0 && narrow.toggle > 0,
+      narrow.width < wide / 2 && narrow.list > 0 && narrow.toggle > 0,
       `${wide} -> ${narrow.width}`);
+    // Collapsing used to hide the notes, New note and the themes outright,
+    // which made the narrow state useless. Everything stays, just smaller.
+    const rail = await win.evaluate(() => {
+      const vis = (sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return false;
+        const r = el.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      };
+      return {
+        notes: vis('.note-row'),
+        newNote: vis('#btn-new'),
+        themes: [...document.querySelectorAll('#theme-pick button')].every((b) => b.getBoundingClientRect().width > 0),
+        initial: document.querySelector('.note-row .nr-title')?.dataset.initial,
+      };
+    });
+    check('and the notes, New note and the themes are all still on the rail',
+      rail.notes && rail.newNote && rail.themes && rail.initial === 'W',
+      JSON.stringify(rail));
     await win.click('#side-toggle');
     await win.waitForTimeout(250);
     check('and comes back',
@@ -537,6 +564,118 @@ try {
         return lum(cs.backgroundColor) - lum(cs.color) > 0.4;
       }));
     await win.keyboard.press('Escape');
+  }
+
+  // A shape sent behind the text is painted UNDER it, so the paragraph on top
+  // takes every click and the shape cannot be picked up at all.
+  {
+    // A paragraph tall enough that the shape sits entirely inside it — the
+    // whole point is a click that lands on text with a shape underneath.
+    await win.evaluate(() => {
+      document.getElementById('editor').innerHTML = `<p>${'a paragraph long enough to wrap over several lines so that the shape underneath is completely covered by text. '.repeat(4)}</p>`;
+    });
+    await win.click('[data-act="shape-rect"]');
+    await win.waitForSelector('#shape-bar:not([hidden])', { timeout: 5_000 });
+    await win.click('#shape-bar [data-shape="back"]');
+    // Centre the shape on the paragraph, then deselect by clicking the sidebar.
+    const point = await win.evaluate(() => {
+      const para = document.querySelector('#editor > p');
+      const p = para.getBoundingClientRect();
+      const ed = document.getElementById('editor').getBoundingClientRect();
+      const s = document.querySelector('#editor .shape');
+      const w = s.offsetWidth, h = s.offsetHeight;
+      s.style.left = `${(p.left - ed.left) + (p.width - w) / 2}px`;
+      s.style.top = `${(p.top - ed.top) + document.getElementById('editor').scrollTop + (p.height - h) / 2}px`;
+      const r = s.getBoundingClientRect();
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+    });
+    await win.click('#side-filter');
+    const overText = await win.evaluate((pt) => {
+      const el = document.elementFromPoint(pt.x, pt.y);
+      return !!el && !el.closest('.shape');
+    }, point);
+    await win.mouse.click(point.x, point.y);
+    await win.waitForTimeout(200);
+    check('a buried shape is still selectable through the text on top of it',
+      overText && await win.evaluate(() => !!document.querySelector('#editor .shape.sel')),
+      overText ? '' : 'the point was not actually covered by text');
+    // ...and a second click there goes through, so the paragraph is not lost.
+    await win.mouse.click(point.x, point.y);
+    await win.waitForTimeout(200);
+    check('and clicking it again puts the caret in the text, not on the shape',
+      await win.evaluate(() => {
+        const sel = getSelection();
+        return !!sel.anchorNode && !!sel.anchorNode.parentElement?.closest('#editor > p');
+      }));
+    await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>x</p>'; });
+  }
+
+  // Ctrl+Z after a font change used to leave a duplicate of the text behind:
+  // the <font> element the browser had just inserted was replaced by a script,
+  // which desynchronised its undo stack.
+  {
+    await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p>undo me please</p>';
+      ed.focus();
+      const p = ed.querySelector('p');
+      const r = document.createRange();
+      r.selectNodeContents(p);
+      const sel = getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+    });
+    const before = await win.evaluate(() => document.getElementById('editor').innerHTML);
+    await win.evaluate(() => {
+      [...document.querySelectorAll('#menu-font button')].find((b) => b.textContent.trim() === 'Arial')?.click();
+    });
+    await win.waitForTimeout(200);
+    const styled = await win.evaluate(() => document.getElementById('editor').innerHTML);
+    await win.evaluate(() => document.getElementById('editor').focus());
+    await win.keyboard.press('Control+z');
+    await win.waitForTimeout(250);
+    const after = await win.evaluate(() => ({
+      html: document.getElementById('editor').innerHTML,
+      text: document.getElementById('editor').textContent,
+    }));
+    check('a font change actually applies', /Arial/i.test(styled), styled.slice(0, 90));
+    check('and Ctrl+Z takes it back off without duplicating the text',
+      after.text === 'undo me please' && !/Arial/i.test(after.html),
+      `${JSON.stringify(after.text)} | ${after.html.slice(0, 90)}`);
+    check('undo lands on the original markup, not a rebuilt one',
+      after.html === before, `${before} -> ${after.html}`);
+  }
+
+  // Ctrl+F. Matches are painted, never marked up, so the note must come out of
+  // a search byte-identical.
+  {
+    await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p>find the needle here</p><p>and another needle</p>';
+      ed.focus();
+    });
+    const noteBefore = await win.evaluate(() => document.getElementById('editor').innerHTML);
+    await win.keyboard.press('Control+f');
+    await win.waitForSelector('#find-bar:not([hidden])', { timeout: 5_000 });
+    check('Ctrl+F opens the find bar', true);
+    await win.fill('#find-input', 'needle');
+    await win.waitForTimeout(250);
+    const found = await win.evaluate(() => ({
+      count: document.getElementById('find-count').textContent,
+      painted: CSS.highlights.has('nebula-find-current'),
+      html: document.getElementById('editor').innerHTML,
+    }));
+    check('it counts the matches in the note', found.count === '1 of 2', found.count);
+    check('and paints them instead of editing the note',
+      found.painted && found.html === noteBefore, found.painted ? 'note unchanged' : 'nothing painted');
+    await win.press('#find-input', 'Enter');
+    await win.waitForTimeout(150);
+    check('Enter steps to the next match',
+      await win.evaluate(() => document.getElementById('find-count').textContent) === '2 of 2');
+    await win.press('#find-input', 'Escape');
+    await win.waitForTimeout(150);
+    check('Escape closes it and drops the highlights',
+      await win.evaluate(() => document.getElementById('find-bar').hidden && !CSS.highlights.has('nebula-find-current')));
   }
 
   // The languages the user asked for, read off the control they appear in.

@@ -25,6 +25,7 @@
           <button type="button" data-theme="main" title="Main — violet">Main</button>
           <button type="button" data-theme="dark" title="Dark">Dark</button>
           <button type="button" data-theme="light" title="Light">Light</button>
+          <button type="button" data-theme="white" title="White — how the note looks on A4">White</button>
         </div>
         <div class="side-meta">
           <span class="app-version" id="app-version" title="About Nebula"></span>
@@ -146,6 +147,16 @@
         </div>
 
         <div class="editor-frame" id="editor-frame">
+          <!-- Ctrl+F. Matches are painted with the CSS Custom Highlight API, so
+               searching never edits the note. -->
+          <div class="find-bar" id="find-bar" hidden>
+            <span class="find-ic" data-icon="search"></span>
+            <input id="find-input" type="text" placeholder="Find in this note…" autocomplete="off" spellcheck="false" aria-label="Find in this note" />
+            <span class="find-count" id="find-count"></span>
+            <button type="button" class="find-btn" data-find="prev" title="Previous (Shift+Enter)">↑</button>
+            <button type="button" class="find-btn" data-find="next" title="Next (Enter)">↓</button>
+            <button type="button" class="find-btn" data-find="close" title="Close (Esc)">✕</button>
+          </div>
           <div id="editor" class="editor" contenteditable="true" spellcheck="true" data-placeholder="Start writing…  ( / for blocks )"></div>
         </div>
       </div>

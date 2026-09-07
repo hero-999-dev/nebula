@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { NoteStore, plainSnippet, relativeTime } from '../src/js/notes.js';
+import { NoteStore, plainSnippet, relativeTime, noteText } from '../src/js/notes.js';
 import { SEED_NOTES } from '../src/js/seed-notes.js';
 
 describe('NoteStore', () => {
@@ -123,5 +123,69 @@ describe('NoteStore.ensureGuide', () => {
     expect(store.ensureGuide(null, '1.0.0')).toBe(false);
     expect(store.ensureGuide(GUIDE, '')).toBe(false);
     expect(store.notes).toHaveLength(0);
+  });
+});
+
+describe('note text', () => {
+  it('leaves shape text out of the preview', () => {
+    // Shapes are the note's first children, so two words typed inside one
+    // became the whole sidebar preview: "Heyoooo… drag me anywhere" ahead of
+    // the actual first line.
+    const html = '<div class="shape-layer"><div class="shape rect">'
+      + '<div class="shape-text">Heyooooooo</div><span class="shape-h"></span></div></div>'
+      + '<h1>Welcome to Nebula</h1><p>A calm place for notes.</p>';
+    expect(noteText(html)).toBe('Welcome to Nebula A calm place for notes.');
+    expect(plainSnippet(html, 40)).not.toContain('Heyo');
+  });
+
+  it('drops both layers, not just the first', () => {
+    const html = '<div class="shape-layer shape-layer--behind"><div class="shape-text">back</div></div>'
+      + '<div class="shape-layer"><div class="shape-text">front</div></div><p>real text</p>';
+    expect(noteText(html)).toBe('real text');
+  });
+
+  it('cuts a long preview with an ellipsis rather than growing', () => {
+    const long = `<p>${'Hey' + 'o'.repeat(200)}</p>`;
+    const snip = plainSnippet(long, 48);
+    expect(snip).toHaveLength(48);
+    expect(snip.endsWith('…')).toBe(true);
+  });
+
+  it('is empty for an empty note', () => {
+    expect(noteText('')).toBe('');
+    expect(noteText(null)).toBe('');
+  });
+});
+
+describe('NoteStore.filter searches the whole note', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('finds a word past the first 500 characters', () => {
+    // It used to search plainSnippet(content, 500), so anything further down a
+    // long note could not be found from the sidebar at all.
+    const store = new NoteStore({ allowSeed: false });
+    store.notes = [
+      { id: 'a', title: 'Long', content: `<p>${'filler '.repeat(200)}needle</p>`, createdAt: 1, updatedAt: 2 },
+      { id: 'b', title: 'Other', content: '<p>nothing here</p>', createdAt: 1, updatedAt: 1 },
+    ];
+    expect(store.filter('needle').map((n) => n.id)).toEqual(['a']);
+  });
+
+  it('still matches on the title, and keeps only what matched', () => {
+    const store = new NoteStore({ allowSeed: false });
+    store.notes = [
+      { id: 'a', title: 'Groceries', content: '<p>milk</p>', createdAt: 1, updatedAt: 2 },
+      { id: 'b', title: 'Ideas', content: '<p>a better milkshake</p>', createdAt: 1, updatedAt: 1 },
+    ];
+    expect(store.filter('grocer').map((n) => n.id)).toEqual(['a']);
+    expect(store.filter('milk').map((n) => n.id)).toEqual(['a', 'b']);
+    expect(store.filter('zebra')).toEqual([]);
+  });
+
+  it('does not match text that only exists inside a shape', () => {
+    const store = new NoteStore({ allowSeed: false });
+    store.notes = [{ id: 'a', title: 'N', content: '<div class="shape-layer"><div class="shape-text">zebra</div></div><p>hi</p>', createdAt: 1, updatedAt: 1 }];
+    expect(store.filter('zebra')).toEqual([]);
+    expect(store.filter('hi').map((n) => n.id)).toEqual(['a']);
   });
 });

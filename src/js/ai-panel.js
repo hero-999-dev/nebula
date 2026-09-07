@@ -16,6 +16,23 @@ export const AI_SERVICES = {
   perplexity: { name: 'Perplexity', url: 'https://www.perplexity.ai', dot: '#20808d' },
 };
 
+/**
+ * A plain Chrome user agent for the embedded views.
+ *
+ * Electron puts "Electron/33.x" and the app name into the UA, and some sites
+ * treat that as an unsupported or automated client — DeepSeek answers with
+ * "Abnormal usage environment… we recommend using our official product". The
+ * engine really is the same Chromium these sites are built for, so the honest
+ * thing to report is Chrome's own string; nothing else about the request
+ * changes. The version tracks whatever Chromium this Electron carries.
+ */
+function chromeUserAgent() {
+  const ua = navigator.userAgent;
+  return ua
+    .replace(/ Electron\/[\d.]+/i, '')
+    .replace(/ Nebula(?: Test)?\/[\d.]+/i, '');
+}
+
 const CUSTOM_KEY = 'nebula:ai-custom';
 const WIDTH_KEY = 'nebula:ai-width';
 const ACTIVE_KEY = 'nebula:ai-active';
@@ -72,6 +89,7 @@ export function initAiPanel({ askText } = {}) {
         // service so signing into one is not signing into another.
         wv.setAttribute('partition', `persist:ai-${id}`);
         wv.setAttribute('allowpopups', '');
+        wv.setAttribute('useragent', chromeUserAgent());
         body.appendChild(wv);
         views.set(id, wv);
       }

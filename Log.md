@@ -15,6 +15,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-07 16:20] v0.4.4 - by claude
+
+Ctrl+Z no longer duplicates text, Ctrl+F finds inside a note, the sidebar filter searches whole notes, buried shapes are selectable again, the collapsed rail keeps everything, plus a White theme and a Chrome user agent for the AI views.
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-07 14:43] v0.4.3 - by claude
 
 Colours are stored as names, so a note reads correctly on all three themes; AI tabs no longer reload and log you out; shapes drag from anywhere; the note list folds away.

@@ -1,5 +1,6 @@
 /**
- * Three themes: main (violet, the default), dark, light.
+ * Four themes: main (violet, the default), dark, light, and white — plain
+ * white, so a note can be checked against what it will look like on A4.
  *
  * `main` is also what bare `:root` carries in tokens.css, so the app is already
  * the right colour before this module runs — nothing flashes while localStorage
@@ -9,7 +10,7 @@
 import { emit } from './bus.js';
 
 const KEY = 'nebula:theme';
-export const THEMES = ['main', 'dark', 'light'];
+export const THEMES = ['main', 'dark', 'light', 'white'];
 const DEFAULT = 'main';
 
 function read() {

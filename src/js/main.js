@@ -16,6 +16,7 @@ import { injectIcons } from './icons.js';
 import { initUpdater, showAppVersion } from './updater.js';
 import { initAbout } from './about.js';
 import { initSideToggle } from './side-toggle.js';
+import { initFind } from './find.js';
 
 const $ = (id) => document.getElementById(id);
 const AUTOSAVE_MS = 400;
@@ -82,6 +83,7 @@ async function boot() {
   });
   initSlashMenu(editorEl);
   initCodeBlocks(editorEl);
+  const find = initFind(editorEl);
 
   function renderList() {
     const notes = store.filter(listFilter);
@@ -95,7 +97,12 @@ async function boot() {
       row.type = 'button';
       row.className = `note-row${note.id === store.activeId ? ' active' : ''}`;
       row.innerHTML = '<div class="nr-title"></div><div class="nr-meta"></div>';
-      row.children[0].textContent = note.title || 'Untitled';
+      const title = note.title || 'Untitled';
+      row.children[0].textContent = title;
+      // The collapsed rail shows only this; CSS cannot take a first letter out
+      // of an inline box reliably, so it is handed over explicitly.
+      row.children[0].dataset.initial = title.trim().charAt(0).toUpperCase() || 'U';
+      row.title = title; // the full name is still readable as a tooltip
       row.children[1].textContent = `${relativeTime(note.updatedAt)} · ${plainSnippet(note.content, 48) || 'Empty'}`;
       row.addEventListener('click', () => openNote(note.id));
       listEl.appendChild(row);
@@ -113,6 +120,7 @@ async function boot() {
     paintAllCode(editorEl);
     paintAllEquations(editorEl);
     shapes?.reset();
+    find?.close(); // its ranges point into the note that just closed
     setSaveState('');
     renderList();
   }

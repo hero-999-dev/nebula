@@ -3,6 +3,7 @@
  *   main   violet, the default — the app's own identity, matching the icon
  *   dark   ember: paper & ink inverted, clay accent
  *   light  paper: the original warm light theme
+ *   white  plain white — what the note looks like printed on A4
  *
  * `main` is written on :root itself rather than in an attribute block, so the
  * app has its real colours before any script runs — no flash of the wrong
@@ -116,4 +117,46 @@
   --fern: #8FAE8B;
   --madder: #D07A6E;
   --shadow: rgba(0, 0, 0, 0.5);
+}
+
+
+/* Plain white. Not a variant of `light`: that one is warm paper, and the point
+   of this theme is to see the note as it will print — white sheet, black ink,
+   no tint anywhere. The colour palette below it is the light one, which is the
+   one chosen for ink on a pale ground. */
+:root[data-theme="white"] {
+  --paper: #FFFFFF;
+  --paper-raised: #FFFFFF;
+  --paper-sunken: #F4F4F4;
+  --ink: #111111;
+  --ink-soft: #444444;
+  --ink-faint: #8C8C8C;
+  --rule: #D8D8D8;
+  --clay: #6B5BD6;
+  --clay-soft: #E6E2FA;
+  --fern: #3F7D52;
+  --madder: #B3261E;
+  --shadow: rgba(0, 0, 0, 0.10);
+  color-scheme: light;
+
+  --c-gray: #6E6E6E;
+  --c-brown: #7A4E2A;
+  --c-orange: #B5540F;
+  --c-yellow: #8A6D07;
+  --c-green: #2F6B3C;
+  --c-blue: #17518F;
+  --c-purple: #61338F;
+  --c-pink: #A61E5B;
+  --c-red: #B3261E;
+
+  --h-gray: #E6E6E6;
+  --h-brown: #EFDCC8;
+  --h-orange: #FBE0C8;
+  --h-yellow: #FBF0C4;
+  --h-green: #DCF0DD;
+  --h-blue: #D8E8F8;
+  --h-purple: #EBDFF8;
+  --h-pink: #FBDCE7;
+  --h-red: #FBDAD7;
+  --h-ink: #111111;
 }

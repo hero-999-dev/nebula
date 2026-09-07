@@ -58,19 +58,56 @@ body {
 .side-toggle:hover { background: var(--paper-raised); border-color: var(--rule); color: var(--ink); }
 .side-toggle .ic { width: 17px; height: 17px; }
 
-/* Collapsed: only the toggle is left, and the editor takes the space. A width
+/* Collapsed: a narrow rail that still has everything on it. Hiding the notes,
+   the New note button and the theme picker made the collapsed state useless —
+   it is meant to give the page more width, not to take the app away. A width
    transition rather than display:none, so it slides instead of jumping. */
-.side {
-  transition: width 140ms ease;
-}
+.side { transition: width 140ms ease; }
+
 #app.side-collapsed .side {
-  width: 52px;
-  padding-left: 8px;
-  padding-right: 8px;
+  width: 64px;
+  padding-left: 7px;
+  padding-right: 7px;
+  gap: 7px;
 }
-#app.side-collapsed .side > *:not(.brand) { display: none; }
-#app.side-collapsed .brand { padding: 2px 0 0; }
+#app.side-collapsed .brand { padding: 2px 0 4px; justify-content: center; }
 #app.side-collapsed .brand-name { display: none; }
+/* The filter box becomes the magnifier that opens the panel again. */
+#app.side-collapsed .side input[type="search"] { display: none; }
+#app.side-collapsed .note-list { margin: 0; padding: 0; }
+/* Each note becomes its initial, with the full title as the tooltip. */
+#app.side-collapsed .note-row {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  padding: 0;
+  margin-bottom: 4px;
+  font-family: var(--serif);
+  font-size: 14px;
+}
+#app.side-collapsed .note-row .nr-meta { display: none; }
+#app.side-collapsed .note-row .nr-title {
+  width: 100%;
+  text-align: center;
+  font-size: 14px;
+}
+/* Only the initial fits. `::first-letter` cannot be relied on inside an inline
+   context, so main.js puts it in data-initial and this draws that. */
+#app.side-collapsed .note-row .nr-title { font-size: 0; }
+#app.side-collapsed .note-row .nr-title::before {
+  content: attr(data-initial);
+  font-size: 15px;
+}
+#app.side-collapsed .note-list-empty { display: none; }
+#app.side-collapsed .btn { padding: 8px 0; font-size: 0; }
+#app.side-collapsed .btn::before { content: "+"; font-size: 17px; line-height: 1; }
+#app.side-collapsed .theme-pick { flex-direction: column; gap: 3px; }
+#app.side-collapsed .theme-pick button { font-size: 0; padding: 7px 0; }
+#app.side-collapsed .theme-pick button::before { content: attr(data-theme); font-size: 9px; }
+#app.side-collapsed .side-meta { flex-direction: column; gap: 4px; }
+#app.side-collapsed .btn-mini { font-size: 0; padding: 6px 0; }
+#app.side-collapsed .btn-mini::before { content: "↻"; font-size: 12px; }
+#app.side-collapsed .app-version { font-size: 9px; }
 
 .side input[type="search"] {
   width: 100%;
@@ -87,7 +124,12 @@ body {
 
 .note-list {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
+  /* A single long word ("Heyoooooo…") made the rows wider than the panel and
+     put a sideways scrollbar under the list. Nothing here scrolls sideways;
+     text that does not fit is cut with an ellipsis. */
+  overflow-x: hidden;
   margin: 0 -4px;
   padding: 0 4px;
 }
@@ -120,7 +162,14 @@ body {
   font-size: 11px;
   color: var(--ink-faint);
   margin-top: 2px;
+  /* Same as the title: one line, cut with an ellipsis. Without min-width:0 a
+     long unbroken word sets the row's minimum width and the panel grows. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
+.note-row .nr-title, .note-row .nr-meta { max-width: 100%; }
 
 .side-foot { display: flex; flex-direction: column; gap: 6px; }
 
@@ -136,9 +185,10 @@ body {
 }
 .theme-pick button {
   flex: 1;
+  min-width: 0;
   font: inherit;
-  font-size: 12px;
-  padding: 5px 4px;
+  font-size: 11.5px;
+  padding: 5px 2px;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -151,7 +201,8 @@ body {
   color: var(--paper-sunken);
   font-weight: 600;
 }
-:root[data-theme="light"] .theme-pick button.on { color: #fff; }
+:root[data-theme="light"] .theme-pick button.on,
+:root[data-theme="white"] .theme-pick button.on { color: #fff; }
 
 .side-meta {
   display: flex;
@@ -192,7 +243,7 @@ body {
   border-color: var(--clay);
   color: #fff;
 }
-:root:not([data-theme="light"]) .btn.primary { color: var(--paper-sunken); }
+:root:not([data-theme="light"]):not([data-theme="white"]) .btn.primary { color: var(--paper-sunken); }
 .btn.ghost {
   background: transparent;
   border-color: transparent;
@@ -364,3 +415,23 @@ body {
   color: inherit;
   cursor: pointer;
 }
+
+
+/* ---------- scrollbars ----------
+   The browser's default bars are chunky and light-mode grey; on the dark
+   themes they read as a bright stripe down the edge of a dark page. Thin,
+   painted from the tokens, and only visible once there is something to
+   scroll. Firefox gets the standard properties, Chromium the -webkit ones —
+   Electron is Chromium, so the second block is the one that runs here. */
+* { scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--rule);
+  border: 2px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }

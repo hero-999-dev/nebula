@@ -6,11 +6,52 @@ const STORAGE_KEY_NOTES = 'nebula:notes';
 const STORAGE_KEY_ACTIVE = 'nebula:active-note';
 const STORAGE_KEY_GUIDE = 'nebula:guide-version';
 
+/**
+ * The readable text of a note.
+ *
+ * Shape layers are dropped: they are the note's first children, so a couple of
+ * words typed inside a shape became the whole sidebar preview of every note
+ * that had one — "Heyoooo… drag me anywhere" ahead of the actual first line.
+ *
+ * Parsed rather than regexed: `.shape-layer` holds nested divs, and a pattern
+ * that tries to match a closing tag across them will pick the wrong one. A
+ * DOMParser document is inert — nothing in it loads or runs.
+ *
+ * Memoised on the exact HTML, because the sidebar filter runs this over every
+ * note on every keystroke and the guide note alone is 85 KB.
+ */
+/** Elements that end a line of prose, so the text either side needs a gap. */
+const BLOCKS = 'p,div,h1,h2,h3,h4,h5,h6,li,ul,ol,blockquote,pre,br,hr,tr,td,th,section,article,figure,figcaption';
+
+const textCache = new Map();
+const TEXT_CACHE_MAX = 64;
+
+export function noteText(html) {
+  const src = String(html ?? '');
+  if (!src) return '';
+  const hit = textCache.get(src);
+  if (hit !== undefined) return hit;
+
+  let text;
+  if (typeof DOMParser === 'function') {
+    const doc = new DOMParser().parseFromString(src, 'text/html');
+    doc.body.querySelectorAll('.shape-layer').forEach((el) => el.remove());
+    // textContent joins blocks with nothing at all, so a heading ran straight
+    // into the paragraph under it ("Welcome to NebulaA calm place"). Inline
+    // elements must NOT get one, or a word split across <strong> comes apart.
+    doc.body.querySelectorAll(BLOCKS).forEach((el) => el.after(' '));
+    text = (doc.body.textContent ?? '').replace(/\s+/g, ' ').trim();
+  } else {
+    text = src.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  if (textCache.size >= TEXT_CACHE_MAX) textCache.clear();
+  textCache.set(src, text);
+  return text;
+}
+
 export function plainSnippet(html, max = 80) {
-  const text = String(html ?? '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const text = noteText(html);
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
 
@@ -151,11 +192,16 @@ export class NoteStore {
     return [...this.notes].sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
+  /**
+   * Title AND the whole body. It used to search `plainSnippet(content, 500)` —
+   * the first 500 characters — so a word further down a long note simply could
+   * not be found from the sidebar.
+   */
   filter(query) {
     const q = query.trim().toLowerCase();
     if (!q) return this.sorted();
     return this.sorted().filter((n) => {
-      const hay = `${n.title} ${plainSnippet(n.content, 500)}`.toLowerCase();
+      const hay = `${n.title} ${noteText(n.content)}`.toLowerCase();
       return hay.includes(q);
     });
   }

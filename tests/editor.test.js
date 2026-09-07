@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { nextLayout, SIDES } from '../src/js/dock.js';
-import { stepIndent, parseSize, TEXT_COLORS, HILITE_COLORS, colorClasses, U_STYLES, FONTS, FONT_MARK, firstFamily, fontLabelFor } from '../src/js/toolbar.js';
+import { stepIndent, parseSize, TEXT_COLORS, HILITE_COLORS, colorClasses, U_STYLES, FONTS, firstFamily, fontLabelFor } from '../src/js/toolbar.js';
 import { detectSlash, filterSlash, SLASH_ITEMS } from '../src/js/slash-menu.js';
 import { makeShape, SHAPE_COLORS, SHAPE_KINDS } from '../src/js/shapes.js';
 import { highlight, LANGS } from '../src/js/highlight.js';
@@ -257,10 +257,6 @@ describe('font picker', () => {
     expect(fontLabelFor('')).toBe(null);
   });
 
-  it('marks its own spans with a face name no real font has', () => {
-    expect(FONT_MARK).toMatch(/^[a-z-]+$/);
-    expect(FONTS.some(([, s]) => s.includes(FONT_MARK))).toBe(false);
-  });
 });
 
 /**

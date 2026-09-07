@@ -78,9 +78,6 @@ export const FONTS = [
   ['Cascadia Code', '"Cascadia Code", Consolas, monospace'],
 ];
 
-/** A face name no real font has, so the post-fix pass can find its own spans. */
-export const FONT_MARK = 'nebula-font-mark';
-
 /** First family of a CSS stack, unquoted — for labelling the picker. */
 export function firstFamily(stack) {
   return String(stack || '').split(',')[0].trim().replace(/^["']|["']$/g, '');
@@ -146,14 +143,27 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
     sel.addRange(r);
   }
 
-  /** Wrap the selection in a classed span. */
+  /**
+   * Wrap the selection in a classed span — through `insertHTML`, not by moving
+   * nodes.
+   *
+   * Chromium's undo stack only knows about edits IT made. A scripted
+   * extractContents/insertNode is invisible to it, so Ctrl+Z would undo some
+   * older edit while the scripted one stayed, and the two states together came
+   * out as duplicated text. `insertHTML` is a real edit command, so one Ctrl+Z
+   * takes the whole wrap back off.
+   */
   function wrapSelection(cls) {
     const range = selectionInEditor();
     if (!range || range.collapsed) return null;
-    const span = document.createElement('span');
-    span.className = cls;
-    span.appendChild(range.extractContents());
-    range.insertNode(span);
+    const holder = document.createElement('div');
+    holder.appendChild(range.cloneContents());
+    const mark = `nb${Math.random().toString(36).slice(2, 9)}`;
+    editorEl.focus();
+    document.execCommand('insertHTML', false, `<span class="${cls} ${mark}">${holder.innerHTML}</span>`);
+    const span = editorEl.querySelector(`.${mark}`);
+    if (!span) { dirty(); return null; }
+    span.classList.remove(mark);
     reselect(span);
     dirty();
     return span;
@@ -275,16 +285,26 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
     dirty();
   }
 
-  /** Apply a px font size — execCommand only knows 1..7, so we post-fix spans. */
+  /**
+   * A px font size. `execCommand('fontSize')` only knows 1..7, so the value is
+   * applied to the spans it creates — but with `styleWithCSS` on, those are
+   * plain spans the browser owns, and setting one more property on them keeps
+   * them inside its own undo entry instead of replacing them wholesale.
+   */
   function applyFontSize(px) {
     const range = selectionInEditor();
-    if (!range || range.collapsed) return;
+    if (!range || range.collapsed) {
+      const block = blockOf();
+      if (!block) return;
+      block.style.fontSize = `${px}px`;
+      dirty();
+      return;
+    }
+    editorEl.focus();
+    document.execCommand('styleWithCSS', false, true);
     document.execCommand('fontSize', false, '7');
-    editorEl.querySelectorAll('font[size="7"]').forEach((f) => {
-      const span = document.createElement('span');
-      span.style.fontSize = `${px}px`;
-      span.innerHTML = f.innerHTML;
-      f.replaceWith(span);
+    editorEl.querySelectorAll('[style*="xxx-large"], font[size="7"]').forEach((el) => {
+      el.style.fontSize = `${px}px`;
     });
     dirty();
   }
@@ -433,14 +453,21 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
   const sizeInput = document.getElementById('tb-size');
 
   /**
-   * `execCommand('fontName')` emits <font face>, which nothing else in the note
-   * understands, so it is post-fixed into a styled span — the same trick
-   * applyFontSize uses. With a collapsed caret there is nothing to wrap, so the
-   * whole block takes the font instead: picking a font with the caret parked in
-   * a line used to do nothing at all, which is what "I can't choose" meant.
+   * Apply a font.
+   *
+   * `styleWithCSS` makes Chromium emit `<span style="font-family:…">` itself,
+   * so there is no `<font face>` left to rewrite afterwards. That rewrite was
+   * the Ctrl+Z bug the user hit: replacing the element the browser had just
+   * inserted desynchronised its undo stack, and undoing a font change left a
+   * duplicate of the text behind.
+   *
+   * With only a caret there is nothing for the command to act on, so the whole
+   * block takes the font instead — picking a font with the caret parked in a
+   * line used to do nothing at all.
    */
   function applyFont(stack) {
     const range = selectionInEditor();
+    editorEl.focus();
     if (!range || range.collapsed) {
       const block = blockOf();
       if (!block) return;
@@ -448,14 +475,8 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
       dirty();
       return;
     }
-    editorEl.focus();
-    document.execCommand('fontName', false, FONT_MARK);
-    editorEl.querySelectorAll(`font[face="${FONT_MARK}"]`).forEach((f) => {
-      const span = document.createElement('span');
-      span.style.fontFamily = stack;
-      span.innerHTML = f.innerHTML;
-      f.replaceWith(span);
-    });
+    document.execCommand('styleWithCSS', false, true);
+    document.execCommand('fontName', false, stack);
     dirty();
   }
 
