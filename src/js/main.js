@@ -1,5 +1,6 @@
 import { initDiskStorage } from './disk-store.js';
 import { NoteStore, plainSnippet, relativeTime } from './notes.js';
+import { seedFor } from './seed-notes.js';
 import { bindEditor } from './editor.js';
 import { initTheme } from './theme.js';
 import { on } from './bus.js';
@@ -43,8 +44,13 @@ async function boot() {
   injectIcons();
   initDialog();
 
-  // Seed the sample notes only for a vault we know is genuinely empty.
-  const store = new NoteStore({ allowSeed: disk.ok && disk.empty });
+  // Seed the sample notes only for a vault we know is genuinely empty. Which
+  // set depends on the build: the test app gets the per-feature checklist, an
+  // installed app gets one help page. The channel is only asked for when there
+  // is actually going to be a seed.
+  const allowSeed = disk.ok && disk.empty;
+  const channel = allowSeed ? (await window.nebula?.paths?.().catch(() => null))?.channel : null;
+  const store = new NoteStore({ allowSeed, seed: seedFor(channel) });
   const titleEl = $('title');
   const saveEl = $('savestate');
   const listEl = $('note-list');

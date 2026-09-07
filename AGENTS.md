@@ -58,7 +58,7 @@ Every session that changed code ends with **all** of these:
 - [ ] **`Prompt.md`** — the "current state" section, if the product changed
 - [ ] **`README.md`** — if structure, scripts or workflow changed
 - [ ] **`HANDOVER.md`** — if a new trap or a new command appeared
-- [ ] `npm run push` when the user says **push** — never on your own initiative
+- [ ] `npm run push` — release the finished work; see **Releasing** below
 
 `npm run push` re-checks the tracking files and refuses to release quietly if
 code moved and `Log.md` / `tests.md` / `memory.json` did not.
@@ -67,16 +67,26 @@ code moved and `Log.md` / `tests.md` / `memory.json` did not.
 
 ## Releasing
 
-Releases are user-initiated. When the user says **"push"**:
+**Standing instruction from the owner (2026-09-07): release automatically.**
+Finish a piece of work, update the tracking files, then push — do not wait to be
+told, and do not ask which platforms to build. Both build, every time.
 
 ```bash
 npm run push                 # patch;  -- minor | major | 0.5.2 | --notes "…"
 ```
 
 The chain: tests → smoke → build → doc freshness → version bump → `Log.md` →
-commit → tag → push → GitHub Actions builds Windows + macOS and publishes one
-Release → local docs site rebuilt → `nebula-web` mirror updated → USB drive
-mirrored if plugged in.
+commit → tag → push → GitHub Actions builds Windows **and** macOS and publishes
+one Release → **`Nebula Test.exe` in the project root rebuilt** → local docs
+site rebuilt → `nebula-web` mirror updated → USB drive mirrored if plugged in.
+
+Why no platform question: `hero-999-dev/nebula` is **public**, and GitHub
+Actions is free and unlimited on public repositories — the macOS runner
+included. The 10× macOS multiplier applies only to private repos, so building
+for macOS costs nothing here.
+
+`npm run kill` (which `pack:test` runs first) closes a running `Nebula Test.exe`
+as well, so the test build refreshes without anyone closing a window.
 
 Details and platform limits: **[docs/RELEASE.md](docs/RELEASE.md)**.
 

@@ -48,7 +48,13 @@ export const ICONS = {
   table: S('<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M3 9.5h18"/><path d="M3 14.5h18"/><path d="M9 9.5v10"/><path d="M15 9.5v10"/>'),
   link: S('<path d="M10.5 13.5a4 4 0 0 0 5.7 0l2.6-2.6a4 4 0 0 0-5.7-5.7l-1.4 1.4"/><path d="M13.5 10.5a4 4 0 0 0-5.7 0l-2.6 2.6a4 4 0 0 0 5.7 5.7l1.4-1.4"/>'),
   code: S('<path d="m9 8-4 4 4 4"/><path d="m15 8 4 4-4 4"/>'),
-  equation: S('<path d="M4 19h2.5L11 5h9"/><path d="M4 12h6"/><path d="m14.5 11 5 6"/><path d="m19.5 11-5 6"/>'),
+  // Plainly √x: radical hook, rising stroke, vinculum, and an italic x sitting
+  // under the bar where it belongs. The old one crossed two strokes under the
+  // bar, which read as a multiplication sign rather than a variable, and put
+  // a second horizontal at y=12 that looked like a strikethrough.
+  equation: S(
+    '<path d="M3 13.2h2.4l2.8 6.6L12.4 4.5H21"/>'
+    + '<text x="14" y="17.4" font-size="9" font-style="italic" font-family="Charter, Georgia, serif" fill="currentColor" stroke="none">x</text>'),
   emoji: S('<circle cx="12" cy="12" r="8.5"/><path d="M8.8 14.5a4.2 4.2 0 0 0 6.4 0"/><circle cx="9.2" cy="9.8" r=".9" fill="currentColor" stroke="none"/><circle cx="14.8" cy="9.8" r=".9" fill="currentColor" stroke="none"/>'),
   clip: S('<path d="M19 11.5 12 18.5a4.5 4.5 0 0 1-6.4-6.4l7.6-7.6a3 3 0 0 1 4.3 4.3l-7.6 7.6a1.6 1.6 0 0 1-2.2-2.2l6.9-6.9"/>'),
   bookmark: S('<path d="M6 4.5h12v15l-6-4-6 4z"/>'),

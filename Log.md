@@ -12,6 +12,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-07 05:45] v0.4.1 - by claude
+
+Eight fixes from the test build: lists you can leave, a to-do you can undo, a font menu that works, equations in a frame, and shapes that really go behind the text.
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-07 00:04] v0.4.0 - by claude
 
 Editor pass: lists that stop cutting each other, an escapable inline format, real typeset equations, six more languages, sharper icons.

@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 114 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 34 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 135 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 44 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -19,41 +19,128 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | File | Tests | Proves |
 |---|---|---|
 | `tests/notes.test.js` | 8 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body |
-| `tests/editor.test.js` | 30 | Toolbar actions, outline formats, indent, lists, underline styles, code blocks, shapes, slash menu |
+| `tests/editor.test.js` | 41 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and which starter notes each build gets |
+| `tests/lists.test.js` | 23 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
+| `tests/inline-format.test.js` | 18 | Enter and Backspace out of an inline wrapper |
+| `tests/highlight.test.js` | 14 | Per-language tokens, and that only SQL is case-insensitive |
 | `tests/disk-store.test.js` | 6 | Rapid saves serialize per file, every mirrored file is valid JSON, deleting a note deletes *its* file, unchanged notes are skipped, boot loads from disk and survives one corrupt file, browser mode never throws |
 | `tests/seed-guard.test.js` | 10 | The distinction between an empty vault and an unreadable one |
+| `tests/user-data.test.js` | 8 | Which vault each build channel gets, and which one may replace itself |
 | `tests/version-compare.test.js` | 7 | `0.3.10 > 0.3.9`, `v` prefixes, pre-releases, unparseable tags refuse rather than guess |
-| `tests/e2e/smoke.mjs` | 22 | The real app, three launches |
+| `tests/e2e/smoke.mjs` | 44 | The real app, four launches |
 
 ---
 
 ## The smoke test, check by check
 
-Launch 1 — a fresh, healthy vault:
+**Launch 1 — a fresh, healthy vault (1-19).**
+The window opens and is titled · the preload bridge exposes `storage`,
+`updates`, `paths` + `reveal` · the theme picker offers main / dark / light,
+starts on main, and repaints both ways · a fresh vault seeds the starter notes
+and they reach disk · `storage/meta.json` is stamped · path-traversal reads are
+rejected through the real IPC handler · the updater reports a mode without
+crashing · `paths` reports the build channel and honours `NEBULA_USER_DATA` ·
+About lists all six folders · toolbar, slash menu, shapes and AI panel are
+wired · opening the code-blocks note renders a highlighted block.
 
-1. Window opens with the app shell · 2. window title · 3-5. the preload bridge
-exposes `storage`, `updates`, `paths` + `reveal` · 6. the sidebar mark is the
-crescent (two paths), not the ring the old `evenodd` geometry produced ·
-7. a fresh vault seeds six notes · 8. they reach disk · 9. `storage/meta.json`
-is stamped · 10. path-traversal reads are rejected through the real IPC handler
-· 11. the updater reports a mode without crashing · 12-13. `paths` reports the
-build channel and honours `NEBULA_USER_DATA` · 14. About lists all six rows ·
-15. toolbar, slash menu, shapes and AI panel are wired · 16-17. opening the
-code-blocks note renders a highlighted block.
+**Launch 2 — the same profile again (20-21).**
+The same notes, not a second seeding, and the note files are byte-identical.
 
-Launch 2 — the same profile again:
+**Launch 3 — a scratch profile, driving the editor (22-41).**
+A numbered list started under a bulleted one is its sibling, not buried in its
+last item · Enter on an empty list item ends the list · Backspace on one leaves
+the list instead of merging up · the to-do button toggles a line on and back
+off · inline code wraps a selection and Enter at the end of it starts a plain
+line · the font menu lists fifteen faces, each drawn in its own type, including
+the four the user named, and picking one with only a caret restyles the line and
+relabels the button · the equation editor opens, previews as you type, typesets
+into the note with a border like inline code, and is still typeset after
+switching notes and back · a shape's bar opens on selection and closes when the
+note changes · send-behind moves the shape onto the layer *under* the text at
+full opacity, bring-above returns it, and ✕ deletes it and really closes the bar
+(computed `display`, not just the attribute) · C, C++, C#, Java, Dart and Ruby
+are offered in the language list.
 
-18. the same six notes, not a second seeding · 19. the note files are byte-identical.
-
-Launch 3 — a vault that cannot be read (`storage/notes` created as a *file*, so
-`readdir` fails with ENOTDIR — a real error that is not ENOENT):
-
-20. the red storage-error banner appears · 21. **nothing is seeded** ·
-22. the vault is left exactly as it was.
+**Launch 4 — a vault that cannot be read (42-44)**, `storage/notes` created as a
+*file* so `readdir` fails with ENOTDIR — a real error that is not ENOENT:
+the red storage-error banner appears · **nothing is seeded** · the vault is left
+exactly as it was.
 
 ---
 
 ## Log
+
+### [2026-09-07] v0.4.1 — the eight things 0.4.0 still got wrong
+
+**Unit 114 → 135, smoke 34 → 44.** No new suites; the new checks live where the
+behaviour does.
+
+**Two fixes shipped in 0.4.0 never worked, and the tests that "covered" them
+passed anyway.**
+
+- The ✕ on the shape bar. `select(null)` sets `hidden` on `#shape-bar` — but
+  `hidden` is only `display: none` in the *user-agent* stylesheet, and
+  `.shape-bar { display: flex }` is an author rule, so it won. The bar stayed on
+  screen with nothing to act on. The old check asserted `bar.hidden`, which was
+  `true` the whole time; it was measuring the attribute, not the outcome. It now
+  asserts the **computed display**, and `app.css` closes the whole class with
+  `[hidden] { display: none !important }` — two elements had already been
+  patched one at a time for the same reason.
+- "Send behind text" only toggled a class. Everything lived on one overlay with
+  `z-index: 3`, so a shape could never get under the text; the visible effect
+  was `opacity: 0.9`, which reads as "faded", not "behind". There are now two
+  layers, and the button *moves* the shape between them. The check compares the
+  computed z-index of the layer against the paragraph's and asserts the shape is
+  still fully opaque.
+
+**Leaving a list.** Enter on an empty item added another item; Backspace merged
+it up into the line above. `exitListOnEmptyItem` ends the list, splitting it when
+the item was in the middle so the items below stay a list, in order. Nested
+lists are left to the browser — there the right answer is outdent, not exit.
+
+**The to-do button was one-way**: a mis-click could not be undone. It toggles
+now, and keeps the indent level across the change.
+
+**The font picker never worked at all.** It was an `<input list="font-list">`.
+A `<datalist>` cannot be styled, so all fifteen faces rendered identically — the
+user's "they all come out in one row, always the same". Worse, picking one only
+fired `change`, and `execCommand('fontName')` with a collapsed caret has nothing
+to apply to, so nothing happened. It is now a real menu, each row set in its own
+face, and with only a caret it sets the whole line.
+
+**And a bug the smoke test caught in that very fix:** the preview face was
+written as `style="font-family:${stack}"`, but stacks contain double quotes
+(`"Segoe UI"`), which end the attribute early. Twelve of the fifteen rows had no
+font at all. Assigned as a property now.
+
+```
+x the font menu lists faces, each drawn in its own type - 15 fonts   <- before
++ the font menu lists faces, each drawn in its own type - 15 fonts   <- after
+```
+
+**Equations** get the same frame as inline code — a rendered formula with no
+border dissolves into the sentence and there is nothing to aim at to reopen it.
+The button's icon is now plainly √x; the old one crossed two strokes under the
+radical, which read as a multiplication sign.
+
+**Starter notes now depend on the build.** The test and dev builds seed the
+seven-note per-feature checklist, including a new one for equations, fonts and
+escaping a format; an installed or portable copy seeds the welcome note plus a
+single help page with no "Check:" lines in it. `seedFor(channel)` decides, and
+`NoteStore` takes the set as an argument rather than importing one.
+
+**The six languages added in 0.4.0 had no samples.** C, C++, C#, Java, Dart
+(Flutter) and Ruby are now in the code-blocks note, each written to exercise the
+tokens its rules claim to know — a broken rule shows up as flat grey text there
+rather than in a real note months later.
+
+**Two ritual changes, on the owner's instruction.** `npm run push` now rebuilds
+`Nebula Test.exe` after the tag, so the build defects get reported against is
+never older than the release. That only works because `scripts/kill-nebula.js`
+closes a running `Nebula Test.exe` as well — it covered `Nebula.exe` and the
+versioned portable but not the one build most likely to be open, so every
+`pack:test` ended in "close it and run this again". And releasing no longer
+waits to be asked: see AGENTS.md → Releasing.
 
 ### [2026-09-07] v0.4.0 — eight editor defects, and two more found while fixing them
 

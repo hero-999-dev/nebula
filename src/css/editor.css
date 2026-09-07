@@ -130,8 +130,24 @@
 .tb-select { max-width: 118px; }
 .tb-select:focus, .tb-input:focus { border-color: var(--clay); }
 .tb-combo { display: inline-flex; }
-.tb-input--font { width: 116px; }
 .tb-input--size { width: 58px; }
+
+/* The font picker is a button that names the current font, not an <input>:
+   a datalist cannot show each option in its own face, and a text field kept
+   being rewritten by syncState on every selectionchange. */
+.tb-font {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: 132px;
+  padding: 0 7px;
+  font-size: 12px;
+  justify-content: space-between;
+}
+.tb-font__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb-font__caret { font-size: 8px; color: var(--ink-faint); flex-shrink: 0; }
+.edit-shell.bar-left .tb-font,
+.edit-shell.bar-right .tb-font { width: 46px; }
 
 .tb-wrap { position: relative; display: inline-flex; align-items: center; }
 .tb-menu {
@@ -181,6 +197,13 @@
   cursor: pointer;
 }
 .tb-menu button:hover { background: var(--paper-sunken); }
+
+/* The font menu has no swatch: the name IS the row, previewed in its own face.
+   These must come AFTER the two rules above — same specificity, so source
+   order decides, and with `.tb-menu button` winning the label landed in the
+   17px swatch column and every font read as a single letter. */
+.tb-menu--font { min-width: 236px; }
+.tb-menu--font button { grid-template-columns: 1fr; font-size: 15px; padding: 6px 10px; }
 .tb-menu .swatch {
   width: 17px; height: 17px;
   border-radius: 4px;
@@ -269,15 +292,20 @@
   padding: 0 4px;
   color: var(--madder);
 }
-/* A typeset equation: KaTeX renders inside, so no italic serif fake here. */
+/* A typeset equation: KaTeX renders inside, so no italic serif fake here.
+   It carries the same frame as inline code — without one a rendered formula
+   dissolves into the sentence around it and there is no target to click to
+   edit it again. */
 .inline-eq {
   display: inline-block;
-  padding: 0 4px;
+  padding: 0 5px;
+  border: 1px solid var(--rule);
   border-radius: 4px;
+  background: var(--paper-sunken);
   cursor: pointer;
   vertical-align: baseline;
 }
-.inline-eq:hover { background: var(--clay-soft); }
+.inline-eq:hover { background: var(--clay-soft); border-color: var(--clay); }
 .inline-eq .katex { font-size: 1.02em; color: var(--ink); }
 
 /* ---------- equation editor ---------- */
@@ -417,12 +445,22 @@
 :root:not([data-theme="light"]) .tok-selector { color: #8FB8E8; }
 
 /* ---------- free-floating shapes (wrap: through) ---------- */
+/* Two layers, because "send behind text" has to mean it.
+   A single layer at z-index 5 could never put a shape under the words: a child
+   with z-index:-1 only sinks within its own stacking context, and the layer
+   itself was above the text. So the text sits between the two layers, and
+   sending a shape back moves it to the lower one. */
 .shape-layer {
   position: absolute;
   inset: 0;
   pointer-events: none; /* only the shapes themselves catch the mouse */
-  z-index: 5;
+  z-index: 3;
 }
+.shape-layer--behind { z-index: 1; }
+
+/* Everything the user writes sits above the back layer and below the front one.
+   z-index needs a position; relative moves nothing. */
+.editor > *:not(.shape-layer) { position: relative; z-index: 2; }
 .shape {
   position: absolute;
   pointer-events: auto;
@@ -442,7 +480,9 @@
 .shape.ellipse { border-radius: 50%; }
 .shape.diamond { border: none; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .shape.diamond .shape-text { max-width: 55%; }
-.shape.behind { z-index: -1; opacity: 0.9; }
+/* No opacity trick: a shape behind the text is fully opaque, it is simply
+   painted first. Fading it was the old way of pretending. */
+.shape.behind { z-index: auto; }
 .shape-text {
   outline: none;
   text-align: center;

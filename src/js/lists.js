@@ -98,6 +98,60 @@ function dropEmptyLists(root) {
 }
 
 /**
+ * Enter or Backspace on an empty list item leaves the list.
+ *
+ * Without this, Enter on the empty item just adds another one and Backspace
+ * merges the caret up into the previous item — so once you are in a numbered
+ * list there is no way out except deleting your way backwards. Every editor
+ * ends a list this way.
+ *
+ * Only top-level lists: a nested one should outdent a level instead, and that
+ * is left to the browser rather than guessed at here.
+ *
+ * @returns {boolean} true if handled — the caller must preventDefault
+ */
+export function exitListOnEmptyItem(root, selection) {
+  if (!selection || !selection.rangeCount) return false;
+  const range = selection.getRangeAt(0);
+  if (!range.collapsed) return false;
+
+  const start = range.startContainer;
+  const el = start.nodeType === 1 ? start : start.parentElement;
+  const li = el?.closest?.('li');
+  if (!li || !root.contains(li)) return false;
+  if (liOwnText(li)) return false;                       // only an empty item
+  if (Array.from(li.children).some(isList)) return false; // it holds a sub-list
+
+  const list = li.parentElement;
+  if (!isList(list) || list.parentElement !== root) return false;
+
+  const doc = root.ownerDocument;
+  const after = [];
+  for (let n = li.nextElementSibling; n; n = n.nextElementSibling) after.push(n);
+
+  const p = doc.createElement('p');
+  p.innerHTML = '<br>';
+  list.after(p);
+
+  // Items below the one being left stay a list, under the new paragraph.
+  if (after.length) {
+    const tail = doc.createElement(list.tagName.toLowerCase());
+    for (const n of after) tail.appendChild(n);
+    p.after(tail);
+  }
+
+  li.remove();
+  if (!list.querySelector('li')) list.remove();
+
+  const caret = doc.createRange();
+  caret.setStart(p, 0);
+  caret.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(caret);
+  return true;
+}
+
+/**
  * @param {Element} root the editor
  * @returns {boolean} whether anything moved — callers use it to skip a save
  */

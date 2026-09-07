@@ -33,15 +33,20 @@ screen are obviously the same product.
 - A **two-row toolbar**: undo/redo · bulleted, numbered and to-do lists ·
   outline format (paragraph, H1-H3, quote, code) · indent ± (also Tab and
   Shift+Tab) · save (Ctrl+S) · print (Ctrl+P) · cut/copy/paste · shapes ‖
-  font · size (any number, not a fixed list) · text colour (Ctrl+T) ·
-  highlight (Ctrl+H) · B I U with underline styles (single, double, bold,
-  wavy, dashed) · strikethrough · inline code (Ctrl+E) · equation (Ctrl+Q) ·
-  four alignments. The font and size boxes show what the caret is actually in.
+  a font menu (each face previewed in its own type) · size (any number, not a
+  fixed list) · text colour (Ctrl+T) · highlight (Ctrl+H) · B I U with underline
+  styles (single, double, bold, wavy, dashed) · strikethrough · inline code
+  (Ctrl+E) · equation (Ctrl+Q, typeset with KaTeX and framed like inline code) ·
+  four alignments. The font button and the size box show what the caret is
+  actually in; with nothing selected a font applies to the whole line.
 - **Right-click a selection** for a compact mini toolbar.
 - **`/` opens a block menu** — headings, lists, to-do, quote, code, divider,
   shapes.
 - **Code blocks** are markdown-style, with a language picker and syntax colours
-  for JS, TS, Python, HTML, CSS, JSON, SQL, Bash and Markdown.
+  for JS, TS, Python, Java, C, C++, C#, Dart (Flutter), Ruby, HTML, CSS, JSON,
+  SQL, Bash and Markdown.
+- **Lists you can leave**: Enter or Backspace on an empty item ends the list;
+  the to-do button toggles a line both ways.
 - **Shapes float over the whole note** — rectangles, ellipses, diamonds. They
   drag anywhere, resize from a corner, recolour from dots, hold editable text,
   and sit above or behind the text without reflowing it.
@@ -112,12 +117,13 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.4.0)
+## Current implementation state (v0.4.1)
 
 **Working:** the whole editor described above — dock pad, two-row toolbar,
 mini toolbar, slash menu, code blocks with syntax colours, free-floating shapes,
-AI panel with tabs and custom sites, the Main/Dark/Light theme picker, six seed
-notes (one per feature) so every function can be checked by hand.
+AI panel with tabs and custom sites, the Main/Dark/Light theme picker, and
+starter notes chosen by build — a seven-note per-feature checklist in the test
+and dev builds, a welcome note plus one help page in an installed copy.
 
 **Identity:** the icon is drawn from vector geometry at every size that ships
 (16 → 256 in a real multi-size `.ico`), not downscaled from one large bitmap,
@@ -132,7 +138,7 @@ stamp, and a dev profile at `<repo>/.dev-profile` that development cannot escape
 on Windows and notify-and-download elsewhere; `npm run push` is the whole
 release ritual.
 
-**Quality:** 61 unit tests, 24 Electron smoke checks against the real app
+**Quality:** 135 unit tests, 44 Electron smoke checks against the real app
 (including "an unreadable vault seeds nothing", verified by breaking the guard
 on purpose and watching the suite go red).
 

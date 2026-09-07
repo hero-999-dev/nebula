@@ -21,6 +21,10 @@ if (!fs.existsSync(mainJs)) {
   process.exit(1);
 }
 
+// The dev profile seeds the per-feature checklist (seedFor in seed-notes.js);
+// an installed copy gets the two-note help set instead.
+const SEEDED = 7;
+
 const results = [];
 const check = (name, ok, extra = '') => {
   results.push({ name, ok });
@@ -82,11 +86,11 @@ try {
   // The seed notes are what a genuine first run gets, and they must reach disk.
   await win.waitForFunction(() => document.querySelectorAll('.note-row').length > 0, undefined, { timeout: 10_000 });
   const seeded = await win.evaluate(() => document.querySelectorAll('.note-row').length);
-  check('a fresh vault seeds the sample notes', seeded === 6, `${seeded} notes`);
+  check('a fresh vault seeds the sample notes', seeded === SEEDED, `${seeded} notes`);
 
   await win.waitForTimeout(1200);
   const onDisk = noteFiles(profile);
-  check('notes are mirrored to disk', onDisk.length === 6, `${onDisk.length} files`);
+  check('notes are mirrored to disk', onDisk.length === SEEDED, `${onDisk.length} files`);
   check('vault meta is stamped', fs.existsSync(path.join(profile, 'storage', 'meta.json')));
 
   // Path guard, from the renderer, through the real IPC handler.
@@ -147,7 +151,7 @@ try {
 
   const afterCount = await win.evaluate(() => document.querySelectorAll('.note-row').length);
   const after = noteFiles(profile).sort().join(',');
-  check('relaunch shows the same notes, not a second seeding', afterCount === 6, `${afterCount} notes`);
+  check('relaunch shows the same notes, not a second seeding', afterCount === SEEDED, `${afterCount} notes`);
   check('note files are unchanged across a restart', after === before);
   await app.close();
 
@@ -179,6 +183,71 @@ try {
   });
   check('a numbered list under a bulleted one is a sibling, not nested',
     lists.ul === 1 && lists.ol === 1 && lists.buried === 0, JSON.stringify(lists));
+
+  // Getting OUT of a list. The report: on an empty numbered item "Backspace
+  // does not leave the list, it goes up" — the empty item merged into the line
+  // above instead of ending the list.
+  const caretAtEndOf = (selector) => win.evaluate((sel) => {
+    const ed = document.getElementById('editor');
+    ed.focus();
+    const r = document.createRange();
+    r.selectNodeContents(ed.querySelector(sel));
+    r.collapse(false);
+    const s = getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+  }, selector);
+
+  await win.evaluate(() => { document.getElementById('editor').innerHTML = '<ol><li>one</li><li>two</li></ol>'; });
+  await caretAtEndOf('li:nth-child(2)');
+  await win.keyboard.press('Enter');   // empty third item
+  await win.keyboard.press('Enter');   // ...and out of the list
+  await win.keyboard.type('plain');
+  {
+    const state = await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      return {
+        items: ed.querySelectorAll('li').length,
+        inList: [...ed.querySelectorAll('li')].some((li) => li.textContent.includes('plain')),
+        html: ed.innerHTML,
+      };
+    });
+    check('Enter on an empty list item ends the list',
+      state.items === 2 && !state.inList, state.html);
+  }
+
+  await win.evaluate(() => { document.getElementById('editor').innerHTML = '<ol><li>one</li></ol>'; });
+  await caretAtEndOf('li');
+  await win.keyboard.press('Enter');       // empty second item
+  await win.keyboard.press('Backspace');   // must leave the list, not merge up
+  await win.keyboard.type('gone');
+  {
+    const state = await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      return {
+        items: [...ed.querySelectorAll('li')].map((li) => li.textContent),
+        text: ed.textContent,
+        html: ed.innerHTML,
+      };
+    });
+    check('Backspace on an empty list item leaves the list instead of merging up',
+      state.items.length === 1 && state.items[0] === 'one' && state.text.includes('gone'),
+      state.html);
+  }
+
+  // The to-do button used to be one-way: a mis-click could not be undone.
+  await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>task</p>'; });
+  await caretAtEndOf('p');
+  await win.click('[data-act="todo"]');
+  const todoOn = await win.evaluate(() =>
+    document.querySelector('#editor .blk-todo')?.textContent === 'task');
+  await win.click('[data-act="todo"]');
+  const todoOff = await win.evaluate(() => {
+    const ed = document.getElementById('editor');
+    return !ed.querySelector('.blk-todo') && ed.textContent.includes('task');
+  });
+  check('the to-do button toggles a line on and back off', todoOn && todoOff,
+    `on=${todoOn} off=${todoOff}`);
 
   // Inline formats have to be escapable.
   await win.evaluate(() => {
@@ -222,6 +291,48 @@ try {
     check('Enter at the end of inline code starts a plain line', state.ok, state.ok ? '' : state.html);
   }
 
+  // The font picker. It was a <datalist>: every option looked identical, and
+  // choosing one with a collapsed caret did nothing at all.
+  await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>fonted</p>'; });
+  await caretAtEndOf('p');
+  await win.click('#tb-font');
+  await win.waitForSelector('#menu-font:not([hidden])', { timeout: 5_000 });
+  const fontRows = await win.evaluate(() =>
+    [...document.querySelectorAll('#menu-font button .label')]
+      .map((el) => ({ name: el.textContent.trim(), face: el.style.fontFamily })));
+  check('the font menu lists faces, each drawn in its own type',
+    fontRows.length >= 12
+      && fontRows.every((r) => r.face)
+      && new Set(fontRows.map((r) => r.face)).size === fontRows.length,
+    `${fontRows.length} fonts`);
+  check('the faces the user asked for are all there',
+    ['Arial', 'Calibri', 'Times New Roman', 'Comic Sans MS']
+      .every((f) => fontRows.some((r) => r.name === f)),
+    fontRows.map((r) => r.name).join(', '));
+  // The first version of this menu passed every check above while showing
+  // "S…", "A…", "C…": the label had landed in the 17px swatch column, because
+  // the override sat before the rule it was overriding. Faces are not enough —
+  // the names have to be readable.
+  const clipped = await win.evaluate(() =>
+    [...document.querySelectorAll('#menu-font button .label')]
+      .filter((el) => el.scrollWidth > el.clientWidth + 1)
+      .map((el) => el.textContent.trim()));
+  check('no font name is squeezed down to an ellipsis',
+    clipped.length === 0, clipped.join(', '));
+  await win.evaluate(() => {
+    [...document.querySelectorAll('#menu-font button')]
+      .find((b) => b.textContent.trim() === 'Comic Sans MS')?.click();
+  });
+  {
+    const state = await win.evaluate(() => ({
+      applied: document.querySelector('#editor p')?.style.fontFamily ?? '',
+      label: document.querySelector('#tb-font .tb-font__name')?.textContent ?? '',
+    }));
+    check('picking a font with only a caret sets the line, and the button says so',
+      /Comic Sans/.test(state.applied) && state.label === 'Comic Sans MS',
+      JSON.stringify(state));
+  }
+
   // Equation: KaTeX, from source, surviving a reload.
   await win.click('[data-act="eq"]');
   await win.waitForSelector('#eq-pop:not([hidden])', { timeout: 5_000 });
@@ -233,6 +344,13 @@ try {
   await win.waitForSelector('#editor .inline-eq .katex', { timeout: 5_000 });
   check('the equation is typeset into the note',
     await win.evaluate(() => document.querySelector('#editor .inline-eq')?.dataset.tex === '\\frac{a}{b}'));
+  // A rendered formula with no frame dissolves into the sentence, and there is
+  // nothing to aim at to open it again.
+  check('a placed equation is framed like inline code',
+    await win.evaluate(() => {
+      const cs = getComputedStyle(document.querySelector('#editor .inline-eq'));
+      return parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none';
+    }));
 
   // An equation survives leaving the note and coming back, because it is
   // regenerated from data-tex rather than restored from saved markup.
@@ -257,6 +375,53 @@ try {
   await win.waitForTimeout(400);
   check('the shape bar closes when the note changes',
     await win.evaluate(() => document.getElementById('shape-bar').hidden));
+
+  // "Send behind text" has to MOVE the shape under the text, not fade it — a
+  // single overlay could never be behind anything, whatever class it carried.
+  await win.click('#editor');
+  await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>words the shape goes behind</p>'; });
+  await win.click('[data-act="shape-rect"]');
+  await win.waitForSelector('#shape-bar:not([hidden])', { timeout: 5_000 });
+  await win.click('#shape-bar [data-shape="back"]');
+  {
+    const state = await win.evaluate(() => {
+      const shape = document.querySelector('#editor .shape.sel');
+      const layer = shape?.closest('.shape-layer');
+      const para = document.querySelector('#editor > p');
+      const z = (el) => Number(getComputedStyle(el).zIndex);
+      return {
+        behindLayer: !!layer?.classList.contains('shape-layer--behind'),
+        under: !!(layer && para) && z(layer) < z(para),
+        opacity: shape ? getComputedStyle(shape).opacity : null,
+      };
+    });
+    check('send-behind moves the shape under the text, at full opacity',
+      state.behindLayer && state.under && state.opacity === '1', JSON.stringify(state));
+  }
+  await win.click('#shape-bar [data-shape="front"]');
+  check('bring-above puts it back on the front layer',
+    await win.evaluate(() => {
+      const layer = document.querySelector('#editor .shape.sel')?.closest('.shape-layer');
+      return !!layer && !layer.classList.contains('shape-layer--behind');
+    }));
+
+  // The ✕. `.shape-bar { display: flex }` beat the UA rule for [hidden], so
+  // setting hidden did nothing and the bar stayed on screen with nothing to act
+  // on. Asserting `.hidden` alone would still have passed — the computed
+  // display is the part that was broken.
+  await win.click('#shape-bar [data-shape="del"]');
+  {
+    const state = await win.evaluate(() => {
+      const bar = document.getElementById('shape-bar');
+      return {
+        hidden: bar.hidden,
+        display: getComputedStyle(bar).display,
+        shapes: document.querySelectorAll('#editor .shape').length,
+      };
+    });
+    check('the ✕ deletes the shape and really closes the bar',
+      state.hidden && state.display === 'none' && state.shapes === 0, JSON.stringify(state));
+  }
 
   // The languages the user asked for, read off the control they appear in.
   await win.click('#editor');

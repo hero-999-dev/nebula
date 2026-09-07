@@ -14,11 +14,19 @@ That is the release. It:
 2. bumps the version in `package.json` (patch by default);
 3. writes an entry in `Log.md` from the commit subjects since the last tag;
 4. commits, tags `vX.Y.Z`, and pushes to `main` with the tag;
-5. mirrors the project to the USB drive if it is plugged in.
+5. rebuilds `Nebula Test.exe` in the project root so the build you click carries
+   the version that was just released (a running copy is closed first);
+6. publishes the docs site and mirrors the project to the USB drive if it is
+   plugged in.
 
 Pushing the tag starts [`.github/workflows/release.yml`](../.github/workflows/release.yml),
 which builds Windows and macOS and publishes one GitHub Release
 (~10 minutes). Installed copies of Nebula offer the update on their next check.
+
+**Both platforms build on every tag, and nobody is asked.** `hero-999-dev/nebula`
+is public, and GitHub Actions is free and unlimited on public repositories —
+the macOS runner included. The 10x macOS multiplier applies only to private
+repos, so there is nothing to save by skipping it.
 
 ### Variants
 

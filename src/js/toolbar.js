@@ -8,7 +8,7 @@
 
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
-import { normalizeLists } from './lists.js';
+import { normalizeLists, exitListOnEmptyItem } from './lists.js';
 import { enterOutOfWrapper, backspaceOutOfWrapper } from './inline-format.js';
 import { initEquation } from './equation.js';
 
@@ -39,6 +39,45 @@ export const HILITE_COLORS = [
 ];
 
 export const U_STYLES = ['u-single', 'u-double', 'u-bold', 'u-wavy', 'u-dash'];
+
+/**
+ * [label, CSS font stack]. Each stack ends in a generic family so a note still
+ * reads on a machine that lacks the face — a bare "Calibri" would silently fall
+ * back to the browser default on macOS.
+ */
+export const FONTS = [
+  ['Serif (default)', '"Charter", "Iowan Old Style", Georgia, serif'],
+  ['Sans', '"Inter", "Segoe UI", system-ui, sans-serif'],
+  ['Arial', 'Arial, Helvetica, sans-serif'],
+  ['Calibri', 'Calibri, "Segoe UI", sans-serif'],
+  ['Segoe UI', '"Segoe UI", system-ui, sans-serif'],
+  ['Verdana', 'Verdana, Geneva, sans-serif'],
+  ['Tahoma', 'Tahoma, Geneva, sans-serif'],
+  ['Trebuchet MS', '"Trebuchet MS", Tahoma, sans-serif'],
+  ['Times New Roman', '"Times New Roman", Times, serif'],
+  ['Georgia', 'Georgia, "Times New Roman", serif'],
+  ['Garamond', 'Garamond, "EB Garamond", Georgia, serif'],
+  ['Comic Sans MS', '"Comic Sans MS", "Comic Sans", cursive'],
+  ['Courier New', '"Courier New", Courier, monospace'],
+  ['Consolas', 'Consolas, "Cascadia Mono", monospace'],
+  ['Cascadia Code', '"Cascadia Code", Consolas, monospace'],
+];
+
+/** A face name no real font has, so the post-fix pass can find its own spans. */
+export const FONT_MARK = 'nebula-font-mark';
+
+/** First family of a CSS stack, unquoted — for labelling the picker. */
+export function firstFamily(stack) {
+  return String(stack || '').split(',')[0].trim().replace(/^["']|["']$/g, '');
+}
+
+/** The FONTS label whose stack starts with the same family, if there is one. */
+export function fontLabelFor(family) {
+  const want = firstFamily(family).toLowerCase();
+  if (!want) return null;
+  const hit = FONTS.find(([, stack]) => firstFamily(stack).toLowerCase() === want);
+  return hit ? hit[0] : null;
+}
 
 /** Clamp indent level on the current block. Pure — tested. */
 export function stepIndent(current, delta, max = 6) {
@@ -178,18 +217,21 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
     sel.addRange(r);
   }
 
+  /**
+   * The to-do button toggles. It used to be one-way: once a line was a to-do
+   * there was no way back to a paragraph, so a mis-click was permanent.
+   */
   function makeTodo() {
     const el = blockOf();
-    if (el && !el.classList.contains('blk-todo')) {
-      const div = document.createElement('div');
-      div.className = 'blk-todo';
-      div.innerHTML = el.innerHTML || '<br>';
-      el.replaceWith(div);
-      placeCaretEnd(div);
-      dirty();
-    } else if (!el) {
-      cmd('insertHTML', '<div class="blk-todo"><br></div>');
-    }
+    if (!el) { cmd('insertHTML', '<div class="blk-todo"><br></div>'); return; }
+    const isTodo = el.classList.contains('blk-todo');
+    const next = document.createElement(isTodo ? 'p' : 'div');
+    if (!isTodo) next.className = 'blk-todo';
+    next.innerHTML = el.innerHTML || '<br>';
+    if (el.dataset.ind) next.dataset.ind = el.dataset.ind; // keep the indent
+    el.replaceWith(next);
+    placeCaretEnd(next);
+    dirty();
   }
 
   /** Apply a px font size — execCommand only knows 1..7, so we post-fix spans. */
@@ -345,15 +387,63 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
     cmd('formatBlock', e.target.value === 'p' ? 'p' : e.target.value);
   });
 
-  const fontInput = document.getElementById('tb-font');
+  const fontBtn = document.getElementById('tb-font');
+  const fontName = fontBtn?.querySelector('.tb-font__name');
   const sizeInput = document.getElementById('tb-size');
 
-  function applyFont() {
-    const v = fontInput.value.trim();
-    if (v) cmd('fontName', v);
+  /**
+   * `execCommand('fontName')` emits <font face>, which nothing else in the note
+   * understands, so it is post-fixed into a styled span — the same trick
+   * applyFontSize uses. With a collapsed caret there is nothing to wrap, so the
+   * whole block takes the font instead: picking a font with the caret parked in
+   * a line used to do nothing at all, which is what "I can't choose" meant.
+   */
+  function applyFont(stack) {
+    const range = selectionInEditor();
+    if (!range || range.collapsed) {
+      const block = blockOf();
+      if (!block) return;
+      block.style.fontFamily = stack;
+      dirty();
+      return;
+    }
+    editorEl.focus();
+    document.execCommand('fontName', false, FONT_MARK);
+    editorEl.querySelectorAll(`font[face="${FONT_MARK}"]`).forEach((f) => {
+      const span = document.createElement('span');
+      span.style.fontFamily = stack;
+      span.innerHTML = f.innerHTML;
+      f.replaceWith(span);
+    });
+    dirty();
   }
-  fontInput?.addEventListener('change', applyFont);
-  fontInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applyFont(); } });
+
+  function buildFontMenu() {
+    const menu = document.getElementById('menu-font');
+    if (!menu) return;
+    menu.innerHTML = '<div class="tb-menu__label">Font</div>';
+    for (const [label, stack] of FONTS) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.font = stack;
+      // Set in its own face, so the list is a preview and not fifteen identical
+      // rows. Assigned as a property, not written into a style="" attribute:
+      // the stacks contain double quotes ("Segoe UI"), which end the attribute
+      // early and leave the row with no font at all.
+      const labelEl = document.createElement('span');
+      labelEl.className = 'label';
+      labelEl.textContent = label;
+      labelEl.style.fontFamily = stack;
+      btn.appendChild(labelEl);
+      btn.addEventListener('click', () => {
+        applyFont(stack);
+        if (fontName) fontName.textContent = label;
+        closeMenus();
+      });
+      menu.appendChild(btn);
+    }
+  }
+  buildFontMenu();
 
   function applySize() {
     const px = parseSize(sizeInput.value);
@@ -370,9 +460,9 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
     if (el.nodeType !== Node.ELEMENT_NODE) el = el.parentElement;
     if (!el) return;
     const cs = getComputedStyle(el);
-    if (document.activeElement !== fontInput) {
-      const fam = (cs.fontFamily || '').split(',')[0].replace(/["']/g, '');
-      if (fam) fontInput.value = fam;
+    if (fontName) {
+      const fam = firstFamily(cs.fontFamily);
+      fontName.textContent = fontLabelFor(fam) ?? fam ?? 'Font';
     }
     if (document.activeElement !== sizeInput) {
       const px = Math.round(parseFloat(cs.fontSize));
@@ -414,6 +504,16 @@ export function initToolbar(editorEl, { onSave, shapes } = {}) {
     // Getting out of an inline format. Enter at the end of one starts the next
     // line plain; Backspace at the start of one takes the format off. Without
     // these two, an inline-code or underline run is a trap — see inline-format.js.
+    // Leaving a list is checked first: on an empty item both keys mean "I am
+    // done with this list", and Backspace especially must not merge the empty
+    // item into the numbered line above it.
+    if (!mod && (e.key === 'Enter' || e.key === 'Backspace') && !e.shiftKey) {
+      if (exitListOnEmptyItem(editorEl, window.getSelection())) {
+        e.preventDefault();
+        dirty();
+        return;
+      }
+    }
     if (!mod && e.key === 'Enter' && !e.shiftKey) {
       if (enterOutOfWrapper(editorEl, window.getSelection())) {
         e.preventDefault();

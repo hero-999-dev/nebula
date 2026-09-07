@@ -55,6 +55,9 @@ src/js/
   bus.js             note-changed / note-opened
   editor.js          contenteditable + debounced autosave
   toolbar.js  dock.js  slash-menu.js  shapes.js  codeblock.js  highlight.js
+  lists.js           repairs what execCommand's list commands leave behind
+  inline-format.js   Enter/Backspace out of an inline wrapper
+  equation.js        KaTeX, rendered from data-tex on every load
   ai-panel.js        webview tabs (deliberately isolated from everything else)
   updater.js         the update card
   about.js          version, build channel, folders
@@ -126,6 +129,17 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 8. **SVG subtraction.** `fill-rule="evenodd"` over two overlapping circles fills
    the cutter's outside too. A crescent is one closed path: big arc out, small
    arc back.
+9. **The `hidden` attribute is only a UA rule** (`display: none`). Any author
+   rule that sets `display` beats it, silently - `.shape-bar { display: flex }`
+   meant `bar.hidden = true` did nothing and the shape bar stayed on screen.
+   `app.css` now carries `[hidden] { display: none !important }`. A test that
+   asserts `el.hidden` cannot see this; assert the computed `display`.
+10. **A CSS class cannot move a node between stacking contexts.** `.shape.behind`
+   could never be behind the text while every shape lived on one overlay above
+   it. There are two layers now, and "send behind" moves the node between them.
+11. **Quotes inside a `style=""` attribute end it.** Font stacks contain
+   `"Segoe UI"`, so building a row as `style="font-family:${stack}"` left it
+   with no font at all. Assign `el.style.fontFamily` as a property.
 
 ---
 

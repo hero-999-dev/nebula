@@ -4,7 +4,7 @@ Calm notes with a real editor. An Electron desktop app for **Windows and macOS**
 that keeps every note as a plain JSON file in your own profile, and updates
 itself without ever touching them.
 
-**Version v0.4.0** ·
+**Version v0.4.1** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 
@@ -31,10 +31,12 @@ So this README describes a small app on purpose. What is here is finished.
 - **A two-row toolbar**: undo/redo · bulleted, numbered and to-do lists ·
   outline format (paragraph, H1–H3, quote, code) · indent ± (also Tab and
   Shift+Tab) · save (`Ctrl+S`) · print (`Ctrl+P`) · cut/copy/paste · shapes ‖
-  font · size, any number you type · text colour (`Ctrl+T`) · highlight
-  (`Ctrl+H`) · **B I U** with five underline styles · strikethrough · inline
-  code (`Ctrl+E`) · **equations** typeset with KaTeX (`Ctrl+Q`) · four alignments. The font and size
-  boxes show what the caret is actually in.
+  a **font menu** whose fifteen faces are each shown in their own type · size,
+  any number you type · text colour (`Ctrl+T`) · highlight (`Ctrl+H`) ·
+  **B I U** with five underline styles · strikethrough · inline code
+  (`Ctrl+E`) · **equations** typeset with KaTeX (`Ctrl+Q`) · four alignments.
+  The font button and the size box show what the caret is actually in; with
+  nothing selected, a font applies to the whole line.
 - **Right-click a selection** for a compact mini toolbar.
 - **`/` opens a block menu** — headings, lists, to-do, quote, code, divider,
   shapes.
@@ -46,8 +48,12 @@ So this README describes a small app on purpose. What is here is finished.
 - **An AI panel** of embedded chat webviews (Claude, Gemini, ChatGPT, Mistral,
   DeepSeek, Copilot, Perplexity, plus any site you add), resizable, with a
   side-scrolling tab strip. It touches no note data, by design.
-- **Six seed notes** on first run, one per feature, so everything can be
-  checked by hand.
+- **Lists you can leave.** Enter or Backspace on an empty item ends the list
+  rather than adding another one or merging into the line above, and the to-do
+  button toggles a line both ways.
+- **Starter notes that suit the build.** An installed copy gets a welcome note
+  and one help page; the test and dev builds get a seven-note per-feature
+  checklist instead.
 - **Three themes**, picked from a segmented control that shows which one is on:
   **Main**, a violet dark theme that is the app's own identity and the default;
   **Dark**, warm paper-and-ink inverted; **Light**, the same warm palette
@@ -149,8 +155,8 @@ happens between a keystroke and a file.
 npm install
 npm run preflight   # START HERE — version, phase, what changed, what is stale
 npm run dev         # dev app on its OWN profile
-npm test            # 114 unit tests
-npm run build && npm run smoke   # 34 checks against the real Electron app
+npm test            # 135 unit tests
+npm run build && npm run smoke   # 44 checks against the real Electron app
 npm run check:versions           # every surface agrees with package.json
 npm run pack:win    # release/Nebula-Setup-*.exe + Nebula-portable-*.exe
 npm run site        # rebuild site/index.html (docs + mind maps)

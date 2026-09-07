@@ -85,28 +85,16 @@
           </div>
 
           <div class="tb-row">
-            <span class="tb-combo">
-              <input id="tb-font" class="tb-input tb-input--font" list="font-list" placeholder="Font" title="Font — pick or type" />
-              <!-- A datalist cannot be styled, so options can't be shown in
-                   their own face; it is kept because it also accepts any font
-                   name typed by hand. -->
-              <datalist id="font-list">
-                <option value="Charter, Georgia, serif">Serif</option>
-                <option value="Inter, 'Segoe UI', sans-serif">Sans</option>
-                <option value="Arial"></option>
-                <option value="Calibri"></option>
-                <option value="Segoe UI"></option>
-                <option value="Verdana"></option>
-                <option value="Tahoma"></option>
-                <option value="Trebuchet MS"></option>
-                <option value="Times New Roman"></option>
-                <option value="Georgia"></option>
-                <option value="Garamond"></option>
-                <option value="Comic Sans MS"></option>
-                <option value="Courier New"></option>
-                <option value="Consolas"></option>
-                <option value="Cascadia Code"></option>
-              </datalist>
+            <!-- A real menu, not a <datalist>: a datalist cannot be styled, so
+                 every font looked identical in one plain column, and picking
+                 one only fired `change` — with a collapsed caret the command
+                 had nothing to apply to, so nothing ever changed. The menu is
+                 filled by toolbar.js, each row set in its own face. -->
+            <span class="tb-wrap">
+              <button type="button" class="tb tb-font" id="tb-font" data-menu="menu-font" title="Font">
+                <span class="tb-font__name">Font</span><span class="tb-font__caret">▾</span>
+              </button>
+              <div class="tb-menu tb-menu--font" id="menu-font" hidden></div>
             </span>
             <span class="tb-combo">
               <input id="tb-size" class="tb-input tb-input--size" list="size-list" inputmode="numeric" placeholder="Size" title="Size — pick or type any number (px)" />

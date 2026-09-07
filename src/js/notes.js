@@ -30,8 +30,11 @@ export class NoteStore {
    *   successfully AND came back genuinely empty — an unreadable vault looks
    *   identical to a first run from in here, and seeding over someone's notes
    *   because a read failed is the one mistake this store must not make.
+   * @param {Array<{title: string, content: string}>} [opts.seed=SEED_NOTES] Which
+   *   starter notes to write. The test build gets the per-feature checklist;
+   *   an installed app gets the single help page (see seedFor).
    */
-  constructor({ allowSeed = true } = {}) {
+  constructor({ allowSeed = true, seed = SEED_NOTES } = {}) {
     this.notes = loadJson(STORAGE_KEY_NOTES, []);
     this.activeId = localStorage.getItem(STORAGE_KEY_ACTIVE);
 
@@ -39,10 +42,10 @@ export class NoteStore {
       // one note per feature category, so everything can be checked by hand.
       // Built in memory and saved ONCE — createNote() saves on every call.
       const now = Date.now();
-      this.notes = SEED_NOTES.map((seed, i) => ({
+      this.notes = seed.map((note, i) => ({
         id: generateId('n'),
-        title: seed.title,
-        content: seed.content,
+        title: note.title,
+        content: note.content,
         createdAt: now - i,
         updatedAt: now - i,
       }));

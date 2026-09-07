@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { nextLayout, SIDES } from '../src/js/dock.js';
-import { stepIndent, parseSize, TEXT_COLORS, HILITE_COLORS, U_STYLES } from '../src/js/toolbar.js';
+import { stepIndent, parseSize, TEXT_COLORS, HILITE_COLORS, U_STYLES, FONTS, FONT_MARK, firstFamily, fontLabelFor } from '../src/js/toolbar.js';
 import { detectSlash, filterSlash, SLASH_ITEMS } from '../src/js/slash-menu.js';
 import { makeShape, SHAPE_COLORS, SHAPE_KINDS } from '../src/js/shapes.js';
 import { highlight, LANGS } from '../src/js/highlight.js';
 import { codeBlockHtml, getCode } from '../src/js/codeblock.js';
 import { ICONS, icon } from '../src/js/icons.js';
-import { SEED_NOTES } from '../src/js/seed-notes.js';
+import { SEED_NOTES, HELP_NOTES, seedFor } from '../src/js/seed-notes.js';
 import { AI_SERVICES } from '../src/js/ai-panel.js';
 
 describe('editing-bar layout (the pad moves the BAR, not the note)', () => {
@@ -191,6 +191,14 @@ describe('icons', () => {
     expect(ICONS.numbers).toContain('font-size="8.5"');
   });
 
+  it('the equation mark reads as √x, not a multiplication cross', () => {
+    // Two crossing strokes under the radical looked like ×, and a second
+    // horizontal at mid-height read as a strikethrough.
+    expect(ICONS.equation).toContain('>x<');
+    expect(ICONS.equation).toContain('font-style="italic"');
+    expect((ICONS.equation.match(/<path/g) || []).length).toBe(1);
+  });
+
   it('unknown icon degrades to empty, never throws', () => {
     expect(icon('nope')).toBe('');
   });
@@ -255,5 +263,97 @@ describe('seed notes (one per feature category)', () => {
   it('the formatting note demonstrates each underline style once', () => {
     const note = SEED_NOTES.find((n) => n.title.includes('Text formatting'));
     for (const u of U_STYLES) expect(note.content).toContain(u);
+  });
+});
+
+describe('font picker', () => {
+  it('offers the faces the user asked for, each with a generic fallback', () => {
+    const labels = FONTS.map(([l]) => l);
+    for (const want of ['Arial', 'Calibri', 'Times New Roman', 'Comic Sans MS']) {
+      expect(labels, want).toContain(want);
+    }
+    // A bare "Calibri" silently falls back to the browser default where the
+    // face is missing; every stack has to end in a family the box knows.
+    for (const [label, stack] of FONTS) {
+      expect(stack, label).toMatch(/(serif|sans-serif|monospace|cursive|system-ui)\s*$/);
+    }
+  });
+
+  it('reads the first family out of a stack, quotes and all', () => {
+    expect(firstFamily('"Times New Roman", Times, serif')).toBe('Times New Roman');
+    expect(firstFamily("'Comic Sans MS', cursive")).toBe('Comic Sans MS');
+    expect(firstFamily('Arial')).toBe('Arial');
+    expect(firstFamily('')).toBe('');
+    expect(firstFamily(null)).toBe('');
+  });
+
+  it('labels what the caret sits in, and admits when it is a font we do not list', () => {
+    // getComputedStyle hands back the resolved stack; the button has to turn
+    // that back into the menu entry it came from.
+    expect(fontLabelFor('"Calibri", "Segoe UI", sans-serif')).toBe('Calibri');
+    expect(fontLabelFor('Arial')).toBe('Arial');
+    expect(fontLabelFor('arial')).toBe('Arial'); // family names are case-insensitive
+    expect(fontLabelFor('Wingdings')).toBe(null);
+    expect(fontLabelFor('')).toBe(null);
+  });
+
+  it('marks its own spans with a face name no real font has', () => {
+    expect(FONT_MARK).toMatch(/^[a-z-]+$/);
+    expect(FONTS.some(([, s]) => s.includes(FONT_MARK))).toBe(false);
+  });
+});
+
+describe('starter notes per build', () => {
+  it('the builds you check things in get the per-feature checklist', () => {
+    for (const channel of ['test', 'dev']) expect(seedFor(channel), channel).toBe(SEED_NOTES);
+    expect(SEED_NOTES.length).toBeGreaterThan(2);
+  });
+
+  it('an installed build gets the welcome note and one help page', () => {
+    for (const channel of ['installed', 'portable', undefined, null]) {
+      expect(seedFor(channel), String(channel)).toBe(HELP_NOTES);
+    }
+    expect(HELP_NOTES).toHaveLength(2);
+    expect(HELP_NOTES[0].title).toBe('Welcome to Nebula');
+    // One page, so no per-note checklist language in it.
+    expect(HELP_NOTES[1].content).not.toContain('Check:');
+  });
+
+  it('the help page still covers every feature area', () => {
+    const html = HELP_NOTES[1].content;
+    for (const topic of ['Font', 'Equations', 'Shapes', 'to-do', 'Dart', 'theme']) {
+      expect(html.toLowerCase(), topic).toContain(topic.toLowerCase());
+    }
+  });
+
+  it('the code note carries the six languages added in 0.4.0', () => {
+    const note = SEED_NOTES.find((n) => n.title.includes('Code blocks'));
+    const div = document.createElement('div');
+    div.innerHTML = note.content;
+    const langs = [...div.querySelectorAll('.blk-code')].map((b) => b.dataset.lang);
+    for (const lang of ['c', 'cpp', 'csharp', 'java', 'dart', 'ruby']) {
+      expect(langs, lang).toContain(lang);
+    }
+  });
+
+  it('seeded equations carry LaTeX source, not a frozen rendering', () => {
+    for (const note of [...SEED_NOTES, ...HELP_NOTES]) {
+      const div = document.createElement('div');
+      div.innerHTML = note.content;
+      for (const eq of div.querySelectorAll('.inline-eq')) {
+        expect(eq.dataset.tex, note.title).toBeTruthy();
+      }
+    }
+  });
+
+  it('the shapes note puts a behind-shape on the behind layer', () => {
+    // A single overlay could only fake "behind" with opacity; the shape has to
+    // physically live under the text.
+    const note = SEED_NOTES.find((n) => n.title.includes('Shapes'));
+    const div = document.createElement('div');
+    div.innerHTML = note.content;
+    const behind = div.querySelector('.shape.behind');
+    expect(behind.closest('.shape-layer').classList.contains('shape-layer--behind')).toBe(true);
+    expect(div.querySelectorAll('.shape-layer').length).toBe(2);
   });
 });

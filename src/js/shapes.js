@@ -8,12 +8,18 @@
 export const SHAPE_COLORS = ['#E8CDBD', '#D6E4D0', '#D3E0EA', '#E2D7E8', '#F0D2CE', '#EFE8D8'];
 export const SHAPE_KINDS = ['rect', 'ellipse', 'diamond'];
 
-/** The overlay is created lazily and always sits as the note's first child. */
-export function ensureLayer(editorEl) {
-  let layer = editorEl.querySelector(':scope > .shape-layer');
+/**
+ * Two overlays, created lazily as the note's first children: one painted under
+ * the text and one over it. "Send behind text" moves a shape between them —
+ * with a single layer it could only ever be faded, never actually behind.
+ */
+export function ensureLayer(editorEl, behind = false) {
+  const cls = behind ? 'shape-layer shape-layer--behind' : 'shape-layer';
+  const sel = behind ? ':scope > .shape-layer--behind' : ':scope > .shape-layer:not(.shape-layer--behind)';
+  let layer = editorEl.querySelector(sel);
   if (!layer) {
     layer = document.createElement('div');
-    layer.className = 'shape-layer';
+    layer.className = cls;
     layer.setAttribute('contenteditable', 'false');
     layer.dataset.blockType = 'shape-layer';
     editorEl.insertBefore(layer, editorEl.firstChild);
@@ -153,8 +159,14 @@ export function initShapes(editorEl) {
       if (color) { selected.style.background = color; dirty(); return; }
       const act = e.target.closest('[data-shape]')?.dataset.shape;
       if (act === 'del') { selected.remove(); select(null); dirty(); }
-      else if (act === 'back') { selected.classList.add('behind'); dirty(); }
-      else if (act === 'front') { selected.classList.remove('behind'); dirty(); }
+      else if (act === 'back' || act === 'front') {
+        const behind = act === 'back';
+        selected.classList.toggle('behind', behind);
+        // Actually move it: the class alone cannot cross a stacking context.
+        ensureLayer(editorEl, behind).appendChild(selected);
+        positionBar();
+        dirty();
+      }
     });
   }
 

@@ -1,11 +1,16 @@
 /**
  * The release ritual: `npm run push`.
  *
- * Tests -> build -> version bump -> Log.md -> commit -> tag -> push.
+ * Tests -> build -> version bump -> Log.md -> commit -> tag -> push, then the
+ * three things that must not fall behind the tag: the local `Nebula Test.exe`,
+ * the docs site, and the USB mirror.
  *
  * Pushing the tag is what starts everything else: .github/workflows/release.yml
  * builds the Windows installer and the macOS DMG, and publishes them as a
  * GitHub Release. Installed copies of Nebula see it on their next check.
+ * BOTH platforms build on every tag and neither is asked about: the repository
+ * is public, and GitHub Actions is free and unlimited on public repos —
+ * including the macOS runner, which is billed at 10x only on private ones.
  *
  *   npm run push                  patch bump  (0.3.0 -> 0.3.1)
  *   npm run push -- minor         0.3.0 -> 0.4.0
@@ -202,10 +207,25 @@ console.log(`  release:  https://github.com/${REPO}/releases/tag/${tag}`);
 console.log('\n  The Windows installer and the macOS DMG appear on the release page in ~10 minutes.');
 console.log('  Installed copies of Nebula offer the update on their next check.\n');
 
+/* --------------------------------------------- the local test build follows */
+
+// `Nebula Test.exe` in the project root is the copy you actually click, so it
+// has to carry the version that was just released — otherwise the next defect
+// report is written against an older build than the one on GitHub. Not
+// committed (it is in .gitignore); rebuilt here so it never has to be
+// remembered. `npm run kill` closes a running copy first, including this one.
+try {
+  console.log('\n> npm run pack:test   (refreshing Nebula Test.exe)');
+  runLoud('npm', ['run', 'pack:test']);
+} catch {
+  console.warn('  (test build not refreshed — run `npm run pack:test` to retry)');
+}
+
 /* ------------------------------------------------------ docs site + mirrors */
 
-// Both are best-effort: the release is already tagged and building, and neither
-// a missing USB drive nor a network hiccup should read as a failed release.
+// All of these are best-effort: the release is already tagged and building, and
+// neither a missing USB drive nor a network hiccup should read as a failed
+// release.
 
 try {
   // The site was built and committed above, so this publishes exactly what the

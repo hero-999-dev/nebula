@@ -1,4 +1,12 @@
 * { box-sizing: border-box; }
+
+/* The `hidden` attribute only sets `display: none` in the UA stylesheet, so any
+   author rule with a `display` beats it. `.shape-bar { display: flex }` was
+   exactly that: setting hidden did nothing and the bar stayed on screen after
+   its shape was deleted. Two elements had already been patched one at a time
+   (.ai-panel, .overlay); this closes the whole class. */
+[hidden] { display: none !important; }
+
 html, body { height: 100%; margin: 0; }
 body {
   background: var(--paper);
