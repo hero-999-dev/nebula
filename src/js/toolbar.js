@@ -8,7 +8,7 @@
 
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
-import { normalizeLists, exitListOnEmptyItem } from './lists.js';
+import { normalizeLists, exitListOnEmptyItem, liftListItemAtStart } from './lists.js';
 import { enterOutOfWrapper, backspaceOutOfWrapper } from './inline-format.js';
 import { initEquation } from './equation.js';
 import { on } from './bus.js';
@@ -477,7 +477,10 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     indent: () => indent(1),
     outdent: () => indent(-1),
     save: () => onSave?.(),
-    print: () => window.print(),
+    // Through Electron, so Chromium lays the page out and hands the driver
+    // text. `window.print()` let the platform rasterise it, which is what made
+    // a printed note look like a photograph of the window.
+    print: () => { const api = window.nebula?.note; if (api?.print) void api.print(); else window.print(); },
     import: () => void importNote(),
     'export-md': () => void exportNote('md'),
     'export-html': () => void exportNote('html'),
@@ -693,13 +696,20 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
   });
 
   // ----- todo tick -----
+  // Only the box itself ticks. The whole 24px left edge used to, so clicking
+  // near the start of a to-do to put the caret there checked it off instead —
+  // "I can only tick it, I cannot click into it to write".
   editorEl.addEventListener('click', (e) => {
     const todo = e.target.closest('.blk-todo');
     if (!todo || e.target !== todo) return;
-    if (e.clientX - todo.getBoundingClientRect().left < 24) {
-      todo.classList.toggle('done');
-      dirty();
-    }
+    const r = todo.getBoundingClientRect();
+    const box = { left: r.left + 2, right: r.left + 18, top: r.top + 2, bottom: r.top + 22 };
+    const onBox = e.clientX >= box.left && e.clientX <= box.right
+      && e.clientY >= box.top && e.clientY <= box.bottom;
+    if (!onBox) return;
+    history?.push();
+    todo.classList.toggle('done');
+    dirty();
   });
 
   // ----- shortcuts -----
@@ -716,6 +726,16 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     // item into the numbered line above it.
     if (!mod && (e.key === 'Enter' || e.key === 'Backspace') && !e.shiftKey) {
       if (exitListOnEmptyItem(editorEl, window.getSelection())) {
+        e.preventDefault();
+        dirty();
+        return;
+      }
+    }
+    // Backspace at the start of an item that HAS text takes it out of the list
+    // rather than merging it upward — the way back to the left margin.
+    if (!mod && e.key === 'Backspace' && !e.shiftKey) {
+      history?.push();
+      if (liftListItemAtStart(editorEl, window.getSelection())) {
         e.preventDefault();
         dirty();
         return;

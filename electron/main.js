@@ -396,6 +396,26 @@ function registerShellHandlers() {
     }
   });
 
+  /**
+   * Print through Chromium's own pipeline, not `window.print()`.
+   *
+   * `window.print()` hands the page to the platform and lets the printer driver
+   * decide how to rasterise it — which on Windows means "Microsoft: Print To
+   * PDF" producing something that reads like a picture of the app. Going
+   * through webContents.print keeps Chromium's own layout and text output all
+   * the way to the driver, with the print stylesheet applied.
+   */
+  ipcMain.handle('note:print', async (e) => {
+    const win = from(e);
+    if (!win) return { ok: false };
+    return new Promise((resolve) => {
+      win.webContents.print(
+        { silent: false, printBackground: true, pageSize: 'A4' },
+        (ok, reason) => resolve({ ok, reason: reason ?? null }),
+      );
+    });
+  });
+
   ipcMain.handle('note:import', async (e) => {
     const win = from(e);
     if (!win) return { ok: false };

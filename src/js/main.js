@@ -12,7 +12,7 @@ import { initCodeBlocks, paintAllCode } from './codeblock.js';
 import { paintAllEquations } from './equation.js';
 import { initAiPanel } from './ai-panel.js';
 import { initDialog, askText } from './dialog.js';
-import { injectIcons } from './icons.js';
+import { injectIcons, icon } from './icons.js';
 import { initUpdater, showAppVersion } from './updater.js';
 import { initAbout } from './about.js';
 import { initSideToggle } from './side-toggle.js';
@@ -146,7 +146,7 @@ async function boot() {
       if (note.pinned) {
         const pin = document.createElement('span');
         pin.className = 'nr-pin';
-        pin.textContent = '●';
+        pin.innerHTML = icon('pin');
         pin.title = 'Pinned';
         row.children[0].prepend(pin);
       }
@@ -165,6 +165,7 @@ async function boot() {
   }
 
   function openNote(id) {
+    flushTitle();     // before the active note changes, or it lands on the wrong one
     editor.flush();
     store.setActive(id);
     const note = store.active();
@@ -183,10 +184,29 @@ async function boot() {
   }
 
   let titleTimer = null;
+
+  /**
+   * Write a pending title now.
+   *
+   * The title is debounced like the body, but only the body was ever flushed
+   * before switching notes. Rename a note and press New note inside the
+   * debounce window and the new name was simply dropped — the note stayed
+   * "Untitled". Worse, the timer would then fire against whichever note had
+   * become active and put the old name on that one instead.
+   */
+  function flushTitle() {
+    if (!titleTimer) return;
+    clearTimeout(titleTimer);
+    titleTimer = null;
+    if (!store.active()) return;
+    store.updateActive({ title: titleEl.value || 'Untitled' });
+  }
+
   titleEl.addEventListener('input', () => {
     setSaveState('saving');
     clearTimeout(titleTimer);
     titleTimer = setTimeout(() => {
+      titleTimer = null;
       store.updateActive({ title: titleEl.value || 'Untitled' });
       setSaveState('saved');
       renderList();
@@ -199,6 +219,7 @@ async function boot() {
   });
 
   $('btn-new').addEventListener('click', () => {
+    flushTitle();
     editor.flush();
     store.createNote('Untitled');
     openNote(store.activeId);

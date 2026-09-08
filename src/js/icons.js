@@ -29,6 +29,8 @@ export const ICONS = {
 
   // Three lines — the universally understood "collapse this panel".
   menu: S('<path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/>'),
+  /** A pushpin, for a pinned note. A bare dot said nothing about why. */
+  pin: S('<path d="M9 4h6l-1 5 3.5 3.5H6.5L10 9z"/><path d="M12 12.5V20"/>'),
 
   /**
    * The app's own mark: a crescent and a sparkle, filled rather than stroked.
@@ -49,7 +51,11 @@ export const ICONS = {
     '<path d="M10 8h10"/><path d="M10 16h10"/>'
     + '<text x="2.6" y="11" font-size="8.5" font-weight="600" font-family="Inter, Segoe UI, sans-serif" fill="currentColor" stroke="none">1</text>'
     + '<text x="2.6" y="19" font-size="8.5" font-weight="600" font-family="Inter, Segoe UI, sans-serif" fill="currentColor" stroke="none">2</text>'),
-  todo: S('<rect x="3.5" y="4.5" width="7" height="7" rx="1.6"/><path d="m5 8 1.6 1.6L9.2 6.6"/><path d="M14 8h7"/><path d="M3.5 16.5h7"/><path d="M14 16h7"/>'),
+  // Two rows, each a box and a rule of the SAME length starting at the same x.
+  // The old one had the ticked row's rule from 14 to 21 and the empty row's box
+  // sitting where the other row's rule began, so nothing lined up with anything.
+  todo: S('<rect x="3.5" y="5" width="6.5" height="6.5" rx="1.5"/><path d="m5.2 8.2 1.5 1.5 2.6-2.9"/><path d="M13 8.25h7.5"/>'
+    + '<rect x="3.5" y="13" width="6.5" height="6.5" rx="1.5"/><path d="M13 16.25h7.5"/>'),
 
   indent: S('<path d="M10 7h11"/><path d="M10 12h11"/><path d="M10 17h11"/><path d="m3 9 3 3-3 3"/>'),
   outdent: S('<path d="M10 7h11"/><path d="M10 12h11"/><path d="M10 17h11"/><path d="m6 9-3 3 3 3"/>'),
@@ -84,7 +90,11 @@ export const ICONS = {
   paste: S('<path d="M9 4.5h6v2.5H9z"/><path d="M15 6h2.5A1.5 1.5 0 0 1 19 7.5V19a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 19V7.5A1.5 1.5 0 0 1 6.5 6H9"/><path d="M8.5 12h7"/><path d="M8.5 16h5"/>'),
   save: S('<path d="M5 5.5A1.5 1.5 0 0 1 6.5 4h9L20 8.5v10A1.5 1.5 0 0 1 18.5 20h-12A1.5 1.5 0 0 1 5 18.5z"/><path d="M8 4v5h7"/><rect x="8" y="13" width="8" height="7" rx="1"/>'),
   shapes: S('<path d="m6.5 3.5 3.5 6h-7z"/><rect x="3.5" y="13" width="7" height="7" rx="1.2"/><circle cx="17" cy="7" r="3.5"/><rect x="13.5" y="13" width="7" height="7" rx="1.2" transform="rotate(45 17 16.5)"/>'),
-  quote: S('<path d="M9 6.5c-2.6 0-4.5 2-4.5 4.5S6.2 15 8 15c.9 0 1.5-.3 1.9-.7-.2 2-1.6 3.3-3.4 3.9"/><path d="M19 6.5c-2.6 0-4.5 2-4.5 4.5S16.2 15 18 15c.9 0 1.5-.3 1.9-.7-.2 2-1.6 3.3-3.4 3.9"/>'),
+  // A quote bar with two filled marks. The old outline curls read as a pair of
+  // commas with tails and did not say "quote" at any size.
+  quote: S('<path d="M4 5.5v13"/>'
+    + '<path d="M9 8.5h3.2v3.2c0 1.9-1.1 3.2-3.2 3.6v-1.5c1-.3 1.5-.9 1.5-1.7H9z" fill="currentColor" stroke="none"/>'
+    + '<path d="M15.4 8.5h3.2v3.2c0 1.9-1.1 3.2-3.2 3.6v-1.5c1-.3 1.5-.9 1.5-1.7h-1.5z" fill="currentColor" stroke="none"/>'),
   divider: S('<path d="M3 12h18"/><path d="M6 7h12" opacity=".35"/><path d="M6 17h12" opacity=".35"/>'),
   heading: S('<path d="M5 5v14"/><path d="M13 5v14"/><path d="M5 12h8"/><path d="M17 19V9l3-1.5"/>'),
   // The three headings used one icon between them, so H1, H2 and H3 were three

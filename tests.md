@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 238 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 116 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 245 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 123 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -20,7 +20,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 |---|---|---|
 | `tests/notes.test.js` | 20 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body, and adds the guide to an older vault exactly once without touching what is there |
 | `tests/editor.test.js` | 41 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and the guide note's completeness |
-| `tests/lists.test.js` | 23 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
+| `tests/lists.test.js` | 30 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
 | `tests/inline-format.test.js` | 18 | Enter and Backspace out of an inline wrapper |
 | `tests/highlight.test.js` | 14 | Per-language tokens, and that only SQL is case-insensitive |
 | `tests/disk-store.test.js` | 6 | Rapid saves serialize per file, every mirrored file is valid JSON, deleting a note deletes *its* file, unchanged notes are skipped, boot loads from disk and survives one corrupt file, browser mode never throws |
@@ -33,7 +33,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
 | `tests/export.test.js` | 18 | A note as Markdown or as a standalone HTML file |
 | `tests/import.test.js` | 18 | A Markdown or HTML file read back as a note, sanitised |
-| `tests/e2e/smoke.mjs` | 116 | The real app, six launches |
+| `tests/e2e/smoke.mjs` | 123 | The real app, six launches |
 
 ---
 
@@ -82,6 +82,73 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-08] v0.6.1 - the second bug report
+
+**Unit 238 -> 245, smoke 116 -> 123.**
+
+**A title could be lost.** Rename a note and press New note within the 400 ms
+debounce and the new name was simply dropped — only the body was ever flushed
+before the active note changed. Worse, the pending timer then fired against
+whichever note had become active, so the name could land on the wrong one.
+`flushTitle()` runs before every note switch now. This is the only one in the
+report that could cost the user something they had written.
+
+**Three that were not reproducible as described, and what they actually were:**
+
+- *"I can only tick the to-do, I cannot click into it to write."* Clicking into
+  a to-do works — but the whole 24px left edge toggled the checkbox, so clicking
+  near the start of the line to place the caret ticked it off instead. The hit
+  area is the box now, and the rest of the line has a text cursor.
+- *"Bulleted and numbered are not aligned."* Measured: both put their text at
+  exactly the same x. The markers were not styled at all though, so a bullet and
+  a "1." were different sizes and colours; they share one marker column now.
+- *"Backspace does not take me back to the far left."* On an EMPTY item it
+  already did. On an item with text it merged into the line above, and there was
+  no way out at all — `liftListItemAtStart` turns it into a paragraph at the
+  margin, which is what every editor does.
+
+**A code block in an older note still could not be deleted.** The ✕ added in
+0.6.0 is written into the markup at creation, and the markup lives in the note —
+so every block written before that had a header with no delete button. Every
+paint tops the header up now. Selecting across a block and pressing Delete works
+too; Chromium leaves a `contenteditable="false"` island behind when a range
+crosses it.
+
+**The / menu did not scroll.** The highlight moved with the arrow keys but the
+menu never followed it, so past the sixth item you were choosing something you
+could not see.
+
+**The dropdown marks were three different things:** an 8px `▾` glyph on the
+underline, colour, shape and font menus; a 4px CSS triangle on the `<select>`s;
+and the browser's own arrow before that. One triangle, one size, everywhere.
+
+**A clip-path cuts the border off** with everything else outside the shape, so
+the diamond and the triangle had no outline at all. They are drawn in two layers
+now — the element paints the outline colour, a pseudo-element inset by the line
+width carries the fill, both clipped to the same silhouette — and the shape bar
+can turn the outline off. The fill moved to a `--shape-fill` custom property
+because CSS cannot read the inline `background` a note stores; shapes saved
+before this get it copied across when their note opens.
+
+**The text-colour swatches came back out of the shape bar.** The user's point
+was that a shape's text is just text: double-click in, select it, use the
+toolbar like anywhere else.
+
+**Also:** a pinned note shows a pin rather than a dot; the to-do mark had rows
+of different lengths at different x positions; the quote mark read as two
+commas with tails; Open in the archive shows the note without un-archiving it,
+and the dividers between archived rows are gone with the buttons moved to the
+right.
+
+**Printing.** The export path was measured, not assumed: the PDF it writes has
+**zero image objects and six embedded fonts** — it is a document. The print
+stylesheet was measured too, under emulated print media: title strip, menus,
+sidebar, toolbar and overlays all compute to `display: none`, on white paper
+with black ink. What was left was `window.print()`, which hands the page to the
+platform and lets the printer driver decide how to rasterise it. Printing goes
+through `webContents.print` now, so Chromium's own layout and text reach the
+driver.
 
 ### [2026-09-07] v0.6.0 - export, and the fourteen things in the bug report
 

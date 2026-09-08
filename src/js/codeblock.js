@@ -44,7 +44,27 @@ export function paintCode(block) {
 }
 
 /** Fill a language <select> with the full list (stored notes ship it empty). */
-export function fillLangSelect(sel, lang) {
+export /**
+ * Give an existing block the controls the current version has.
+ *
+ * A note written before 0.6.0 has a `.code-head` with a language picker and
+ * Copy and nothing else, so its blocks were still undeletable after the ✕ was
+ * added — the markup lives in the note, not in the code. Every paint tops the
+ * head up.
+ */
+function ensureHeadControls(block) {
+  const head = block.querySelector('.code-head');
+  if (!head || head.querySelector('.code-del')) return;
+  const del = block.ownerDocument.createElement('button');
+  del.type = 'button';
+  del.className = 'code-del';
+  del.title = 'Delete this code block';
+  del.setAttribute('aria-label', 'Delete this code block');
+  del.textContent = '✕';
+  head.appendChild(del);
+}
+
+function fillLangSelect(sel, lang) {
   if (!sel) return;
   if (sel.options.length !== Object.keys(LANGS).length) {
     sel.innerHTML = Object.entries(LANGS)
@@ -58,6 +78,7 @@ export function fillLangSelect(sel, lang) {
 export function paintAllCode(root) {
   root.querySelectorAll('.blk-code').forEach((b) => {
     fillLangSelect(b.querySelector('.code-lang'), b.dataset.lang || 'plain');
+    ensureHeadControls(b);
     paintCode(b);
   });
 }
@@ -227,9 +248,23 @@ export function initCodeBlocks(editorEl, { history } = {}) {
     if (e.key !== 'Backspace' && e.key !== 'Delete') return;
     if (e.target.closest?.('.code-src')) return;      // editing the source
     const sel = window.getSelection();
-    if (!sel || !sel.rangeCount || !sel.isCollapsed) return;
+    if (!sel || !sel.rangeCount) return;
     const range = sel.getRangeAt(0);
     if (!editorEl.contains(range.startContainer)) return;
+
+    // A selection that takes in whole blocks: delete them with it. Chromium
+    // leaves a contenteditable=false island behind when the range crosses it.
+    if (!sel.isCollapsed) {
+      const inside = [...editorEl.querySelectorAll('.blk-code')].filter((b) => range.intersectsNode(b));
+      if (inside.length) {
+        e.preventDefault();
+        history?.push();
+        range.deleteContents();
+        inside.forEach((b) => b.remove());
+        dirty();
+      }
+      return;
+    }
 
     // The block on the side the key is pointing at, when the caret sits at the
     // very edge of the text next to it.

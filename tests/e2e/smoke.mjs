@@ -284,10 +284,12 @@ try {
       width: document.getElementById('side').getBoundingClientRect().width,
       list: document.getElementById('note-list').getBoundingClientRect().width,
       toggle: document.getElementById('side-toggle').getBoundingClientRect().width,
+      collapsed: document.getElementById('app').classList.contains('side-collapsed'),
+      expanded: document.getElementById('side-toggle').getAttribute('aria-expanded'),
     }));
     check('the sidebar collapses and the toggle stays reachable',
       narrow.width < wide / 2 && narrow.list > 0 && narrow.toggle > 0,
-      `${wide} -> ${narrow.width}`);
+      `${wide} -> ${narrow.width}, ${JSON.stringify(narrow)}`);
     // Collapsing used to hide the notes, New note and the themes outright,
     // which made the narrow state useless. Everything stays, just smaller.
     const rail = await win.evaluate(() => {
@@ -507,6 +509,148 @@ try {
         return titles.length === 1 && titles[0] === 'Welcome to Nebula Guide';
       }),
       await win.evaluate(() => [...document.querySelectorAll('.note-row .nr-title')].map((e) => e.textContent).join(' | ')));
+  }
+
+  // A title typed and then abandoned by pressing New note was simply lost: only
+  // the body was flushed before the active note changed, never the title.
+  {
+    const before = await win.evaluate(() => document.querySelectorAll('.note-row').length);
+    await win.fill('#title', 'Kept name');
+    await press(win, '#btn-new');
+    await win.waitForTimeout(700);
+    const titles = await win.evaluate(() =>
+      [...document.querySelectorAll('.note-row .nr-title')].map((e) => e.textContent.trim()));
+    check('a title typed just before New note is kept, not dropped',
+      titles.includes('Kept name') && titles.length === before + 1, titles.join(' | '));
+    // Put the vault back: rename the guide and drop the note New note made,
+    // or the checks that count notes fail for a reason of my own making.
+    await win.evaluate(() => {
+      const row = [...document.querySelectorAll('.note-item')]
+        .find((el) => el.querySelector('.nr-title')?.textContent.trim() === 'Kept name');
+      row?.querySelector('.note-row')?.click();
+    });
+    await win.waitForTimeout(400);
+    await win.fill('#title', 'Welcome to Nebula Guide');
+    await win.waitForTimeout(700);
+
+    await win.evaluate(() => {
+      const row = [...document.querySelectorAll('.note-item')]
+        .find((el) => el.querySelector('.nr-title')?.textContent.trim() === 'Untitled');
+      row?.querySelector('.nr-more')?.click();
+    });
+    await win.waitForSelector('#note-menu:not([hidden])', { timeout: 5_000 });
+    await press(win, '#note-menu [data-note-act="trash"]');
+    await win.waitForTimeout(300);
+    await press(win, '[data-drawer="trash"]');
+    await win.waitForTimeout(300);
+    await win.evaluate(() => {
+      const item = [...document.querySelectorAll('#drawer-body .drawer-item')]
+        .find((el) => el.querySelector('.nr-title')?.textContent.trim() === 'Untitled');
+      [...(item?.querySelectorAll('.drawer-actions button') ?? [])]
+        .find((b) => b.textContent === 'Delete')?.click();
+    });
+    await win.waitForTimeout(400);
+    await press(win, '[data-drawer="trash"]');
+    await win.waitForTimeout(250);
+    check('the guide is alone again after the title check',
+      await win.evaluate(() => {
+        const t = [...document.querySelectorAll('.note-row .nr-title')].map((e) => e.textContent.trim());
+        return t.length === 1 && t[0] === 'Welcome to Nebula Guide';
+      }),
+      await win.evaluate(() => [...document.querySelectorAll('.note-row .nr-title')].map((e) => e.textContent.trim()).join(' | ')));
+  }
+
+  // A code block in a note written before the ✕ existed still has to be
+  // removable — the markup lives in the note, not in the code.
+  {
+    await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p>before</p><div class="blk-code" data-block-type="code" data-lang="python"'
+        + ` data-code="${encodeURIComponent('print(1)')}" contenteditable="false">`
+        + '<div class="code-head"><select class="code-lang"></select><button type="button" class="code-copy">Copy</button></div>'
+        + '<pre class="code-body"><code class="code-src" contenteditable="true"></code></pre></div><p>after</p>';
+      window.nebulaRepaint?.();
+    });
+    // openNote runs the paint pass; reopening the note is how that happens.
+    await win.evaluate(() => document.querySelector('.note-row').click());
+    await win.waitForTimeout(600);
+  }
+
+  // The / menu moved its highlight without scrolling, so past the sixth item
+  // you were choosing something you could not see.
+  {
+    await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p>x</p>'; ed.focus();
+      const r = document.createRange();
+      r.selectNodeContents(ed.querySelector('p')); r.collapse(false);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    });
+    await win.keyboard.type(' /');
+    await win.waitForTimeout(300);
+    for (let i = 0; i < 9; i++) await win.keyboard.press('ArrowDown');
+    await win.waitForTimeout(200);
+    check('the / menu scrolls its highlighted row into view',
+      await win.evaluate(() => {
+        const menu = document.getElementById('slash-menu');
+        const on = menu.querySelector('button.sel');
+        if (!on) return false;
+        const m = menu.getBoundingClientRect();
+        const b = on.getBoundingClientRect();
+        return b.top >= m.top - 1 && b.bottom <= m.bottom + 1;
+      }));
+    await win.keyboard.press('Escape');
+  }
+
+  // Backspace at the start of an item with text lifts it out of the list;
+  // before, it merged into the item above and there was no way back to the
+  // left margin.
+  {
+    const out = await win.evaluate(() => {
+      const ed = document.getElementById('editor'); ed.focus();
+      ed.innerHTML = '<ul><li>one</li><li>two</li></ul>';
+      const li = ed.querySelectorAll('li')[1];
+      const r = document.createRange();
+      r.setStart(li.firstChild, 0); r.collapse(true);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      return true;
+    });
+    void out;
+    await win.keyboard.press('Backspace');
+    await win.waitForTimeout(250);
+    check('Backspace at the start of a list item lifts it to the left margin',
+      await win.evaluate(() => document.getElementById('editor').innerHTML) === '<ul><li>one</li></ul><p>two</p>',
+      await win.evaluate(() => document.getElementById('editor').innerHTML));
+  }
+
+  // Every dropdown mark in the bar is the same triangle at the same size.
+  check('every caret in the editing bar is the same size',
+    await win.evaluate(() => {
+      const sizes = [...document.querySelectorAll('.tb-caret')]
+        .map((el) => getComputedStyle(el, '::after').borderTopWidth);
+      const fontCaret = getComputedStyle(document.querySelector('.tb-font__caret')).borderTopWidth;
+      return sizes.length > 2 && new Set(sizes).size === 1 && sizes[0] === fontCaret;
+    }));
+
+  // A clip-path cuts a border off with everything else outside the shape, so
+  // the diamond and the triangle had no outline at all.
+  {
+    await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>x</p>'; });
+    await press(win, '[data-shape-add="triangle"]');
+    await win.waitForTimeout(300);
+    const shape = await win.evaluate(() => {
+      const s = document.querySelector('#editor .shape.triangle');
+      return {
+        fill: s.style.getPropertyValue('--shape-fill'),
+        inset: getComputedStyle(s, '::before').inset,
+        outline: getComputedStyle(s).backgroundColor,
+      };
+    });
+    check('the triangle is drawn with an outline layer under its fill',
+      shape.fill !== '' && shape.inset !== 'auto' && parseFloat(shape.inset) > 0,
+      JSON.stringify(shape));
+    check('and the shape bar can turn that outline off',
+      await win.evaluate(() => !!document.querySelector('#shape-bar [data-shape="outline"]')));
   }
 
   // Printing has to put the note on the page, and nothing else.

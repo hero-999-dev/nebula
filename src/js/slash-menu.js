@@ -51,6 +51,9 @@ export function initSlashMenu(editorEl, { history, shapes } = {}) {
       btn.addEventListener('mousedown', (e) => { e.preventDefault(); apply(it.id); });
       menu.appendChild(btn);
     });
+    // Follow the arrow keys. The selection moved but the menu never scrolled,
+    // so past the sixth item you were choosing something you could not see.
+    menu.querySelector('button.sel')?.scrollIntoView({ block: 'nearest' });
   }
 
   function position() {

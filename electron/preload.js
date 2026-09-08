@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('nebula', {
   note: {
     export: (payload) => ipcRenderer.invoke('note:export', payload),
     pdf: (payload) => ipcRenderer.invoke('note:pdf', payload),
+    print: () => ipcRenderer.invoke('note:print'),
     import: () => ipcRenderer.invoke('note:import'),
   },
   updates: {

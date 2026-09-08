@@ -18,6 +18,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-08 13:28] v0.6.1 - by claude
+
+The second bug report: a title can no longer be lost by pressing New note, code blocks in older notes are deletable, the diamond and triangle have outlines again, and printing goes through Chromium rather than the platform.
+
+* Close running Nebula before the release gates, not after the tag
+
+---
+
 ## [2026-09-08 00:05] v0.6.0 - by claude
 
 Export a note as Markdown, HTML or a real PDF, import one back, and fourteen fixes from the bug report — including a code block you can finally delete and a size box that actually changes the text you selected.

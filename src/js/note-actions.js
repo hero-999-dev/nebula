@@ -102,8 +102,10 @@ export function initNoteActions({ store, onChanged, openNote }) {
     archive: {
       empty: 'Nothing archived',
       notes: () => store.archived(),
+      // Open shows the note; it does NOT bring it back to the list. Reading an
+      // archived note is not the same as un-archiving it.
       actions: [
-        ['Open', (id) => { store.unarchive(id); openNote?.(id); }],
+        ['Open', (id) => openNote?.(id)],
         ['Unarchive', (id) => store.unarchive(id)],
       ],
     },
@@ -132,6 +134,7 @@ export function initNoteActions({ store, onChanged, openNote }) {
     row.children[1].textContent = plainSnippet(note.content, 44) || 'Empty';
     row.title = title;
 
+    // The buttons sit to the RIGHT of the note block, not under it.
     const bar = document.createElement('div');
     bar.className = 'drawer-actions';
     for (const [label, run] of actions) {
@@ -169,15 +172,7 @@ export function initNoteActions({ store, onChanged, openNote }) {
       drawerBody.appendChild(none);
       return;
     }
-    notes.forEach((note, i) => {
-      if (i) {
-        // A divider between note blocks, as asked for.
-        const hr = document.createElement('div');
-        hr.className = 'drawer-divider';
-        drawerBody.appendChild(hr);
-      }
-      drawerBody.appendChild(drawerRow(note, set.actions));
-    });
+    for (const note of notes) drawerBody.appendChild(drawerRow(note, set.actions));
   }
 
   for (const tab of tabs) {

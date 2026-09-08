@@ -7,7 +7,7 @@
  * inside the last item of the first.
  */
 import { describe, it, expect } from 'vitest';
-import { normalizeLists, liOwnText, exitListOnEmptyItem } from '../src/js/lists.js';
+import { normalizeLists, liOwnText, exitListOnEmptyItem, liftListItemAtStart } from '../src/js/lists.js';
 
 const root = (html) => {
   const el = document.createElement('div');
@@ -206,5 +206,96 @@ describe('exitListOnEmptyItem', () => {
     expect(exitListOnEmptyItem(host, null)).toBe(false);
     window.getSelection().removeAllRanges();
     expect(exitListOnEmptyItem(host, window.getSelection())).toBe(false);
+  });
+});
+
+/**
+ * Backspace at the start of an item that HAS text.
+ *
+ * `exitListOnEmptyItem` only fires on an empty item, so a line with words in it
+ * had no way out: Backspace merged it into the item above. "Pressing back does
+ * not take me to the very beginning, to the far left."
+ */
+describe('liftListItemAtStart', () => {
+  let host;
+
+  function mount(html) {
+    document.body.innerHTML = '';
+    host = document.createElement('div');
+    host.innerHTML = html;
+    document.body.appendChild(host);
+    return host;
+  }
+
+  /** Collapsed caret at `offset` in the first text node of `selector`. */
+  function caret(selector, offset = 0) {
+    const node = host.querySelector(selector).firstChild;
+    const range = document.createRange();
+    range.setStart(node, offset);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    return sel;
+  }
+
+  const flat = () => host.innerHTML.replace(/\s+</g, '<').replace(/>\s+/g, '>');
+
+  it('turns the item into a paragraph at the left margin', () => {
+    mount('<ul><li>one</li><li>two</li></ul>');
+    expect(liftListItemAtStart(host, caret('li:nth-child(2)'))).toBe(true);
+    expect(flat()).toBe('<ul><li>one</li></ul><p>two</p>');
+  });
+
+  it('keeps the items below as a list of their own, in order', () => {
+    mount('<ol><li>a</li><li>b</li><li>c</li></ol>');
+    liftListItemAtStart(host, caret('li:nth-child(2)'));
+    expect(flat()).toBe('<ol><li>a</li></ol><p>b</p><ol><li>c</li></ol>');
+  });
+
+  it('removes the list when it was the only item', () => {
+    mount('<ul><li>only</li></ul>');
+    liftListItemAtStart(host, caret('li'));
+    expect(flat()).toBe('<p>only</p>');
+  });
+
+  it('keeps the text inside the item, formatting and all', () => {
+    mount('<ul><li><strong>bold</strong> tail</li></ul>');
+    liftListItemAtStart(host, caret('li strong'));
+    // Not `flat()` here: it collapses whitespace between tags, and the space
+    // after </strong> is exactly what this is checking survived.
+    expect(host.querySelectorAll('li')).toHaveLength(0);
+    expect(host.querySelector('p').innerHTML).toBe('<strong>bold</strong> tail');
+  });
+
+  it('does nothing in the middle of the text — Backspace still deletes', () => {
+    mount('<ul><li>one</li></ul>');
+    expect(liftListItemAtStart(host, caret('li', 2))).toBe(false);
+    expect(flat()).toBe('<ul><li>one</li></ul>');
+  });
+
+  it('leaves an empty item to exitListOnEmptyItem', () => {
+    mount('<ul><li>one</li><li><br></li></ul>');
+    const li = host.querySelectorAll('li')[1];
+    const range = document.createRange();
+    range.setStart(li, 0);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    expect(liftListItemAtStart(host, sel)).toBe(false);
+  });
+
+  it('does nothing outside a list, or with a range rather than a caret', () => {
+    mount('<p>plain</p>');
+    expect(liftListItemAtStart(host, caret('p'))).toBe(false);
+    mount('<ul><li>one</li></ul>');
+    const range = document.createRange();
+    range.selectNodeContents(host.querySelector('li'));
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    expect(liftListItemAtStart(host, sel)).toBe(false);
+    expect(liftListItemAtStart(host, null)).toBe(false);
   });
 });

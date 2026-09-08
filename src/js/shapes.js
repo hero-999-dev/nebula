@@ -7,9 +7,6 @@
 
 export const SHAPE_COLORS = ['#E8CDBD', '#D6E4D0', '#D3E0EA', '#E2D7E8', '#F0D2CE', '#EFE8D8'];
 
-/** Ink for the text inside a shape. The fills are always pale, so these are
- *  all dark enough to read on any of them. */
-export const SHAPE_INKS = ['#201E1A', '#7A2E22', '#1F4B6E', '#2F5D3A', '#5B2D6E', '#8A6D07'];
 export const SHAPE_KINDS = ['rect', 'ellipse', 'diamond', 'triangle'];
 
 /**
@@ -45,6 +42,11 @@ export function makeShape(kind = 'rect', color = SHAPE_COLORS[0], at = null) {
   el.style.width = '150px';
   el.style.height = '90px';
   el.style.background = color;
+  // The diamond and the triangle are clipped, so their fill is painted by a
+  // pseudo-element inset from the edge — and CSS cannot read an inline
+  // `background`. Both are set; the rectangle and ellipse use the first, the
+  // clipped kinds the second.
+  el.style.setProperty('--shape-fill', color);
   el.innerHTML = '<div class="shape-text" contenteditable="true"></div><span class="shape-h" title="Resize"></span>';
   return el;
 }
@@ -243,8 +245,9 @@ export function initShapes(editorEl, { history } = {}) {
     bar.innerHTML =
       SHAPE_COLORS.map((c) => `<span class="dot" data-color="${c}" style="background:${c}" title="Fill"></span>`).join('') +
       '<span class="shape-bar__sep"></span>' +
-      SHAPE_INKS.map((c) => `<span class="dot dot--ink" data-ink="${c}" style="color:${c}" title="Text colour">A</span>`).join('') +
-      '<span class="shape-bar__sep"></span>' +
+      // No text-colour swatches here: double-click into the shape, select the
+      // words, and use the toolbar's own colours like anywhere else.
+      '<button type="button" data-shape="outline" title="Outline on / off">▭</button>' +
       '<button type="button" data-shape="back" title="Send behind text">▾</button>' +
       '<button type="button" data-shape="front" title="Bring above text">▴</button>' +
       '<button type="button" data-shape="del" title="Delete shape">✕</button>';
@@ -252,13 +255,22 @@ export function initShapes(editorEl, { history } = {}) {
     bar.addEventListener('click', (e) => {
       if (!selected) return;
       const color = e.target.closest('.dot')?.dataset.color;
-      if (color) { history?.push(); selected.style.background = color; dirty(); return; }
-      const ink = e.target.closest('[data-ink]')?.dataset.ink;
-      if (ink) { history?.push(); selected.style.color = ink; dirty(); return; }
+      if (color) {
+        history?.push();
+        selected.style.background = color;
+        selected.style.setProperty('--shape-fill', color);
+        dirty();
+        return;
+      }
+
       const act = e.target.closest('[data-shape]')?.dataset.shape;
       // Deleting a shape has to be undoable: it is a scripted DOM removal, and
       // Chromium's undo has never known about those.
-      if (act === 'del') { history?.push(); selected.remove(); select(null); dirty(); }
+      if (act === 'outline') {
+        history?.push();
+        selected.classList.toggle('no-outline');
+        dirty();
+      } else if (act === 'del') { history?.push(); selected.remove(); select(null); dirty(); }
       else if (act === 'back' || act === 'front') {
         history?.push();
         const behind = act === 'back';
@@ -286,7 +298,20 @@ export function initShapes(editorEl, { history } = {}) {
   return {
     addShape: (kind) => select(addShape(editorEl, kind, history)),
     select,
-    /** Called when a note is opened: the previous note's shapes are gone. */
-    reset: () => select(null),
+    /**
+     * Called when a note is opened: the previous note's shapes are gone.
+     *
+     * Shapes saved before 0.6.1 carry only an inline `background`, and the
+     * clipped kinds now paint their fill from `--shape-fill`. Copy it across so
+     * an old note does not open with hollow diamonds.
+     */
+    reset: () => {
+      select(null);
+      for (const shape of editorEl.querySelectorAll('.shape')) {
+        if (shape.style.getPropertyValue('--shape-fill')) continue;
+        const fill = shape.style.background || getComputedStyle(shape).backgroundColor;
+        if (fill) shape.style.setProperty('--shape-fill', fill);
+      }
+    },
   };
 }

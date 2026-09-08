@@ -164,7 +164,14 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 14. **A search must never mark up the note.** Wrapping hits would dirty it,
    autosave it and land on the undo stack; `find.js` paints ranges with the CSS
    Custom Highlight API instead.
-15. **A toolbar control that takes focus loses the selection.** The mousedown
+15. **Anything written into a note's markup is frozen in old notes.** The
+   code block's ✕ is created with the block, so blocks written before it existed
+   never got one — `paintAllCode` tops the header up on every load. Any new
+   in-note control needs the same treatment.
+16. **A `clip-path` cuts the border off too.** A clipped shape cannot have a
+   `border`; draw it as two layers (outline behind, fill inset) and remember
+   that CSS cannot read an element's inline `background`.
+17. **A toolbar control that takes focus loses the selection.** The mousedown
    preventDefault skips `input` and `select` so they can be used, and focusing
    them clears the document selection — so the action finds nothing and returns
    in silence. Anything driven from a field must go through `withSelection`.

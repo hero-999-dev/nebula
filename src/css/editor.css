@@ -103,7 +103,27 @@
 .tb:hover { background: var(--paper-sunken); border-color: var(--rule); }
 .tb:active, .tb.active { background: var(--clay-soft); border-color: var(--clay-soft); }
 .tb-sep { width: 1px; height: 18px; background: var(--rule); margin: 0 4px; }
-.tb-caret { min-width: 14px; padding: 0 1px; font-size: 8px; color: var(--ink-faint); }
+/* Every dropdown mark in the bar is the same triangle at the same size: the
+   ▾ glyph ones (underline, colours, shapes, font) and the CSS-drawn ones on
+   the <select>s. They were an 8px glyph next to a 4px drawing next to the
+   browser's own arrow. */
+.tb-caret {
+  min-width: 14px;
+  padding: 0 1px;
+  font-size: 0;                 /* the glyph is replaced by the mark below */
+  color: var(--ink-faint);
+  position: relative;
+}
+.tb-caret::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 0; height: 0;
+  margin: -1px 0 0 -4px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid currentColor;
+}
 
 /* color buttons carry a live color bar underneath, Word-style */
 .tb-color { padding-bottom: 4px; }
@@ -137,7 +157,7 @@
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
                     linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position: calc(100% - 11px) calc(50% + 1px), calc(100% - 7px) calc(50% + 1px);
-  background-size: 4px 4px, 4px 4px;
+  background-size: 4px 4px, 4px 4px;   /* the same 8px-wide triangle as .tb-caret */
   background-repeat: no-repeat;
   padding-right: 22px;
 }
@@ -158,7 +178,14 @@
   justify-content: space-between;
 }
 .tb-font__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tb-font__caret { font-size: 8px; color: var(--ink-faint); flex-shrink: 0; }
+.tb-font__caret {
+  font-size: 0;
+  flex-shrink: 0;
+  width: 8px; height: 4px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid var(--ink-faint);
+}
 .edit-shell.bar-left .tb-font,
 .edit-shell.bar-right .tb-font { width: 46px; }
 
@@ -267,7 +294,11 @@
   font-style: italic;
 }
 .editor hr.blk-hr { border: none; border-top: 1.4px solid var(--rule); margin: 14px 0; }
+/* One marker column, so a bullet and "1." put their text at the same x — and
+   so a two-digit number cannot push its line out of line with the rest. */
 .editor ul, .editor ol { margin: 4px 0; padding-left: 26px; }
+.editor li { padding-left: 2px; }
+.editor li::marker { font-family: var(--sans); font-size: 0.86em; color: var(--ink-soft); }
 
 .editor [data-ind="1"] { margin-left: 26px; }
 .editor [data-ind="2"] { margin-left: 52px; }
@@ -276,7 +307,10 @@
 .editor [data-ind="5"] { margin-left: 130px; }
 .editor [data-ind="6"] { margin-left: 156px; }
 
-.blk-todo { position: relative; padding-left: 26px; margin: 2px 0; }
+/* The checkbox is the box, and only the box. The whole left edge used to
+   toggle, so clicking near the start of the line ticked the item instead of
+   putting the caret in it. */
+.blk-todo { position: relative; padding-left: 26px; margin: 2px 0; cursor: text; }
 .blk-todo::before {
   content: '';
   position: absolute;
@@ -498,10 +532,32 @@
 .shape:active { cursor: grabbing; }
 .shape.sel { box-shadow: 0 0 0 2.5px var(--clay); }
 .shape.ellipse { border-radius: 50%; }
-.shape.diamond { border: none; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
-.shape.triangle { border: none; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-.shape.triangle .shape-text { max-width: 60%; margin-top: 18%; }
-.shape.triangle .shape-h { right: 2px; bottom: 2px; }
+/* A clip-path cuts the border off along with everything else outside the shape,
+   so the diamond and the triangle had no outline at all.
+   
+   Drawn in two layers instead: the element itself is the outline colour, and a
+   pseudo-element inset by the line width carries the fill. Both are clipped to
+   the same silhouette, so what shows around the edge is the outline. The fill
+   comes from --shape-fill because CSS cannot read the inline `background` the
+   note stores. */
+.shape.diamond, .shape.triangle {
+  border: none;
+  background-color: rgba(28, 26, 22, 0.62) !important;
+}
+.shape.diamond { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.shape.triangle { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.shape.diamond::before, .shape.triangle::before {
+  content: '';
+  position: absolute;
+  inset: 2.4px;
+  clip-path: inherit;
+  background: var(--shape-fill, #E8CDBD);
+  pointer-events: none;
+}
+/* Outline off: the fill runs to the edge and there is nothing left to show. */
+.shape.diamond.no-outline::before, .shape.triangle.no-outline::before { inset: 0; }
+.shape.no-outline { border-color: transparent; }
+.shape.triangle .shape-text, .shape.diamond .shape-text { position: relative; z-index: 1; }
 .shape.diamond .shape-text { max-width: 55%; }
 /* No opacity trick: a shape behind the text is fully opaque, it is simply
    painted first. Fading it was the old way of pretending. */
@@ -931,17 +987,7 @@ body.resizing webview { pointer-events: none; }
 .code-del:hover { color: var(--madder); border-color: var(--madder); }
 
 
-/* The shape bar carries two rows of swatches now — fill, then ink. */
 .shape-bar__sep { width: 1px; align-self: stretch; margin: 2px 3px; background: var(--rule); }
-.dot--ink {
-  display: grid;
-  place-items: center;
-  background: #F4F1EA;
-  font-family: var(--sans);
-  font-weight: 700;
-  font-size: 10px;
-  line-height: 1;
-}
 
 
 /* Like the font menu: a label is the whole row, no swatch column. */

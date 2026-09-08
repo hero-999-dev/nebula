@@ -152,6 +152,62 @@ export function exitListOnEmptyItem(root, selection) {
 }
 
 /**
+ * Backspace at the very start of a list item lifts that item out of the list.
+ *
+ * `exitListOnEmptyItem` only fires on an EMPTY item, so an item with text in it
+ * had no way back: pressing Backspace at its start merged it into the item
+ * above instead of returning the line to the left margin. Every editor lifts it
+ * out — one press to leave the list, another to join the previous line.
+ *
+ * @returns {boolean} true if handled — the caller must preventDefault
+ */
+export function liftListItemAtStart(root, selection) {
+  if (!selection || !selection.rangeCount) return false;
+  const range = selection.getRangeAt(0);
+  if (!range.collapsed || range.startOffset !== 0) return false;
+
+  const start = range.startContainer;
+  const el = start.nodeType === 1 ? start : start.parentElement;
+  const li = el?.closest?.('li');
+  if (!li || !root.contains(li)) return false;
+  if (!liOwnText(li)) return false;          // the empty case belongs to exitList
+
+  // Only at the true start of the item, not merely at the start of some node
+  // in the middle of it.
+  const before = root.ownerDocument.createRange();
+  before.selectNodeContents(li);
+  before.setEnd(range.startContainer, range.startOffset);
+  if (before.toString().length) return false;
+
+  const list = li.parentElement;
+  if (!isList(list) || list.parentElement !== root) return false;
+
+  const doc = root.ownerDocument;
+  const p = doc.createElement('p');
+  while (li.firstChild) p.appendChild(li.firstChild);
+  if (!p.firstChild) p.innerHTML = '<br>';
+
+  const after = [];
+  for (let n = li.nextElementSibling; n; n = n.nextElementSibling) after.push(n);
+
+  list.after(p);
+  if (after.length) {
+    const tail = doc.createElement(list.tagName.toLowerCase());
+    for (const n of after) tail.appendChild(n);
+    p.after(tail);
+  }
+  li.remove();
+  if (!list.querySelector('li')) list.remove();
+
+  const caret = doc.createRange();
+  caret.setStart(p, 0);
+  caret.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(caret);
+  return true;
+}
+
+/**
  * @param {Element} root the editor
  * @returns {boolean} whether anything moved — callers use it to skip a save
  */
