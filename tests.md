@@ -177,6 +177,14 @@ note blocks and a divider between them.
 so it cannot fall behind the menu - the same arrangement the command palette has
 with the app menus.
 
+**A note on the release ritual.** Four releases in a row were killed for want of
+memory, twice *after* the gates had already passed — leaving the version bumped
+with no tag. The cause was ordering, not the code: `npm run kill` lived inside
+`pack:test`, which runs after the tag, so Vitest, a full build and six Electron
+launches all happened while the installed app and the test build were holding
+about 1.6 GB between them. It runs first now. The same processes get closed
+either way.
+
 ### [2026-09-07] v0.5.0 - the editor gets its own undo, and the app gets a menu bar
 
 **Unit 156 -> 201, smoke 71 -> 92.** Three new suites: `history.test.js` (21),

@@ -117,7 +117,19 @@ console.log(`\nNebula ${pkg.version} -> ${version}${dryRun ? '   (dry run)' : ''
 // Nothing is committed until both of these pass. A release that fails to build
 // still creates a tag that users' apps will try to update to.
 
-console.log('> npm test');
+// Close any running Nebula FIRST, not later.
+//
+// `pack:test` has always called this, but that runs after the tag — so the
+// heaviest part of a release (Vitest, a full Vite build, then six Electron
+// launches for the smoke suite) happened while the installed app and the test
+// build were still holding ~1.6 GB between them. Four releases in a row were
+// killed for want of memory, twice after the gates had already passed. The
+// same processes get closed either way; closing them at the start is simply
+// the order that works.
+console.log('> npm run kill');
+runSoft('npm', ['run', 'kill']);
+
+console.log('\n> npm test');
 runLoud('npm', ['test']);
 
 console.log('\n> npm run build');
