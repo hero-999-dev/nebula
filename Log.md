@@ -19,6 +19,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-08 15:22] v0.6.2 - by claude
+
+Code blocks wrapped in a colour can be removed, underline needs a selection again, the size field has a working caret, shapes show a caret and grow to fit, and the pink fringe on menu text is gone.
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-08 13:28] v0.6.1 - by claude
 
 The second bug report: a title can no longer be lost by pressing New note, code blocks in older notes are deletable, the diamond and triangle have outlines again, and printing goes through Chromium rather than the platform.

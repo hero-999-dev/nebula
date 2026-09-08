@@ -240,7 +240,7 @@ export function initCodeBlocks(editorEl, { history } = {}) {
     const block = btn.closest('.blk-code');
     if (!block) return;
     history?.push();
-    block.remove();
+    removeBlock(block);
     dirty();
   });
 
@@ -273,18 +273,65 @@ export function initCodeBlocks(editorEl, { history } = {}) {
     const atEnd = node.nodeType === Node.TEXT_NODE
       ? range.startOffset === node.nodeValue.length
       : range.startOffset === node.childNodes.length;
-    let block = null;
-    if (e.key === 'Backspace' && atStart) {
-      block = blockOf(node)?.previousElementSibling;
-    } else if (e.key === 'Delete' && atEnd) {
-      block = blockOf(node)?.nextElementSibling;
-    }
-    if (!block?.classList?.contains('blk-code')) return;
+    const here = blockOf(node);
+    const block = e.key === 'Backspace' && atStart ? codeBlockIn(here?.previousElementSibling, 'before')
+      : e.key === 'Delete' && atEnd ? codeBlockIn(here?.nextElementSibling, 'after')
+        : null;
+    if (!block) return;
     e.preventDefault();
     history?.push();
-    block.remove();
+    removeBlock(block);
     dirty();
   });
+
+  /**
+   * Take the block, and the wrapper it was alone in.
+   *
+   * Leaving an empty `<div class="c-red">` behind is the blank line that was
+   * reported under a deleted block.
+   */
+  function removeBlock(block) {
+    let target = block;
+    let parent = target.parentElement;
+    // Climb while the parent holds nothing but this: one element child, and no
+    // text of its own. Testing `parent.textContent` would include the block's
+    // own source, so the wrapper never qualified and an empty <div> was left
+    // behind — the blank line reported under a deleted block.
+    while (parent && parent !== editorEl && parent.children.length === 1 && ownText(parent) === '') {
+      target = parent;
+      parent = target.parentElement;
+    }
+    target.remove();
+  }
+
+  /** A parent's own text, ignoring its element children. */
+  function ownText(el) {
+    let text = '';
+    for (const node of el.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) text += node.nodeValue;
+    }
+    return text.trim();
+  }
+
+  /**
+   * A code block at, or wrapped inside, this element.
+   *
+   * A block is not always a direct child of the editor: applying a colour or a
+   * font around one leaves it inside a `<div class="c-red">` wrapper, and the
+   * neighbour-of-the-caret lookup then found the wrapper and gave up. Backspace
+   * fell through to Chromium, which merged the paragraphs and left the block —
+   * and a stray blank line — behind.
+   */
+  function codeBlockIn(el, side) {
+    if (!el) return null;
+    if (el.classList?.contains('blk-code')) return el;
+    const inner = [...(el.querySelectorAll?.(':scope > .blk-code, :scope > * > .blk-code') ?? [])];
+    if (!inner.length) return null;
+    // Reaching backwards takes the block nearest the caret, which is the last
+    // one in the wrapper; reaching forwards takes the first. A wrapper holding
+    // text as well keeps its text — only the block goes.
+    return side === 'before' ? inner[inner.length - 1] : inner[0];
+  }
 
   /** The direct child of the editor that contains a node. */
   function blockOf(node) {

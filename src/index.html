@@ -135,14 +135,13 @@
               </button>
               <div class="tb-menu tb-menu--font" id="menu-font" hidden></div>
             </span>
-            <span class="tb-combo">
-              <input id="tb-size" class="tb-input tb-input--size" list="size-list" inputmode="numeric" placeholder="Size" title="Size — pick or type any number (px)" />
-              <datalist id="size-list">
-                <option value="10"></option><option value="12"></option><option value="14"></option>
-                <option value="16"></option><option value="18"></option><option value="20"></option>
-                <option value="24"></option><option value="28"></option><option value="32"></option>
-                <option value="48"></option><option value="72"></option>
-              </datalist>
+            <!-- The field still takes any number typed into it; the caret beside
+                 it opens the common sizes. A <datalist> drew no arrow of its own
+                 and could not be styled to match the other menus. -->
+            <span class="tb-wrap tb-combo">
+              <input id="tb-size" class="tb-input tb-input--size" inputmode="numeric" placeholder="Size" title="Size — type any number, or pick one" />
+              <button type="button" class="tb tb-caret" data-menu="menu-size" title="Font size">▾</button>
+              <div class="tb-menu tb-menu--size" id="menu-size" hidden></div>
             </span>
             <span class="tb-sep"></span>
             <span class="tb-wrap">

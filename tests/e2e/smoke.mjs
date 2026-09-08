@@ -653,6 +653,114 @@ try {
       await win.evaluate(() => !!document.querySelector('#shape-bar [data-shape="outline"]')));
   }
 
+  // A code block wrapped in a colour or font span is not a direct child of the
+  // editor, so the neighbour-of-the-caret lookup found the wrapper and gave up —
+  // Backspace fell through to Chromium, which merged the paragraphs and left
+  // both the block and a stray blank line behind.
+  {
+    const CODE = '<div class="blk-code" data-block-type="code" data-lang="js"'
+      + ' data-code="eA%3D%3D" contenteditable="false"><div class="code-head"></div>'
+      + '<pre class="code-body"><code class="code-src">x</code></pre></div>';
+    const run = async (html) => {
+      await win.evaluate(({ h }) => {
+        const ed = document.getElementById('editor'); ed.focus();
+        ed.innerHTML = h;
+        const p = ed.querySelector('p:last-of-type');
+        const r = document.createRange(); r.setStart(p.firstChild, 0); r.collapse(true);
+        const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      }, { h: html });
+      await win.keyboard.press('Backspace');
+      await win.waitForTimeout(250);
+      return win.evaluate(() => document.getElementById('editor').innerHTML);
+    };
+    check('Backspace below a code block removes it, leaving no blank line',
+      await run(`<p>a</p>${CODE}<p>below</p>`) === '<p>a</p><p>below</p>');
+    check('and the same when the block sits inside a colour wrapper',
+      await run(`<p>a</p><div class="c-red">${CODE}</div><p>below</p>`) === '<p>a</p><p>below</p>');
+    check('a wrapper that also holds text keeps its text',
+      await run(`<p>a</p><div class="c-red">keep me${CODE}</div><p>below</p>`)
+        === '<p>a</p><div class="c-red">keep me</div><p>below</p>');
+  }
+
+  // Underline is a selection, never the whole line: picking a style with the
+  // caret merely parked in a line underlined the entire line.
+  {
+    const caretOnly = await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p>caret only here</p>'; ed.focus();
+      const t = ed.querySelector('p').firstChild;
+      const r = document.createRange(); r.setStart(t, 6); r.collapse(true);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      document.querySelector('[data-ustyle="u-wavy"]')?.click();
+      return ed.innerHTML;
+    });
+    check('an underline with no selection changes nothing',
+      caretOnly === '<p>caret only here</p>', caretOnly);
+    const selected = await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p>underline these words</p>'; ed.focus();
+      const t = ed.querySelector('p').firstChild;
+      const r = document.createRange(); r.setStart(t, 10); r.setEnd(t, 15);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      document.querySelector('[data-act="underline"]').click();
+      return ed.innerHTML;
+    });
+    check('and with a selection it underlines exactly that',
+      selected === '<p>underline <span class="u-single">these</span> words</p>', selected);
+  }
+
+  // The size field kept free typing but had no arrow of its own; a <datalist>
+  // draws none and cannot be styled to match the other menus.
+  {
+    const out = await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p>make these words bigger</p>'; ed.focus();
+      const t = ed.querySelector('p').firstChild;
+      const r = document.createRange(); r.setStart(t, 5); r.setEnd(t, 16);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      document.querySelector('[data-menu="menu-size"]').click();
+      [...document.querySelectorAll('#menu-size button')].find((b) => b.dataset.size === '28').click();
+      return ed.innerHTML;
+    });
+    check('the size caret opens a menu that sizes the selection',
+      out === '<p>make <span style="font-size: 28px;">these words</span> bigger</p>', out);
+    check('and every caret in the bar is now one triangle at one size',
+      await win.evaluate(() => {
+        const marks = [...document.querySelectorAll('.tb-caret')]
+          .map((el) => getComputedStyle(el, '::after').borderTopWidth);
+        return marks.length >= 4 && new Set(marks).size === 1;
+      }));
+  }
+
+  // A shape's text: a caret to see, and room to grow into.
+  {
+    await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>x</p>'; });
+    await press(win, '[data-shape-add="rect"]');
+    await win.waitForTimeout(300);
+    const pt = await win.evaluate(() => {
+      const r = document.querySelector('#editor .shape').getBoundingClientRect();
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+    });
+    const startedAt = await win.evaluate(() => document.querySelector('#editor .shape').offsetHeight);
+    await win.mouse.dblclick(pt.x, pt.y);
+    await win.waitForTimeout(300);
+    check('double-clicking a shape opens its text with a caret to see',
+      await win.evaluate(() => {
+        const t = document.querySelector('#editor .shape-text');
+        // An empty contenteditable has no line box, so Chromium paints no caret
+        // and nothing says you may type.
+        return t.closest('.shape').classList.contains('editing') && t.offsetHeight > 10;
+      }));
+    await win.keyboard.type('a much longer piece of text than this shape was ever sized for');
+    await win.waitForTimeout(700);
+    check('and the shape grows until the text fits',
+      await win.evaluate((was) => {
+        const s = document.querySelector('#editor .shape');
+        const t = s.querySelector('.shape-text');
+        return s.offsetHeight > was && t.offsetHeight <= s.clientHeight;
+      }, startedAt));
+  }
+
   // Printing has to put the note on the page, and nothing else.
   check('the print stylesheet hides every piece of app chrome',
     await win.evaluate(() => {

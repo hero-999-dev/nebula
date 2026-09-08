@@ -47,7 +47,10 @@ export function makeShape(kind = 'rect', color = SHAPE_COLORS[0], at = null) {
   // `background`. Both are set; the rectangle and ellipse use the first, the
   // clipped kinds the second.
   el.style.setProperty('--shape-fill', color);
-  el.innerHTML = '<div class="shape-text" contenteditable="true"></div><span class="shape-h" title="Resize"></span>';
+  // A <br>, not nothing: an empty contenteditable has no line box, so Chromium
+  // paints no caret in it — you double-click in and there is no sign at all
+  // that you may type.
+  el.innerHTML = '<div class="shape-text" contenteditable="true"><br></div><span class="shape-h" title="Resize"></span>';
   return el;
 }
 
@@ -215,6 +218,31 @@ export function initShapes(editorEl, { history } = {}) {
     }
   });
 
+  /**
+   * Grow a shape to fit what has been typed in it.
+   *
+   * `.shape-text` clips, so a long line simply disappeared instead of
+   * overflowing anywhere visible. The shape gains height (and a little width,
+   * up to a sane cap) until the text fits.
+   */
+  function fitToText(shape) {
+    const text = shape?.querySelector('.shape-text');
+    if (!text) return;
+    // The text sizes itself; what runs out is the SHAPE. A diamond or a
+    // triangle only shows its middle, so the same words need more room in one.
+    const slack = shape.classList.contains('rect') || shape.classList.contains('ellipse') ? 14 : 40;
+    let guard = 0;
+    while (text.offsetHeight + slack > shape.clientHeight && guard < 60) {
+      shape.style.height = `${shape.offsetHeight + 8}px`;
+      guard += 1;
+    }
+  }
+
+  editorEl.addEventListener('input', (e) => {
+    const text = e.target.closest?.('.shape-text');
+    if (text) fitToText(text.closest('.shape'));
+  });
+
   editorEl.addEventListener('scroll', () => { if (selected) positionBar(); });
 
   /** Hand the shape's text over to the caret. Double-click, or a second click. */
@@ -223,6 +251,7 @@ export function initShapes(editorEl, { history } = {}) {
     shape.classList.add('editing'); // now the text takes clicks, and drags stop
     const text = shape.querySelector('.shape-text');
     if (!text) return;
+    if (!text.textContent.trim() && !text.querySelector('br')) text.innerHTML = '<br>';
     text.focus();
     const r = document.createRange();
     r.selectNodeContents(text);

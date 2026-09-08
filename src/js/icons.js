@@ -49,8 +49,8 @@ export const ICONS = {
   // rows of 6px digits were 4.5 device pixels tall — a grey smudge.
   numbers: S(
     '<path d="M10 8h10"/><path d="M10 16h10"/>'
-    + '<text x="2.6" y="11" font-size="8.5" font-weight="600" font-family="Inter, Segoe UI, sans-serif" fill="currentColor" stroke="none">1</text>'
-    + '<text x="2.6" y="19" font-size="8.5" font-weight="600" font-family="Inter, Segoe UI, sans-serif" fill="currentColor" stroke="none">2</text>'),
+    + '<text x="2.4" y="11.2" font-size="9.5" font-weight="700" font-family="Inter, Segoe UI, sans-serif" fill="currentColor" stroke="none">1</text>'
+    + '<text x="2.4" y="19.4" font-size="9.5" font-weight="700" font-family="Inter, Segoe UI, sans-serif" fill="currentColor" stroke="none">2</text>'),
   // Two rows, each a box and a rule of the SAME length starting at the same x.
   // The old one had the ticked row's rule from 14 to 21 and the empty row's box
   // sitting where the other row's rule began, so nothing lined up with anything.

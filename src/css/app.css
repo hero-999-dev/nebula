@@ -14,6 +14,10 @@ body {
   font-family: var(--sans);
   font-size: 15px;
   overflow: hidden;
+  /* Grayscale, not subpixel. Windows renders near-white text on a dark ground
+     with RGB subpixel antialiasing, which fringes small text warm — the menu
+     rows read as pink and nobody could account for the colour. */
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ---------- the window's own strip ----------
@@ -386,14 +390,19 @@ body {
 
 /* Three themes as a segmented control: which one is on is visible without
    clicking, unlike a button that only says "Theme". */
+/* Flush with the New note button above it: the outer border and 2px padding
+   held every segment three pixels inside that edge, so the row looked narrower
+   than the button it sits under. */
 .theme-pick {
   display: flex;
-  gap: 2px;
-  padding: 2px;
+  gap: 0;
+  padding: 0;
   border: 1px solid var(--rule);
   border-radius: 9px;
   background: var(--paper-raised);
+  overflow: hidden;
 }
+.theme-pick button + button { border-left: 1px solid var(--rule); }
 .theme-pick button {
   flex: 1;
   min-width: 0;
@@ -412,6 +421,7 @@ body {
   color: var(--paper-sunken);
   font-weight: 600;
 }
+.theme-pick button { border-radius: 0; }
 :root[data-theme="light"] .theme-pick button.on,
 :root[data-theme="white"] .theme-pick button.on { color: #fff; }
 

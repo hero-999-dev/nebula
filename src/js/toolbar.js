@@ -281,7 +281,15 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     dirty();
   }
 
-  const applyUnderline = (cls) => applyToBlockOrSelection(U_STYLES, cls === 'none' ? '' : cls);
+  /**
+   * Underline needs a selection — no whole-block fallback.
+   *
+   * Colours and fonts apply to the line when nothing is selected, which is what
+   * was asked for. An underline is not the same: picking a style with the caret
+   * merely parked in a line underlined the entire line, which is never what
+   * anyone means by it.
+   */
+  const applyUnderline = (cls) => applyExclusive(U_STYLES, cls === 'none' ? '' : cls);
   const applyTextColor = (cls) => applyToBlockOrSelection(colorClasses(TEXT_COLORS), cls);
   const applyHilite = (cls) => applyToBlockOrSelection(colorClasses(HILITE_COLORS), cls);
 
@@ -654,6 +662,29 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     const px = parseSize(sizeInput.value);
     if (px) { sizeInput.value = String(px); withSelection(() => applyFontSize(px)); }
   }
+  /** The common sizes, behind the caret. Typing a number still works. */
+  const SIZES = [10, 12, 14, 16, 18, 20, 24, 28, 32, 48, 72];
+  (function buildSizeMenu() {
+    const menu = document.getElementById('menu-size');
+    if (!menu) return;
+    menu.innerHTML = '<div class="tb-menu__label">Size</div>';
+    for (const px of SIZES) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.size = String(px);
+      const label = document.createElement('span');
+      label.className = 'label';
+      label.textContent = `${px} px`;
+      btn.appendChild(label);
+      btn.addEventListener('click', () => {
+        closeMenus();
+        sizeInput.value = String(px);
+        withSelection(() => applyFontSize(px));
+      });
+      menu.appendChild(btn);
+    }
+  }());
+
   sizeInput?.addEventListener('change', applySize);
   sizeInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applySize(); } });
 

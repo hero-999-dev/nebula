@@ -164,7 +164,13 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 14. **A search must never mark up the note.** Wrapping hits would dirty it,
    autosave it and land on the undo stack; `find.js` paints ranges with the CSS
    Custom Highlight API instead.
-15. **Anything written into a note's markup is frozen in old notes.** The
+15. **A block is not always a direct child of the editor.** Applying a colour
+   or a font around one wraps it in a `<div>`, so any "what is next to the
+   caret" lookup has to search inside the neighbour, not just test it.
+16. **Near-white text on a dark ground fringes warm** under Windows subpixel
+   antialiasing — it reads as a colour nobody set. `-webkit-font-smoothing:
+   antialiased` on the body is the fix; do not go looking for the colour.
+17. **Anything written into a note's markup is frozen in old notes.** The
    code block's ✕ is created with the block, so blocks written before it existed
    never got one — `paintAllCode` tops the header up on every load. Any new
    in-note control needs the same treatment.

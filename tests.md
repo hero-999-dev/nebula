@@ -5,7 +5,7 @@ What is tested, what each test proves, and what is knowingly untested.
 | | |
 |---|---|
 | **Unit** | 245 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 123 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Electron smoke** | 132 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -33,7 +33,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
 | `tests/export.test.js` | 18 | A note as Markdown or as a standalone HTML file |
 | `tests/import.test.js` | 18 | A Markdown or HTML file read back as a note, sanitised |
-| `tests/e2e/smoke.mjs` | 123 | The real app, six launches |
+| `tests/e2e/smoke.mjs` | 132 | The real app, six launches |
 
 ---
 
@@ -82,6 +82,52 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-08] v0.6.2 - the third report
+
+**Smoke 123 -> 132**, unit unchanged at 245: everything here is behaviour in the
+running app rather than new pure logic.
+
+The report was written at 12:33 against 0.6.0; the test build only became 0.6.1
+at 13:31. Its last third repeats items 0.6.1 had already fixed, so this entry
+covers what was genuinely new.
+
+**A code block below a wrapper could not be removed.** 0.6.1 added Backspace at
+the edge, but it looked at `previousElementSibling` of the caret's own block —
+and applying a colour or a font around a code block leaves it inside a
+`<div class="c-red">`. The lookup found the wrapper, gave up, and Chromium's
+default merged the paragraphs and left the block *and* a blank line behind. It
+now finds a block wrapped at either depth, takes the nearest one when a wrapper
+holds several, keeps a wrapper that also holds text, and removes a wrapper left
+empty — which was the reported blank line.
+
+**Underline applied to the whole line.** The block-level fallback added in 0.6.0
+was right for colours and fonts (picking one with a caret parked in a line was
+reported as "nothing happens") but wrong here: an underline across a whole
+paragraph is never what anyone means. It needs a selection now; colours and
+fonts keep the fallback.
+
+**The size field had no arrow.** It was an `<input list>`, and a `<datalist>`
+draws no mark of its own and cannot be styled to match anything. It keeps free
+typing and gains the same caret the other menus have, opening the common sizes.
+
+**"There is a strange colour in the export menu, outside — remove that layer."**
+Measured: the rows compute to `--ink`, exactly like every other menu. What
+differed was the *rendering*. Windows draws near-white text on a dark ground
+with RGB subpixel antialiasing, which fringes small text warm — the rows read as
+pink and there was no colour anywhere to account for it. Grayscale smoothing on
+the body removes the fringe.
+
+**Shapes.** Double-clicking to edit did work, but the text starts empty and an
+empty contenteditable has no line box, so Chromium paints no caret: nothing at
+all said you could type. It carries a `<br>` and a minimum line height now, with
+a rule under the text while editing. A shape also grows to fit what is typed
+into it — the text was clipped and simply vanished before, and the clipped kinds
+get more slack because a diamond only shows its middle.
+
+**Also:** the numbered-list mark's digits are bold like the rest of the set, and
+the theme picker's segments now reach the same edges as the New note button
+above them — its own border and 2px padding had held them three pixels inside.
 
 ### [2026-09-08] v0.6.1 - the second bug report
 

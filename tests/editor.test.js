@@ -188,7 +188,8 @@ describe('icons', () => {
     expect(ICONS.numbers).toContain('>1<');
     expect(ICONS.numbers).toContain('>2<');
     expect(ICONS.numbers).not.toContain('>3<');
-    expect(ICONS.numbers).toContain('font-size="8.5"');
+    // Bold, like the rest of the set — the digits read as a smudge otherwise.
+    expect(ICONS.numbers).toContain('font-weight="700"');
   });
 
   it('the equation mark reads as √x, not a multiplication cross', () => {
