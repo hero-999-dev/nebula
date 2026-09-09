@@ -1,6 +1,6 @@
 {
   "name": "nebula",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "description": "Nebula — calm notes with a real editor: movable editing bar, line icons, markdown code blocks with syntax colors, free-floating shapes, AI panel with tabs.",
   "main": "dist-electron/main.js",
   "type": "module",
@@ -98,6 +98,7 @@
         }
       ],
       "category": "public.app-category.productivity",
+      "_comment_signing": "identity null = no Developer ID. build/after-pack.cjs ad-hoc signs instead, so macOS loads the app rather than calling it damaged.",
       "icon": "build/icon.png",
       "artifactName": "Nebula-${version}-mac.${ext}",
       "darkModeSupport": true,
@@ -124,7 +125,8 @@
           "path": "/Applications"
         }
       ]
-    }
+    },
+    "afterPack": "build/after-pack.cjs"
   },
   "devDependencies": {
     "electron": "^33.2.1",

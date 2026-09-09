@@ -201,7 +201,21 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    after toggling the sidebar reads a frame of the animation. Wait for the
    width to be both stable AND at its target: an ease curve crawls at each end,
    so two consecutive frames round to the same pixel mid-flight.
-25. **Anything written into a note's markup is frozen in old notes.** The
+25. **A page's margin band cannot be painted.** Chromium fills it from a
+   document background colour cached outside the print stylesheet — CSS under
+   print media, `BrowserWindow.setBackgroundColor` and a theme switch were all
+   measured and all failed. Use `@page { margin: 0 }` and pad the content.
+26. **`cmd()` must not focus the editor when the caret is already inside it.**
+   A shape's text is a nested editable within the editor, so `editorEl.focus()`
+   moves focus off it and throws the selection away.
+27. **`.shape-text` takes no pointer events unless the shape is `.editing`,**
+   so `e.target` on a double-click reports the shape. Hit-test with geometry.
+28. **`styleWithCSS` is document-wide and sticky.** `applyFont` turns it on;
+   anything using execCommand afterwards emits spans instead of tags unless it
+   resets the flag.
+29. **A block with no children has no line box** — no height, and no caret to
+   click into. `migrateBlankLines` puts a `<br>` in.
+30. **Anything written into a note's markup is frozen in old notes.** The
    code block's ✕ is created with the block, so blocks written before it existed
    never got one — `paintAllCode` tops the header up on every load. Any new
    in-note control needs the same treatment.

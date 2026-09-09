@@ -13,6 +13,49 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.6.5': {
+    headline: 'Switches that switch off, and one typeface for the whole app.',
+    items: [
+      {
+        title: 'Underline and highlight turn off again',
+        text: 'Pressing Underline on underlined text removes it, the way Bold '
+          + 'always has. Picking a highlight you already have clears it.',
+      },
+      {
+        title: 'A font only changes what you selected',
+        text: 'Picking a font with nothing selected no longer restyles the whole '
+          + 'line.',
+      },
+      {
+        title: 'Empty lines have a cursor again',
+        text: 'A blank line written by the app had no height and no caret, so '
+          + 'clicking it put the cursor nowhere you could see.',
+      },
+      {
+        title: 'Shapes',
+        text: 'Square and circle join the set, the button repeats whichever kind '
+          + 'you chose last, double-clicking the text selects all of it, and bold, '
+          + 'italic and underline work inside a shape. Arrow keys no longer walk '
+          + 'the cursor into one.',
+      },
+      {
+        title: 'Exports use A4 with narrow margins',
+        text: '1.27 cm on all four sides, the note title at the top, and no dark '
+          + 'band around the page.',
+      },
+      {
+        title: 'One typeface',
+        text: 'The panels, menus and code-block labels are set in the same face as '
+          + 'the Nebula wordmark. Only code itself stays monospaced.',
+      },
+      {
+        title: 'Opening it on a Mac',
+        text: 'macOS says it cannot verify the app, because registering with Apple '
+          + 'costs money. The release page now says exactly which two clicks get '
+          + 'past it, and the app is signed so macOS never calls it damaged.',
+      },
+    ],
+  },
   '0.6.4': {
     headline: 'Deleting, underlining, and a tidier toolbar.',
     items: [

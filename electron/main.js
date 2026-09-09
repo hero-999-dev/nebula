@@ -31,6 +31,9 @@ function readAppVersion() {
   return reported;
 }
 const APP_VERSION = readAppVersion();
+
+/** The window's own base colour — what shows wherever the page paints nothing. */
+const WINDOW_BG = '#17122A';
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 
 // Windows groups taskbar buttons by AppUserModelID and takes the button's icon
@@ -212,7 +215,7 @@ function titleBarOptions() {
   if (process.platform === 'darwin') return { titleBarStyle: 'hiddenInset' };
   return {
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#17122A', symbolColor: '#EDE7F7', height: 38 },
+    titleBarOverlay: { color: WINDOW_BG, symbolColor: '#EDE7F7', height: 38 },
   };
 }
 
@@ -224,7 +227,7 @@ function createWindow() {
     minHeight: 480,
     show: false,
     title: APP_TITLE,
-    backgroundColor: '#17122A',
+    backgroundColor: WINDOW_BG,
     ...titleBarOptions(),
     // The .ico on Windows, not the 1024px PNG: the title bar draws at 16px, and
     // handing Electron one huge bitmap makes it downscale — which is what made
@@ -410,10 +413,10 @@ function registerShellHandlers() {
     // band is gone. Nothing is transparent on screen, so swapping it to white
     // for the length of the export is invisible and leaves no colour that can
     // show through at all.
-    const base = win.webContents.getBackgroundColor?.() ?? null;
-    try {
-      win.webContents.setBackgroundColor?.('#FFFFFF');
-    } catch { /* older Electron; the print stylesheet still covers the page */ }
+    // No background-colour dance here. `webContents.setBackgroundColor` does not
+    // exist in this Electron, and `BrowserWindow.setBackgroundColor` was
+    // measured to have no effect on printToPDF at all. The sheet is covered by
+    // the print stylesheet instead — see `@page` in editor.css.
     try {
       // printBackground: the note's own frame and code-block fills are part of
       // how it reads; the print stylesheet already flattens the theme to paper.
@@ -433,10 +436,6 @@ function registerShellHandlers() {
       return { ok: true, path: filePath, bytes: data.length };
     } catch (err) {
       return { ok: false, error: err.message };
-    } finally {
-      try {
-        if (base) win.webContents.setBackgroundColor?.(base);
-      } catch { /* the window may already be gone */ }
     }
   });
 

@@ -10,7 +10,8 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  migrateNote, migrateShapes, migrateCodeBlocks, unwrapBlockSwallowingSpans, MARKUP_VERSION,
+  migrateNote, migrateShapes, migrateCodeBlocks, unwrapBlockSwallowingSpans,
+  migrateBlankLines, MARKUP_VERSION,
 } from '../src/js/migrate.js';
 
 const root = (html) => {
@@ -178,6 +179,43 @@ describe('unwrapBlockSwallowingSpans', () => {
   });
 });
 
+/**
+ * An empty block has no line box, so Chromium paints no caret in it and the
+ * line has no height either: clicking there put the caret nowhere visible and
+ * the line read as a gap nobody could get into.
+ */
+describe('migrateBlankLines', () => {
+  it('gives an empty paragraph a <br> to put a caret on', () => {
+    const el = root('<p>text</p><p></p>');
+    expect(migrateBlankLines(el)).toBe(1);
+    expect(el.innerHTML).toBe('<p>text</p><p><br></p>');
+  });
+
+  it('does the same for a formatting wrapper left empty', () => {
+    const el = root('<div class="c-red"></div>');
+    migrateBlankLines(el);
+    expect(el.querySelector('.c-red').innerHTML).toBe('<br>');
+  });
+
+  it('leaves a line that already has one alone', () => {
+    const el = root('<p><br></p>');
+    expect(migrateBlankLines(el)).toBe(0);
+  });
+
+  it('never reaches into a code block or a shape layer', () => {
+    const html = '<div class="blk-code"><pre class="code-body"><code class="code-src"></code></pre></div>'
+      + '<div class="shape-layer"><div class="shape"><div class="shape-text"></div></div></div>';
+    const el = root(html);
+    expect(migrateBlankLines(el)).toBe(0);
+  });
+
+  it('is idempotent', () => {
+    const el = root('<p></p><div></div>');
+    migrateBlankLines(el);
+    expect(migrateBlankLines(el)).toBe(0);
+  });
+});
+
 describe('migrateNote', () => {
   it('runs every pass and counts what it touched', () => {
     const el = root(shape('style="background: rgb(4, 5, 6);"')
@@ -185,11 +223,12 @@ describe('migrateNote', () => {
       + '<div class="code-head"><select class="code-lang"></select></div>'
       + '<pre class="code-body"><code class="code-src"></code></pre></div>'
       + '<span class="u-single"><p>swallowed</p></span>');
-    expect(migrateNote(el)).toEqual({ shapes: 1, code: 1, wrappers: 1 });
+    // The shape's own empty text is a blank line too, so `blanks` counts it.
+    expect(migrateNote(el)).toEqual({ shapes: 1, code: 1, wrappers: 1, blanks: 0 });
   });
 
   it('survives being handed nothing', () => {
-    expect(migrateNote(null)).toEqual({ shapes: 0, code: 0, wrappers: 0 });
+    expect(migrateNote(null)).toEqual({ shapes: 0, code: 0, wrappers: 0, blanks: 0 });
   });
 
   it('carries a version, so a log line means something', () => {

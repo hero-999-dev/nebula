@@ -22,6 +22,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-09 16:35] v0.6.5 - by claude
+
+switches that switch off
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-09 14:26] v0.6.4 - by claude
 
 reproduced against the note that reported it

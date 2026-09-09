@@ -1,6 +1,6 @@
 {
   "projectName": "Nebula",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "lastUpdated": "2026-09-09",
   "currentPhase": "v0.6.0 - export (Markdown, standalone HTML, real PDF via printToPDF) and import, a proper print stylesheet, and the fourteen defects from the user's Bug Report note.",
   "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, command palette, search, i18n.",
@@ -31,8 +31,8 @@
     "releasePolicy": "Standing instruction (2026-09-07): release finished work with npm run push without being asked, and never ask which platforms to build - the repo is public, so Actions is free on both Windows and macOS runners. npm run push also refreshes Nebula Test.exe in the project root."
   },
   "quality": {
-    "unitTests": 284,
-    "smokeChecks": 149,
+    "unitTests": 289,
+    "smokeChecks": 150,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
@@ -62,7 +62,11 @@
     "A bug reported against a real note must be reproduced with that note's own markup, read out of Nebula-data/storage/notes — a lookalike hid the code-block delete bug through two releases.",
     "The block the caret is in is NOT the editor's direct child: a colour or font wraps a run in a div, so neighbour lookups find the nearest block and step outward.",
     "app.getVersion() returns ELECTRON's version whenever Electron was started against a directory with no package.json (every dev run, every smoke launch).",
-    "Every release needs an entry in src/js/release-notes.js; npm run push refuses to ship without one."
+    "Every release needs an entry in src/js/release-notes.js; npm run push refuses to ship without one.",
+    "A page's margin band cannot be painted from the app: Chromium fills it from a cached document background colour. Use @page { margin: 0 } and pad the content.",
+    "cmd() must not call editorEl.focus() when the caret is already inside the editor — a shape's text is a nested editable and focusing the editor discards the selection.",
+    "styleWithCSS is a sticky, document-wide flag; applyFont leaves it on, so reset it before any other execCommand.",
+    "macOS: the app is ad-hoc signed in build/after-pack.cjs so it is never reported as damaged; the notarization warning needs a paid Developer ID and cannot be removed for free."
   ],
   "history": [
     {

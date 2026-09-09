@@ -1250,13 +1250,33 @@ try {
       .find((b) => b.textContent.trim() === 'Comic Sans MS')?.click();
   });
   {
+    // A font needs a SELECTION. 0.6.0 gave the collapsed caret a whole-block
+    // fallback because picking a font with the caret merely parked in a line
+    // appeared to do nothing; the answer to that was explicit — "only what is
+    // selected should change; if nothing is selected it should not change" —
+    // and a font quietly taking a whole paragraph is the more surprising of the
+    // two. The click above had only a caret.
     const state = await win.evaluate(() => ({
       applied: document.querySelector('#editor p')?.style.fontFamily ?? '',
       label: document.querySelector('#tb-font .tb-font__name')?.textContent ?? '',
     }));
-    check('picking a font with only a caret sets the line, and the button says so',
-      /Comic Sans/.test(state.applied) && state.label === 'Comic Sans MS',
-      JSON.stringify(state));
+    check('a font picked with only a caret leaves the line alone',
+      state.applied === '', JSON.stringify(state));
+
+    const selected = await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      const p = ed.querySelector('p');
+      const r = document.createRange();
+      r.setStart(p.firstChild, 0);
+      r.setEnd(p.firstChild, Math.min(4, p.firstChild.length));
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      ed.focus();
+      [...document.querySelectorAll('#menu-font button')]
+        .find((b) => b.textContent.trim() === 'Comic Sans MS')?.click();
+      return ed.innerHTML;
+    });
+    check('and applies to exactly what IS selected',
+      /Comic Sans/.test(selected), selected.slice(0, 120));
   }
 
   // Equation: KaTeX, from source, surviving a reload.

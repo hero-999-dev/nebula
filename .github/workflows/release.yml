@@ -125,13 +125,31 @@ jobs:
             |---|---|---|
             | **Windows** | `Nebula-Setup-*.exe` | Installer. **Updates itself** from here on. |
             | **Windows portable** | `Nebula-portable-*.exe` | Runs from a folder or USB stick. Does not auto-update. |
-            | **macOS** (Apple Silicon + Intel) | `Nebula-*-mac.dmg` | Open, drag to Applications. First launch: **right-click -> Open**. |
+            | **macOS** (Apple Silicon + Intel) | `Nebula-*-mac.dmg` | Open, drag to Applications, then see below. |
+
+            ### Opening it on macOS the first time
+
+            macOS will say **"Apple could not verify that Nebula is free of
+            malware"** (in German: *"Apple konnte nicht überprüfen, ob Nebula
+            frei von Schadsoftware ist"*). That message is about
+            **notarization**, not about anything being wrong with the download —
+            Nebula is not registered with Apple, which costs 99 USD a year.
+
+            Open it once, either way:
+
+            1. **System Settings -> Privacy & Security**, scroll to the bottom.
+               Next to *"Nebula was blocked"* press **Open Anyway**
+               (*Trotzdem öffnen*), then **Open** in the dialog that follows.
+            2. Or in Terminal, once:
+               `xattr -dr com.apple.quarantine /Applications/Nebula.app`
+
+            You only do this once. Every later launch opens normally.
 
             ### Updating
 
             The installed Windows app checks this page on its own and offers the
-            update in-app. macOS is unsigned, so it tells you a new version is
-            out and brings you back here to download it.
+            update in-app. macOS is not notarized, so it tells you a new version
+            is out and brings you back here to download it.
 
             **Your notes are never touched by an update.** They live in your user
             profile, not next to the app, and Nebula copies the whole vault aside

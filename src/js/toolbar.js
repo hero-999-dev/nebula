@@ -113,6 +113,7 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
   // What the A and H buttons apply when pressed directly — a class, not a hex.
   let lastColor = 'c-red';
   let lastHilite = 'h-yellow';
+  let lastShape = 'rect';
   const colorBar = document.getElementById('color-bar');
   const hiliteBar = document.getElementById('hilite-bar');
 
@@ -125,7 +126,16 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
   const dirty = () => editorEl.dispatchEvent(new Event('input', { bubbles: true }));
 
   function cmd(name, value = null) {
-    editorEl.focus();
+    // Only when the caret is somewhere else. A shape's text is a nested
+    // editable INSIDE the editor, so focusing the editor moved focus off it and
+    // threw the selection away — bold, italic and the rest simply did nothing
+    // inside a shape.
+    if (!editorEl.contains(document.activeElement)) editorEl.focus();
+    // styleWithCSS is a document-wide flag and applyFont leaves it ON, so bold
+    // afterwards emitted <span style="font-weight:bold"> instead of <b>. Every
+    // other part of the app — queryCommandState, the export, the importer's
+    // allow-list — is written for the tags.
+    try { document.execCommand('styleWithCSS', false, false); } catch { /* ignore */ }
     // Even the browser's own commands are snapshotted: the app's undo is the
     // only one now, so it has to know about every edit, not just ours.
     history?.push();
@@ -255,8 +265,11 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     let node;
     while ((node = walker.nextNode())) {
       if (!range.intersectsNode(node)) continue;
-      // A code block owns its own text, and a shape layer is not prose.
-      if (node.parentElement?.closest('.blk-code, .shape-layer')) continue;
+      // A code block owns its own text. A shape's TEXT is ordinary prose and
+      // must take bold, italic and the rest — only the layer's chrome is out.
+      if (node.parentElement?.closest('.blk-code')) continue;
+      if (node.parentElement?.closest('.shape-layer')
+        && !node.parentElement?.closest('.shape-text')) continue;
       const start = node === range.startContainer ? range.startOffset : 0;
       const end = node === range.endContainer ? range.endOffset : node.nodeValue.length;
       // intersectsNode is true for a node merely touching a boundary.
@@ -372,12 +385,46 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
    */
   // `u` is in the strip set as well as the classes: Ctrl+U used to fall through
   // to Chromium and leave a native <u>, which "None" then could not remove.
-  const applyUnderline = (cls) =>
-    withSelection(() => applyExclusive(U_STYLES, cls === 'none' ? '' : cls, 'u'));
-  const applyTextColor = (cls) =>
-    withSelection(() => applyToBlockOrSelection(colorClasses(TEXT_COLORS), cls));
-  const applyHilite = (cls) =>
-    withSelection(() => applyToBlockOrSelection(colorClasses(HILITE_COLORS), cls));
+  /**
+   * Is everything the selection touches already wearing this class?
+   *
+   * Bold and Italic go through execCommand, which toggles: pressing Bold on
+   * bold text turns it off. Ours did not — "the underline part will not switch
+   * off", "a background was picked and it will not close". Picking what is
+   * already applied clears it now, which is what every one of these controls
+   * has always looked like it would do.
+   */
+  function alreadyApplied(cls) {
+    if (!cls) return false;
+    const range = selectionInEditor();
+    if (!range) return false;
+    let node = range.commonAncestorContainer;
+    if (node.nodeType !== Node.ELEMENT_NODE) node = node.parentElement;
+    if (node?.closest?.(`.${cls}`)) return true;
+    if (range.collapsed) return false;
+    // A range that spans several wrappers counts only if every part is covered.
+    const walker = document.createTreeWalker(
+      node ?? editorEl, NodeFilter.SHOW_TEXT,
+    );
+    let n, saw = false;
+    while ((n = walker.nextNode())) {
+      if (!range.intersectsNode(n) || !n.nodeValue.trim()) continue;
+      if (n === range.startContainer && range.startOffset === n.nodeValue.length) continue;
+      if (n === range.endContainer && range.endOffset === 0) continue;
+      saw = true;
+      if (!n.parentElement?.closest(`.${cls}`)) return false;
+    }
+    return saw;
+  }
+
+  const applyUnderline = (cls) => withSelection(() => {
+    const want = cls === 'none' ? '' : cls;
+    applyExclusive(U_STYLES, alreadyApplied(want) ? '' : want, 'u');
+  });
+  const applyTextColor = (cls) => withSelection(() =>
+    applyToBlockOrSelection(colorClasses(TEXT_COLORS), alreadyApplied(cls) ? '' : cls));
+  const applyHilite = (cls) => withSelection(() =>
+    applyToBlockOrSelection(colorClasses(HILITE_COLORS), alreadyApplied(cls) ? '' : cls));
 
   /** What a colour class actually paints in the theme that is on right now. */
   function tokenValue(cls, prop) {
@@ -453,7 +500,7 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       dirty();
       return;
     }
-    editorEl.focus();
+    if (!editorEl.contains(document.activeElement)) editorEl.focus();
     document.execCommand('styleWithCSS', false, true);
     document.execCommand('fontSize', false, '7');
     // Only what the command just marked, and only inside the new selection:
@@ -585,7 +632,9 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     // Through the shapes controller when there is one, so a new shape arrives
     // selected with its colour bar open — adding one and then having to hunt
     // for it to recolour it is not the point of a shape button.
-    'shape-rect': () => insertShape('rect'),
+    // The button inserts whatever kind was chosen last — picking Circle from
+    // the menu and then pressing the button again gave a rectangle.
+    'shape-rect': () => insertShape(lastShape),
     codeblock: () => insertCodeBlock(editorEl, 'javascript', history),
     divider: () => cmd('insertHTML', '<hr class="blk-hr"><p><br></p>'),
     bold: () => cmd('bold'),
@@ -622,7 +671,7 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     if (ustyle) { applyUnderline(ustyle); closeMenus(); return; }
 
     const shapeKind = e.target.closest('[data-shape-add]')?.dataset.shapeAdd;
-    if (shapeKind) { insertShape(shapeKind); closeMenus(); }
+    if (shapeKind) { lastShape = shapeKind; insertShape(shapeKind); closeMenus(); }
   });
 
   function closeMenus() {
@@ -703,15 +752,15 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
    */
   function applyFont(stack) {
     const range = selectionInEditor();
-    editorEl.focus();
+    // Nothing selected, nothing to restyle. 0.6.0 gave this a whole-block
+    // fallback because picking a font with the caret parked in a line appeared
+    // to do nothing; the user's answer to that is explicit — "when changing the
+    // font only what is SELECTED should change; if nothing is selected it
+    // should not change" — and a font quietly taking a whole paragraph is the
+    // more surprising of the two.
+    if (!range || range.collapsed) return;
+    if (!editorEl.contains(document.activeElement)) editorEl.focus();
     history?.push();
-    if (!range || range.collapsed) {
-      const block = blockOf();
-      if (!block) return;
-      block.style.fontFamily = stack;
-      dirty();
-      return;
-    }
     document.execCommand('styleWithCSS', false, true);
     document.execCommand('fontName', false, stack);
     dirty();

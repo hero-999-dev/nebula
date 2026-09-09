@@ -27,11 +27,12 @@ export const MARKUP_VERSION = '0.6.3';
  * @returns {{shapes: number, code: number}} how many nodes were touched
  */
 export function migrateNote(root, { fitShape } = {}) {
-  if (!root) return { shapes: 0, code: 0, wrappers: 0 };
+  if (!root) return { shapes: 0, code: 0, wrappers: 0, blanks: 0 };
   return {
     shapes: migrateShapes(root, fitShape),
     code: migrateCodeBlocks(root),
     wrappers: unwrapBlockSwallowingSpans(root),
+    blanks: migrateBlankLines(root),
   };
 }
 
@@ -118,6 +119,13 @@ export function migrateShapes(root, fitShape) {
       changed = true;
     }
 
+    // 0.6.4 — a shape's text is editable only while it is being edited, so the
+    // caret cannot walk into it from the paragraph beside it with an arrow key.
+    if (text && text.getAttribute('contenteditable') !== 'false') {
+      text.setAttribute('contenteditable', 'false');
+      changed = true;
+    }
+
     // 0.6.1 — the resize grip gained a tooltip.
     const grip = shape.querySelector('.shape-h');
     if (grip && !grip.getAttribute('title')) {
@@ -137,6 +145,28 @@ export function migrateShapes(root, fitShape) {
     }
 
     if (changed) touched += 1;
+  }
+  return touched;
+}
+
+/**
+ * Give an empty line something to put a caret on.
+ *
+ * A block with no children and no text has no line box, so Chromium draws no
+ * caret in it and the line has no height either: clicking there put the caret
+ * nowhere visible — "the straight line that guides while typing is gone,
+ * clicking does not show it" — and the line itself read as a gap nobody could
+ * get into. A `<br>` is what a browser puts in an empty paragraph of its own
+ * accord; these were made by script and never got one.
+ */
+export function migrateBlankLines(root) {
+  let touched = 0;
+  for (const el of root.querySelectorAll('p, div, h1, h2, h3, h4, li, blockquote')) {
+    if (el.children.length || el.textContent.length) continue;
+    if (el.closest('.blk-code, .shape-layer, .code-head')) continue;
+    if (el.classList.contains('shape-text')) continue;
+    el.appendChild(el.ownerDocument.createElement('br'));
+    touched += 1;
   }
   return touched;
 }

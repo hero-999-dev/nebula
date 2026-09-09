@@ -7,7 +7,10 @@
 
 export const SHAPE_COLORS = ['#E8CDBD', '#D6E4D0', '#D3E0EA', '#E2D7E8', '#F0D2CE', '#EFE8D8'];
 
-export const SHAPE_KINDS = ['rect', 'ellipse', 'diamond', 'triangle'];
+export const SHAPE_KINDS = ['rect', 'square', 'ellipse', 'circle', 'diamond', 'triangle'];
+
+/** The kinds that must stay as wide as they are tall. */
+export const EQUILATERAL = new Set(['square', 'circle']);
 
 /**
  * Two overlays, created lazily as the note's first children: one painted under
@@ -39,8 +42,11 @@ export function makeShape(kind = 'rect', color = SHAPE_COLORS[0], at = null) {
   const top = at?.top ?? 40 + cascade * 24;
   el.style.left = `${left}px`;
   el.style.top = `${top}px`;
-  el.style.width = '150px';
-  el.style.height = '90px';
+  // A square and a circle are defined by being as wide as they are tall; the
+  // rest get the usual landscape box.
+  const side = EQUILATERAL.has(kind);
+  el.style.width = side ? '110px' : '150px';
+  el.style.height = side ? '110px' : '90px';
   el.style.background = color;
   // The diamond and the triangle are clipped, so their fill is painted by a
   // pseudo-element inset from the edge — and CSS cannot read an inline
@@ -50,7 +56,10 @@ export function makeShape(kind = 'rect', color = SHAPE_COLORS[0], at = null) {
   // A <br>, not nothing: an empty contenteditable has no line box, so Chromium
   // paints no caret in it — you double-click in and there is no sign at all
   // that you may type.
-  el.innerHTML = '<div class="shape-text" contenteditable="true"><br></div><span class="shape-h" title="Resize"></span>';
+  // contenteditable="false" until it is actually being edited: otherwise the
+  // caret walks in from the paragraph next to it on an arrow key.
+  el.innerHTML = '<div class="shape-text" contenteditable="false"><br></div>'
+    + '<span class="shape-h" title="Resize"></span>';
   return el;
 }
 
@@ -188,8 +197,14 @@ export function initShapes(editorEl, { history } = {}) {
       drag.el.style.left = `${Math.max(0, drag.left + dx)}px`;
       drag.el.style.top = `${Math.max(0, drag.top + dy)}px`;
     } else {
-      drag.el.style.width = `${Math.max(48, drag.w + dx)}px`;
-      drag.el.style.height = `${Math.max(34, drag.h + dy)}px`;
+      if (EQUILATERAL.has(drag.el.dataset.kind)) {
+        const side = Math.max(48, Math.max(drag.w + dx, drag.h + dy));
+        drag.el.style.width = `${side}px`;
+        drag.el.style.height = `${side}px`;
+      } else {
+        drag.el.style.width = `${Math.max(48, drag.w + dx)}px`;
+        drag.el.style.height = `${Math.max(34, drag.h + dy)}px`;
+      }
     }
     positionBar();
   });
@@ -231,9 +246,12 @@ export function initShapes(editorEl, { history } = {}) {
     // The text sizes itself; what runs out is the SHAPE. A diamond or a
     // triangle only shows its middle, so the same words need more room in one.
     const slack = shape.classList.contains('rect') || shape.classList.contains('ellipse') ? 14 : 40;
+    const side = EQUILATERAL.has(shape.dataset.kind);
     let guard = 0;
     while (text.offsetHeight + slack > shape.clientHeight && guard < 60) {
       shape.style.height = `${shape.offsetHeight + 8}px`;
+      // A square that grew taller than it is wide is not a square any more.
+      if (side) shape.style.width = shape.style.height;
       guard += 1;
     }
   }
@@ -245,27 +263,78 @@ export function initShapes(editorEl, { history } = {}) {
 
   editorEl.addEventListener('scroll', () => { if (selected) positionBar(); });
 
-  /** Hand the shape's text over to the caret. Double-click, or a second click. */
-  function startEditing(shape) {
+  /**
+   * Hand the shape's text over to the caret. Double-click, or a second click.
+   *
+   * @param {Element} shape
+   * @param {boolean} selectAll whether to take the whole text, the way a
+   *   double-click on a word takes the word
+   */
+  function startEditing(shape, selectAll = false) {
     if (!shape) return;
     shape.classList.add('editing'); // now the text takes clicks, and drags stop
     const text = shape.querySelector('.shape-text');
     if (!text) return;
+    // Editable only while being edited — see stopEditing. Arrow keys used to
+    // walk the caret straight into a shape from the paragraph beside it.
+    text.setAttribute('contenteditable', 'true');
     if (!text.textContent.trim() && !text.querySelector('br')) text.innerHTML = '<br>';
     text.focus();
-    const r = document.createRange();
-    r.selectNodeContents(text);
-    r.collapse(false);
-    const s = window.getSelection();
-    s.removeAllRanges();
-    s.addRange(r);
+    const place = () => {
+      const r = document.createRange();
+      r.selectNodeContents(text);
+      if (!selectAll) r.collapse(false);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    };
+    place();
+    // A double-click carries the browser's own word selection, which lands
+    // after this handler and replaced ours — the whole text came out
+    // unselected. Set it again once that has happened.
+    if (selectAll) requestAnimationFrame(place);
+  }
+
+  /**
+   * Take the text back out of the caret's reach.
+   *
+   * A `.shape-text` left `contenteditable="true"` is part of the editor's own
+   * caret path: holding the down arrow through a paragraph dropped the caret
+   * inside the shape, which is never what was meant — "it should never go into
+   * the shape's note like that".
+   */
+  function stopEditing(shape) {
+    const el = shape ?? editorEl;
+    for (const text of el.querySelectorAll?.('.shape-text') ?? []) {
+      text.setAttribute('contenteditable', 'false');
+      text.closest('.shape')?.classList.remove('editing');
+    }
   }
 
   editorEl.addEventListener('dblclick', (e) => {
     const shape = e.target.closest('.shape') ?? behindShapeAt(e.clientX, e.clientY);
     if (!shape) return;
     select(shape);
-    startEditing(shape);
+    // Was the pointer over the words? `e.target` cannot answer: `.shape-text`
+    // only takes pointer events once the shape is already `.editing`, so a
+    // double-click on it reports the SHAPE and the whole text was never taken.
+    // Ask the geometry instead.
+    const text = shape.querySelector('.shape-text');
+    const box = text?.getBoundingClientRect();
+    const onText = !!box && e.clientX >= box.left && e.clientX <= box.right
+      && e.clientY >= box.top && e.clientY <= box.bottom;
+    startEditing(shape, onText);
+  });
+
+  // Leaving the shape puts its text back out of reach.
+  editorEl.addEventListener('focusout', (e) => {
+    const text = e.target.closest?.('.shape-text');
+    if (!text) return;
+    requestAnimationFrame(() => {
+      if (text.contains(document.activeElement)) return;
+      if (document.activeElement === text) return;
+      stopEditing(text.closest('.shape'));
+    });
   });
 
   // floating shape toolbar (colors + delete + send back/front)
@@ -328,7 +397,7 @@ export function initShapes(editorEl, { history } = {}) {
     addShape: (kind) => select(addShape(editorEl, kind, history)),
     select,
     /** Called when a note is opened: the previous note's shapes are gone. */
-    reset: () => { select(null); },
+    reset: () => { select(null); stopEditing(null); },
 
     /**
      * Grow one shape to fit the text already in it.

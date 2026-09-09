@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 284 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 149 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 289 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 150 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -21,7 +21,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/notes.test.js` | 20 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body, and adds the guide to an older vault exactly once without touching what is there |
 | `tests/editor.test.js` | 41 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and the guide note's completeness |
 | `tests/lists.test.js` | 30 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
-| `tests/migrate.test.js` | 22 | Bringing a stored note up to what this version writes |
+| `tests/migrate.test.js` | 27 | Bringing a stored note up to what this version writes |
 | `tests/release-notes.test.js` | 17 | What each release says for itself |
 | `tests/inline-format.test.js` | 18 | Enter and Backspace out of an inline wrapper |
 | `tests/highlight.test.js` | 14 | Per-language tokens, and that only SQL is case-insensitive |
@@ -35,7 +35,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
 | `tests/export.test.js` | 18 | A note as Markdown or as a standalone HTML file |
 | `tests/import.test.js` | 18 | A Markdown or HTML file read back as a note, sanitised |
-| `tests/e2e/smoke.mjs` | 149 | The real app, six launches |
+| `tests/e2e/smoke.mjs` | 150 | The real app, six launches |
 
 ---
 
@@ -84,6 +84,69 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-09] v0.6.5 - switches that switch off
+
+**Unit 284 -> 289, smoke 149 -> 150.**
+
+**Nothing switched off.** Bold and Italic go through execCommand, which toggles;
+underline, text colour and highlight are ours, and every one of them only ever
+applied. "The underline part will not switch off", "a background was picked and
+it will not close". Picking what is already there clears it now.
+
+**A font took the whole line.** 0.6.0 gave a collapsed caret a whole-block
+fallback, because picking a font with the caret merely parked in a line looked
+like it did nothing. The answer to that was explicit — *only what is selected
+should change* — and a font quietly swallowing a paragraph is the more
+surprising of the two. The smoke check that asserted the old behaviour was
+rewritten rather than deleted: it asserts the new rule and that a selection
+still works.
+
+**An empty line had no cursor.** A block with no children has no line box, so
+Chromium paints no caret in it and it has no height either: clicking a blank
+line put the cursor nowhere visible — *"the straight line that guides while
+typing is gone, clicking does not show it"*. A browser puts a `<br>` in an empty
+paragraph of its own accord; these were made by script and never got one.
+
+**Shapes.** Square and circle join the set and stay equilateral when grown or
+dragged. The button repeats the kind chosen last. The menu is 54px instead of as
+wide as the font list. Double-clicking the text takes all of it — the hit test
+had to move to geometry, because `.shape-text` only accepts pointer events once
+the shape is already editing, so `e.target` always reported the shape. Bold,
+italic and the rest work inside a shape now: `cmd()` called `editorEl.focus()`
+unconditionally, and a shape's text is a nested editable INSIDE the editor, so
+focusing the editor threw the selection away. And arrow keys no longer walk into
+one — the text is `contenteditable="false"` until it is actually being edited.
+
+**The export's dark band, measured to the end.** Four separate attempts, each
+disproved: `html { background: #fff }` under print media (the page computes
+white and the band stays dark), `webContents.setBackgroundColor` (does not exist
+in this Electron), `BrowserWindow.setBackgroundColor` (measured: no effect on
+printToPDF at all), and switching the app's theme (the band follows one change
+LATE — Chromium caches a document background colour outside the print
+stylesheet). A page's margin band cannot be painted. So there is no band:
+`@page { margin: 0 }` makes the page box the whole sheet, the white canvas
+covers it edge to edge, and the 1.27 cm Word-Narrow margins come from padding on
+the content. The one thing padding cannot do is repeat, so a note long enough to
+break starts its second page at the paper's edge — a real limitation, and a
+better one than a dark frame on every page. The note's title heads the document.
+
+**One typeface.** Eleven `font-family: var(--sans)` declarations moved to the
+wordmark's serif: the chrome was Inter while every note was set in Charter, so
+the window read as two programs. Only code itself stays monospaced.
+
+**`styleWithCSS` is a document-wide flag** and `applyFont` leaves it on, so bold
+afterwards emitted `<span style="font-weight:bold">` instead of `<b>` — and
+queryCommandState, the export and the importer's allow-list are all written for
+the tags. `cmd()` resets it.
+
+**macOS.** The reported message is *"Apple konnte nicht überprüfen, ob Nebula
+frei von Schadsoftware ist"* — that is **notarization**, not a broken download,
+and removing it needs a paid Developer ID. What could be done was done: the app
+is ad-hoc signed in `build/after-pack.cjs`, so macOS never escalates to calling
+it *damaged* (an unsigned arm64 binary will not load at all), and the release
+page now names the two ways past the dialog instead of the right-click that
+newer macOS no longer honours.
 
 ### [2026-09-09] v0.6.4 - reproduced against the note that reported it
 
