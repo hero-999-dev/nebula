@@ -375,15 +375,15 @@ body {
 .drawer-empty { padding: 8px 10px; font-size: 12px; color: var(--ink-faint); }
 #app.side-collapsed .drawer-body { display: none; }
 #app.side-collapsed .drawer-tabs { flex-direction: column; }
-/* Label over count, both centred. Side by side, the count kept its own
-   font-size while the label was hidden and re-drawn at 9px, so the pair sat
-   off-centre and the word did not read as centred at all. */
+/* The label is the only thing in the rail — the count is hidden below — so it
+   is centred on its own. It was not: `gap: 6px` from the expanded rule still
+   reserved room beside it for the count that is not drawn, pushing the word
+   off to one side of a 64px rail. */
 #app.side-collapsed .drawer-tab {
   font-size: 0;
   padding: 5px 0;
-  flex-direction: column;
+  gap: 0;
   justify-content: center;
-  gap: 1px;
   text-align: center;
 }
 #app.side-collapsed .drawer-tab::before {
@@ -392,7 +392,6 @@ body {
   line-height: 1.1;
   text-transform: capitalize;
 }
-#app.side-collapsed .drawer-count { font-size: 9px; line-height: 1; }
 #app.side-collapsed .drawer-count { display: none; }
 .note-row.active { background: var(--paper-raised); border-color: var(--rule); }
 .note-row .nr-title {
