@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 289 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 150 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 300 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 152 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -35,7 +35,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
 | `tests/export.test.js` | 18 | A note as Markdown or as a standalone HTML file |
 | `tests/import.test.js` | 18 | A Markdown or HTML file read back as a note, sanitised |
-| `tests/e2e/smoke.mjs` | 150 | The real app, six launches |
+| `tests/e2e/smoke.mjs` | 152 | The real app, six launches |
 
 ---
 
@@ -84,6 +84,58 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-09] v0.6.9 - printed as a document, and shapes you can turn
+
+**Unit 289 -> 300, smoke 150 -> 152.**
+
+**The export is no longer a picture of the window.** The margin problem was a
+genuine dead end while the LIVE window was the thing being printed: Chromium
+fills a page's margin band from a document background colour it captures once,
+at load, outside the print stylesheet — so `@page { margin: 12.7mm }` framed
+every page of a dark-themed app in violet, and the only route to a white sheet,
+`@page { margin: 0 }`, cannot repeat a margin. Four ways round it were measured
+and all four failed (0.6.7).
+
+A document that is white from the moment it loads has neither problem. The note
+is now built into a standalone page — its own markup, the app's own stylesheets
+with their relative font URLs made absolute — written to a temp file and printed
+from a hidden window with JavaScript off. Measured on a three-page export: the
+page box is 698x1027 on every page (A4 less 1.27 cm a side), every painted
+rectangle is white, and the highlight, text colour, code-block fill and border
+all survive with four embedded fonts and no images.
+
+**Backspace could swallow every shape in a note.** A shape layer is
+`contenteditable="false"`, and Chromium's answer to Backspace against a
+non-editable island beside the caret is to take the whole island — eleven shapes
+in one keystroke. Both delete keys now refuse when a shape layer is what would
+go.
+
+**Shapes turn.** A second grip at the bottom-left, opposite the resize grip;
+Shift snaps to fifteen degrees. The angle is kept in `data-rot`, so it survives
+being saved, and old shapes get the grip from the migration.
+
+**One line weight for every shape.** The diamond and triangle drew their outline
+as a box inset on the fill, and a box inset moves each edge perpendicular to the
+BOX — which on a diagonal is not perpendicular to the EDGE. The diamond read as
+heavier than the square and the triangle went thin at its apex, where the inset
+degenerates. The fill is clipped to its own polygon now, drawn parallel just
+inside the outer one.
+
+**The shape menu draws the shapes.** Unicode glyphs were never the right
+silhouette and were hairlines at 14px; each row is the shape it makes, in the
+same 1.6px line.
+
+**The website had been stuck on v0.6.0 for eight releases.** The page prints
+`memory.currentPhase` as "Right now", and nothing was updating it while every
+other version on the page was correct — which is why "the site is not up to
+date" was reported twice and looked wrong both times. `npm run push` now refuses
+to ship when that line does not name the version being released.
+
+**Two smoke checks were rewritten rather than deleted:** one asserted the
+outline was a box inset, which is no longer how it is drawn, and one asserted a
+colour with only a caret restyled the whole line — the behaviour 0.6.8 removed
+on request.
 
 ### [2026-09-09] v0.6.8 - the page edge, and lists that line up
 

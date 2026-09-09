@@ -7,7 +7,7 @@
  * out as a document. These are the conversions that make a real export.
  */
 import { describe, it, expect } from 'vitest';
-import { toMarkdown, toHtml, safeFileName, FORMATS } from '../src/js/export.js';
+import { toMarkdown, toHtml, toPrintDocument, safeFileName, FORMATS } from '../src/js/export.js';
 
 const code = (src, lang) =>
   `<div class="blk-code" data-block-type="code" data-lang="${lang}" data-code="${encodeURIComponent(src)}" contenteditable="false">`
@@ -129,5 +129,82 @@ describe('FORMATS', () => {
     // so it would be an empty file with a confident name.
     expect(FORMATS.map((f) => f.id)).toEqual(['md', 'html', 'pdf']);
     expect(FORMATS.every((f) => f.label && f.ext)).toBe(true);
+  });
+});
+
+/**
+ * The document the PDF writer prints.
+ *
+ * Exporting used to print the LIVE window, which forced a choice: a page's
+ * margin band is filled from a document background colour Chromium captures at
+ * load, so on a dark app `@page { margin: 12.7mm }` framed every page in
+ * violet. The only way to a white sheet was `@page { margin: 0 }` — and a page
+ * margin is the only kind that repeats, so the second page began at the paper's
+ * edge. A document that is white from the moment it loads has neither problem.
+ */
+describe('toPrintDocument', () => {
+  it('is a complete document', () => {
+    const out = toPrintDocument({ title: 'Note', body: '<p>hello</p>' });
+    expect(out.startsWith('<!doctype html>')).toBe(true);
+    expect(out).toContain('<p>hello</p>');
+  });
+
+  it('carries the page margin that repeats on every page', () => {
+    expect(toPrintDocument({ margin: '12.7mm' })).toContain('@page { size: A4; margin: 12.7mm; }');
+  });
+
+  it('loads light, so the sheet is white before anything is drawn', () => {
+    expect(toPrintDocument({})).toContain('data-theme="white"');
+  });
+
+  it('heads the page with the note title', () => {
+    const out = toPrintDocument({ title: 'Bug Report', body: '<p>x</p>' });
+    expect(out).toContain('<div class="print-title">Bug Report</div>');
+    expect(out.indexOf('print-title')).toBeLessThan(out.indexOf('<p>x</p>'));
+  });
+
+  it('escapes a title that contains markup', () => {
+    expect(toPrintDocument({ title: '<script>x</script>' }))
+      .toContain('&lt;script&gt;x&lt;/script&gt;');
+  });
+
+  it('carries no script, and no handler on any element', () => {
+    const out = toPrintDocument({
+      body: '<p onclick="steal()">t</p><script>bad()</script><iframe src="x"></iframe>',
+    });
+    expect(out).not.toContain('bad()');
+    expect(out).not.toContain('onclick');
+    expect(out).not.toContain('<iframe');
+  });
+
+  it('drops the controls that are chrome, not content', () => {
+    const out = toPrintDocument({
+      body: '<div class="shape"><span class="shape-h"></span></div>'
+        + '<div class="code-head"><button class="code-copy">Copy</button>'
+        + '<button class="code-del">x</button></div>',
+    });
+    expect(out).not.toContain('shape-h');
+    expect(out).not.toContain('code-copy');
+    expect(out).not.toContain('code-del');
+  });
+
+  it('leaves nothing editable', () => {
+    expect(toPrintDocument({ body: '<div contenteditable="true">x</div>' }))
+      .not.toContain('contenteditable');
+  });
+
+  it('tells the printer the colours are content', () => {
+    // Without this Chromium drops every background as decoration and a
+    // highlighted note prints as plain text.
+    expect(toPrintDocument({})).toContain('print-color-adjust: exact');
+  });
+
+  it('inlines the stylesheet it is given', () => {
+    expect(toPrintDocument({ css: '.x{color:red}' })).toContain('.x{color:red}');
+  });
+
+  it('survives being given nothing at all', () => {
+    expect(() => toPrintDocument()).not.toThrow();
+    expect(toPrintDocument()).toContain('Untitled');
   });
 });

@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.6.8",
+  "version": "0.6.9",
   "lastUpdated": "2026-09-09",
-  "currentPhase": "v0.6.0 - export (Markdown, standalone HTML, real PDF via printToPDF) and import, a proper print stylesheet, and the fourteen defects from the user's Bug Report note.",
-  "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, command palette, search, i18n.",
+  "currentPhase": "v0.6.9 - the editor turned over to what the bug reports actually say: selection-only formatting, lists whose markers line up, code blocks that take Enter, shapes that rotate and cannot be shrunk into hiding their text, and an export printed as its own white document so every page keeps its 1.27cm margins.",
+  "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, search, i18n.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -31,8 +31,8 @@
     "releasePolicy": "Standing instruction (2026-09-07): release finished work with npm run push without being asked, and never ask which platforms to build - the repo is public, so Actions is free on both Windows and macOS runners. npm run push also refreshes Nebula Test.exe in the project root."
   },
   "quality": {
-    "unitTests": 289,
-    "smokeChecks": 150,
+    "unitTests": 300,
+    "smokeChecks": 152,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
@@ -69,7 +69,10 @@
     "macOS: the app is ad-hoc signed in build/after-pack.cjs so it is never reported as damaged; the notarization warning needs a paid Developer ID and cannot be removed for free.",
     "printToPDF needs preferCSSPageSize: true, or Chromium rounds the page box and leaves a sub-point strip of the document background along the top of every page.",
     "execCommand('insertText', '\\n') is discarded in a contenteditable; insert the newline as a text node and double it at the end of a block.",
-    "::marker is right-aligned in list-style-position: outside — a bullet and a number start at different x however well the text aligns. Draw markers as ::before in a fixed column."
+    "::marker is right-aligned in list-style-position: outside — a bullet and a number start at different x however well the text aligns. Draw markers as ::before in a fixed column.",
+    "The PDF export is printed from a hidden window loading a standalone white document; only that gives real @page margins on every page.",
+    "Every delete key must refuse when a .shape-layer is what would go — Chromium removes a non-editable island whole.",
+    "memory.currentPhase is what the docs site prints as 'Right now'; the release fails if it does not name the shipping version."
   ],
   "history": [
     {

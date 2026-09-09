@@ -12,7 +12,7 @@ import { normalizeLists, exitListOnEmptyItem, liftListItemAtStart } from './list
 import { enterOutOfWrapper, backspaceOutOfWrapper } from './inline-format.js';
 import { initEquation } from './equation.js';
 import { on } from './bus.js';
-import { toMarkdown, toHtml, safeFileName, FORMATS } from './export.js';
+import { toMarkdown, toHtml, toPrintDocument, safeFileName, FORMATS } from './export.js';
 import { noteFromFile } from './import.js';
 
 /**
@@ -573,11 +573,51 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     const title = noteTitle?.() || 'Untitled';
     if (!api) { window.print(); return; }          // browser preview: no dialogs
     if (format === 'pdf') {
-      await api.pdf({ suggested: safeFileName(title, 'pdf') });
+      await api.pdf({ suggested: safeFileName(title, 'pdf'), document: printDocument(title) });
       return;
     }
     const content = format === 'html' ? toHtml(editorEl.innerHTML, title) : toMarkdown(editorEl.innerHTML, title);
     await api.export({ suggested: safeFileName(title, format), content, format });
+  }
+
+  /**
+   * Every stylesheet the app is using, as text, with its relative URLs made
+   * absolute.
+   *
+   * The print window loads from a temporary directory, so `url(./KaTeX_*.woff2)`
+   * would resolve to nothing there and every equation would fall back to a
+   * system font. Each sheet's own href is the base to resolve against.
+   */
+  function appStyles() {
+    let out = '';
+    for (const sheet of document.styleSheets) {
+      let rules;
+      try {
+        rules = [...sheet.cssRules];
+      } catch {
+        continue;   // a sheet from another origin cannot be read; skip it
+      }
+      const base = sheet.href || document.baseURI;
+      for (const rule of rules) {
+        // The app's own `@media print` block is left behind on purpose. It
+        // exists to flatten a dark WINDOW onto paper — hiding the sidebar,
+        // covering a dark sheet with `@page { margin: 0 }`. This document has
+        // no sidebar and is white to begin with, and that zeroed page margin
+        // fought the real one: the export came out with a correct left margin
+        // and no top margin at all.
+        if (rule.media && /print/i.test(rule.media.mediaText)) continue;
+        out += `${rule.cssText.replace(/url\((['"]?)([^'")]+)\1\)/g, (whole, quote, ref) => {
+          if (/^(data:|https?:|file:|blob:)/i.test(ref)) return whole;
+          try { return `url("${new URL(ref, base).href}")`; } catch { return whole; }
+        })}\n`;
+      }
+    }
+    return out;
+  }
+
+  /** The note as a standalone white document, for the PDF writer. */
+  function printDocument(title) {
+    return toPrintDocument({ title, body: editorEl.innerHTML, css: appStyles() });
   }
 
   async function importNote() {
@@ -979,6 +1019,42 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       }
       return;
     }
+    /**
+     * A shape layer is not text and Backspace must never take one.
+     *
+     * It is `contenteditable="false"`, and Chromium's answer to Backspace
+     * against a non-editable island next to the caret is to swallow the whole
+     * island — "if I press back from here it deletes ALL the shapes". Eleven of
+     * them, in one keystroke, with the note's own undo the only way back.
+     */
+    if (!mod && (e.key === 'Backspace' || e.key === 'Delete')) {
+      const sel = window.getSelection();
+      const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+      if (range && editorEl.contains(range.startContainer)) {
+        const layers = [...editorEl.querySelectorAll('.shape-layer')];
+        const doomed = range.collapsed
+          ? (() => {
+            // At the very edge of a block, the neighbour is what gets taken.
+            const atStart = range.startOffset === 0;
+            const node = range.startContainer;
+            const atEnd = node.nodeType === Node.TEXT_NODE
+              ? range.startOffset === node.nodeValue.length
+              : range.startOffset === node.childNodes.length;
+            if (e.key === 'Backspace' && !atStart) return null;
+            if (e.key === 'Delete' && !atEnd) return null;
+            let el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+            while (el && el.parentElement !== editorEl) el = el.parentElement;
+            const sib = e.key === 'Backspace' ? el?.previousElementSibling : el?.nextElementSibling;
+            return sib?.classList?.contains('shape-layer') ? sib : null;
+          })()
+          : layers.find((l) => range.intersectsNode(l)) ?? null;
+        if (doomed) {
+          e.preventDefault();
+          return;
+        }
+      }
+    }
+
     if (!mod && e.key === 'Backspace') {
       if (backspaceOutOfWrapper(editorEl, window.getSelection())) {
         e.preventDefault();

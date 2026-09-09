@@ -12,6 +12,7 @@ import { _electron as electron } from 'playwright-core';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
+import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -452,6 +453,58 @@ try {
     check('the PDF is a real PDF from the app, not a screenshot of the window',
       pdf.subarray(0, 5).toString() === '%PDF-' && pdf.length > 2000, `${pdf.length} bytes`);
 
+    /**
+     * The sheet, and the margins, on every page.
+     *
+     * Printed from the live window this was a choice nobody should have to
+     * make: a page's margin band is filled from a document background colour
+     * Chromium captures at load, so `@page { margin: 12.7mm }` framed every
+     * page of a dark-themed app, and the only way to a white sheet —
+     * `@page { margin: 0 }` — cannot repeat a margin, so page two began at the
+     * paper's edge. The note is printed as its own white document now.
+     */
+    {
+      const latin = pdf.toString('latin1');
+      const NL = String.fromCharCode(10);
+      const CR = String.fromCharCode(13);
+
+      // Walked, not matched. A regex here needs carriage return and newline
+      // written into this file, and every layer between here and the disk has
+      // its own opinion about a backslash; plain string search has none.
+      const streams = [];
+      for (let at = latin.indexOf('stream'); at >= 0; at = latin.indexOf('stream', at + 6)) {
+        let st = at + 6;
+        if (latin[st] === CR) st += 1;
+        if (latin[st] !== NL) continue;                 // part of "endstream"
+        st += 1;
+        const en = pdf.indexOf('endstream', st);
+        if (en < 0) continue;
+        try { streams.push(zlib.inflateSync(pdf.subarray(st, en)).toString('latin1')); } catch { /* not flate */ }
+      }
+
+      /** The first `r g b rg ... x y w h re f` a page paints. */
+      const firstBox = (text) => {
+        const i = text.indexOf(' rg');
+        if (i < 0) return null;
+        // A stroke and a fill are set on one line: '1 1 1 RG 1 1 1 rg'.
+        const rgb = text.slice(0, i).split(NL).pop().trim().split(' ').slice(-3).join(' ');
+        const after = text.slice(i);
+        const j = after.indexOf(' re');
+        if (j < 0) return null;
+        const nums = after.slice(0, j).split(NL).pop().trim().split(' ').map(Number);
+        if (nums.length < 4 || nums.some(Number.isNaN)) return null;
+        return { rgb, w: nums[2], h: nums[3] };
+      };
+      const boxes = streams.map(firstBox).filter(Boolean);
+      check('nothing dark is painted on any page of the export',
+        boxes.length > 0 && boxes.every((b) => b.rgb === '1 1 1'),
+        JSON.stringify(boxes.slice(0, 3)));
+      // A4 at 3.125 units/px is 794x1123; 12.7mm a side leaves 698x1027.
+      check('every page keeps the 1.27cm margin, not just the first',
+        boxes.every((b) => Math.abs(b.w - 698) <= 2 && Math.abs(b.h - 1027) <= 2),
+        JSON.stringify(boxes.slice(0, 3)));
+    }
+
     const html = fs.readFileSync(path.join(outDir, 'My Report.html'), 'utf8');
     check('the HTML is one self-contained file with nothing to fetch',
       html.startsWith('<!doctype html>') && html.includes('<style>') && !/<link|src="http/.test(html));
@@ -653,12 +706,17 @@ try {
       const s = document.querySelector('#editor .shape.triangle');
       return {
         fill: s.style.getPropertyValue('--shape-fill'),
-        inset: getComputedStyle(s, '::before').inset,
+        clip: getComputedStyle(s, '::before').clipPath,
+        outerClip: getComputedStyle(s).clipPath,
         outline: getComputedStyle(s).backgroundColor,
       };
     });
+    // The fill is clipped to its OWN polygon, drawn parallel just inside the
+    // outer one. A box inset moves each edge perpendicular to the BOX, which on
+    // a diagonal is not perpendicular to the EDGE: the diamond came out heavier
+    // than the square and the triangle went thin at its point.
     check('the triangle is drawn with an outline layer under its fill',
-      shape.fill !== '' && shape.inset !== 'auto' && parseFloat(shape.inset) > 0,
+      shape.fill !== '' && shape.clip.startsWith('polygon') && shape.clip !== shape.outerClip,
       JSON.stringify(shape));
     check('and the shape bar can turn that outline off',
       await win.evaluate(() => !!document.querySelector('#shape-bar [data-shape="outline"]')));
@@ -956,12 +1014,14 @@ try {
       }));
     await win.keyboard.type('a much longer piece of text than this shape was ever sized for');
     await win.waitForTimeout(700);
+    const grew = await win.evaluate((was) => {
+      const s = document.querySelector('#editor .shape');
+      const t = s.querySelector('.shape-text');
+      return { was, h: s.offsetHeight, clientH: s.clientHeight, textH: t.offsetHeight,
+               editing: s.classList.contains('editing'), text: t.textContent.slice(0, 24) };
+    }, startedAt);
     check('and the shape grows until the text fits',
-      await win.evaluate((was) => {
-        const s = document.querySelector('#editor .shape');
-        const t = s.querySelector('.shape-text');
-        return s.offsetHeight > was && t.offsetHeight <= s.clientHeight;
-      }, startedAt));
+      grew.h > grew.was && grew.textH <= grew.clientH, JSON.stringify(grew));
   }
 
   // Printing has to put the note on the page, and nothing else.

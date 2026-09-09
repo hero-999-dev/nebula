@@ -126,6 +126,15 @@ export function migrateShapes(root, fitShape) {
       changed = true;
     }
 
+    // 0.6.9 — shapes can be turned, so every one needs the grip that turns it.
+    if (!shape.querySelector('.shape-rot')) {
+      const rot = shape.ownerDocument.createElement('span');
+      rot.className = 'shape-rot';
+      rot.setAttribute('title', 'Rotate');
+      shape.insertBefore(rot, shape.querySelector('.shape-h'));
+      changed = true;
+    }
+
     // 0.6.1 — the resize grip gained a tooltip.
     const grip = shape.querySelector('.shape-h');
     if (grip && !grip.getAttribute('title')) {

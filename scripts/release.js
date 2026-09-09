@@ -129,6 +129,25 @@ if (tryGit('rev-parse', '-q', '--verify', `refs/tags/${tag}`)) {
   }
 }
 
+/**
+ * The docs site prints `memory.currentPhase` as "Right now".
+ *
+ * Nobody was updating it, so the published page said the project was on v0.6.0
+ * for eight releases while every other version on it was correct — reported as
+ * "the site is still not up to date" twice before anyone found which line was
+ * wrong.
+ */
+{
+  const mem = JSON.parse(fs.readFileSync(path.join(ROOT, 'memory.json'), 'utf8'));
+  if (!String(mem.currentPhase ?? '').includes(version)) {
+    fail([
+      `memory.json currentPhase does not mention ${version}.`,
+      '  It is what the docs site prints as "Right now":',
+      `    ${String(mem.currentPhase ?? '(empty)').slice(0, 120)}`,
+    ].join('\n'));
+  }
+}
+
 console.log(`\nNebula ${pkg.version} -> ${version}${dryRun ? '   (dry run)' : ''}\n`);
 
 /* ------------------------------------------------- gates: tests and build */

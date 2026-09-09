@@ -59,6 +59,7 @@ export function makeShape(kind = 'rect', color = SHAPE_COLORS[0], at = null) {
   // contenteditable="false" until it is actually being edited: otherwise the
   // caret walks in from the paragraph next to it on an arrow key.
   el.innerHTML = '<div class="shape-text" contenteditable="false"><br></div>'
+    + '<span class="shape-rot" title="Rotate"></span>'
     + '<span class="shape-h" title="Resize"></span>';
   return el;
 }
@@ -143,6 +144,7 @@ export function initShapes(editorEl, { history } = {}) {
 
   editorEl.addEventListener('mousedown', (e) => {
     const handle = e.target.closest('.shape-h');
+    const rotator = e.target.closest('.shape-rot');
     let shape = e.target.closest('.shape');
     if (!shape) {
       // Nothing was hit directly. Before letting the click place a caret, check
@@ -167,7 +169,7 @@ export function initShapes(editorEl, { history } = {}) {
     // Only a shape that is BEING EDITED gives its click to the text. Otherwise
     // the whole body of the shape is a drag handle — the text used to cover it
     // completely, so a drag could only start from the 1.6px border.
-    if (shape.classList.contains('editing') && e.target.closest('.shape-text') && !handle) return;
+    if (shape.classList.contains('editing') && e.target.closest('.shape-text') && !handle && !rotator) return;
     e.preventDefault();
     // One snapshot for the whole gesture, taken before the first pixel moves.
     history?.push();
@@ -177,7 +179,11 @@ export function initShapes(editorEl, { history } = {}) {
       downX: e.clientX,
       downY: e.clientY,
       el: shape,
-      kind: handle ? 'resize' : 'move',
+      kind: rotator ? 'rotate' : (handle ? 'resize' : 'move'),
+      // Where the pointer started, as an angle, so the shape turns WITH the
+      // hand rather than snapping its corner to the cursor.
+      grabAngle: rotator ? angleTo(shape, e.clientX, e.clientY) : 0,
+      rot: rotationOf(shape),
       startX: e.clientX,
       startY: e.clientY,
       left: parseFloat(shape.style.left) || 0,
@@ -192,6 +198,16 @@ export function initShapes(editorEl, { history } = {}) {
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
     if (Math.abs(e.clientX - drag.downX) > 2 || Math.abs(e.clientY - drag.downY) > 2) drag.moved = true;
+    if (drag.kind === 'rotate') {
+      // Shift snaps to 15 degrees, the way every drawing tool does it.
+      let deg = drag.rot + (angleTo(drag.el, e.clientX, e.clientY) - drag.grabAngle);
+      if (e.shiftKey) deg = Math.round(deg / 15) * 15;
+      deg = Math.round(deg * 10) / 10;
+      drag.el.dataset.rot = String(deg);
+      drag.el.style.transform = deg ? `rotate(${deg}deg)` : '';
+      positionBar();
+      return;
+    }
     if (drag.kind === 'move') {
       // free movement across the whole note — only kept out of negative space
       drag.el.style.left = `${Math.max(0, drag.left + dx)}px`;
@@ -212,6 +228,17 @@ export function initShapes(editorEl, { history } = {}) {
     }
     positionBar();
   });
+
+  /** The angle from a shape's centre to a point, in degrees. */
+  function angleTo(shape, x, y) {
+    const r = shape.getBoundingClientRect();
+    return (Math.atan2(y - (r.top + r.height / 2), x - (r.left + r.width / 2)) * 180) / Math.PI;
+  }
+
+  /** What a shape is turned by right now. */
+  function rotationOf(shape) {
+    return Number(shape.dataset.rot || 0);
+  }
 
   window.addEventListener('mouseup', (e) => {
     if (!drag) return;

@@ -207,3 +207,79 @@ export const FORMATS = [
   { id: 'html', label: 'HTML (.html)', ext: 'html' },
   { id: 'pdf', label: 'PDF (.pdf)', ext: 'pdf' },
 ];
+
+/**
+ * A standalone document for the PDF writer.
+ *
+ * Exporting used to print the LIVE window, which forced a choice nobody should
+ * have to make. A page's margin band is filled by Chromium from a document
+ * background colour it captures once, at load, outside the print stylesheet —
+ * so on a dark-themed app `@page { margin: 12.7mm }` framed every page in
+ * violet, and the only way to a white sheet was `@page { margin: 0 }`, which
+ * cannot repeat a margin: the second page began at the paper's edge.
+ *
+ * A document that is white from the moment it loads has no such conflict. This
+ * builds one — the note, the app's own styles, and nothing else — for a hidden
+ * window to print.
+ *
+ * @param {{title?: string, body?: string, css?: string, margin?: string}} opts
+ */
+export function toPrintDocument({ title = 'Untitled', body = '', css = '', margin = '12.7mm' } = {}) {
+  const doc = parse(body);
+  // Nothing executable travels into the print window. It has JavaScript turned
+  // off as well; this is the belt to that pair of braces.
+  doc.body.querySelectorAll('script, iframe, object, embed, link, meta').forEach((el) => el.remove());
+  doc.body.querySelectorAll('*').forEach((el) => {
+    for (const attr of [...el.attributes]) {
+      if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
+    }
+    el.removeAttribute('contenteditable');
+  });
+  // The shape layer is positioned against the editor, and the resize grips and
+  // code-block buttons are controls, not content.
+  doc.body.querySelectorAll('.shape-h, .code-copy, .code-del, .code-hint').forEach((el) => el.remove());
+
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  return `<!doctype html>
+<html lang="en" data-theme="white">
+<head>
+<meta charset="utf-8">
+<title>${esc(title)}</title>
+<style>${css}</style>
+<style>
+  /* Last word, on purpose: the app's own print block zeroes the page margin
+     because it has to cover a dark sheet. This document is white to begin with,
+     so the margin can be a real page margin - which is the only kind that
+     repeats on every page. */
+  @page { size: A4; margin: ${margin}; }
+  html, body { background: #fff; margin: 0; padding: 0; }
+  body { color: #111; }
+  /* The colours in a note are the note. Chromium drops backgrounds when
+     printing unless told they are content, not decoration. */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  h1, h2, h3 { break-after: avoid; page-break-after: avoid; }
+  .blk-code, .shape { break-inside: avoid; page-break-inside: avoid; }
+  p, li, blockquote { orphans: 2; widows: 2; }
+  .print-title {
+    margin: 0 0 6mm;
+    font-size: 22pt;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .editor {
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+  .shape-layer { position: relative; }
+</style>
+</head>
+<body>
+<div class="print-title">${esc(title)}</div>
+<div class="editor">${doc.body.innerHTML}</div>
+</body>
+</html>`;
+}

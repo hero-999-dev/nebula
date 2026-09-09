@@ -226,7 +226,17 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    Draw markers as `::before` in a fixed column.
 33. **Padding on an inline changes the layout of the line.** A highlight needs
    a matching negative margin or every following word moves.
-34. **Anything written into a note's markup is frozen in old notes.** The
+34. **The PDF is printed from a hidden window, not the live one**
+   (`withPrintWindow` in electron/main.js, `toPrintDocument` in export.js). A
+   page's margin band takes a document background colour captured at load, so
+   only a document that is white from the start can have real page margins.
+35. **Chromium takes a non-editable island with Backspace.** Guard every
+   delete key against removing a `.shape-layer`.
+36. **A box inset is not a parallel line on a diagonal.** Clip a shape's fill
+   to its own inner polygon, or the diamond looks heavy and the triangle thin.
+37. **`memory.currentPhase` is what the docs site prints as "Right now".**
+   `npm run push` fails if it does not name the version being released.
+38. **Anything written into a note's markup is frozen in old notes.** The
    code block's ✕ is created with the block, so blocks written before it existed
    never got one — `paintAllCode` tops the header up on every load. Any new
    in-note control needs the same treatment.

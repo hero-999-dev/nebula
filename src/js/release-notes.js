@@ -13,6 +13,42 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.6.9': {
+    headline: 'Shapes you can turn, and an export with margins on every page.',
+    items: [
+      {
+        title: 'Shapes rotate',
+        text: 'A second grip at the bottom-left turns the shape; hold Shift to '
+          + 'snap to fifteen degrees.',
+      },
+      {
+        title: 'The shape menu shows the shapes',
+        text: 'Each row is drawn as the shape it makes, in the same line weight, '
+          + 'instead of the nearest character a font happened to have.',
+      },
+      {
+        title: 'One line weight for every shape',
+        text: 'The diamond read as heavier than the square and the triangle went '
+          + 'thin at its point, because the outline was a box inset rather than a '
+          + 'line drawn parallel to each edge.',
+      },
+      {
+        title: 'Backspace cannot swallow your shapes',
+        text: 'Pressing it beside a shape layer removed every shape in the note '
+          + 'in one keystroke.',
+      },
+      {
+        title: 'Exported pages keep their margins',
+        text: 'All four 1.27 cm margins now hold on every page, not only the '
+          + 'first. The note is printed as a document of its own rather than as a '
+          + 'picture of the window.',
+      },
+      {
+        title: 'The website says what this build is',
+        text: 'Its "Right now" line had been stuck several releases back.',
+      },
+    ],
+  },
   '0.6.8': {
     headline: 'Lists that line up, Enter in code blocks, and a clean page edge.',
     items: [

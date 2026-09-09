@@ -399,7 +399,50 @@ function registerShellHandlers() {
    * the app. This is the same Skia writer Notion's export goes through, so the
    * text stays text and stays selectable.
    */
-  ipcMain.handle('note:pdf', async (e, { suggested } = {}) => {
+  /**
+   * Render a standalone document in a window of its own and print it.
+   *
+   * Printing the live window forced a choice between a white sheet and margins
+   * that repeat: Chromium fills a page's margin band from a document background
+   * colour captured once at load, outside the print stylesheet, so a dark app
+   * framed every page. `@page { margin: 0 }` was the only way to a clean sheet,
+   * and a page margin is the only kind that repeats.
+   *
+   * A document that is white from the moment it loads has neither problem. It
+   * gets no preload, no Node and no JavaScript at all — it is the user's own
+   * note, but it is also markup being handed to a fresh renderer, and this one
+   * has nothing to offer it.
+   */
+  async function withPrintWindow(html, run) {
+    const dir = await fs.mkdtemp(path.join(app.getPath('temp'), 'nebula-print-'));
+    const file = path.join(dir, 'note.html');
+    await fs.writeFile(file, html, 'utf8');
+    const win = new BrowserWindow({
+      show: false,
+      width: 900,
+      height: 1200,
+      backgroundColor: '#FFFFFF',
+      webPreferences: {
+        javascript: false,
+        sandbox: true,
+        contextIsolation: true,
+        nodeIntegration: false,
+        webSecurity: true,
+      },
+    });
+    try {
+      await win.loadFile(file);
+      // Web fonts (KaTeX) and the first layout; printing before they land gives
+      // a page set in fallback faces.
+      await new Promise((resolve) => { setTimeout(resolve, 350); });
+      return await run(win);
+    } finally {
+      try { win.destroy(); } catch { /* already gone */ }
+      try { await fs.rm(dir, { recursive: true, force: true }); } catch { /* leave it */ }
+    }
+  }
+
+  ipcMain.handle('note:pdf', async (e, { suggested, document: html } = {}) => {
     const win = from(e);
     if (!win) return { ok: false };
     const { canceled, filePath } = await dialog.showSaveDialog(win, {
@@ -408,39 +451,29 @@ function registerShellHandlers() {
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
     });
     if (canceled || !filePath) return { ok: false, canceled: true };
-    // The base background colour paints under everything and fills whatever the
-    // page box does not cover — a hairline at the sheet's edge once the margin
-    // band is gone. Nothing is transparent on screen, so swapping it to white
-    // for the length of the export is invisible and leaves no colour that can
-    // show through at all.
-    // No background-colour dance here. `webContents.setBackgroundColor` does not
-    // exist in this Electron, and `BrowserWindow.setBackgroundColor` was
-    // measured to have no effect on printToPDF at all. The sheet is covered by
-    // the print stylesheet instead — see `@page` in editor.css.
+
+    const options = {
+      // The note's own frame and code-block fills are part of how it reads.
+      printBackground: true,
+      pageSize: 'A4',
+      // The page box comes from the document's own `@page`, exactly. Without
+      // this Chromium rounds it — the sheet came out 795x1124 while the page box
+      // was 794x1123 offset by a pixel, leaving a 0.75pt strip of the document's
+      // background along the top edge of every page.
+      preferCSSPageSize: true,
+    };
     try {
-      // printBackground: the note's own frame and code-block fills are part of
-      // how it reads; the print stylesheet already flattens the theme to paper.
-      const data = await win.webContents.printToPDF({
-        printBackground: true,
-        // No margin BAND. Chromium fills a page's margin area with the view's
-        // base background colour and paints no CSS background into it — so a
-        // default-margin export came out as a white page inside a dark purple
-        // frame (#17122A, this window's own backgroundColor) and no amount of
-        // print CSS could reach it. With the margin at zero the whole sheet is
-        // the page box, the print stylesheet's white covers it edge to edge,
-        // and the margins are drawn as padding where they can be controlled.
-        margins: { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 },
-        pageSize: 'A4',
-        // Take the page box from the stylesheet's own `@page`, exactly.
-        // Without this Chromium rounds it: the sheet came out 795x1124 while
-        // the page box was 794x1123 offset by one pixel, leaving a 0.75pt strip
-        // of the document's background colour along the top edge — the "dark
-        // straight line still at the very top" of every export. With it the
-        // white covers the sheet corner to corner.
-        preferCSSPageSize: true,
-      });
+      // A whole document, printed in a window of its own. Falling back to the
+      // live window keeps the export working if the renderer is too old to send
+      // one — it just loses the repeating margins.
+      const data = html
+        ? await withPrintWindow(html, (w) => w.webContents.printToPDF(options))
+        : await win.webContents.printToPDF(options);
       await fs.writeFile(filePath, data);
-      return { ok: true, path: filePath, bytes: data.length };
+      // `via` says which path produced it: the note's own white document, or
+      // the live window as a fallback. Worth having in the return value — the
+      // two differ in exactly the way that is hard to see from the outside.
+      return { ok: true, path: filePath, bytes: data.length, via: html ? 'document' : 'window' };
     } catch (err) {
       return { ok: false, error: err.message };
     }

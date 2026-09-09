@@ -455,9 +455,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  /* The language picker lines up with the code under it rather than sitting
-     further in than everything else in the block. */
-  padding: 5px 8px 5px 4px;
+  /* Back off the edge: flush with the code under it read as crowded against
+     the block's own border. */
+  padding: 5px 8px 5px 12px;
   border-bottom: 1px solid var(--rule);
   background: var(--paper-raised);
 }
@@ -583,16 +583,29 @@
 }
 .shape.diamond { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .shape.triangle { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+/* The fill is clipped to its OWN polygon, drawn just inside the outer one —
+   not to a box inset of the same shape.
+   A box inset moves each edge perpendicular to the BOX, and on a diagonal that
+   is not the same as moving it perpendicular to the EDGE: the diamond came out
+   a touch thicker than the square and the triangle's line went uneven, thin at
+   the apex where the inset degenerates. Two parallel polygons give one even
+   line, the same weight as the 1.6px border the other kinds carry. */
 .shape.diamond::before, .shape.triangle::before {
   content: '';
   position: absolute;
-  inset: 2.4px;
-  clip-path: inherit;
+  inset: 0;
   background: var(--shape-fill, #E8CDBD);
   pointer-events: none;
 }
+.shape.diamond::before {
+  clip-path: polygon(50% 3.2%, 96.8% 50%, 50% 96.8%, 3.2% 50%);
+}
+.shape.triangle::before {
+  clip-path: polygon(50% 5%, 95.5% 96.4%, 4.5% 96.4%);
+}
 /* Outline off: the fill runs to the edge and there is nothing left to show. */
-.shape.diamond.no-outline::before, .shape.triangle.no-outline::before { inset: 0; }
+.shape.diamond.no-outline::before { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.shape.triangle.no-outline::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
 .shape.no-outline { border-color: transparent; }
 .shape.triangle .shape-text, .shape.diamond .shape-text { position: relative; z-index: 1; }
 .shape.diamond .shape-text { max-width: 55%; }
@@ -641,6 +654,28 @@
   cursor: nwse-resize;
 }
 .shape.diamond .shape-h { right: calc(50% - 6px); bottom: 2px; }
+
+/* Turn the shape. Bottom-left, opposite the resize grip at the bottom-right,
+   so the two are never mistaken for each other. */
+.shape-rot { display: none; }
+.shape.sel .shape-rot { display: block; }
+.shape-rot {
+  position: absolute;
+  left: -1px; bottom: -1px;
+  width: 12px; height: 12px;
+  background: var(--clay);
+  border-radius: 0 3px 0 0;
+  cursor: crosshair;
+}
+.shape-rot::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1.5px solid var(--paper-sunken);
+  border-right-color: transparent;
+  border-radius: 50%;
+}
+.shape.diamond .shape-rot { left: calc(50% - 6px); top: 2px; bottom: auto; }
 
 .shape-bar {
   position: fixed;
@@ -1103,15 +1138,15 @@ body.resizing webview { pointer-events: none; }
   gap: 8px;
   text-align: left;
 }
-/* Filled marks in full-strength ink: the outlined glyphs were hairlines at
-   14px and read as smudges next to the names. */
+/* Each row shows the shape it makes, drawn the way the shape is drawn — a
+   1.6px outline, the same weight the real one carries. Unicode glyphs were
+   never the right silhouette and were hairlines at this size. */
 .tb-menu--shapes .sh-mark {
-  font-size: 13px;
-  line-height: 1;
-  text-align: center;
+  display: grid;
+  place-items: center;
   color: var(--ink);
-  font-weight: 700;
 }
+.tb-menu--shapes .sh-mark svg { display: block; }
 
 /* What the size box is about to change, kept visible while it has focus. */
 ::highlight(nebula-size-target) {

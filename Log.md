@@ -26,6 +26,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-09 21:34] v0.6.9 - by claude
+
+printed as a document, and shapes you can turn
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-09 18:25] v0.6.8 - by claude
 
 the page edge, and lists that line up
