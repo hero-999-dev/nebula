@@ -111,9 +111,24 @@ describe('the notes that actually ship', () => {
     }
   });
 
-  it('has notes for the version in package.json, so a release says something', async () => {
-    const pkg = await import('../package.json', { with: { type: 'json' } });
-    const version = pkg.default.version;
-    expect(Object.keys(RELEASE_NOTES), `no notes written for ${version}`).toContain(version);
+  /**
+   * NOT "the version in package.json has notes".
+   *
+   * The suite runs BEFORE `npm run push` bumps the version, so at that moment
+   * package.json still names the release that just shipped while the notes have
+   * already moved on to the one being prepared — which failed a release on a
+   * rule that cannot hold. The version about to ship is checked where it is
+   * actually known: `scripts/release.js`, against the bumped number.
+   */
+  it('is a map of versions to notes, newest first in the file', () => {
+    const keys = Object.keys(RELEASE_NOTES);
+    expect(keys.length).toBeGreaterThan(0);
+    for (const k of keys) expect(k, k).toMatch(/^\d+\.\d+\.\d+$/);
+    const sorted = [...keys].sort((a, b) => {
+      const pa = a.split('.').map(Number); const pb = b.split('.').map(Number);
+      for (let i = 0; i < 3; i += 1) if (pa[i] !== pb[i]) return pb[i] - pa[i];
+      return 0;
+    });
+    expect(keys).toEqual(sorted);
   });
 });

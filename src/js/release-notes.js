@@ -13,7 +13,7 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
-  '0.6.5': {
+  '0.6.6': {
     headline: 'Switches that switch off, and one typeface for the whole app.',
     items: [
       {
