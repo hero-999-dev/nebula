@@ -13,7 +13,7 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
-  '0.6.6': {
+  '0.6.7': {
     headline: 'Switches that switch off, and one typeface for the whole app.',
     items: [
       {
@@ -51,8 +51,8 @@ export const RELEASE_NOTES = {
       {
         title: 'Opening it on a Mac',
         text: 'macOS says it cannot verify the app, because registering with Apple '
-          + 'costs money. The release page now says exactly which two clicks get '
-          + 'past it, and the app is signed so macOS never calls it damaged.',
+          + 'costs money and Nebula is not registered. The release page now names '
+          + 'exactly which two clicks get past the dialog — you do it once.',
       },
     ],
   },

@@ -142,11 +142,22 @@ the tags. `cmd()` resets it.
 
 **macOS.** The reported message is *"Apple konnte nicht überprüfen, ob Nebula
 frei von Schadsoftware ist"* — that is **notarization**, not a broken download,
-and removing it needs a paid Developer ID. What could be done was done: the app
-is ad-hoc signed in `build/after-pack.cjs`, so macOS never escalates to calling
-it *damaged* (an unsigned arm64 binary will not load at all), and the release
-page now names the two ways past the dialog instead of the right-click that
-newer macOS no longer honours.
+and removing it needs a paid Developer ID. The release page now names the two
+ways past the dialog, instead of the right-click that newer macOS no longer
+honours.
+
+An ad-hoc `codesign` hook was written first, on the theory that an unsigned
+arm64 binary would be reported as *damaged*. It was wrong twice over and both
+mistakes cost a release. The first cost one because an unknown key was added
+inside `build.mac`, which electron-builder validates strictly — the config error
+failed the Windows build too, and it would have been caught by running
+`npx electron-builder --dir` locally, which is now the habit. The second was the
+hook itself: `afterPack` runs once per architecture, and two independently
+signed halves cannot be merged into a universal binary
+(*"expected all non-binary files to have identical SHAs"*). It was also
+unnecessary — electron-builder already signs the frameworks, which is why the
+Mac that reported this got the notarization dialog rather than a refusal. The
+hook is gone.
 
 ### [2026-09-09] v0.6.4 - reproduced against the note that reported it
 
