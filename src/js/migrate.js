@@ -171,9 +171,23 @@ export function migrateShapes(root, fitShape) {
 export function migrateBlankLines(root) {
   let touched = 0;
   for (const el of root.querySelectorAll('p, div, h1, h2, h3, h4, li, blockquote')) {
-    if (el.children.length || el.textContent.length) continue;
     if (el.closest('.blk-code, .shape-layer, .code-head')) continue;
     if (el.classList.contains('shape-text')) continue;
+    if (el.textContent.length) continue;                 // it has words
+    if (el.querySelector('br') && el.children.length === 1) continue;   // already blank
+    if (el.querySelector('img, hr, .blk-code, .inline-eq, .shape-layer')) continue;
+
+    // Everything inside is empty formatting. Clear it and leave one <br>.
+    //
+    // A line that LOOKS blank was often three nested empty spans —
+    // `<p class="h-blue"><span class="u-single"><span class="h-blue">
+    // <span class="c-red"></span></span></span></p>` — left behind by applying
+    // a style and then deleting the words under it. Two things follow from
+    // that, and both were reported: the caret lands inside a stub four pixels
+    // wide and is impossible to see, and anything typed there comes out
+    // underlined, highlighted AND red, because that is what the caret is
+    // standing in.
+    el.textContent = '';
     el.appendChild(el.ownerDocument.createElement('br'));
     touched += 1;
   }

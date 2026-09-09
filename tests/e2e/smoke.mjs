@@ -431,7 +431,12 @@ try {
         document.querySelector('[data-menu="menu-export"]').click();
         [...document.querySelectorAll('#menu-export button')].find((b) => b.dataset.format === f).click();
       }, fmt);
-      await win.waitForTimeout(1600);
+      // Wait for the FILE, not for a guess. The PDF is rendered in a window of
+      // its own now — loaded, given a moment for its web fonts, then printed —
+      // so a fixed wait that was comfortable before is not any more.
+      const target = path.join(outDir, `My Report.${fmt}`);
+      for (let i = 0; i < 60 && !fs.existsSync(target); i += 1) await win.waitForTimeout(200);
+      await win.waitForTimeout(200);
     }
 
     const written = fs.readdirSync(outDir).filter((f) => f !== 'incoming.md').sort();

@@ -1055,6 +1055,41 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       }
     }
 
+    /**
+     * A divider takes two presses: the first one arms it, the second removes it.
+     *
+     * One press deleted it the moment the caret reached the line under it,
+     * which is the opposite of what is wanted — "I want to get CLOSE to the
+     * divider and push the block up under it; right now the space above just
+     * stays empty". Arming it shows what the next press will take.
+     */
+    if (!mod && e.key === 'Backspace') {
+      const sel = window.getSelection();
+      const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+      if (range && range.collapsed && range.startOffset === 0 && editorEl.contains(range.startContainer)) {
+        let el = range.startContainer;
+        if (el.nodeType !== Node.ELEMENT_NODE) el = el.parentElement;
+        while (el && el.parentElement !== editorEl) el = el.parentElement;
+        const prev = el?.previousElementSibling;
+        if (prev?.classList?.contains('blk-hr')) {
+          e.preventDefault();
+          if (prev.classList.contains('armed')) {
+            history?.push();
+            prev.remove();
+            dirty();
+          } else {
+            editorEl.querySelectorAll('.blk-hr.armed').forEach((h) => h.classList.remove('armed'));
+            prev.classList.add('armed');
+          }
+          return;
+        }
+      }
+    }
+    // Any other key means the divider was not what they were after.
+    if (e.key !== 'Backspace') {
+      editorEl.querySelectorAll('.blk-hr.armed').forEach((h) => h.classList.remove('armed'));
+    }
+
     if (!mod && e.key === 'Backspace') {
       if (backspaceOutOfWrapper(editorEl, window.getSelection())) {
         e.preventDefault();

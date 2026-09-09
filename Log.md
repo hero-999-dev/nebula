@@ -27,6 +27,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-09 22:48] v0.6.10 - by claude
+
+a blank line that is really blank
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-09 21:34] v0.6.9 - by claude
 
 printed as a document, and shapes you can turn

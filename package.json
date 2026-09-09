@@ -1,6 +1,6 @@
 {
   "name": "nebula",
-  "version": "0.6.9",
+  "version": "0.6.10",
   "description": "Nebula — calm notes with a real editor: movable editing bar, line icons, markdown code blocks with syntax colors, free-floating shapes, AI panel with tabs.",
   "main": "dist-electron/main.js",
   "type": "module",

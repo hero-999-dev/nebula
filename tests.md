@@ -4,7 +4,7 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 300 passing — `npm test` (Vitest, jsdom) |
+| **Unit** | 303 passing — `npm test` (Vitest, jsdom) |
 | **Electron smoke** | 152 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
@@ -21,7 +21,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/notes.test.js` | 20 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body, and adds the guide to an older vault exactly once without touching what is there |
 | `tests/editor.test.js` | 41 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and the guide note's completeness |
 | `tests/lists.test.js` | 30 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
-| `tests/migrate.test.js` | 27 | Bringing a stored note up to what this version writes |
+| `tests/migrate.test.js` | 30 | Bringing a stored note up to what this version writes |
 | `tests/release-notes.test.js` | 17 | What each release says for itself |
 | `tests/inline-format.test.js` | 18 | Enter and Backspace out of an inline wrapper |
 | `tests/highlight.test.js` | 14 | Per-language tokens, and that only SQL is case-insensitive |
@@ -84,6 +84,45 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-09] v0.6.10 - a blank line that is really blank
+
+**Unit 300 -> 303, smoke 152.**
+
+**"From here down, five lines, the cursor does not show" — and, in the same
+breath, "underline gets in, something silly happens".** One cause. Those lines
+were
+
+    <p class="h-blue"><span class="u-single"><span class="h-blue">
+      <span class="c-red"></span></span></span></p>
+
+— a style applied, then the words under it deleted, leaving the wrappers. Two
+things follow and the user reported both: the caret lands inside a stub four
+pixels wide against the highlight it is standing in, and anything typed there
+comes out underlined, highlighted AND red, because that is what the caret is
+inside. `migrateBlankLines` used to skip these — it only emptied a block with no
+children at all, and these have three. A line with no text is now cleared to a
+single `<br>`, keeping the block's own class so the line itself is unchanged.
+
+**The AI panel would not stop resizing.** It holds a `<webview>`, which is a
+view of its own: the moment the pointer crossed into it the host renderer
+stopped receiving `mousemove` and `mouseup` entirely, so the drag never ended.
+Pointer events with capture, a pointer-events shield over the guest while
+dragging, and `blur` as a last resort.
+
+**The shape outlines were set in percentages,** so they scaled with the shape —
+the rule that looked like a hairline on a small diamond drew a four-pixel band
+on a 150x90 one. Reported twice as "still not fixed", and correctly: 0.6.9
+changed how the line was drawn without changing that it grew. Pixels now.
+
+**A divider takes two presses.** One press deleted it as soon as the caret
+reached the line beneath, which is the opposite of "I want to get CLOSE to the
+divider". The first press arms it and shows what the next one will take.
+
+**Checked and already right:** the shape menu does carry both a drawing of each
+shape and its name, and the code block's language picker had moved — it is
+lined up with the code inside the `<pre>` now rather than with the block's outer
+edge, which is what made it look left of everything under it.
 
 ### [2026-09-09] v0.6.9 - printed as a document, and shapes you can turn
 

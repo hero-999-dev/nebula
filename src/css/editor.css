@@ -455,9 +455,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  /* Back off the edge: flush with the code under it read as crowded against
-     the block's own border. */
-  padding: 5px 8px 5px 12px;
+  /* Lined up with the code itself, which sits inside the <pre>'s own padding —
+     matching the block's outer edge put the picker visibly left of everything
+     under it. */
+  padding: 5px 8px 5px 14px;
   border-bottom: 1px solid var(--rule);
   background: var(--paper-raised);
 }
@@ -597,11 +598,24 @@
   background: var(--shape-fill, #E8CDBD);
   pointer-events: none;
 }
+/* In PIXELS, not percentages. A percentage inset scales with the shape, so the
+   same rule that looked like a hairline on a small diamond drew a four-pixel
+   band on a 150x90 one — "the triangle's edge is not a clean line, the diamond
+   is a touch thick, make them all the weight of the square". 2.2px along the
+   axes is about 1.6px measured across a 45-degree edge, which is the border the
+   other kinds carry. */
 .shape.diamond::before {
-  clip-path: polygon(50% 3.2%, 96.8% 50%, 50% 96.8%, 3.2% 50%);
+  clip-path: polygon(
+    50% 2.2px,
+    calc(100% - 2.2px) 50%,
+    50% calc(100% - 2.2px),
+    2.2px 50%);
 }
 .shape.triangle::before {
-  clip-path: polygon(50% 5%, 95.5% 96.4%, 4.5% 96.4%);
+  clip-path: polygon(
+    50% 3.4px,
+    calc(100% - 2.6px) calc(100% - 1.7px),
+    2.6px calc(100% - 1.7px));
 }
 /* Outline off: the fill runs to the edge and there is nothing left to show. */
 .shape.diamond.no-outline::before { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
@@ -1152,4 +1166,18 @@ body.resizing webview { pointer-events: none; }
 ::highlight(nebula-size-target) {
   background: var(--clay-soft);
   color: var(--ink);
+}
+
+/* While the AI panel is being resized, nothing else takes the pointer.
+   The panel holds a <webview>, which is a separate view: once the pointer
+   crossed into it the host stopped seeing mousemove and mouseup entirely, so
+   the drag never ended and the panel kept growing until it was clicked again. */
+body.resizing .ai-body,
+body.resizing webview { pointer-events: none !important; }
+body.resizing { cursor: col-resize; user-select: none; }
+
+/* Armed by the first Backspace against it; the next press takes it. */
+.blk-hr.armed {
+  border-color: var(--clay) !important;
+  box-shadow: 0 0 0 2px var(--clay-soft);
 }

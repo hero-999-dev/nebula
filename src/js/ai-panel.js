@@ -183,19 +183,42 @@ export function initAiPanel({ askText } = {}) {
   // drag the left edge to resize
   const grip = document.getElementById('ai-resize');
   if (grip) {
+    /**
+     * Pointer events with capture, not mouse events on the window.
+     *
+     * The panel holds a `<webview>`, which is a view of its own: the moment the
+     * pointer crossed into it the host renderer stopped seeing `mousemove` and
+     * `mouseup` at all, so `dragging` stayed true and the panel went on
+     * resizing after the button was released — "I let go and it keeps growing,
+     * I have to click again". Capture routes every pointer event back to the
+     * grip whatever it passes over, and the shield in the stylesheet takes the
+     * guest out of the way as well.
+     */
     let dragging = false;
-    grip.addEventListener('mousedown', (e) => { e.preventDefault(); dragging = true; document.body.classList.add('resizing'); });
-    window.addEventListener('mousemove', (e) => {
-      if (!dragging) return;
-      const w = Math.min(900, Math.max(280, window.innerWidth - e.clientX));
-      panel.style.width = `${w}px`;
-    });
-    window.addEventListener('mouseup', () => {
+    const stop = () => {
       if (!dragging) return;
       dragging = false;
       document.body.classList.remove('resizing');
-      localStorage.setItem(WIDTH_KEY, String(parseInt(panel.style.width, 10) || 360));
+      try {
+        localStorage.setItem(WIDTH_KEY, String(parseInt(panel.style.width, 10) || 360));
+      } catch { /* private mode */ }
+    };
+
+    grip.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      dragging = true;
+      document.body.classList.add('resizing');
+      try { grip.setPointerCapture(e.pointerId); } catch { /* no capture; the shield still helps */ }
     });
+    grip.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      panel.style.width = `${Math.min(900, Math.max(280, window.innerWidth - e.clientX))}px`;
+    });
+    grip.addEventListener('pointerup', stop);
+    grip.addEventListener('pointercancel', stop);
+    // Belt to that brace: a release the grip never sees still ends the drag.
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('blur', stop);
   }
 
   renderTabs();

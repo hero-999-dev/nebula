@@ -1,8 +1,8 @@
 {
   "projectName": "Nebula",
-  "version": "0.6.9",
+  "version": "0.6.10",
   "lastUpdated": "2026-09-09",
-  "currentPhase": "v0.6.9 - the editor turned over to what the bug reports actually say: selection-only formatting, lists whose markers line up, code blocks that take Enter, shapes that rotate and cannot be shrunk into hiding their text, and an export printed as its own white document so every page keeps its 1.27cm margins.",
+  "currentPhase": "v0.6.10 - a line cleared of its words is cleared of its formatting too, the AI panel stops resizing when the button is released, shape outlines hold one line weight at every size, and a divider takes two presses to remove.",
   "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, search, i18n.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
@@ -31,7 +31,7 @@
     "releasePolicy": "Standing instruction (2026-09-07): release finished work with npm run push without being asked, and never ask which platforms to build - the repo is public, so Actions is free on both Windows and macOS runners. npm run push also refreshes Nebula Test.exe in the project root."
   },
   "quality": {
-    "unitTests": 300,
+    "unitTests": 303,
     "smokeChecks": 152,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
@@ -72,7 +72,10 @@
     "::marker is right-aligned in list-style-position: outside — a bullet and a number start at different x however well the text aligns. Draw markers as ::before in a fixed column.",
     "The PDF export is printed from a hidden window loading a standalone white document; only that gives real @page margins on every page.",
     "Every delete key must refuse when a .shape-layer is what would go — Chromium removes a non-editable island whole.",
-    "memory.currentPhase is what the docs site prints as 'Right now'; the release fails if it does not name the shipping version."
+    "memory.currentPhase is what the docs site prints as 'Right now'; the release fails if it does not name the shipping version.",
+    "A <webview> is a separate view: the host stops receiving mousemove/mouseup once the pointer crosses into it. Drag with pointer capture plus a pointer-events shield.",
+    "A block whose text is empty but which still holds formatting wrappers is not blank: the caret hides in a few-pixel stub and typing inherits the style. migrateBlankLines clears it.",
+    "Shape outline geometry must be in px, not %, or it scales with the shape."
   ],
   "history": [
     {

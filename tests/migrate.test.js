@@ -202,6 +202,30 @@ describe('migrateBlankLines', () => {
     expect(migrateBlankLines(el)).toBe(0);
   });
 
+  it('empties a line that is nothing but empty formatting', () => {
+    // Applying a style and then deleting the words under it leaves the
+    // wrappers. The caret lands in a stub four pixels wide, impossible to see,
+    // and anything typed there comes out underlined, highlighted AND red.
+    const el = root('<p class="h-blue"><span class="u-single">'
+      + '<span class="h-blue"><span class="c-red"></span></span></span></p>');
+    expect(migrateBlankLines(el)).toBe(1);
+    expect(el.querySelector('p').innerHTML).toBe('<br>');
+    expect(el.querySelector('p').className).toBe('h-blue');   // the line keeps its own style
+  });
+
+  it('never empties a line that has words in it', () => {
+    const html = '<p><span class="c-red">words</span></p>';
+    const el = root(html);
+    expect(migrateBlankLines(el)).toBe(0);
+    expect(el.innerHTML).toBe(html);
+  });
+
+  it('leaves a line holding a divider or an equation alone', () => {
+    const el = root('<div><hr class="blk-hr"></div>'
+      + '<p><span class="inline-eq" data-tex="x"></span></p>');
+    expect(migrateBlankLines(el)).toBe(0);
+  });
+
   it('never reaches into a code block or a shape layer', () => {
     const html = '<div class="blk-code"><pre class="code-body"><code class="code-src"></code></pre></div>'
       + '<div class="shape-layer"><div class="shape"><div class="shape-text"></div></div></div>';

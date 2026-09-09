@@ -13,6 +13,37 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.6.10': {
+    headline: 'Blank lines that are really blank, and a resize that stops.',
+    items: [
+      {
+        title: 'Blank lines behave again',
+        text: 'A line you cleared kept the underline, highlight and colour it '
+          + 'used to carry, as empty wrappers a few pixels wide. The cursor '
+          + 'vanished inside them and anything typed there came out formatted. '
+          + 'They are emptied when the note opens.',
+      },
+      {
+        title: 'The AI panel stops resizing when you let go',
+        text: 'Dragging its edge over the panel itself meant the release was '
+          + 'never seen, so it kept growing until you clicked again.',
+      },
+      {
+        title: 'One line weight for every shape, at every size',
+        text: 'The diamond and triangle outlines were set as a percentage, so '
+          + 'they grew thicker as the shape did.',
+      },
+      {
+        title: 'A divider takes two presses',
+        text: 'The first highlights it, the second removes it — so you can bring '
+          + 'a block up close to a divider without losing it.',
+      },
+      {
+        title: 'The code block language sits with the code',
+        text: 'It was lined up with the block edge instead.',
+      },
+    ],
+  },
   '0.6.9': {
     headline: 'Shapes you can turn, and an export with margins on every page.',
     items: [
