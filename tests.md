@@ -5,7 +5,7 @@ What is tested, what each test proves, and what is knowingly untested.
 | | |
 |---|---|
 | **Unit** | 303 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 152 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Electron smoke** | 153 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -35,7 +35,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
 | `tests/export.test.js` | 18 | A note as Markdown or as a standalone HTML file |
 | `tests/import.test.js` | 18 | A Markdown or HTML file read back as a note, sanitised |
-| `tests/e2e/smoke.mjs` | 152 | The real app, six launches |
+| `tests/e2e/smoke.mjs` | 153 | The real app, six launches |
 
 ---
 
@@ -85,7 +85,7 @@ added** · the vault is left exactly as it was.
 
 ## Log
 
-### [2026-09-09] v0.6.10 - a blank line that is really blank
+### [2026-09-09] v0.7.0 - a blank line that is really blank
 
 **Unit 300 -> 303, smoke 152.**
 
@@ -118,6 +118,13 @@ changed how the line was drawn without changing that it grew. Pixels now.
 **A divider takes two presses.** One press deleted it as soon as the caret
 reached the line beneath, which is the opposite of "I want to get CLOSE to the
 divider". The first press arms it and shows what the next one will take.
+
+**A shape could drag the bottom of the note with it.** It is absolutely
+positioned, so dragging one past the last paragraph grew the editor's scroll
+height to reach it — measured going 1033 -> 2610 across one drag — and shrank it
+again on the way home, which is the bottom edge moving under your hand. A shape
+is clamped to the note's own extent now, measured once before the drag so the
+limit cannot chase its own tail.
 
 **Checked and already right:** the shape menu does carry both a drawing of each
 shape and its name, and the code block's language picker had moved — it is

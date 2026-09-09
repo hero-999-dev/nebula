@@ -998,6 +998,35 @@ try {
       }));
   }
 
+  /**
+   * A shape cannot drag the bottom of the note around with it.
+   *
+   * It is absolutely positioned, so dragging one past the last paragraph grew
+   * the editor's scroll height to reach it: the note's bottom edge followed
+   * the shape down and snapped back up on the way home.
+   */
+  {
+    await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p>line</p>'.repeat(25);
+      ed.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await press(win, '[data-shape-add=rect]');
+    await win.waitForTimeout(400);
+    const before = await win.evaluate(() => document.getElementById('editor').scrollHeight);
+    const at = await win.evaluate(() => {
+      const r = document.querySelector('#editor .shape').getBoundingClientRect();
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+    });
+    await win.mouse.move(at.x, at.y);
+    await win.mouse.down();
+    for (let i = 1; i <= 20; i += 1) await win.mouse.move(at.x, at.y + i * 80);
+    await win.mouse.up();
+    await win.waitForTimeout(250);
+    const after = await win.evaluate(() => document.getElementById('editor').scrollHeight);
+    check('dragging a shape down does not stretch the note', after === before,
+      `${before} -> ${after}`);
+  }
   // A shape's text: a caret to see, and room to grow into.
   {
     await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>x</p>'; });

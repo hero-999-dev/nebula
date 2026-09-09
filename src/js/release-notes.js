@@ -13,7 +13,7 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
-  '0.6.10': {
+  '0.7.0': {
     headline: 'Blank lines that are really blank, and a resize that stops.',
     items: [
       {
@@ -41,6 +41,11 @@ export const RELEASE_NOTES = {
       {
         title: 'The code block language sits with the code',
         text: 'It was lined up with the block edge instead.',
+      },
+      {
+        title: 'A shape stays inside the note',
+        text: 'Dragging one below the last paragraph used to pull the bottom of '
+          + 'the note down with it, and shove it back up on the way home.',
       },
     ],
   },

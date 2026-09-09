@@ -1,8 +1,8 @@
 {
   "projectName": "Nebula",
-  "version": "0.6.10",
+  "version": "0.7.0",
   "lastUpdated": "2026-09-09",
-  "currentPhase": "v0.6.10 - a line cleared of its words is cleared of its formatting too, the AI panel stops resizing when the button is released, shape outlines hold one line weight at every size, and a divider takes two presses to remove.",
+  "currentPhase": "v0.7.0 - a line cleared of its words is cleared of its formatting too, the AI panel stops resizing when the button is released, shape outlines hold one line weight at every size, a shape cannot drag the bottom of the note with it, and a divider takes two presses.",
   "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, search, i18n.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
@@ -32,7 +32,7 @@
   },
   "quality": {
     "unitTests": 303,
-    "smokeChecks": 152,
+    "smokeChecks": 153,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
@@ -75,7 +75,8 @@
     "memory.currentPhase is what the docs site prints as 'Right now'; the release fails if it does not name the shipping version.",
     "A <webview> is a separate view: the host stops receiving mousemove/mouseup once the pointer crosses into it. Drag with pointer capture plus a pointer-events shield.",
     "A block whose text is empty but which still holds formatting wrappers is not blank: the caret hides in a few-pixel stub and typing inherits the style. migrateBlankLines clears it.",
-    "Shape outline geometry must be in px, not %, or it scales with the shape."
+    "Shape outline geometry must be in px, not %, or it scales with the shape.",
+    "A shape is absolutely positioned: clamp a drag to the note's own extent, measured before the drag, or the scroll height follows the shape."
   ],
   "history": [
     {
