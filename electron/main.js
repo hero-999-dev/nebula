@@ -381,18 +381,38 @@ function registerShellHandlers() {
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
     });
     if (canceled || !filePath) return { ok: false, canceled: true };
+    // The base background colour paints under everything and fills whatever the
+    // page box does not cover — a hairline at the sheet's edge once the margin
+    // band is gone. Nothing is transparent on screen, so swapping it to white
+    // for the length of the export is invisible and leaves no colour that can
+    // show through at all.
+    const base = win.webContents.getBackgroundColor?.() ?? null;
+    try {
+      win.webContents.setBackgroundColor?.('#FFFFFF');
+    } catch { /* older Electron; the print stylesheet still covers the page */ }
     try {
       // printBackground: the note's own frame and code-block fills are part of
       // how it reads; the print stylesheet already flattens the theme to paper.
       const data = await win.webContents.printToPDF({
         printBackground: true,
-        margins: { marginType: 'default' },
+        // No margin BAND. Chromium fills a page's margin area with the view's
+        // base background colour and paints no CSS background into it — so a
+        // default-margin export came out as a white page inside a dark purple
+        // frame (#17122A, this window's own backgroundColor) and no amount of
+        // print CSS could reach it. With the margin at zero the whole sheet is
+        // the page box, the print stylesheet's white covers it edge to edge,
+        // and the margins are drawn as padding where they can be controlled.
+        margins: { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 },
         pageSize: 'A4',
       });
       await fs.writeFile(filePath, data);
       return { ok: true, path: filePath, bytes: data.length };
     } catch (err) {
       return { ok: false, error: err.message };
+    } finally {
+      try {
+        if (base) win.webContents.setBackgroundColor?.(base);
+      } catch { /* the window may already be gone */ }
     }
   });
 

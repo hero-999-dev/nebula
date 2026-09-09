@@ -75,7 +75,9 @@ export const ICONS = {
   // a second horizontal at y=12 that looked like a strikethrough.
   equation: S(
     '<path d="M3 13.2h2.4l2.8 6.6L12.4 4.5H21"/>'
-    + '<text x="14" y="17.4" font-size="9" font-style="italic" font-family="Charter, Georgia, serif" fill="currentColor" stroke="none">x</text>'),
+    // The radical is a 1.7px stroke; a hairline italic serif x beside it read
+    // as a different weight from every other mark in the row.
+    + '<text x="13.6" y="17.6" font-size="10" font-weight="700" font-style="italic" font-family="Charter, Georgia, serif" fill="currentColor" stroke="none">x</text>'),
   emoji: S('<circle cx="12" cy="12" r="8.5"/><path d="M8.8 14.5a4.2 4.2 0 0 0 6.4 0"/><circle cx="9.2" cy="9.8" r=".9" fill="currentColor" stroke="none"/><circle cx="14.8" cy="9.8" r=".9" fill="currentColor" stroke="none"/>'),
   clip: S('<path d="M19 11.5 12 18.5a4.5 4.5 0 0 1-6.4-6.4l7.6-7.6a3 3 0 0 1 4.3 4.3l-7.6 7.6a1.6 1.6 0 0 1-2.2-2.2l6.9-6.9"/>'),
   bookmark: S('<path d="M6 4.5h12v15l-6-4-6 4z"/>'),

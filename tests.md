@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 245 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 132 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 267 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 141 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -21,6 +21,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/notes.test.js` | 20 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body, and adds the guide to an older vault exactly once without touching what is there |
 | `tests/editor.test.js` | 41 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and the guide note's completeness |
 | `tests/lists.test.js` | 30 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
+| `tests/migrate.test.js` | 22 | Bringing a stored note up to what this version writes |
 | `tests/inline-format.test.js` | 18 | Enter and Backspace out of an inline wrapper |
 | `tests/highlight.test.js` | 14 | Per-language tokens, and that only SQL is case-insensitive |
 | `tests/disk-store.test.js` | 6 | Rapid saves serialize per file, every mirrored file is valid JSON, deleting a note deletes *its* file, unchanged notes are skipped, boot loads from disk and survives one corrupt file, browser mode never throws |
@@ -33,7 +34,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
 | `tests/export.test.js` | 18 | A note as Markdown or as a standalone HTML file |
 | `tests/import.test.js` | 18 | A Markdown or HTML file read back as a note, sanitised |
-| `tests/e2e/smoke.mjs` | 132 | The real app, six launches |
+| `tests/e2e/smoke.mjs` | 141 | The real app, six launches |
 
 ---
 
@@ -82,6 +83,75 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-09] v0.6.3 - what the old notes were still holding
+
+**Unit 245 -> 267, smoke 132 -> 141.**
+
+The user asked the question this release is named after: *"in trying not to lose
+my old notes, are you still keeping their buggy state?"* Comparing tonight's
+report against the 02:07 backup answered half of it — six items in it are
+byte-identical to text written before 0.6.1 and were fixed then; the report is a
+running document nobody deletes from. But the other half was a fair hit, and
+bigger than the question implied.
+
+**A fix that lives in a note's MARKUP never reaches the notes written before
+it.** The code block's ✕ needed a hand-written top-up to reach old blocks;
+`--shape-fill` needed another; the `<br>` that gives an empty shape a visible
+caret never got one at all. Each was patched where it was found. `migrate.js`
+is now the single place that runs on every note open, and every new in-markup
+control belongs in it.
+
+The clearest case was the guide note's own shape: a 150x90 box with 155
+characters in it. `fitToText` only ever ran on `input`, so a shape saved
+overflowing was never measured again — the text was clipped, and double-clicking
+put the caret at the end of it, outside the visible box. That is the whole of
+"the flat line for writing does not appear": the caret was there, off-screen,
+inside a box that should have grown.
+
+**An underline applied to a selection spanning two paragraphs underlined
+nothing.** Reproduced, and worse than reported: `wrapSelection` extracted BLOCK
+nodes and put them inside one inline span —
+
+    <p>first </p><span class="u-single"><p>rest</p><p>second</p></span><p> more</p>
+
+`text-decoration` does not propagate into a block child, so every text node
+computed `none`; and the paragraph the drag started in was silently split in
+two. It wraps one span per block now, which is exactly what `execCommand` does
+for fonts and why the font path never had this bug.
+
+That same markup explains a second report. A `<span class="c-red">` holding
+several paragraphs becomes the editor's direct child, so it is what "the block
+the caret is in" resolves to — picking a font anywhere inside restyled all of
+it. "Selecting some places still changes the font of the whole area." Notes
+already carrying such a span are taken apart on open, the formatting moved down
+onto each block where it belongs.
+
+**Ctrl+U was never in the shortcut table.** It fell through to Chromium, which
+inserts a native `<u>` — a different mechanism from the button's `u-single`, so
+the style menu's own "None" could not remove it. It runs the same action as the
+button now, and "None" strips `<u>` as well.
+
+**"There is a nonsense colour outside the export."** Measured this time, not
+guessed: every exported PDF opens with
+
+    .0902 .0706 .1647 rg   0 0 1009 1479 re f
+
+across the whole sheet, then white only inside the margins. `#17122A` is this
+window's own `backgroundColor`. Chromium fills a page's margin band with the
+view's base colour and paints no CSS background into it, so no print stylesheet
+could ever have reached it — 0.6.2 looked for the colour in the export *menu*
+and found subpixel antialiasing, which was a real finding about a different
+thing. `@page { margin: 0 }` hands the whole sheet to the stylesheet, the
+margins are drawn as padding, and the base colour is white for the length of the
+export so nothing can show through at the edge.
+
+**Also:** the pin in the collapsed rail has a column of its own, so the initials
+line up down the list; Archive and Trash put their count under a centred label;
+the size field's arrow moved inside the field; the `<select>` arrow was drawn
+from `currentColor` and so came out darker than every other caret; the √x mark's
+x is bold like the rest of the set; and A and H are now the same glyph in the
+same face, on the same baseline, rather than one drawn path and one letter.
 
 ### [2026-09-08] v0.6.2 - the third report
 

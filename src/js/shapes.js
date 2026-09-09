@@ -327,20 +327,16 @@ export function initShapes(editorEl, { history } = {}) {
   return {
     addShape: (kind) => select(addShape(editorEl, kind, history)),
     select,
+    /** Called when a note is opened: the previous note's shapes are gone. */
+    reset: () => { select(null); },
+
     /**
-     * Called when a note is opened: the previous note's shapes are gone.
+     * Grow one shape to fit the text already in it.
      *
-     * Shapes saved before 0.6.1 carry only an inline `background`, and the
-     * clipped kinds now paint their fill from `--shape-fill`. Copy it across so
-     * an old note does not open with hollow diamonds.
+     * Exposed for migrate.js: the sizing rules live here, but the thing that
+     * needs them most is a shape that was saved overflowing and never typed in
+     * again. `input` alone could not reach those.
      */
-    reset: () => {
-      select(null);
-      for (const shape of editorEl.querySelectorAll('.shape')) {
-        if (shape.style.getPropertyValue('--shape-fill')) continue;
-        const fill = shape.style.background || getComputedStyle(shape).backgroundColor;
-        if (fill) shape.style.setProperty('--shape-fill', fill);
-      }
-    },
+    fit: (shape) => fitToText(shape),
   };
 }

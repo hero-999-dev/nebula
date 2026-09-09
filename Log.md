@@ -20,6 +20,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-09 03:37] v0.6.3 - by claude
+
+what the old notes were still holding
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-08 15:22] v0.6.2 - by claude
 
 Code blocks wrapped in a colour can be removed, underline needs a selection again, the size field has a working caret, shapes show a caret and grow to fit, and the pink fringe on menu text is gone.

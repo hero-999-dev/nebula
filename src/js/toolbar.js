@@ -195,14 +195,83 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     const range = selectionInEditor();
     if (!range || range.collapsed) return null;
     history?.push();
-    const span = document.createElement('span');
-    span.className = cls;
-    span.appendChild(range.extractContents());
-    range.insertNode(span);
+    const parts = blockRanges(range);
+    if (!parts.length) { dirty(); return null; }
+    // Back to front: extracting inside one block cannot disturb the ranges in
+    // the blocks before it.
+    const spans = [];
+    for (let i = parts.length - 1; i >= 0; i -= 1) {
+      const span = document.createElement('span');
+      span.className = cls;
+      span.appendChild(parts[i].extractContents());
+      parts[i].insertNode(span);
+      spans.unshift(span);
+    }
     editorEl.normalize();
-    reselect(span);
+    if (spans.length === 1) reselect(spans[0]);
+    else {
+      const sel = window.getSelection();
+      const r = document.createRange();
+      r.setStartBefore(spans[0]);
+      r.setEndAfter(spans[spans.length - 1]);
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
     dirty();
-    return span;
+    return spans[0];
+  }
+
+  /** The nearest ancestor that lays its children out as a block. */
+  function blockAncestor(node) {
+    let el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    while (el && el !== editorEl) {
+      const d = getComputedStyle(el).display;
+      if (d !== 'inline' && d !== 'contents') return el;
+      el = el.parentElement;
+    }
+    return editorEl;
+  }
+
+  /**
+   * The selection cut at block boundaries — one range per block it touches.
+   *
+   * A drag across a paragraph boundary makes a range whose `extractContents`
+   * returns BLOCK nodes. Wrapping those in one inline span produced
+   *
+   *     <p>first </p><span class="u-single"><p>rest</p><p>second</p></span>...
+   *
+   * and `text-decoration` does not propagate into a block child, so the
+   * underline was applied and nothing at all was underlined — while the
+   * paragraph the drag started in was silently split in two. Per block, each
+   * gets its own span: exactly what execCommand does for fonts, which is why
+   * the font path never had this bug.
+   */
+  function blockRanges(range) {
+    const root = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+      ? range.commonAncestorContainer
+      : range.commonAncestorContainer.parentNode;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const runs = [];
+    let node;
+    while ((node = walker.nextNode())) {
+      if (!range.intersectsNode(node)) continue;
+      // A code block owns its own text, and a shape layer is not prose.
+      if (node.parentElement?.closest('.blk-code, .shape-layer')) continue;
+      const start = node === range.startContainer ? range.startOffset : 0;
+      const end = node === range.endContainer ? range.endOffset : node.nodeValue.length;
+      // intersectsNode is true for a node merely touching a boundary.
+      if (start >= end) continue;
+      const block = blockAncestor(node);
+      const last = runs[runs.length - 1];
+      if (last && last.block === block) { last.endNode = node; last.endOffset = end; }
+      else runs.push({ block, startNode: node, startOffset: start, endNode: node, endOffset: end });
+    }
+    return runs.map((r) => {
+      const out = document.createRange();
+      out.setStart(r.startNode, r.startOffset);
+      out.setEnd(r.endNode, r.endOffset);
+      return out;
+    });
   }
 
   /**
@@ -210,8 +279,8 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
    * text. A family is a set of classes only one of which may apply at a time:
    * the five underline styles, the nine text colours, the nine highlights.
    */
-  function stripFamily(classes) {
-    const sel = classes.map((c) => `.${c}`).join(',');
+  function stripFamily(classes, extra = '') {
+    const sel = [...classes.map((c) => `.${c}`), ...(extra ? [extra] : [])].join(',');
     const range = selectionInEditor();
     if (!range || !sel) return;
     history?.push();
@@ -235,14 +304,26 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
    * One class from `classes`, replacing whichever one was already there — never
    * nesting them. An empty `cls` just clears the family.
    */
-  function applyExclusive(classes, cls) {
+  function applyExclusive(classes, cls, extra = '') {
     const range = selectionInEditor();
     if (!range || range.collapsed) return;
     const text = range.toString();
-    stripFamily(classes);
+    // Stripping can drop the selection. Its boundary points usually survive,
+    // and putting them back is exact — the content search below cannot find a
+    // run that spans two blocks, so without this the whole action was a no-op
+    // on exactly the selections that needed it most.
+    const saved = range.cloneRange();
+    stripFamily(classes, extra);
     if (!cls) { dirty(); return; }
-    // re-find the same text after stripping, then wrap it once
     const sel = window.getSelection();
+    if ((sel.isCollapsed || !selectionInEditor())
+        && saved.startContainer.isConnected && saved.endContainer.isConnected) {
+      try {
+        sel.removeAllRanges();
+        sel.addRange(saved);
+      } catch { /* boundaries no longer form a range; fall through */ }
+    }
+    // re-find the same text after stripping, then wrap it once
     if (sel.isCollapsed && text) {
       // the strip can drop the selection — restore it by content search
       const walker = document.createTreeWalker(editorEl, NodeFilter.SHOW_TEXT);
@@ -289,9 +370,14 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
    * merely parked in a line underlined the entire line, which is never what
    * anyone means by it.
    */
-  const applyUnderline = (cls) => applyExclusive(U_STYLES, cls === 'none' ? '' : cls);
-  const applyTextColor = (cls) => applyToBlockOrSelection(colorClasses(TEXT_COLORS), cls);
-  const applyHilite = (cls) => applyToBlockOrSelection(colorClasses(HILITE_COLORS), cls);
+  // `u` is in the strip set as well as the classes: Ctrl+U used to fall through
+  // to Chromium and leave a native <u>, which "None" then could not remove.
+  const applyUnderline = (cls) =>
+    withSelection(() => applyExclusive(U_STYLES, cls === 'none' ? '' : cls, 'u'));
+  const applyTextColor = (cls) =>
+    withSelection(() => applyToBlockOrSelection(colorClasses(TEXT_COLORS), cls));
+  const applyHilite = (cls) =>
+    withSelection(() => applyToBlockOrSelection(colorClasses(HILITE_COLORS), cls));
 
   /** What a colour class actually paints in the theme that is on right now. */
   function tokenValue(cls, prop) {
@@ -649,7 +735,11 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       labelEl.style.fontFamily = stack;
       btn.appendChild(labelEl);
       btn.addEventListener('click', () => {
-        applyFont(stack);
+        // Through withSelection: if anything has taken the selection since the
+        // words were highlighted, applyFont's collapsed-caret branch would
+        // quietly restyle the WHOLE line instead — "selecting some places
+        // still changes the font of the whole area".
+        withSelection(() => applyFont(stack));
         if (fontName) fontName.textContent = label;
         closeMenus();
       });
@@ -791,6 +881,10 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     const k = e.key.toLowerCase();
     if (k === 'z' && !e.shiftKey) { e.preventDefault(); ACTIONS.undo(); return; }
     if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); ACTIONS.redo(); return; }
+    // Ctrl+U was never in this table, so it fell through to Chromium and
+    // inserted a native <u> — a different mechanism from the button's
+    // `u-single`, which is why the style menu's "None" could not undo it.
+    if (k === 'u') { e.preventDefault(); ACTIONS.underline(); return; }
     if (k === 'e') { e.preventDefault(); ACTIONS.code(); }
     else if (k === 'q') { e.preventDefault(); ACTIONS.eq(); }
     else if (k === 't') { e.preventDefault(); ACTIONS.color(); }

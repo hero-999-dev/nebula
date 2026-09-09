@@ -709,6 +709,110 @@ try {
       selected === '<p>underline <span class="u-single">these</span> words</p>', selected);
   }
 
+  /**
+   * A formatting run that crosses a paragraph boundary.
+   *
+   * The old wrapSelection extracted BLOCK nodes and put them inside one inline
+   * span — `<span class="u-single"><p>a</p><p>b</p></span>`. text-decoration
+   * does not propagate into a block child, so the underline was applied and
+   * absolutely nothing was underlined, and the paragraph the drag started in
+   * was split in two. One span per block now.
+   */
+  {
+    const out = await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p id="s-a">first line here</p><p id="s-b">second line here</p>';
+      ed.focus();
+      const r = document.createRange();
+      r.setStart(document.getElementById('s-a').firstChild, 6);
+      r.setEnd(document.getElementById('s-b').firstChild, 6);
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      document.querySelector('[data-act="underline"]').click();
+      const decorated = [...ed.querySelectorAll('span.u-single')]
+        .filter((el) => getComputedStyle(el).textDecorationLine === 'underline').length;
+      return {
+        paras: ed.querySelectorAll('p').length,
+        swallowed: !![...ed.querySelectorAll('span')].find((el) => el.querySelector('p,div,h1,h2,h3')),
+        decorated,
+      };
+    });
+    check('a cross-block underline keeps the paragraphs whole', out.paras === 2, `${out.paras} paragraphs`);
+    check('a cross-block underline puts no block inside an inline span', !out.swallowed);
+    check('a cross-block underline actually underlines both runs', out.decorated === 2,
+      `${out.decorated} underlined`);
+
+    await win.keyboard.press('Control+z');
+    await win.waitForTimeout(150);
+    check('and one Ctrl+Z takes the whole thing off',
+      await win.evaluate(() => document.querySelectorAll('#editor .u-single').length === 0));
+  }
+
+  // Ctrl+U was never in the shortcut table, so it fell through to Chromium and
+  // left a native <u> that the style menu's own "None" could not strip.
+  {
+    const out = await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p id="s-u">underline this line</p>'; ed.focus();
+      const r = document.createRange(); r.selectNodeContents(document.getElementById('s-u'));
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      return ed.innerHTML;
+    });
+    void out;
+    await win.keyboard.press('Control+u');
+    await win.waitForTimeout(150);
+    const html = await win.evaluate(() => document.getElementById('editor').innerHTML);
+    check('Ctrl+U makes the same u-single the button makes',
+      html.includes('u-single') && !html.includes('<u>'), html);
+
+    const stripped = await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p id="s-l"><u>a legacy underline</u></p>'; ed.focus();
+      const r = document.createRange(); r.selectNodeContents(document.getElementById('s-l'));
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      document.querySelector('[data-ustyle="none"]').click();
+      return ed.innerHTML;
+    });
+    check('and None strips a native <u> an older note stored',
+      !stripped.includes('<u>'), stripped);
+  }
+
+  /**
+   * The migration. Anything a feature writes into a note's MARKUP is frozen in
+   * every note saved before it — "are you still keeping the buggy state of the
+   * old notes?" This runs on open and is the one place that answers it.
+   */
+  {
+    const out = await win.evaluate(async () => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML =
+        '<div class="shape-layer" contenteditable="false" data-block-type="shape-layer">'
+        + '<div class="shape rect" data-kind="rect" style="left:40px;top:30px;width:150px;'
+        + 'height:90px;background:rgb(232,205,189);">'
+        + `<div class="shape-text" contenteditable="true">${'Chat'.repeat(40)}</div>`
+        + '<span class="shape-h"></span></div></div>'
+        + '<span class="u-single"><p>one</p><p>two</p></span>';
+      ed.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 600));
+      // Switch away and back, so openNote runs over what was stored.
+      const rows = [...document.querySelectorAll('.note-row')];
+      rows[rows.length - 1]?.click();
+      await new Promise((r) => setTimeout(r, 250));
+      rows[0]?.click();
+      await new Promise((r) => setTimeout(r, 450));
+      const shape = document.querySelector('#editor .shape');
+      const text = shape?.querySelector('.shape-text');
+      return {
+        fits: !!text && text.offsetHeight <= shape.clientHeight,
+        fill: shape?.style.getPropertyValue('--shape-fill') || '',
+        swallowed: !![...document.querySelectorAll('#editor span')]
+          .find((el) => el.querySelector('p,div,h1,h2,h3')),
+      };
+    });
+    check('a shape stored overflowing is re-measured when the note opens', out.fits);
+    check('a shape stored before --shape-fill gets it', !!out.fill, out.fill);
+    check('a stored block-swallowing span is taken apart on open', !out.swallowed);
+  }
+
   // The size field kept free typing but had no arrow of its own; a <datalist>
   // draws none and cannot be styled to match the other menus.
   {

@@ -1,6 +1,7 @@
 import { initDiskStorage } from './disk-store.js';
 import { NoteStore, plainSnippet, relativeTime } from './notes.js';
 import { GUIDE_NOTE, GUIDE_VERSION, addGuide } from './seed-notes.js';
+import { migrateNote } from './migrate.js';
 import { bindEditor } from './editor.js';
 import { initTheme } from './theme.js';
 import { on } from './bus.js';
@@ -172,6 +173,10 @@ async function boot() {
     titleEl.value = note?.title ?? '';
     titleEl.disabled = !note;
     editor.load(note);
+    // Before anything reads the markup: bring what the note SAVED up to what
+    // this version writes. A fix that lives in a note's HTML never reaches the
+    // notes written before it otherwise — see migrate.js.
+    migrateNote(editorEl, { fitShape: shapes?.fit });
     // Both are regenerated from their stored source, never trusted from the
     // saved HTML — and the shape bar belongs to a note that is now gone.
     paintAllCode(editorEl);

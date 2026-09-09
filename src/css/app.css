@@ -167,7 +167,20 @@ body {
   margin-bottom: 4px;
   font-family: var(--serif);
   font-size: 14px;
+  position: relative;   /* the pin hangs off this — see below */
 }
+/* The pin is prepended INSIDE .nr-title, so in the rail it landed after the
+   initial and the pair was centred together: a pinned row's letter sat further
+   left than every other row's. Taken out of the flow, it keeps a column of its
+   own on the left and the initials line up down the rail. */
+#app.side-collapsed .note-row .nr-pin {
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+}
+#app.side-collapsed .note-row .nr-pin svg { width: 11px; height: 11px; }
 #app.side-collapsed .note-row .nr-meta { display: none; }
 #app.side-collapsed .note-row .nr-title {
   width: 100%;
@@ -362,8 +375,24 @@ body {
 .drawer-empty { padding: 8px 10px; font-size: 12px; color: var(--ink-faint); }
 #app.side-collapsed .drawer-body { display: none; }
 #app.side-collapsed .drawer-tabs { flex-direction: column; }
-#app.side-collapsed .drawer-tab { font-size: 0; padding: 6px 0; }
-#app.side-collapsed .drawer-tab::before { content: attr(data-drawer); font-size: 9px; }
+/* Label over count, both centred. Side by side, the count kept its own
+   font-size while the label was hidden and re-drawn at 9px, so the pair sat
+   off-centre and the word did not read as centred at all. */
+#app.side-collapsed .drawer-tab {
+  font-size: 0;
+  padding: 5px 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  text-align: center;
+}
+#app.side-collapsed .drawer-tab::before {
+  content: attr(data-drawer);
+  font-size: 9px;
+  line-height: 1.1;
+  text-transform: capitalize;
+}
+#app.side-collapsed .drawer-count { font-size: 9px; line-height: 1; }
 #app.side-collapsed .drawer-count { display: none; }
 .note-row.active { background: var(--paper-raised); border-color: var(--rule); }
 .note-row .nr-title {

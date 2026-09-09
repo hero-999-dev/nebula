@@ -400,12 +400,30 @@ export const GUIDE_NOTE = {
  * and that has to work even when the version stamp says "already done".
  */
 export function addGuide(store) {
-  const existing = store.notes.find((n) => n.title === GUIDE_NOTE.title && !n.deletedAt);
-  if (existing) {
+  const live = store.notes.filter((n) => !n.deletedAt);
+  const existing = live.find((n) => n.title === GUIDE_NOTE.title);
+
+  // The guide that is already there is the one to open — but only while it is
+  // still THIS guide. `ensureGuide` never refreshes an existing one, so a vault
+  // opened before a guide rewrite kept the old text for good, and asking Help
+  // for the guide handed the stale copy straight back.
+  //
+  // A guide the user has written in is theirs: it is never overwritten. The
+  // current one arrives beside it under a versioned title instead, so nothing
+  // is lost either way.
+  if (existing && existing.content === GUIDE_NOTE.content) {
     if (existing.archivedAt) store.unarchive(existing.id);
     return existing.id;
   }
-  const note = store.createNote(GUIDE_NOTE.title);
+
+  const title = existing ? `${GUIDE_NOTE.title} (${GUIDE_VERSION})` : GUIDE_NOTE.title;
+  const already = live.find((n) => n.title === title && n.content === GUIDE_NOTE.content);
+  if (already) {
+    if (already.archivedAt) store.unarchive(already.id);
+    return already.id;
+  }
+
+  const note = store.createNote(title);
   store.updateActive({ content: GUIDE_NOTE.content });
   return note.id;
 }

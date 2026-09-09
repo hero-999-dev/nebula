@@ -1,7 +1,7 @@
 {
   "projectName": "Nebula",
-  "version": "0.6.2",
-  "lastUpdated": "2026-09-08",
+  "version": "0.6.3",
+  "lastUpdated": "2026-09-09",
   "currentPhase": "v0.6.0 - export (Markdown, standalone HTML, real PDF via printToPDF) and import, a proper print stylesheet, and the fourteen defects from the user's Bug Report note.",
   "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, command palette, search, i18n.",
   "repository": {
@@ -31,8 +31,8 @@
     "releasePolicy": "Standing instruction (2026-09-07): release finished work with npm run push without being asked, and never ask which platforms to build - the repo is public, so Actions is free on both Windows and macOS runners. npm run push also refreshes Nebula Test.exe in the project root."
   },
   "quality": {
-    "unitTests": 245,
-    "smokeChecks": 132,
+    "unitTests": 267,
+    "smokeChecks": 141,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
@@ -55,7 +55,10 @@
     "Toolbar controls that take focus (input, select) clear the editor's selection; field-driven actions must restore it via withSelection or they silently do nothing.",
     "Imported files are sanitised in import.js before they reach the store - a note is loaded with innerHTML and mirrored to disk.",
     "Note export goes through export.js (pure functions) and printToPDF; window.print() only prints, and the print stylesheet must hide all app chrome.",
-    "Controls written into a note's markup (the code block's delete button) must be topped up on every paint, or notes written before the control existed never get it."
+    "Controls written into a note's markup (the code block's delete button) must be topped up on every paint, or notes written before the control existed never get it.",
+    "A fix that lives in a note's markup reaches no note saved before it. src/js/migrate.js runs on every note open and is the only place that class of fix belongs.",
+    "An inline span must never wrap a block: text-decoration does not reach a block child, and the span becomes what 'the block the caret is in' resolves to. Wrap one span per block.",
+    "Chromium fills a page's margin band with the view's base background colour and paints no CSS background into it, so an export shows the window's backgroundColor there."
   ],
   "history": [
     {

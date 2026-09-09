@@ -154,8 +154,11 @@
 .tb-select, .code-lang {
   appearance: none;
   -webkit-appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
-                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  /* --ink-faint, not currentColor: the text in a <select> is full-strength
+     ink, so the arrow drawn from currentColor came out darker than the caret
+     on every other control in the row. */
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%),
+                    linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
   background-position: calc(100% - 11px) calc(50% + 1px), calc(100% - 7px) calc(50% + 1px);
   background-size: 4px 4px, 4px 4px;   /* the same 8px-wide triangle as .tb-caret */
   background-repeat: no-repeat;
@@ -163,7 +166,19 @@
 }
 .tb-select:focus, .tb-input:focus { border-color: var(--clay); }
 .tb-combo { display: inline-flex; }
-.tb-input--size { width: 58px; }
+/* The size field's arrow sits INSIDE the field, where a <select> puts its own.
+   Beside it, it read as a second control that happened to be touching. */
+.tb-input--size { width: 62px; padding-right: 19px; }
+.tb-combo .tb-caret {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 15px;
+  height: 23px;
+  padding: 0;
+  border-radius: 4px;
+}
 
 /* The font picker is a button that names the current font, not an <input>:
    a datalist cannot show each option in its own face, and a text field kept
@@ -828,6 +843,24 @@ body.resizing webview { pointer-events: none; }
   .mini-bar, .float-menu, .savestate, .shape-bar, .code-head, .find-bar,
   .update-card, .overlay, .note-menu, .eq-pop { display: none !important; }
 
+  /* The sheet itself, margins and all.
+     `body` being white is not enough: a page's margin area is painted from the
+     CANVAS, and the canvas takes its colour from the ROOT element — which has
+     none here, so what showed through was the BrowserWindow's own
+     `backgroundColor` (#17122A). Every exported PDF was a white page in a dark
+     purple frame. Only an opaque background on `html` reaches the margins. */
+  html { background: #fff !important; }
+  /* The margins are ours, as padding on the page's own content: the printer's
+     margin band cannot be painted (see electron/main.js) and showed the
+     window's background colour through. `@page { margin: 0 }` hands the whole
+     sheet to the stylesheet; this puts the text back where a document has it. */
+  @page { size: A4; margin: 0; }
+  .edit-shell { padding: 16mm 15mm !important; }
+
+  /* The caret is part of the app, not the note. It was being drawn into the
+     export as a thin coloured bar wherever the cursor happened to be parked. */
+  .editor, .editor *, .shape-text { caret-color: transparent !important; }
+
   body, #app, .main {
     overflow: visible !important;
     height: auto !important;
@@ -835,7 +868,7 @@ body.resizing webview { pointer-events: none; }
     background: #fff !important;
     color: #000 !important;
   }
-  .edit-shell { display: block; padding: 0; }
+  .edit-shell { display: block; }
   .editor-frame {
     border: none; outline: none; display: block; margin: 0;
     background: #fff !important; box-shadow: none !important;
@@ -1006,4 +1039,4 @@ body.resizing webview { pointer-events: none; }
 /* The size menu, like the font one: the label is the whole row. */
 .tb-menu--size { min-width: 130px; }
 .tb-menu--size button { grid-template-columns: 1fr; }
-.tb-combo .tb-caret { margin-left: -1px; }
+/* .tb-combo .tb-caret is positioned inside the field — see above. */

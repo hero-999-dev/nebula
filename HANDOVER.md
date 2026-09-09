@@ -170,7 +170,23 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 16. **Near-white text on a dark ground fringes warm** under Windows subpixel
    antialiasing — it reads as a colour nobody set. `-webkit-font-smoothing:
    antialiased` on the body is the fix; do not go looking for the colour.
-17. **Anything written into a note's markup is frozen in old notes.** The
+17. **Anything written into a note's markup is frozen in old notes** — and the
+   place to fix that is `src/js/migrate.js`, which runs on every note open.
+   Never add another one-off top-up at a call site: a shape saved overflowing
+   was never re-measured, an empty shape never got its `<br>`, and only the code
+   block's ✕ had a top-up at all.
+18. **An inline span must never be allowed to wrap a block.** `text-decoration`
+   does not propagate into a block child, so `<span class="u-single"><p>..</p>`
+   underlines nothing — and the span becomes the editor's direct child, which
+   is what "the block the caret is in" resolves to. Wrap one span per block.
+19. **Chromium paints no CSS background into a page's margin band.** It is the
+   view's base colour, so an export shows the window's `backgroundColor` there
+   and no print stylesheet can reach it. `@page { margin: 0 }` and draw the
+   margins as padding.
+20. **A shortcut that is not in the table falls through to Chromium**, which
+   has its own idea of the markup — Ctrl+U left a native `<u>` the app's own
+   "None" could not strip.
+21. **Anything written into a note's markup is frozen in old notes.** The
    code block's ✕ is created with the block, so blocks written before it existed
    never got one — `paintAllCode` tops the header up on every load. Any new
    in-note control needs the same treatment.
