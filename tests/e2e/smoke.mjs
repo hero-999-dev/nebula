@@ -999,34 +999,77 @@ try {
   }
 
   /**
-   * A shape cannot drag the bottom of the note around with it.
+   * Deleting next to a shape layer, and deleting a divider.
    *
-   * It is absolutely positioned, so dragging one past the last paragraph grew
-   * the editor's scroll height to reach it: the note's bottom edge followed
-   * the shape down and snapped back up on the way home.
+   * Both rules were written against `keydown` first, by working out from the
+   * caret which element WOULD go. That guess is wrong often enough to matter:
+   * with empty spans between the caret and a shape layer it saw the spans, and
+   * Chromium — which selects a non-editable island on the first Backspace and
+   * removes it on the second — took all eleven shapes in a note on the second
+   * press. `beforeinput` does not guess; `getTargetRanges()` is what is about
+   * to go.
    */
   {
     await win.evaluate(() => {
       const ed = document.getElementById('editor');
-      ed.innerHTML = '<p>line</p>'.repeat(25);
+      ed.innerHTML = '<div class="shape-layer" contenteditable="false" data-block-type="shape-layer">'
+        + '<div class="shape rect" data-kind="rect" style="left:40px;top:20px;width:120px;height:80px;'
+        + 'background:#e8cdbd;--shape-fill:#e8cdbd;">'
+        + '<div class="shape-text" contenteditable="false"><br></div>'
+        + '<span class="shape-h"></span></div></div>'
+        + '<span class="c-red"></span><span class="c-red">text after the layer</span>';
       ed.dispatchEvent(new Event('input', { bubbles: true }));
+      const t = [...ed.querySelectorAll('span')]
+        .find((x) => x.textContent.startsWith('text')).firstChild;
+      const r = document.createRange();
+      r.setStart(t, 0);
+      r.collapse(true);
+      const s = getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+      ed.focus();
     });
-    await press(win, '[data-shape-add=rect]');
-    await win.waitForTimeout(400);
-    const before = await win.evaluate(() => document.getElementById('editor').scrollHeight);
-    const at = await win.evaluate(() => {
-      const r = document.querySelector('#editor .shape').getBoundingClientRect();
-      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
-    });
-    await win.mouse.move(at.x, at.y);
-    await win.mouse.down();
-    for (let i = 1; i <= 20; i += 1) await win.mouse.move(at.x, at.y + i * 80);
-    await win.mouse.up();
     await win.waitForTimeout(250);
-    const after = await win.evaluate(() => document.getElementById('editor').scrollHeight);
-    check('dragging a shape down does not stretch the note', after === before,
-      `${before} -> ${after}`);
+    await win.keyboard.press('Backspace');
+    await win.waitForTimeout(150);
+    await win.keyboard.press('Backspace');
+    await win.waitForTimeout(150);
+    check('no delete key can take a shape layer',
+      await win.evaluate(() => document.querySelectorAll('#editor .shape').length === 1),
+      await win.evaluate(() => String(document.querySelectorAll('#editor .shape').length)));
   }
+
+  // A divider takes two presses: one to show which one, one to take it.
+  {
+    const hrs0 = await win.evaluate(async () => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p>above</p><hr class="blk-hr"><p id="under">below</p>';
+      ed.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 150));
+      const t = document.getElementById('under').firstChild;
+      const r = document.createRange();
+      r.setStart(t, 0);
+      r.collapse(true);
+      const s = getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+      ed.focus();
+      return ed.querySelectorAll('hr').length;
+    });
+    await win.keyboard.press('Backspace');
+    await win.waitForTimeout(200);
+    const armed = await win.evaluate(() => ({
+      hrs: document.querySelectorAll('#editor hr').length,
+      armed: document.querySelectorAll('#editor hr.armed').length,
+    }));
+    check('the first press shows the divider rather than taking it',
+      hrs0 === 1 && armed.hrs === 1 && armed.armed === 1, JSON.stringify(armed));
+    await win.keyboard.press('Backspace');
+    await win.waitForTimeout(200);
+    check('and the second press takes it',
+      await win.evaluate(() => document.querySelectorAll('#editor hr').length === 0));
+  }
+
   // A shape's text: a caret to see, and room to grow into.
   {
     await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>x</p>'; });

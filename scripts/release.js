@@ -59,8 +59,25 @@ function runSoft(cmd, cmdArgs) {
   }
 }
 
+/**
+ * Git, with the credential chain reset to the gh session we are signed into.
+ *
+ * Credential helpers are ADDITIVE: naming one only appends it to a list that
+ * already holds the machine's global `manager`, and Git asks them in order — so
+ * Windows' credential manager opened an interactive window and the release sat
+ * on it forever. Three releases were lost that way before the empty value,
+ * which clears the list, went in. `publish-site.js` learned this first; the
+ * main repo's own push was still doing it.
+ */
+const CREDS = [
+  '-c', 'credential.helper=',
+  '-c', 'credential.helper=!gh auth git-credential',
+];
+
 function git(...gitArgs) {
-  return run('git', gitArgs);
+  const needsAuth = ['push', 'fetch', 'pull', 'ls-remote'].includes(gitArgs[0]);
+  return run('git', needsAuth ? [...CREDS, ...gitArgs] : gitArgs,
+    needsAuth ? { env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } } : {});
 }
 
 function tryGit(...gitArgs) {

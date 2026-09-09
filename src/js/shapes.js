@@ -190,9 +190,6 @@ export function initShapes(editorEl, { history } = {}) {
       top: parseFloat(shape.style.top) || 0,
       w: shape.offsetWidth,
       h: shape.offsetHeight,
-      // The note's own extent, so a shape cannot drag the bottom edge with it.
-      maxTop: Math.max(0, contentBottom() - shape.offsetHeight),
-      maxLeft: Math.max(0, editorEl.clientWidth - shape.offsetWidth),
     };
   });
 
@@ -212,11 +209,15 @@ export function initShapes(editorEl, { history } = {}) {
       return;
     }
     if (drag.kind === 'move') {
-      // Anywhere in the note, and nowhere outside it. Without the ceiling a
-      // shape dragged past the last paragraph pulled the scrollable bottom
-      // along behind it, and pushed it back up on the way home.
-      drag.el.style.left = `${Math.min(drag.maxLeft, Math.max(0, drag.left + dx))}px`;
-      drag.el.style.top = `${Math.min(drag.maxTop, Math.max(0, drag.top + dy))}px`;
+      // Free movement across the whole note, kept only out of negative space.
+      //
+      // A ceiling was tried here and taken back out. It was meant for "a shape
+      // drags the bottom of the note around with it", and it did stop that —
+      // but a tall shape in a short note already sits below any such limit, so
+      // the first pixel of movement threw it upwards and then it would not come
+      // back down. Two new faults for one ambiguous one is the wrong trade.
+      drag.el.style.left = `${Math.max(0, drag.left + dx)}px`;
+      drag.el.style.top = `${Math.max(0, drag.top + dy)}px`;
     } else {
       // A shape grows to fit its text, so it must not be draggable back down
       // to where the text no longer fits — that is the same clipping, put back
@@ -233,25 +234,6 @@ export function initShapes(editorEl, { history } = {}) {
     }
     positionBar();
   });
-
-  /**
-   * How far down the note actually goes, ignoring the shapes.
-   *
-   * A shape is absolutely positioned, so dragging one past the last paragraph
-   * grows the editor's scroll height to reach it — the note's bottom edge
-   * follows the shape down, and snaps back up when it is dragged back. Measured
-   * from the text alone, once, before the drag starts: measuring it live would
-   * chase its own tail.
-   */
-  function contentBottom() {
-    const base = editorEl.getBoundingClientRect().top - editorEl.scrollTop;
-    let bottom = 0;
-    for (const el of editorEl.children) {
-      if (el.classList?.contains('shape-layer')) continue;
-      bottom = Math.max(bottom, el.getBoundingClientRect().bottom - base);
-    }
-    return Math.max(bottom, editorEl.clientHeight);
-  }
 
   /** The angle from a shape's centre to a point, in degrees. */
   function angleTo(shape, x, y) {

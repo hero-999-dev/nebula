@@ -29,6 +29,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-10 00:43] v0.7.1 - by claude
+
+what is actually about to be deleted
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-09 23:32] v0.7.0 - by claude
 
 a blank line that is really blank

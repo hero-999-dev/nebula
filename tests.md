@@ -5,7 +5,7 @@ What is tested, what each test proves, and what is knowingly untested.
 | | |
 |---|---|
 | **Unit** | 303 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 153 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Electron smoke** | 155 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -35,7 +35,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
 | `tests/export.test.js` | 18 | A note as Markdown or as a standalone HTML file |
 | `tests/import.test.js` | 18 | A Markdown or HTML file read back as a note, sanitised |
-| `tests/e2e/smoke.mjs` | 153 | The real app, six launches |
+| `tests/e2e/smoke.mjs` | 155 | The real app, six launches |
 
 ---
 
@@ -84,6 +84,39 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-10] v0.7.1 - what is actually about to be deleted
+
+**Smoke 153 -> 155.**
+
+**Two Backspaces before a marked line removed all eleven shapes in the note.**
+The user marked the spot with a `*` and said "press back just before it"; from
+there it reproduced on the second press, every time.
+
+Both delete rules had been written against `keydown`, working out from the caret
+which element WOULD go. That guess is wrong often enough to matter. Between the
+caret and the shape layer sat empty spans left over from deleted text, so the
+guess looked at the spans and stood aside — and Chromium, which SELECTS a
+non-editable island on the first Backspace and removes it on the second, took
+the layer whole.
+
+`beforeinput` does not guess: `getTargetRanges()` is the range the browser is
+about to delete, before it deletes it. One guard now reads it and refuses when a
+shape layer is in it.
+
+**The divider needed the other half of the same lesson.** An `<hr>` is a void
+element, so a delete positioned right after one does not *intersect* it and the
+range test missed it — it was removed without ever being armed. Its boundary is
+read instead. And the second press removes it here rather than leaving it to the
+browser, whose own backward delete at that boundary merges the blocks around the
+divider and leaves the divider standing.
+
+**The shape clamp is reverted.** 0.7.0 stopped a shape dragging the note's
+bottom edge around, and the cure was worse: a tall shape in a short note already
+sits below any such limit, so the first pixel of movement threw it upwards and
+then it would not come back down — "they fly straight up and cannot be dragged
+down". Two certain faults for one ambiguous one is the wrong trade, so it is
+out, and the original report is open again.
 
 ### [2026-09-09] v0.7.0 - a blank line that is really blank
 

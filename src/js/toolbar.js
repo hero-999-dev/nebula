@@ -941,6 +941,94 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     syncState();
   });
 
+  /**
+   * What a delete is actually about to take.
+   *
+   * Both of the rules below were written against `keydown` first, by working out
+   * from the caret which element WOULD go. That guess is wrong often enough to
+   * matter: with empty spans between the caret and a shape layer the guess saw
+   * the spans, and Chromium — which selects a non-editable island on the first
+   * Backspace and removes it on the second — took all eleven shapes in a note
+   * on the second press. The same guess let a divider go without arming.
+   *
+   * `beforeinput` does not guess. `getTargetRanges()` is the range the browser
+   * is about to delete, before it deletes it.
+   */
+  editorEl.addEventListener('beforeinput', (e) => {
+    if (!e.inputType?.startsWith('delete')) {
+      editorEl.querySelectorAll('hr.blk-hr.armed').forEach((h) => h.classList.remove('armed'));
+      return;
+    }
+    const statics = typeof e.getTargetRanges === 'function' ? e.getTargetRanges() : [];
+    if (!statics.length) return;
+    const live = statics.map((r) => {
+      const out = document.createRange();
+      try {
+        out.setStart(r.startContainer, r.startOffset);
+        out.setEnd(r.endContainer, r.endOffset);
+      } catch { return null; }
+      return out;
+    }).filter(Boolean);
+    const touching = (selector) => [...editorEl.querySelectorAll(selector)]
+      .filter((el) => live.some((r) => r.intersectsNode(el)));
+
+    // A shape layer is not text. Nothing typed, and no delete, removes one —
+    // the shape bar's own ✕ is the way, and it is undoable.
+    if (touching('.shape-layer').length) {
+      e.preventDefault();
+      return;
+    }
+
+    /**
+     * The element a backward delete is about to merge with.
+     *
+     * `intersectsNode` cannot see a void element next to a boundary: an `<hr>`
+     * has no content for a range to overlap, so a delete positioned right after
+     * one does not "touch" it and the divider went without ever being armed.
+     * Its boundary is what has to be read.
+     */
+    const mergeTarget = () => {
+      const r = live[0];
+      if (!r) return null;
+      const n = r.startContainer;
+      if (n.nodeType === Node.ELEMENT_NODE && r.startOffset > 0) {
+        const cand = n.childNodes[r.startOffset - 1];
+        if (cand?.nodeType === Node.ELEMENT_NODE) return cand;
+      }
+      if (n.nodeType === Node.TEXT_NODE && r.startOffset > 0) return null;
+      let el = n.nodeType === Node.ELEMENT_NODE ? n : n.parentElement;
+      while (el && el !== editorEl) {
+        if (el.previousElementSibling) return el.previousElementSibling;
+        el = el.parentElement;
+      }
+      return null;
+    };
+
+    // A divider takes two goes: the first shows which one, the second takes it.
+    // One press removed it the moment the caret reached the line beneath, which
+    // is the opposite of "I want to get CLOSE to the divider".
+    const before = e.inputType === 'deleteContentBackward' ? mergeTarget() : null;
+    const hrs = [...new Set([
+      ...touching('hr.blk-hr'),
+      ...(before?.classList?.contains('blk-hr') ? [before] : []),
+    ])];
+    if (hrs.length === 1) {
+      e.preventDefault();
+      const hr = hrs[0];
+      if (hr.classList.contains('armed')) {
+        // Removed here rather than left to the browser: at this boundary its own
+        // backward delete merges the blocks around the divider and leaves the
+        // divider itself alone, so the second press appeared to do nothing.
+        history?.push();
+        hr.remove();
+        dirty();
+      } else {
+        editorEl.querySelectorAll('hr.blk-hr.armed').forEach((h) => h.classList.remove('armed'));
+        hr.classList.add('armed');
+      }
+    }
+  });
+
   // ----- todo tick -----
   // Only the box itself ticks. The whole 24px left edge used to, so clicking
   // near the start of a to-do to put the caret there checked it off instead —
@@ -1019,77 +1107,6 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       }
       return;
     }
-    /**
-     * A shape layer is not text and Backspace must never take one.
-     *
-     * It is `contenteditable="false"`, and Chromium's answer to Backspace
-     * against a non-editable island next to the caret is to swallow the whole
-     * island — "if I press back from here it deletes ALL the shapes". Eleven of
-     * them, in one keystroke, with the note's own undo the only way back.
-     */
-    if (!mod && (e.key === 'Backspace' || e.key === 'Delete')) {
-      const sel = window.getSelection();
-      const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
-      if (range && editorEl.contains(range.startContainer)) {
-        const layers = [...editorEl.querySelectorAll('.shape-layer')];
-        const doomed = range.collapsed
-          ? (() => {
-            // At the very edge of a block, the neighbour is what gets taken.
-            const atStart = range.startOffset === 0;
-            const node = range.startContainer;
-            const atEnd = node.nodeType === Node.TEXT_NODE
-              ? range.startOffset === node.nodeValue.length
-              : range.startOffset === node.childNodes.length;
-            if (e.key === 'Backspace' && !atStart) return null;
-            if (e.key === 'Delete' && !atEnd) return null;
-            let el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-            while (el && el.parentElement !== editorEl) el = el.parentElement;
-            const sib = e.key === 'Backspace' ? el?.previousElementSibling : el?.nextElementSibling;
-            return sib?.classList?.contains('shape-layer') ? sib : null;
-          })()
-          : layers.find((l) => range.intersectsNode(l)) ?? null;
-        if (doomed) {
-          e.preventDefault();
-          return;
-        }
-      }
-    }
-
-    /**
-     * A divider takes two presses: the first one arms it, the second removes it.
-     *
-     * One press deleted it the moment the caret reached the line under it,
-     * which is the opposite of what is wanted — "I want to get CLOSE to the
-     * divider and push the block up under it; right now the space above just
-     * stays empty". Arming it shows what the next press will take.
-     */
-    if (!mod && e.key === 'Backspace') {
-      const sel = window.getSelection();
-      const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
-      if (range && range.collapsed && range.startOffset === 0 && editorEl.contains(range.startContainer)) {
-        let el = range.startContainer;
-        if (el.nodeType !== Node.ELEMENT_NODE) el = el.parentElement;
-        while (el && el.parentElement !== editorEl) el = el.parentElement;
-        const prev = el?.previousElementSibling;
-        if (prev?.classList?.contains('blk-hr')) {
-          e.preventDefault();
-          if (prev.classList.contains('armed')) {
-            history?.push();
-            prev.remove();
-            dirty();
-          } else {
-            editorEl.querySelectorAll('.blk-hr.armed').forEach((h) => h.classList.remove('armed'));
-            prev.classList.add('armed');
-          }
-          return;
-        }
-      }
-    }
-    // Any other key means the divider was not what they were after.
-    if (e.key !== 'Backspace') {
-      editorEl.querySelectorAll('.blk-hr.armed').forEach((h) => h.classList.remove('armed'));
-    }
-
     if (!mod && e.key === 'Backspace') {
       if (backspaceOutOfWrapper(editorEl, window.getSelection())) {
         e.preventDefault();

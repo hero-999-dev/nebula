@@ -236,7 +236,13 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    to its own inner polygon, or the diamond looks heavy and the triangle thin.
 37. **`memory.currentPhase` is what the docs site prints as "Right now".**
    `npm run push` fails if it does not name the version being released.
-38. **Anything written into a note's markup is frozen in old notes.** The
+38. **Guard deletions in `beforeinput`, never in `keydown`.**
+   `getTargetRanges()` is what the browser is about to remove; working it out
+   from the caret misses empty spans between the caret and a non-editable
+   island, and Chromium takes such an island on the SECOND Backspace.
+39. **`intersectsNode` cannot see a void element** beside a boundary — an
+   `<hr>` next to a collapsed range does not "intersect" it. Read the boundary.
+40. **Anything written into a note's markup is frozen in old notes.** The
    code block's ✕ is created with the block, so blocks written before it existed
    never got one — `paintAllCode` tops the header up on every load. Any new
    in-note control needs the same treatment.

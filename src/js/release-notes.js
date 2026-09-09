@@ -13,6 +13,28 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.7.1': {
+    headline: 'Deleting near a shape, and dragging one, both behave.',
+    items: [
+      {
+        title: 'No delete key can take your shapes',
+        text: 'Pressing Backspace twice just before a line that sat under a '
+          + 'shape removed every shape in the note. The rule was working out '
+          + 'which element WOULD go; it now asks the browser what is actually '
+          + 'about to be deleted.',
+      },
+      {
+        title: 'A divider really does take two presses',
+        text: 'The first highlights it, the second removes it.',
+      },
+      {
+        title: 'Shapes drag freely again',
+        text: 'A limit added in the last release threw a tall shape upwards on '
+          + 'the first pixel of movement and then would not let it come back '
+          + 'down. It is gone.',
+      },
+    ],
+  },
   '0.7.0': {
     headline: 'Blank lines that are really blank, and a resize that stops.',
     items: [
