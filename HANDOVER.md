@@ -186,7 +186,22 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 20. **A shortcut that is not in the table falls through to Chromium**, which
    has its own idea of the markup — Ctrl+U left a native `<u>` the app's own
    "None" could not strip.
-21. **Anything written into a note's markup is frozen in old notes.** The
+21. **Reproduce against the note that reported it, not one that looks like
+   it.** The code-block delete bug survived two "fixes" because both were
+   verified against markup I wrote to resemble the user's. The real note keeps
+   a block and the line under it inside ONE wrapper; read the vault
+   (`Nebula-data/storage/notes/*.json`) and load that.
+22. **"The block the caret is in" is not the editor's direct child.** A colour
+   or a font wraps a run in a `<div>`, so any neighbour lookup must find the
+   nearest real block and then step OUTWARD a level at a time.
+23. **`app.getVersion()` answers with ELECTRON's version** when Electron was
+   pointed at a directory with no package.json — which is every dev run and
+   every smoke launch. `APP_VERSION` in `electron/main.js` falls back properly.
+24. **A width transition outlives a fixed wait.** Measuring geometry right
+   after toggling the sidebar reads a frame of the animation. Wait for the
+   width to be both stable AND at its target: an ease curve crawls at each end,
+   so two consecutive frames round to the same pixel mid-flight.
+25. **Anything written into a note's markup is frozen in old notes.** The
    code block's ✕ is created with the block, so blocks written before it existed
    never got one — `paintAllCode` tops the header up on every load. Any new
    in-note control needs the same treatment.

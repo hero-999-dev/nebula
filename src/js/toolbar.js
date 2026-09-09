@@ -764,7 +764,9 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       btn.dataset.size = String(px);
       const label = document.createElement('span');
       label.className = 'label';
-      label.textContent = `${px} px`;
+      // Just the number. "px" on every row is eleven characters of noise in a
+      // list where every entry is a size in px.
+      label.textContent = String(px);
       btn.appendChild(label);
       btn.addEventListener('click', () => {
         closeMenus();
@@ -799,8 +801,14 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       const tag = block.tagName.toLowerCase();
       outlineSel.value = ['h1', 'h2', 'h3', 'blockquote'].includes(tag) ? tag : 'p';
     }
+    // Underline is ours, not Chromium's: it is a class, so queryCommandState
+    // knows nothing about it and the button never lit up the way Bold and
+    // Italic do. Ask the DOM instead — and accept a native <u> from an older
+    // note, which is still an underline as far as the reader is concerned.
+    const underlined = !!el.closest(`${U_STYLES.map((c) => `.${c}`).join(',')},u`);
     toolbar.querySelectorAll('[data-act]').forEach((b) => {
       const a = b.dataset.act;
+      if (a === 'underline') { b.classList.toggle('active', underlined); return; }
       const map = { bold: 'bold', italic: 'italic', strike: 'strikeThrough' };
       if (map[a]) {
         try { b.classList.toggle('active', document.queryCommandState(map[a])); } catch { /* ignore */ }

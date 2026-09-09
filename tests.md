@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 267 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 141 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 284 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 149 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -22,6 +22,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/editor.test.js` | 41 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and the guide note's completeness |
 | `tests/lists.test.js` | 30 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
 | `tests/migrate.test.js` | 22 | Bringing a stored note up to what this version writes |
+| `tests/release-notes.test.js` | 17 | What each release says for itself |
 | `tests/inline-format.test.js` | 18 | Enter and Backspace out of an inline wrapper |
 | `tests/highlight.test.js` | 14 | Per-language tokens, and that only SQL is case-insensitive |
 | `tests/disk-store.test.js` | 6 | Rapid saves serialize per file, every mirrored file is valid JSON, deleting a note deletes *its* file, unchanged notes are skipped, boot loads from disk and survives one corrupt file, browser mode never throws |
@@ -34,7 +35,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
 | `tests/export.test.js` | 18 | A note as Markdown or as a standalone HTML file |
 | `tests/import.test.js` | 18 | A Markdown or HTML file read back as a note, sanitised |
-| `tests/e2e/smoke.mjs` | 141 | The real app, six launches |
+| `tests/e2e/smoke.mjs` | 149 | The real app, six launches |
 
 ---
 
@@ -83,6 +84,69 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-09] v0.6.4 - reproduced against the note that reported it
+
+**Unit 267 -> 284, smoke 141 -> 149.**
+
+**"I still cannot delete a code block by pressing back underneath it."** Said
+for three releases running, and right every time. 0.6.3 was verified against a
+note I built to look like the real one, and the shape I guessed was wrong. Read
+out of the actual vault, the note holds this:
+
+    <div class="c-red">
+      <div class="blk-code">…</div>
+      <p>the caret is here</p>
+    </div>
+
+Applying a colour across a run that contains a code block puts the block AND the
+line under it inside ONE wrapper. `blockOf` climbed all the way to the editor's
+direct child, so it returned the *wrapper*, and compared whatever came before
+the wrapper with the caret — never the block sitting directly above it. Backspace
+fell through to Chromium, which cannot delete a `contenteditable="false"` island,
+so nothing happened at all. It finds the nearest real block now and steps
+outward a level at a time when a block has no sibling of its own.
+
+The lesson is the one the user put plainly: *if we cannot solve this, we can
+never solve users' problems.* The fix was verified by loading the actual
+`Untitled1` content and deleting all three of its blocks.
+
+**The underline button never lit up.** Bold and Italic get their state from
+`document.queryCommandState`, and underline is ours — a class, which that API
+knows nothing about. It reads the DOM now, and counts a native `<u>` from an
+older note as an underline too.
+
+**The size control.** "px" on every row of a list where every row is a size in
+px, in a menu twice as wide as its widest entry, with the arrow across a gap
+from the number. Rows are bare numbers, the menu is 62px, the field is 48px and
+the arrow sits 1px from its edge.
+
+**Two lines beside the theme buttons in the collapsed rail.**
+`.theme-pick button + button` draws a `border-left` — correct for the horizontal
+row it was written for, and in a vertical stack those became short vertical
+stubs hanging beside the names. Stacked, the separator runs across.
+
+**Every update now says what it changed.** A card in the middle of the screen,
+once per version, listing what the reader can now do; Help -> What's new opens it
+again. `release-notes.js` decides what there is to say and whether it has been
+said, both pure and tested; the dialog only draws. It does NOT open on a first
+run — there is no older version to have missed, and it would land on top of the
+guide. `npm run push` refuses to ship a version with no entry.
+
+**`app.getVersion()` was answering with Electron's version.** It reads the
+package.json of whatever directory Electron was pointed at, and
+`electron dist-electron/main.js` — how both a dev run and the smoke suite start
+it — points at a directory that has none. Everything downstream believed the app
+was v33.4.11, which is why the card looked up notes for a version that will never
+have any and silently showed nothing.
+
+**Two tests were wrong, not the code.** One clicked the sidebar toggle twice
+(`el.click()` returns undefined, so a `??` fallback fired as well) and measured
+the expanded rail while asserting about the collapsed one. The other waited a
+fixed 250ms for a 140ms width transition; it passed by luck for months and broke
+the moment boot got busier. Both wait for the width to settle now — stability
+alone is not enough, because an ease curve crawls at both ends and two frames
+round to the same pixel while the bar is still moving.
 
 ### [2026-09-09] v0.6.3 - what the old notes were still holding
 

@@ -1,6 +1,6 @@
 {
   "projectName": "Nebula",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "lastUpdated": "2026-09-09",
   "currentPhase": "v0.6.0 - export (Markdown, standalone HTML, real PDF via printToPDF) and import, a proper print stylesheet, and the fourteen defects from the user's Bug Report note.",
   "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, command palette, search, i18n.",
@@ -31,8 +31,8 @@
     "releasePolicy": "Standing instruction (2026-09-07): release finished work with npm run push without being asked, and never ask which platforms to build - the repo is public, so Actions is free on both Windows and macOS runners. npm run push also refreshes Nebula Test.exe in the project root."
   },
   "quality": {
-    "unitTests": 267,
-    "smokeChecks": 141,
+    "unitTests": 284,
+    "smokeChecks": 149,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
@@ -58,7 +58,11 @@
     "Controls written into a note's markup (the code block's delete button) must be topped up on every paint, or notes written before the control existed never get it.",
     "A fix that lives in a note's markup reaches no note saved before it. src/js/migrate.js runs on every note open and is the only place that class of fix belongs.",
     "An inline span must never wrap a block: text-decoration does not reach a block child, and the span becomes what 'the block the caret is in' resolves to. Wrap one span per block.",
-    "Chromium fills a page's margin band with the view's base background colour and paints no CSS background into it, so an export shows the window's backgroundColor there."
+    "Chromium fills a page's margin band with the view's base background colour and paints no CSS background into it, so an export shows the window's backgroundColor there.",
+    "A bug reported against a real note must be reproduced with that note's own markup, read out of Nebula-data/storage/notes — a lookalike hid the code-block delete bug through two releases.",
+    "The block the caret is in is NOT the editor's direct child: a colour or font wraps a run in a div, so neighbour lookups find the nearest block and step outward.",
+    "app.getVersion() returns ELECTRON's version whenever Electron was started against a directory with no package.json (every dev run, every smoke launch).",
+    "Every release needs an entry in src/js/release-notes.js; npm run push refuses to ship without one."
   ],
   "history": [
     {

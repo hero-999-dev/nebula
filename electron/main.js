@@ -7,6 +7,30 @@ import { initUpdater } from './updater.js';
 import { resolveUserData, appChannel, canSelfUpdate } from './user-data.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * The app's version, not Electron's.
+ *
+ * `app.getVersion()` reads the package.json of whatever directory Electron was
+ * pointed at. Started as `electron dist-electron/main.js` — which is how the
+ * smoke suite and a dev run both start it — that directory has no package.json,
+ * so Electron answers with ITS OWN version instead. Everything downstream then
+ * believes the app is v33.4.11: the sidebar prints it, and the what's-new card
+ * looks up release notes for a version that will never have any and silently
+ * shows nothing.
+ */
+function readAppVersion() {
+  const reported = app.getVersion();
+  if (reported && reported !== process.versions.electron) return reported;
+  for (const dir of [path.join(__dirname, '..'), path.join(__dirname, '..', '..')]) {
+    try {
+      const pkg = JSON.parse(fsSync.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+      if (pkg.version && pkg.name === 'nebula') return pkg.version;
+    } catch { /* not there; try the next one */ }
+  }
+  return reported;
+}
+const APP_VERSION = readAppVersion();
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
 
 // Windows groups taskbar buttons by AppUserModelID and takes the button's icon
@@ -115,7 +139,7 @@ function stampVaultMeta() {
     }
     const next = {
       schemaVersion: 1,
-      appVersion: app.getVersion(),
+      appVersion: APP_VERSION,
       firstOpened: meta.firstOpened ?? new Date().toISOString(),
       lastOpened: new Date().toISOString(),
     };
@@ -540,13 +564,13 @@ app.whenReady().then(async () => {
     return { ok: true, path: abs };
   });
 
-  ipcMain.handle('app:version', () => app.getVersion());
+  ipcMain.handle('app:version', () => APP_VERSION);
 
   // The four places a user ever needs to find: the program, their notes, the
   // backups, and the profile that holds both. About renders them and can open
   // each one — which is the whole answer to "where is this thing installed".
   const appPaths = () => ({
-    version: app.getVersion(),
+    version: APP_VERSION,
     channel: CHANNEL,
     platform: process.platform,
     exeDir: process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(app.getPath('exe')),
@@ -583,7 +607,7 @@ app.whenReady().then(async () => {
     canSelfUpdate: canSelfUpdate(CHANNEL),
     getWindow: () => mainWindow,
     beforeInstall: async () => {
-      snapshotStorage({ label: `pre-update-${app.getVersion()}-${Date.now()}` });
+      snapshotStorage({ label: `pre-update-${APP_VERSION}-${Date.now()}` });
     },
   });
 

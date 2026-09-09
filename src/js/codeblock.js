@@ -274,8 +274,8 @@ export function initCodeBlocks(editorEl, { history } = {}) {
       ? range.startOffset === node.nodeValue.length
       : range.startOffset === node.childNodes.length;
     const here = blockOf(node);
-    const block = e.key === 'Backspace' && atStart ? codeBlockIn(here?.previousElementSibling, 'before')
-      : e.key === 'Delete' && atEnd ? codeBlockIn(here?.nextElementSibling, 'after')
+    const block = e.key === 'Backspace' && atStart ? codeBlockIn(neighbourOf(here, 'before'), 'before')
+      : e.key === 'Delete' && atEnd ? codeBlockIn(neighbourOf(here, 'after'), 'after')
         : null;
     if (!block) return;
     e.preventDefault();
@@ -325,7 +325,9 @@ export function initCodeBlocks(editorEl, { history } = {}) {
   function codeBlockIn(el, side) {
     if (!el) return null;
     if (el.classList?.contains('blk-code')) return el;
-    const inner = [...(el.querySelectorAll?.(':scope > .blk-code, :scope > * > .blk-code') ?? [])];
+    // Any depth: a wrapper can hold a wrapper. The old two-level selector
+    // missed a block that had been coloured and then given a font.
+    const inner = [...(el.querySelectorAll?.('.blk-code') ?? [])];
     if (!inner.length) return null;
     // Reaching backwards takes the block nearest the caret, which is the last
     // one in the wrapper; reaching forwards takes the first. A wrapper holding
@@ -333,10 +335,48 @@ export function initCodeBlocks(editorEl, { history } = {}) {
     return side === 'before' ? inner[inner.length - 1] : inner[0];
   }
 
-  /** The direct child of the editor that contains a node. */
+  /**
+   * The nearest block-level element the caret is in.
+   *
+   * This used to climb all the way to the editor's DIRECT child, which is the
+   * bug the user kept reporting. Applying a colour across a run that contains
+   * a code block leaves the block AND the paragraph under it inside one
+   * `<div class="c-red">`:
+   *
+   *     <div class="c-red">
+   *       <div class="blk-code">…</div>
+   *       <p>the caret is here</p>
+   *     </div>
+   *
+   * Climbing to the direct child returned the WRAPPER, whose previous sibling
+   * is whatever came before the wrapper — never the block sitting right above
+   * the caret. Backspace fell through to Chromium, which cannot delete a
+   * `contenteditable="false"` island, so nothing happened at all.
+   */
   function blockOf(node) {
     let el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-    while (el && el.parentElement !== editorEl) el = el.parentElement;
-    return el && el !== editorEl ? el : null;
+    while (el && el !== editorEl) {
+      const d = getComputedStyle(el).display;
+      if (d !== 'inline' && d !== 'contents') return el;
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  /**
+   * What sits next to the caret's block, looking outward.
+   *
+   * When the block is the first thing in its wrapper it has no previous
+   * sibling of its own, so the search has to step out a level and ask again —
+   * otherwise a block wrapped one deeper than the caret is unreachable.
+   */
+  function neighbourOf(el, side) {
+    let cur = el;
+    while (cur && cur !== editorEl) {
+      const sib = side === 'before' ? cur.previousElementSibling : cur.nextElementSibling;
+      if (sib) return sib;
+      cur = cur.parentElement;
+    }
+    return null;
   }
 }

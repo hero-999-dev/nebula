@@ -168,13 +168,13 @@
 .tb-combo { display: inline-flex; }
 /* The size field's arrow sits INSIDE the field, where a <select> puts its own.
    Beside it, it read as a second control that happened to be touching. */
-.tb-input--size { width: 62px; padding-right: 19px; }
+.tb-input--size { width: 48px; padding: 0 15px 0 6px; }
 .tb-combo .tb-caret {
   position: absolute;
-  right: 2px;
+  right: 1px;
   top: 50%;
   transform: translateY(-50%);
-  min-width: 15px;
+  min-width: 12px;
   height: 23px;
   padding: 0;
   border-radius: 4px;
@@ -1037,6 +1037,8 @@ body.resizing webview { pointer-events: none; }
 .tb-menu--export button { grid-template-columns: 1fr; }
 
 /* The size menu, like the font one: the label is the whole row. */
-.tb-menu--size { min-width: 130px; }
+/* The rows are two or three characters wide; 130px left most of the menu
+   empty down the middle. */
+.tb-menu--size { min-width: 62px; }
 .tb-menu--size button { grid-template-columns: 1fr; }
 /* .tb-combo .tb-caret is positioned inside the field — see above. */

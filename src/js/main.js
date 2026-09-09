@@ -2,6 +2,7 @@ import { initDiskStorage } from './disk-store.js';
 import { NoteStore, plainSnippet, relativeTime } from './notes.js';
 import { GUIDE_NOTE, GUIDE_VERSION, addGuide } from './seed-notes.js';
 import { migrateNote } from './migrate.js';
+import { initWhatsNew } from './whats-new.js';
 import { bindEditor } from './editor.js';
 import { initTheme } from './theme.js';
 import { on } from './bus.js';
@@ -56,7 +57,9 @@ async function boot() {
   // never overwriting anything — so an existing copy is not left without it.
   // Both need a vault that was read successfully; an unreadable one is written
   // to under no circumstances.
-  const store = new NoteStore({ allowSeed: disk.ok && disk.empty });
+  // A vault we know is genuinely empty: this is someone's first run.
+  const firstRun = disk.ok && disk.empty;
+  const store = new NoteStore({ allowSeed: firstRun });
   // When the guide is genuinely new to this vault, open it — otherwise the one
   // note the user was told to look at is the one they never see.
   if (disk.ok && store.ensureGuide(GUIDE_NOTE, GUIDE_VERSION)) {
@@ -250,7 +253,16 @@ async function boot() {
   const blocks = initBlocks();
   let menu = null;
   const palette = initPalette(() => menu?.commands ?? []);
+  // Built before the menu, which needs it for Help -> What's new. The version
+  // arrives from the main process, so the card opens on its own once it does.
+  const whatsNew = initWhatsNew({
+    overlay: $('ov-whats-new'),
+    body: $('whats-new-body'),
+    close: $('whats-new-close'),
+  });
+
   menu = initAppMenu({
+    whatsNew,
     actions: toolbar?.actions ?? {},
     history,
     store,
@@ -298,6 +310,18 @@ async function boot() {
   const { checkForUpdates } = initUpdater({ checkButton });
   initAbout({ trigger: $('app-version'), checkButton });
   showAppVersion($('app-version'));
+
+  // Once the version is known: say what this build changed, once per version.
+  // Deliberately after openNote, so the card is the last thing drawn and lands
+  // over a window that is already finished rather than a half-built one.
+  void window.nebula?.version?.().then((v) => {
+    if (!v) return;
+    whatsNew.setVersion(v);
+    // First run: stamp it and stay out of the way. There is no older version
+    // to have missed, and the guide is what this window is for.
+    if (firstRun) whatsNew.acknowledge();
+    else whatsNew.maybeOpen();
+  }).catch(() => { /* a browser preview has no main process */ });
   on('note-changed', () => renderList());
 
   openNote(store.activeId);

@@ -197,7 +197,15 @@ body {
 #app.side-collapsed .note-list-empty { display: none; }
 #app.side-collapsed .btn { padding: 8px 0; font-size: 0; }
 #app.side-collapsed .btn::before { content: "+"; font-size: 17px; line-height: 1; }
-#app.side-collapsed .theme-pick { flex-direction: column; gap: 3px; }
+/* Stacked, the separator has to run ACROSS the buttons, not down their side.
+   `.theme-pick button + button` draws a border-LEFT for the horizontal row, and
+   in the rail those became two short vertical lines hanging beside the theme
+   names — "two side lines next to the one separating dark and light". */
+#app.side-collapsed .theme-pick { flex-direction: column; gap: 0; }
+#app.side-collapsed .theme-pick button + button {
+  border-left: 0;
+  border-top: 1px solid var(--rule);
+}
 #app.side-collapsed .theme-pick button { font-size: 0; padding: 7px 0; }
 #app.side-collapsed .theme-pick button::before { content: attr(data-theme); font-size: 9px; }
 #app.side-collapsed .side-meta { flex-direction: column; gap: 4px; }
@@ -766,3 +774,28 @@ body {
 .blocks-table th { width: 92px; }
 .blocks-table .bl-ic { width: 28px; padding: 3px 8px 3px 0; color: var(--clay); }
 .blocks-table .bl-ic svg { width: 17px; height: 17px; }
+
+/* ---------------------------------------------------------- what's new card */
+/* An update that arrives silently gives no reason to look for what it fixed. */
+.wn-headline {
+  margin: 0 0 12px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.wn-list { display: flex; flex-direction: column; gap: 12px; }
+.wn-item {
+  padding-left: 11px;
+  border-left: 2px solid var(--clay);
+}
+.wn-item__title {
+  margin: 0 0 3px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.wn-item__text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}

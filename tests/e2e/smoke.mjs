@@ -279,7 +279,18 @@ try {
   {
     const wide = await win.evaluate(() => document.getElementById('side').getBoundingClientRect().width);
     await press(win, '#side-toggle');
-    await win.waitForTimeout(250);
+    // The WIDTH is animated, so the class lands long before the geometry does.
+    // A fixed wait here passed by luck and failed the moment boot got busier;
+    // wait for the width to stop moving instead.
+    // Stability alone is not enough: the ease curve crawls at both ends, so two
+    // consecutive frames round to the same pixel while the bar is still moving.
+    // Wait for it to reach the collapsed width as well.
+    await win.waitForFunction(() => {
+      const w = Math.round(document.getElementById('side').getBoundingClientRect().width);
+      const settled = window.__sideW === w;
+      window.__sideW = w;
+      return settled && w < 100;
+    }, null, { timeout: 10_000 }).catch(() => { /* fall through to the check */ });
     const narrow = await win.evaluate(() => ({
       width: document.getElementById('side').getBoundingClientRect().width,
       list: document.getElementById('note-list').getBoundingClientRect().width,
@@ -774,6 +785,94 @@ try {
     });
     check('and None strips a native <u> an older note stored',
       !stripped.includes('<u>'), stripped);
+  }
+
+  /**
+   * A code block wrapped together with the line under it.
+   *
+   * Applying a colour across a run that holds a code block leaves the block AND
+   * the paragraph below it inside one `<div class="c-red">`. The neighbour
+   * lookup used to climb to the editor's direct child, so it compared the
+   * WRAPPER with whatever came before the wrapper and never saw the block
+   * sitting right above the caret — "I still cannot delete a code block by
+   * pressing back underneath it", reported for three releases running.
+   */
+  {
+    const out = await win.evaluate(async () => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<div class="c-red">'
+        + '<div class="blk-code" data-block-type="code" data-lang="javascript" data-code=""'
+        + ' contenteditable="false"><div class="code-head">'
+        + '<select class="code-lang"><option value="javascript" selected>JavaScript</option></select>'
+        + '</div><pre class="code-body"><code class="code-src"><br></code></pre></div>'
+        + '<p id="under">the line under it</p></div>';
+      ed.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 200));
+      const p = document.getElementById('under');
+      const r = document.createRange();
+      r.setStart(p.firstChild, 0);
+      r.collapse(true);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      ed.focus();
+      return ed.querySelectorAll('.blk-code').length;
+    });
+    check('a wrapped code block is there to begin with', out === 1, `${out} blocks`);
+    await win.keyboard.press('Backspace');
+    await win.waitForTimeout(200);
+    const after = await win.evaluate(() => ({
+      blocks: document.querySelectorAll('#editor .blk-code').length,
+      text: document.getElementById('editor').textContent.trim(),
+    }));
+    check('Backspace under a wrapped code block removes it', after.blocks === 0,
+      `${after.blocks} left`);
+    check('and the line the caret was in survives', after.text === 'the line under it',
+      JSON.stringify(after.text));
+  }
+
+  // Underline is a class, so queryCommandState knows nothing about it and the
+  // button never lit up the way Bold and Italic do.
+  {
+    const lit = await win.evaluate(async () => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p id="lit">underline me</p><p id="plain">plain</p>';
+      ed.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 150));
+      const r = document.createRange();
+      r.selectNodeContents(document.getElementById('lit'));
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      ed.focus();
+      document.querySelector('.toolbar [data-act="underline"]').click();
+      await new Promise((res) => setTimeout(res, 250));
+      return document.querySelector('.toolbar [data-act="underline"]').classList.contains('active');
+    });
+    check('the underline button shows active on underlined text', lit);
+    const dark = await win.evaluate(async () => {
+      const r = document.createRange();
+      r.selectNodeContents(document.getElementById('plain'));
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      document.getElementById('editor').focus();
+      await new Promise((res) => setTimeout(res, 250));
+      return document.querySelector('.toolbar [data-act="underline"]').classList.contains('active');
+    });
+    check('and goes dark on a line without one', !dark);
+  }
+
+  // The size list is a column of two-digit numbers; "px" on every row was
+  // eleven characters of noise in a 130px-wide menu.
+  {
+    const out = await win.evaluate(() => {
+      document.querySelector('[data-menu="menu-size"]').click();
+      const rows = [...document.querySelectorAll('#menu-size button .label')].map((l) => l.textContent);
+      const menu = document.getElementById('menu-size').getBoundingClientRect();
+      const input = document.getElementById('tb-size').getBoundingClientRect();
+      const caret = document.querySelector('.tb-combo .tb-caret').getBoundingClientRect();
+      document.querySelector('[data-menu="menu-size"]').click();
+      return { anyPx: rows.some((r) => /px/.test(r)), first: rows[0],
+               menuW: Math.round(menu.width), gap: Math.round(input.right - caret.right) };
+    });
+    check('the size rows are plain numbers', !out.anyPx && out.first === '10', out.first);
+    check('the size menu is only as wide as its rows', out.menuW <= 90, `${out.menuW}px`);
+    check('the size arrow sits inside, against the number', out.gap <= 3, `${out.gap}px`);
   }
 
   /**

@@ -111,6 +111,24 @@ if (tryGit('rev-parse', '-q', '--verify', `refs/tags/${tag}`)) {
   fail(`Tag ${tag} already exists. Pick another version.`);
 }
 
+/**
+ * Every release says what it changed.
+ *
+ * The card is only as good as the notes behind it, and the version being
+ * released is the one that needs an entry — the tests run BEFORE the bump, so
+ * they can only ever vouch for the version being replaced. This is the gate
+ * that looks forward.
+ */
+{
+  const notesFile = path.join(ROOT, 'src', 'js', 'release-notes.js');
+  const src = fs.readFileSync(notesFile, 'utf8');
+  if (!new RegExp(`['"]${version.replace(/\./g, '\\.')}['"]\\s*:`).test(src)) {
+    fail(`No release notes for ${version}.\n`
+      + `  Add an entry to src/js/release-notes.js — it is what the what's-new\n`
+      + `  card shows the user on their first run of this build.`);
+  }
+}
+
 console.log(`\nNebula ${pkg.version} -> ${version}${dryRun ? '   (dry run)' : ''}\n`);
 
 /* ------------------------------------------------- gates: tests and build */

@@ -21,6 +21,16 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-09 14:26] v0.6.4 - by claude
+
+reproduced against the note that reported it
+
+* Collapsed rail: drop the dead count rule beside the label
+* Release: never sit on an interactive credential prompt
+
+---
+
 ## [2026-09-09 03:37] v0.6.3 - by claude
 
 what the old notes were still holding

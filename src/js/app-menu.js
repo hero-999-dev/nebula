@@ -18,6 +18,7 @@ export function buildMenus(ctx) {
   const {
     actions = {}, store, openNote, newNote, find, palette, shortcuts,
     about, checkUpdates, guide, toggleSide, toggleBar, toggleAi, history, blocks,
+    whatsNew,
   } = ctx;
   const shell = typeof window !== 'undefined' ? window.nebula : null;
 
@@ -91,6 +92,7 @@ export function buildMenus(ctx) {
         { id: 'help.blocks', label: 'Blocks (the / menu)', run: () => blocks?.open() },
         { id: 'help.palette', label: 'Command palette', hint: 'Ctrl+K', run: () => palette?.open() },
         { separator: true },
+        { id: 'help.whatsnew', label: 'What’s new', run: () => whatsNew?.open() },
         { id: 'help.updates', label: 'Check for updates', run: () => checkUpdates?.() },
         { id: 'help.about', label: 'About Nebula', run: () => about?.() },
       ],
