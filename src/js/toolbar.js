@@ -27,7 +27,7 @@ import { noteFromFile } from './import.js';
  * `[label, class]`; the empty class is "clear it".
  */
 export const TEXT_COLORS = [
-  ['Default text', ''],
+  ['Black text', ''],
   ['Gray text', 'c-gray'],
   ['Brown text', 'c-brown'],
   ['Orange text', 'c-orange'],
@@ -366,13 +366,12 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
    */
   function applyToBlockOrSelection(classes, cls) {
     const range = selectionInEditor();
-    if (range && !range.collapsed) { applyExclusive(classes, cls); return; }
-    const block = blockOf();
-    if (!block) return;
-    history?.push();
-    block.classList.remove(...classes);
-    if (cls) block.classList.add(cls);
-    dirty();
+    // Selection only. This used to fall back to the whole block when nothing
+    // was selected, which is how "I did not select anywhere, I press change
+    // colour and everything changes" happened — the same complaint the font
+    // picker had, and the same answer.
+    if (!range || range.collapsed) return;
+    applyExclusive(classes, cls);
   }
 
   /**
@@ -507,8 +506,12 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     // sweeping the whole editor for `xxx-large` also resized anything that
     // already carried it, which is a local action reaching across the note.
     const marked = selectionInEditor();
+    // No selection to scope by means no sweep. Without this guard the loop
+    // resized EVERY element in the note carrying xxx-large — "sometimes random
+    // places grow by themselves".
+    if (!marked) { dirty(); return; }
     editorEl.querySelectorAll('[style*="xxx-large"], font[size="7"]').forEach((el) => {
-      if (marked && !marked.intersectsNode(el)) return;
+      if (!marked.intersectsNode(el)) return;
       el.style.fontSize = `${px}px`;
       el.removeAttribute('size');
     });
@@ -800,6 +803,7 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
   function applySize() {
     const px = parseSize(sizeInput.value);
     if (px) { sizeInput.value = String(px); withSelection(() => applyFontSize(px)); }
+    paintSizeTarget(false);
   }
   /** The common sizes, behind the caret. Typing a number still works. */
   const SIZES = [10, 12, 14, 16, 18, 20, 24, 28, 32, 48, 72];
@@ -825,6 +829,30 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       menu.appendChild(btn);
     }
   }());
+
+  /**
+   * Keep the selection VISIBLE while the size box has focus.
+   *
+   * The range is remembered and put back (`withSelection`), so the size always
+   * landed on the right words — but Chromium stops painting a selection the
+   * moment its editable loses focus, so the highlight vanished the instant the
+   * box was clicked and there was no way to tell what was about to change.
+   * Painted with the same Custom Highlight API the find bar uses, which draws
+   * without touching the note.
+   */
+  const SIZE_HL = 'nebula-size-target';
+  function paintSizeTarget(on) {
+    if (!window.CSS?.highlights) return;
+    if (!on || !savedRange || savedRange.collapsed) {
+      CSS.highlights.delete(SIZE_HL);
+      return;
+    }
+    try {
+      CSS.highlights.set(SIZE_HL, new Highlight(savedRange.cloneRange()));
+    } catch { /* a detached range; nothing to draw */ }
+  }
+  sizeInput?.addEventListener('focus', () => paintSizeTarget(true));
+  sizeInput?.addEventListener('blur', () => paintSizeTarget(false));
 
   sizeInput?.addEventListener('change', applySize);
   sizeInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applySize(); } });
@@ -894,6 +922,31 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
   editorEl.addEventListener('keydown', (e) => {
     if (e.target.closest('.code-src')) return; // code blocks own their keys
     const mod = e.ctrlKey || e.metaKey;
+
+    /**
+     * The caret stays in the note.
+     *
+     * Held at the top of a note, Chromium walks the selection OUT of the
+     * editable and into the page around it — it ends up in the sidebar's
+     * "Nebula" wordmark, where nothing is drawn and nothing typed arrives.
+     * "Press the up arrow from here and you will see the bug straight away."
+     * The default is left to run and the selection is pulled back only if it
+     * actually left, so ordinary movement is untouched.
+     */
+    if (!mod && e.key.startsWith('Arrow')) {
+      requestAnimationFrame(() => {
+        if (document.activeElement !== editorEl) return;   // focus left deliberately
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        if (editorEl.contains(sel.getRangeAt(0).commonAncestorContainer)) return;
+        const back = document.createRange();
+        back.selectNodeContents(editorEl);
+        back.collapse(e.key === 'ArrowUp' || e.key === 'ArrowLeft');
+        sel.removeAllRanges();
+        sel.addRange(back);
+      });
+    }
+
     if (e.key === 'Tab') { e.preventDefault(); indent(e.shiftKey ? -1 : 1); return; }
 
     // Getting out of an inline format. Enter at the end of one starts the next

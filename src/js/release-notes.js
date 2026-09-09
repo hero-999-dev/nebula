@@ -13,6 +13,48 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.6.8': {
+    headline: 'Lists that line up, Enter in code blocks, and a clean page edge.',
+    items: [
+      {
+        title: 'Bullets and numbers start in the same column',
+        text: 'A bullet and a "1." were pushed apart because a list marker is '
+          + 'right-aligned by default. They are drawn in a fixed column now, so '
+          + 'even "10." begins where the bullet does.',
+      },
+      {
+        title: 'Enter works inside a code block',
+        text: 'It did nothing at all: the newline was being handed to the browser '
+          + 'in a way it quietly discards.',
+      },
+      {
+        title: 'Nothing selected, nothing changed',
+        text: 'A colour picked with no selection used to recolour the whole line, '
+          + 'like the font did. Both leave the line alone now. Text no longer '
+          + 'changes size on its own in places you never touched.',
+      },
+      {
+        title: 'Highlighting does not nudge the line',
+        text: 'Applying a background shifted every following word sideways and '
+          + 'shifted it back when removed.',
+      },
+      {
+        title: 'A clean page edge in exports',
+        text: 'The thin dark line along the top of every exported page is gone.',
+      },
+      {
+        title: 'Shapes and the toolbar',
+        text: 'A shape cannot be dragged smaller than the words inside it, the '
+          + 'shape menu marks are bolder, and the size box shows what it is about '
+          + 'to change while you type in it.',
+      },
+      {
+        title: 'The cursor stays in the note',
+        text: 'Holding the up arrow at the top used to carry it out of the page '
+          + 'entirely, somewhere nothing you typed would land.',
+      },
+    ],
+  },
   '0.6.7': {
     headline: 'Switches that switch off, and one typeface for the whole app.',
     items: [

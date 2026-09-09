@@ -1,6 +1,6 @@
 {
   "projectName": "Nebula",
-  "version": "0.6.7",
+  "version": "0.6.8",
   "lastUpdated": "2026-09-09",
   "currentPhase": "v0.6.0 - export (Markdown, standalone HTML, real PDF via printToPDF) and import, a proper print stylesheet, and the fourteen defects from the user's Bug Report note.",
   "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, command palette, search, i18n.",
@@ -66,7 +66,10 @@
     "A page's margin band cannot be painted from the app: Chromium fills it from a cached document background colour. Use @page { margin: 0 } and pad the content.",
     "cmd() must not call editorEl.focus() when the caret is already inside the editor — a shape's text is a nested editable and focusing the editor discards the selection.",
     "styleWithCSS is a sticky, document-wide flag; applyFont leaves it on, so reset it before any other execCommand.",
-    "macOS: the app is ad-hoc signed in build/after-pack.cjs so it is never reported as damaged; the notarization warning needs a paid Developer ID and cannot be removed for free."
+    "macOS: the app is ad-hoc signed in build/after-pack.cjs so it is never reported as damaged; the notarization warning needs a paid Developer ID and cannot be removed for free.",
+    "printToPDF needs preferCSSPageSize: true, or Chromium rounds the page box and leaves a sub-point strip of the document background along the top of every page.",
+    "execCommand('insertText', '\\n') is discarded in a contenteditable; insert the newline as a text node and double it at the end of a block.",
+    "::marker is right-aligned in list-style-position: outside — a bullet and a number start at different x however well the text aligns. Draw markers as ::before in a fixed column."
   ],
   "history": [
     {

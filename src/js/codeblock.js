@@ -200,9 +200,50 @@ export function initCodeBlocks(editorEl, { history } = {}) {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       e.stopPropagation();
-      document.execCommand('insertText', false, '\n');
+      insertNewline(src);
     }
   }, true);
+
+  /**
+   * A newline in the source.
+   *
+   * `execCommand('insertText', '\n')` looks right and does nothing: Chromium
+   * drops a bare newline in a contenteditable, so Enter inside a code block
+   * never inserted anything — "printf, press enter, it comes back up, enter
+   * does not work in there". The character is put in by hand.
+   *
+   * A newline as the very last character has no line box after it, so nothing
+   * moves and the caret appears stuck. When the caret is at the end, two are
+   * inserted and it is parked between them — the same trick every code editor
+   * in a browser uses.
+   */
+  function insertNewline(src) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    if (!src.contains(range.startContainer)) return;
+    range.deleteContents();
+
+    const after = document.createRange();
+    after.selectNodeContents(src);
+    after.setStart(range.endContainer, range.endOffset);
+    const atEnd = after.toString().length === 0;
+
+    const node = document.createTextNode(atEnd ? '\n\n' : '\n');
+    range.insertNode(node);
+
+    const caret = document.createRange();
+    caret.setStart(node, 1);
+    caret.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caret);
+
+    // The text node was added by script, so no `input` event fired and
+    // `data-code` — which is the block's real source — would have missed it.
+    const block = src.closest('.blk-code');
+    if (block) setCode(block, src.textContent ?? '');
+    dirty();
+  }
 
   // repaint when focus leaves a code block
   /**

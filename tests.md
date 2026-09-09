@@ -85,7 +85,66 @@ added** · the vault is left exactly as it was.
 
 ## Log
 
-### [2026-09-09] v0.6.5 - switches that switch off
+### [2026-09-09] v0.6.8 - the page edge, and lists that line up
+
+**Unit 289, smoke 150.**
+
+**"Why are bulleted and numbered not on the same line" — reported three times,
+measured as aligned every time.** Both put their TEXT at exactly the same x;
+what was out of line was the markers. `::marker` is right-aligned against the
+text in `list-style-position: outside`, so a narrow "•" and a wide "1." share
+their right edge and begin at different places. Measuring the text answered a
+question nobody had asked. The markers are drawn as `::before` in a fixed
+22px column now, left-aligned, so "•", "1." and "10." all begin at the same x.
+
+**Enter did nothing inside a code block.** The handler was there and looked
+right: `execCommand('insertText', '\n')`. Chromium discards a bare newline in a
+contenteditable, so the character never arrived — typing "one", Enter, "two"
+produced "onetwo". The newline is inserted as a text node now, doubled when the
+caret is at the end (a trailing newline has no line box, so nothing appears to
+move), and `data-code` is updated by hand because a scripted insertion fires no
+`input` event.
+
+**The dark line along the top of every exported page.** Chromium was rounding
+the page box: the sheet came out 795x1124 while the page box was 794x1123 offset
+by one pixel, leaving a 0.75pt strip of the document's background along the top
+edge — and the clip region started below it, so nothing the page painted could
+reach it. `preferCSSPageSize: true` makes the page box the stylesheet's own
+`@page` box exactly; the white now covers the sheet corner to corner, on every
+page. Measured across a three-page export.
+
+*Still true, and worth stating:* the 1.27 cm margins come from padding on the
+content, so a note long enough to break starts its second page at the paper's
+edge. Repeating margins need `@page` margins, and a page's margin band cannot be
+painted — four separate attempts are recorded under 0.6.7. Between a dark frame
+on every page and a missing top margin on continuation pages, this is the better
+half of a trade that Chromium does not let us avoid.
+
+**Nothing selected, nothing changed.** The colour picker kept the whole-block
+fallback the font picker lost in 0.6.7 — "I did not select anywhere, I press
+change colour and everything changes". Both are selection-only now, and the
+smoke check that asserted the old behaviour was rewritten rather than deleted.
+`applyFontSize` also swept the WHOLE note for `xxx-large` whenever it had no
+selection to scope by, which is "sometimes random places grow by themselves".
+
+**A highlight nudged the line.** `padding: 0 2px` on the highlight classes
+widened the run by 4px, so every following word jumped sideways when a
+background was applied and jumped back when it was removed. The padding is
+still painted; a matching negative margin gives the width back.
+
+**Also:** a shape cannot be dragged smaller than the text in it; the shape menu
+uses filled marks in full-strength ink; the code block's language picker lines
+up with the code under it; "Default text" is called Black text; and the size box
+paints what it is about to change, because Chromium stops drawing a selection
+the moment its editable loses focus.
+
+**The caret could leave the note.** Held at the top, the up arrow walked the
+selection out of the editable and into the page around it — it came to rest in
+the sidebar's wordmark, where no caret is drawn and nothing typed arrives. The
+default is still allowed to run; the selection is pulled back only when it has
+actually left.
+
+### [2026-09-09] v0.6.7 - switches that switch off
 
 **Unit 284 -> 289, smoke 149 -> 150.**
 

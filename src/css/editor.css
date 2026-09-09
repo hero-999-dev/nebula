@@ -309,11 +309,31 @@
   font-style: italic;
 }
 .editor hr.blk-hr { border: none; border-top: 1.4px solid var(--rule); margin: 14px 0; }
-/* One marker column, so a bullet and "1." put their text at the same x — and
-   so a two-digit number cannot push its line out of line with the rest. */
-.editor ul, .editor ol { margin: 4px 0; padding-left: 26px; }
-.editor li { padding-left: 2px; }
-.editor li::marker { font-family: var(--serif); font-size: 0.86em; color: var(--ink-soft); }
+/* One marker column that both kinds START in.
+   `::marker` is right-aligned against the text in `outside` position, so a "•"
+   and a "1." shared their right edge and began at different x — which is what
+   "why are bulleted and numbered not on the same line" was about, reported
+   three times while the TEXT was measured as perfectly aligned every time. The
+   markers are drawn as ::before in a fixed column, left-aligned, so both begin
+   at the same place and two digits cannot shift anything. */
+.editor ul, .editor ol { margin: 4px 0; padding-left: 26px; list-style: none; }
+.editor ol { counter-reset: nebula-ol; }
+.editor li { padding-left: 2px; position: relative; }
+.editor ol > li { counter-increment: nebula-ol; }
+.editor ul > li::before { content: "\2022"; }
+.editor ol > li:not(.blk-todo)::before { content: counter(nebula-ol) "."; }
+.editor li:not(.blk-todo)::before {
+  position: absolute;
+  left: -24px;
+  width: 22px;
+  text-align: left;
+  font-family: var(--serif);
+  font-size: 0.86em;
+  color: var(--ink-soft);
+  pointer-events: none;
+}
+/* A to-do draws its own box in ::before, so it is left out of the rules above
+   rather than having its marker cancelled afterwards. */
 
 .editor [data-ind="1"] { margin-left: 26px; }
 .editor [data-ind="2"] { margin-left: 52px; }
@@ -435,7 +455,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 8px;
+  /* The language picker lines up with the code under it rather than sitting
+     further in than everything else in the block. */
+  padding: 5px 8px 5px 4px;
   border-bottom: 1px solid var(--rule);
   background: var(--paper-raised);
 }
@@ -949,7 +971,12 @@ body.resizing webview { pointer-events: none; }
 .h-blue, .h-purple, .h-pink, .h-red {
   color: var(--h-ink);
   border-radius: 3px;
+  /* The 2px of breathing room is painted, not laid out: as plain padding it
+     made every following word jump 4px sideways the moment a highlight was
+     applied, and jump back when it was removed. The negative margin gives the
+     width back. */
   padding: 0 2px;
+  margin: 0 -2px;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -1076,9 +1103,18 @@ body.resizing webview { pointer-events: none; }
   gap: 8px;
   text-align: left;
 }
+/* Filled marks in full-strength ink: the outlined glyphs were hairlines at
+   14px and read as smudges next to the names. */
 .tb-menu--shapes .sh-mark {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1;
   text-align: center;
-  color: var(--ink-soft);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* What the size box is about to change, kept visible while it has focus. */
+::highlight(nebula-size-target) {
+  background: var(--clay-soft);
+  color: var(--ink);
 }

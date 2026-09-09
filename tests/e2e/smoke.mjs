@@ -1581,8 +1581,14 @@ try {
       gone === 0 && JSON.stringify(back) === JSON.stringify(shape), JSON.stringify(back));
   }
 
-  // Colour with a caret and no selection did nothing at all — the fonts got
-  // this fallback in 0.4.4 and the colours never did.
+  /**
+   * A colour needs a SELECTION, like a font.
+   *
+   * 0.4.4 gave the collapsed caret a whole-block fallback, because picking a
+   * colour with the caret merely parked in a line did nothing at all. That
+   * traded one surprise for a bigger one: "I did not select anywhere, I press
+   * change colour and everything changes." Nothing selected, nothing changed.
+   */
   {
     await win.evaluate(() => {
       const ed = document.getElementById('editor');
@@ -1597,8 +1603,11 @@ try {
     await win.waitForSelector('#menu-color:not([hidden])', { timeout: 5_000 });
     await press(win, '#menu-color button[data-color-class="c-red"]');
     await win.waitForTimeout(200);
-    check('a colour with only a caret applies to the whole line',
-      await win.evaluate(() => document.querySelector('#editor p')?.classList.contains('c-red')));
+    check('a colour with only a caret leaves the line alone',
+      await win.evaluate(() => {
+        const p = document.querySelector('#editor p');
+        return !p?.classList.contains('c-red') && !p?.querySelector('.c-red');
+      }), await win.evaluate(() => document.getElementById('editor').innerHTML.slice(0, 90)));
 
     // ...and a selection must not have its surrounding spaces rewritten.
     await win.evaluate(() => {

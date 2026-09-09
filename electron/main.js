@@ -431,6 +431,13 @@ function registerShellHandlers() {
         // and the margins are drawn as padding where they can be controlled.
         margins: { marginType: 'custom', top: 0, bottom: 0, left: 0, right: 0 },
         pageSize: 'A4',
+        // Take the page box from the stylesheet's own `@page`, exactly.
+        // Without this Chromium rounds it: the sheet came out 795x1124 while
+        // the page box was 794x1123 offset by one pixel, leaving a 0.75pt strip
+        // of the document's background colour along the top edge — the "dark
+        // straight line still at the very top" of every export. With it the
+        // white covers the sheet corner to corner.
+        preferCSSPageSize: true,
       });
       await fs.writeFile(filePath, data);
       return { ok: true, path: filePath, bytes: data.length };

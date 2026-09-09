@@ -197,13 +197,17 @@ export function initShapes(editorEl, { history } = {}) {
       drag.el.style.left = `${Math.max(0, drag.left + dx)}px`;
       drag.el.style.top = `${Math.max(0, drag.top + dy)}px`;
     } else {
+      // A shape grows to fit its text, so it must not be draggable back down
+      // to where the text no longer fits — that is the same clipping, put back
+      // by hand. The floor is what the words need.
+      const floor = minSize(drag.el);
       if (EQUILATERAL.has(drag.el.dataset.kind)) {
-        const side = Math.max(48, Math.max(drag.w + dx, drag.h + dy));
+        const side = Math.max(48, floor.h, floor.w, Math.max(drag.w + dx, drag.h + dy));
         drag.el.style.width = `${side}px`;
         drag.el.style.height = `${side}px`;
       } else {
-        drag.el.style.width = `${Math.max(48, drag.w + dx)}px`;
-        drag.el.style.height = `${Math.max(34, drag.h + dy)}px`;
+        drag.el.style.width = `${Math.max(48, floor.w, drag.w + dx)}px`;
+        drag.el.style.height = `${Math.max(34, floor.h, drag.h + dy)}px`;
       }
     }
     positionBar();
@@ -240,6 +244,20 @@ export function initShapes(editorEl, { history } = {}) {
    * overflowing anywhere visible. The shape gains height (and a little width,
    * up to a sane cap) until the text fits.
    */
+  /**
+   * The smallest this shape may be without hiding what is written in it.
+   *
+   * Measured by letting the text lay itself out at the shape's current width:
+   * `scrollHeight` on the text is what it WANTS, whatever the box allows.
+   */
+  function minSize(shape) {
+    const text = shape?.querySelector('.shape-text');
+    if (!text) return { w: 48, h: 34 };
+    const slack = shape.classList.contains('rect') || shape.classList.contains('square')
+      || shape.classList.contains('ellipse') || shape.classList.contains('circle') ? 14 : 40;
+    return { w: 48, h: Math.max(34, text.scrollHeight + slack) };
+  }
+
   function fitToText(shape) {
     const text = shape?.querySelector('.shape-text');
     if (!text) return;

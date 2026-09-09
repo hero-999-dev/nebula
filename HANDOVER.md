@@ -215,7 +215,18 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    resets the flag.
 29. **A block with no children has no line box** — no height, and no caret to
    click into. `migrateBlankLines` puts a `<br>` in.
-30. **Anything written into a note's markup is frozen in old notes.** The
+30. **`preferCSSPageSize: true` or the page box is rounded.** Without it
+   Chromium leaves a sub-point strip of the document background along the top
+   of every printed page, outside the clip region, unreachable by CSS.
+31. **`execCommand('insertText', '\n')` is discarded by Chromium.** Insert a
+   newline as a text node, and double it at the end of a block — a trailing
+   newline has no line box.
+32. **`::marker` is right-aligned in `list-style-position: outside`,** so a
+   bullet and a number begin at different x however well the TEXT lines up.
+   Draw markers as `::before` in a fixed column.
+33. **Padding on an inline changes the layout of the line.** A highlight needs
+   a matching negative margin or every following word moves.
+34. **Anything written into a note's markup is frozen in old notes.** The
    code block's ✕ is created with the block, so blocks written before it existed
    never got one — `paintAllCode` tops the header up on every load. Any new
    in-note control needs the same treatment.
