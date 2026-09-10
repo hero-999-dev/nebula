@@ -299,3 +299,73 @@ describe('liftListItemAtStart', () => {
     expect(liftListItemAtStart(host, null)).toBe(false);
   });
 });
+
+/**
+ * A list must never be left inside a paragraph.
+ *
+ * `execCommand('insertUnorderedList')` on an ordinary paragraph produces
+ * `<p><ul><li>…</li></ul></p>`. Everything after it went wrong in sequence:
+ * leaving the list added a <div> INSIDE that paragraph, the next list nested
+ * inside that, and pressing To-do converted the paragraph itself, swallowing
+ * both lists into one to-do. Found by building the user's own note with a
+ * mouse rather than by reading the code.
+ *
+ * The nesting is built with DOM calls on purpose: a <p> cannot contain a <ul>,
+ * so the HTML parser closes the paragraph first and innerHTML can never
+ * express what the browser's own command produces at runtime.
+ */
+describe('normalizeLists: a list inside a paragraph', () => {
+  /** `<p>[before]<ul><li>one</li></ul>[after]</p>`, built past the parser. */
+  const nested = (tag = 'ul', before = '', after = '') => {
+    const el = document.createElement('div');
+    const p = document.createElement('p');
+    if (before) p.appendChild(document.createTextNode(before));
+    const list = document.createElement(tag);
+    const li = document.createElement('li');
+    li.textContent = tag === 'ol' ? 'first' : 'one';
+    list.appendChild(li);
+    p.appendChild(list);
+    if (after) p.appendChild(document.createTextNode(after));
+    el.appendChild(p);
+    return el;
+  };
+
+  it('lifts the list out and drops the empty paragraph', () => {
+    const el = nested();
+    expect(normalizeLists(el)).toBe(true);
+    expect(shape(el)).toBe('<ul><li>one</li></ul>');
+  });
+
+  it('keeps text that was before the list, in order', () => {
+    const el = nested('ul', 'lead');
+    normalizeLists(el);
+    expect(shape(el)).toBe('<p>lead</p><ul><li>one</li></ul>');
+  });
+
+  it('keeps text that was after it too', () => {
+    const el = nested('ul', '', 'tail');
+    normalizeLists(el);
+    expect(shape(el)).toBe('<ul><li>one</li></ul><p>tail</p>');
+  });
+
+  it('handles a numbered list the same way', () => {
+    const el = nested('ol');
+    normalizeLists(el);
+    expect(shape(el)).toBe('<ol><li>first</li></ol>');
+  });
+
+  it('leaves a list that is already a sibling alone', () => {
+    const html = '<p>text</p><ul><li>one</li></ul>';
+    const el = root(html);
+    expect(normalizeLists(el)).toBe(false);
+    expect(shape(el)).toBe(html);
+  });
+
+  it('is idempotent', () => {
+    const el = nested();
+    normalizeLists(el);
+    const after = el.innerHTML;
+    expect(normalizeLists(el)).toBe(false);
+    expect(el.innerHTML).toBe(after);
+  });
+});

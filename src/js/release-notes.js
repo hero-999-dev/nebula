@@ -13,6 +13,30 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.7.3': {
+    headline: 'Built the note by hand, and fixed what that turned up.',
+    items: [
+      {
+        title: 'Clicking a shape no longer jumps to the top',
+        text: 'The view stayed where it was measured at; a change in the last '
+          + 'release had been throwing it to the top of the note on every click.',
+      },
+      {
+        title: 'Lists, to-dos and dividers stay separate blocks',
+        text: 'Making a bulleted list, then a numbered one, then a to-do used to '
+          + 'end with one to-do holding all of them — and a divider inserted '
+          + 'inside it. Each is its own block now.',
+      },
+      {
+        title: 'Enter on an empty to-do ends the run',
+        text: 'The only way out before was to keep making empty to-dos.',
+      },
+      {
+        title: 'A divider is always a line of its own',
+        text: 'It went wherever the cursor was, including inside a to-do.',
+      },
+    ],
+  },
   '0.7.2': {
     headline: 'Toolbar marks that tell the truth, and one outline weight.',
     items: [

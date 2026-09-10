@@ -31,6 +31,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-10 03:02] v0.7.3 - by claude
+
+built the note by hand
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-10 02:00] v0.7.2 - by claude
 
 the indicator, read from two screenshots

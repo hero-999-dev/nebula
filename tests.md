@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 303 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 160 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 309 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 169 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -20,7 +20,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 |---|---|---|
 | `tests/notes.test.js` | 20 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body, and adds the guide to an older vault exactly once without touching what is there |
 | `tests/editor.test.js` | 41 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and the guide note's completeness |
-| `tests/lists.test.js` | 30 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
+| `tests/lists.test.js` | 36 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
 | `tests/migrate.test.js` | 30 | Bringing a stored note up to what this version writes |
 | `tests/release-notes.test.js` | 17 | What each release says for itself |
 | `tests/inline-format.test.js` | 18 | Enter and Backspace out of an inline wrapper |
@@ -35,7 +35,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
 | `tests/export.test.js` | 18 | A note as Markdown or as a standalone HTML file |
 | `tests/import.test.js` | 18 | A Markdown or HTML file read back as a note, sanitised |
-| `tests/e2e/smoke.mjs` | 160 | The real app, six launches |
+| `tests/e2e/smoke.mjs` | 169 | The real app, six launches |
 
 ---
 
@@ -84,6 +84,50 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-10] v0.7.3 - built the note by hand
+
+The user's instruction, after the same faults came back too many times: stop
+reading the report and *make* it. Open a new note, call it Untitled 2, and try
+to build the same thing with the mouse.
+
+That found more in one pass than the previous three rounds of prose.
+
+**Clicking a shape threw the view to the top of the note.** Measured at
+820 -> 0. Mine, from 0.7.2: the editor's size was frozen for the length of a
+drag to stop the bottom of the note moving under the hand, and a `min-height`
+on the element that SCROLLS stops it overflowing — so it stops scrolling and its
+scrollTop goes to zero. It ran on mousedown, so every click did it. Second
+attempt at that report, second worse fault; it is out, and the original is open
+again until there is a reproduction to work from.
+
+**One to-do swallowed both lists and the divider.** Building the note by hand
+produced this:
+
+    <div class="blk-todo"><ul>…</ul><div><ol>…</ol><div>a thing</div></div></div>
+
+The whole cascade came from the first step. `execCommand('insertUnorderedList')`
+leaves the list INSIDE the block the caret was in, and `<p><ul>` is not merely
+untidy — it is invalid. Leaving the list then added a `<div>` inside that
+paragraph, the next list nested inside that, and To-do converted the outermost
+block, taking everything with it.
+
+`listCommand` half-knew: it builds a list by hand for a to-do line, with a
+comment describing exactly this markup, and left the ordinary case to the
+browser. `normalizeLists` lifts a list out of any wrapper that is not an `<li>`
+now.
+
+The first attempt only handled `<p>` — and passed a clean-start trace while the
+real sequence still failed, because after a heading the block Chromium makes on
+Enter is a `<div>`. The order the user actually works in is the test.
+
+**Enter on an empty to-do ends the run,** the way it does in a list; before
+this the only way out was to keep making empty to-dos. **And a divider is
+inserted at the top level** rather than wherever the caret happens to be — it
+was landing inside the to-do.
+
+**Untitled 2 is in the test vault**, built end to end with a real pointer, so
+the structure can be looked at rather than described.
 
 ### [2026-09-10] v0.7.2 - the indicator, read from two screenshots
 

@@ -211,17 +211,70 @@ export function liftListItemAtStart(root, selection) {
  * @param {Element} root the editor
  * @returns {boolean} whether anything moved — callers use it to skip a save
  */
+/**
+ * Take a list out of the paragraph Chromium put it in.
+ *
+ * `execCommand('insertUnorderedList')` on an ordinary paragraph produces
+ * `<p><ul><li>…</li></ul></p>` — which is not merely untidy, it is invalid: a
+ * `<p>` cannot contain a `<ul>` at all. Everything after it went wrong in
+ * sequence. Leaving the list added a `<div>` INSIDE that paragraph, the next
+ * list nested inside that, and pressing To-do converted the paragraph itself —
+ * swallowing both lists and everything under them into one to-do.
+ *
+ * This was half-known: `listCommand` builds a list by hand for a to-do line
+ * with a comment describing exactly this markup, and left the ordinary case to
+ * the browser.
+ */
+function liftOutOfParagraphs(root) {
+  let touched = false;
+  for (const list of [...root.querySelectorAll('ul, ol')]) {
+    const p = list.parentElement;
+    if (!p || p === root) continue;
+    // An <li> holding a list is genuine nesting and stays. Anything else is a
+    // wrapper the list fell into: a <p> from `insertUnorderedList`, a <div>
+    // Chromium made when Enter was pressed on a line further up, a to-do that
+    // swallowed the list whole. Checking only for <p> was not enough — the
+    // trace that found this started from a heading, so the block the caret was
+    // in was a DIV and nothing was lifted at all.
+    if (p.tagName === 'LI') continue;
+    // Whatever else the paragraph holds keeps a paragraph of its own, in order.
+    const before = [];
+    const after = [];
+    let seen = false;
+    for (const node of [...p.childNodes]) {
+      if (node === list) { seen = true; continue; }
+      (seen ? after : before).push(node);
+    }
+    const own = (nodes) => {
+      if (!nodes.some((n) => n.nodeType !== 3 || n.nodeValue.trim())) return null;
+      // The piece keeps the wrapper it was in — a to-do line stays a to-do.
+      const el = p.cloneNode(false);
+      nodes.forEach((n) => el.appendChild(n));
+      return el;
+    };
+    const head = own(before);
+    const tail = own(after);
+    if (head) p.parentNode.insertBefore(head, p);
+    p.parentNode.insertBefore(list, p);
+    if (tail) p.parentNode.insertBefore(tail, p);
+    p.remove();
+    touched = true;
+  }
+  return touched;
+}
+
 export function normalizeLists(root) {
   if (!root) return false;
   let touched = false;
   // Hoisting can expose a new merge, and merging can expose a new hoist, so
   // this repeats until it settles. Bounded: a malformed tree must not spin.
   for (let pass = 0; pass < 5; pass++) {
+    const z = liftOutOfParagraphs(root);
     const a = liftMismatched(root);
     const b = mergeAdjacent(root);
     const c = dropEmptyLists(root);
-    touched = touched || a || b || c;
-    if (!a && !b && !c) break;
+    touched = touched || z || a || b || c;
+    if (!z && !a && !b && !c) break;
   }
   return touched;
 }

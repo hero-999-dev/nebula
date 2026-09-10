@@ -248,7 +248,15 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    formatting — step into the child beside it first.
 41. **A declared 1.6px border is rounded to a whole pixel; an SVG stroke is
    not.** Declaring the same number on both gives two different lines.
-42. **Anything written into a note's markup is frozen in old notes.** The
+42. **Build the thing by hand before believing a fix.** Driving the real app
+   with a pointer, in the order a person works, found in one pass what three
+   rounds of reading the report did not — and a clean-start trace passed while
+   the real sequence still failed.
+43. **Never set `min-height` on the element that scrolls.** It stops
+   overflowing, so it stops scrolling and its scrollTop goes to zero.
+44. **`execCommand` list commands leave the list inside the caret's block.**
+   `normalizeLists` lifts it out of any wrapper that is not an `<li>`.
+45. **Anything written into a note's markup is frozen in old notes.** The
    code block's ✕ is created with the block, so blocks written before it existed
    never got one — `paintAllCode` tops the header up on every load. Any new
    in-note control needs the same treatment.

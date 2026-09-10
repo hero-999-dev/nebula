@@ -216,15 +216,17 @@ export function initShapes(editorEl, { history } = {}) {
       w: shape.offsetWidth,
       h: shape.offsetHeight,
     };
-    // Freeze how far the note reaches while a shape is being dragged.
+    // Nothing is done to the editor's own size here, and that is deliberate.
     //
-    // A shape is absolutely positioned, so the one furthest down decides the
-    // editor's scroll height: moving it moved the bottom of the note under the
-    // hand, and the scrollbar appearing or vanishing shifted everything
-    // sideways as well. Held still for the length of the gesture and released
-    // afterwards, so a shape can still be put anywhere.
-    editorEl.style.minHeight = `${editorEl.scrollHeight}px`;
-    editorEl.style.minWidth = `${editorEl.scrollWidth}px`;
+    // 0.7.2 froze it for the length of the drag, to stop the bottom of the note
+    // moving under the hand. A min-height on the element that SCROLLS stops it
+    // overflowing, so it stops scrolling — and its scrollTop went to zero. Since
+    // this runs on mousedown, every click on a shape threw the view to the top
+    // of the note: "I press a shape and the screen suddenly jumps up." Measured
+    // at 820 -> 0.
+    //
+    // Second attempt at that report, second worse fault. It stays out until
+    // there is a reproduction of the original to work from.
   });
 
   window.addEventListener('mousemove', (e) => {
@@ -284,8 +286,6 @@ export function initShapes(editorEl, { history } = {}) {
     if (!drag) return;
     const { el, moved, wasSelected } = drag;
     drag = null;
-    editorEl.style.minHeight = '';
-    editorEl.style.minWidth = '';
     if (moved) { dirty(); return; }
 
     // A press that never moved is a click. On a shape that was ALREADY

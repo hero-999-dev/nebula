@@ -1184,6 +1184,125 @@ try {
       new Set(Object.values(weights)).size === 1, JSON.stringify(weights));
   }
 
+  /**
+   * Blocks built one after another stay siblings.
+   *
+   * Building the user's own note by hand, with a real pointer, produced this:
+   *
+   *     <div class="blk-todo"><ul>…</ul><div><ol>…</ol><div>a thing</div></div></div>
+   *
+   * One to-do holding both lists and everything under them. The whole cascade
+   * came from the first step — `execCommand('insertUnorderedList')` on an
+   * ordinary paragraph produces `<p><ul>…</ul></p>`, which is not merely untidy
+   * but invalid, and every later block nested one deeper inside it.
+   */
+  {
+    const press = async (act) => {
+      await win.evaluate((a) => document.querySelector(`.toolbar [data-act="${a}"]`).click(), act);
+      await win.waitForTimeout(200);
+    };
+    const write = async (t) => { await win.keyboard.type(t, { delay: 4 }); await win.waitForTimeout(120); };
+
+    await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p><br></p>';
+      ed.dispatchEvent(new Event('input', { bubbles: true }));
+      ed.focus();
+      const r = document.createRange();
+      r.setStart(ed.firstChild, 0);
+      r.collapse(true);
+      const s = getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    });
+    await win.waitForTimeout(200);
+
+    await press('ul');
+    const listShape = await win.evaluate(() => document.getElementById('editor').innerHTML);
+    check('a bulleted list is not made inside a paragraph',
+      !/<p[^>]*>\s*<ul/i.test(listShape), listShape.slice(0, 80));
+
+    await write('one');
+    await win.keyboard.press('Enter');
+    await write('two');
+    await win.keyboard.press('Enter');
+    await win.keyboard.press('Enter');
+    await press('ol');
+    await write('first');
+    await win.keyboard.press('Enter');
+    await write('second');
+    await win.keyboard.press('Enter');
+    await win.keyboard.press('Enter');
+    await press('todo');
+    await write('a thing');
+    await win.keyboard.press('Enter');
+    await press('divider');
+    await win.waitForTimeout(250);
+
+    const built = await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      return {
+        kids: [...ed.children].map((c) => c.tagName.toLowerCase()
+          + (c.className ? '.' + String(c.className).split(' ')[0] : '')),
+        listInPara: !!ed.querySelector('p ul, p ol'),
+        listInTodo: !!ed.querySelector('.blk-todo ul, .blk-todo ol'),
+        hrInTodo: !!ed.querySelector('.blk-todo hr'),
+        ulItems: ed.querySelectorAll('ul li').length,
+        olItems: ed.querySelectorAll('ol li').length,
+      };
+    });
+    check('no list ends up inside a paragraph', !built.listInPara, JSON.stringify(built.kids));
+    check('no to-do swallows a list', !built.listInTodo, JSON.stringify(built.kids));
+    check('a divider is not made inside a to-do', !built.hrInTodo, JSON.stringify(built.kids));
+    check('both lists keep their two items',
+      built.ulItems === 2 && built.olItems === 2,
+      `ul ${built.ulItems}, ol ${built.olItems}`);
+    check('everything built is a sibling of everything else',
+      built.kids.filter((k) => k.startsWith('ul') || k.startsWith('ol')
+        || k.startsWith('div.blk-todo') || k === 'hr.blk-hr').length === 4,
+      JSON.stringify(built.kids));
+  }
+
+  /**
+   * Clicking a shape leaves the view where it is.
+   *
+   * 0.7.2 froze the editor's size for the length of a drag, to stop the bottom
+   * of the note moving under the hand. A min-height on the element that SCROLLS
+   * stops it overflowing, so it stops scrolling and its scrollTop goes to zero —
+   * and since that ran on mousedown, every click on a shape threw the view to
+   * the top of the note. Measured at 820 -> 0.
+   */
+  {
+    await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p>line</p>'.repeat(40)
+        + '<div class="shape-layer" contenteditable="false" data-block-type="shape-layer">'
+        + '<div class="shape rect" data-kind="rect" style="left:60px;top:900px;width:150px;'
+        + 'height:90px;background:#e8cdbd;--shape-fill:#e8cdbd;">'
+        + '<div class="shape-text" contenteditable="false"><br></div>'
+        + '<span class="shape-h"></span></div></div>';
+      ed.dispatchEvent(new Event('input', { bubbles: true }));
+      ed.scrollTop = 820;
+    });
+    await win.waitForTimeout(350);
+    const before = await win.evaluate(() => Math.round(document.getElementById('editor').scrollTop));
+    const at = await win.evaluate(() => {
+      const r = document.querySelector('#editor .shape').getBoundingClientRect();
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + 14),
+               onScreen: r.top > 0 && r.bottom < window.innerHeight };
+    });
+    check('the shape is on screen to be clicked', at.onScreen);
+    await win.mouse.click(at.x, at.y);
+    await win.waitForTimeout(350);
+    const after = await win.evaluate(() => ({
+      top: Math.round(document.getElementById('editor').scrollTop),
+      selected: !!document.querySelector('#editor .shape.sel'),
+    }));
+    check('clicking a shape does not throw the view to the top',
+      Math.abs(after.top - before) < 20, `${before} -> ${after.top}`);
+    check('and it selects the shape', after.selected);
+  }
+
   // A shape's text: a caret to see, and room to grow into.
   {
     await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>x</p>'; });

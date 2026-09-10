@@ -469,6 +469,36 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
    * The to-do button toggles. It used to be one-way: once a line was a to-do
    * there was no way back to a paragraph, so a mis-click was permanent.
    */
+  /**
+   * A divider, always at the top level.
+   *
+   * `insertHTML` puts it wherever the caret is, and the caret is often inside
+   * something: pressing it on an empty to-do line produced
+   * `<div class="blk-todo"><hr class="blk-hr">…</div>` — a divider inside a
+   * to-do, which is not a thing. It goes after the caret's own top-level block
+   * instead, with an empty line under it to carry on in.
+   */
+  function insertDivider() {
+    const block = blockOf();
+    history?.push();
+    const hr = document.createElement('hr');
+    hr.className = 'blk-hr';
+    const after = document.createElement('p');
+    after.innerHTML = '<br>';
+    if (block) {
+      block.after(hr);
+      hr.after(after);
+      // An empty block the divider was called from has nothing left to say.
+      if (!block.textContent.trim() && !block.querySelector('img, .blk-code, .inline-eq')) {
+        block.remove();
+      }
+    } else {
+      editorEl.append(hr, after);
+    }
+    placeCaretEnd(after);
+    dirty();
+  }
+
   function makeTodo() {
     const el = blockOf();
     if (!el) { cmd('insertHTML', '<div class="blk-todo"><br></div>'); return; }
@@ -679,7 +709,7 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     // the menu and then pressing the button again gave a rectangle.
     'shape-rect': () => insertShape(lastShape),
     codeblock: () => insertCodeBlock(editorEl, 'javascript', history),
-    divider: () => cmd('insertHTML', '<hr class="blk-hr"><p><br></p>'),
+    divider: () => insertDivider(),
     bold: () => cmd('bold'),
     italic: () => cmd('italic'),
     underline: () => applyUnderline('u-single'),
@@ -1151,6 +1181,22 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
         return;
       }
     }
+    // Enter on an EMPTY to-do ends the run, exactly as it does in a list.
+    // Without it the only way out was to keep making empty to-dos.
+    if (!mod && e.key === 'Enter' && !e.shiftKey) {
+      const here = blockOf();
+      if (here?.classList.contains('blk-todo') && !here.textContent.trim()) {
+        e.preventDefault();
+        history?.push();
+        const out = document.createElement('p');
+        out.innerHTML = '<br>';
+        here.replaceWith(out);
+        placeCaretEnd(out);
+        dirty();
+        return;
+      }
+    }
+
     if (!mod && e.key === 'Enter' && !e.shiftKey) {
       if (enterOutOfWrapper(editorEl, window.getSelection())) {
         e.preventDefault();
