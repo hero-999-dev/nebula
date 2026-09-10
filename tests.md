@@ -5,7 +5,7 @@ What is tested, what each test proves, and what is knowingly untested.
 | | |
 |---|---|
 | **Unit** | 309 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 169 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Electron smoke** | 173 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -35,7 +35,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
 | `tests/export.test.js` | 18 | A note as Markdown or as a standalone HTML file |
 | `tests/import.test.js` | 18 | A Markdown or HTML file read back as a note, sanitised |
-| `tests/e2e/smoke.mjs` | 169 | The real app, six launches |
+| `tests/e2e/smoke.mjs` | 173 | The real app, six launches |
 
 ---
 
@@ -84,6 +84,47 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-10] v0.7.4 - the note, copied by hand
+
+**Smoke 169 -> 173.**
+
+The instruction was exact: make Untitled 2 the same as Untitled1 — the text,
+the shapes' positions, the colours — before touching anything else. Doing that
+found two faults that six rounds of reading the report had not.
+
+**"The underline part will not close", said six times, and true.** Formatting
+carries across Enter, so a new line inherits the wrappers of the line above.
+Every one of these controls needs a SELECTION — which was the answer to "a
+colour I did not ask for took the whole line" — and on a fresh empty line there
+is nothing to select, so the mark could not be switched off at all. Typing the
+note out revealed it immediately: every line after an underlined one came out
+underlined, coloured and highlighted.
+
+With the caret inside a wrapper and nothing selected, an empty wrapper is now
+taken away and a wrapper holding words is stepped out of.
+
+**The shape names were there and invisible.** `labelW: 0`. `min-width: 0` was
+added when the menu was asked to be less wide and it crushed the name column to
+nothing; the labels stayed in the markup at 13px, measuring 0 x 18. Every check
+made until now asked whether the text EXISTED, which is why "write the shapes'
+names next to the arrow, I have asked dozens of times" was answered with "they
+are already there" more than once. The smoke suite measures the rendered width
+now.
+
+**Untitled 2 is in the test vault**, built from scratch: every character typed,
+every mark applied from the toolbar, every shape inserted from the menu and
+dragged into place. It matches the original 12 blocks out of 12 — text, marks,
+both dividers and the code block — and 7 shapes out of 7 for kind, position and
+size. The last few pixels of each shape's position are set rather than dragged,
+because a thousand-pixel drag through a scrolling container accumulates drift;
+everything else is a real gesture.
+
+Two of the three defects fixed in this release were found by that exercise, and
+the recipe extractor itself had to be fixed twice on the way — first it walked
+only the editor's direct children and so treated a code block nested in a
+wrapper as prose, "typing" its painted source and its language menu's option
+labels into the copy.
 
 ### [2026-09-10] v0.7.3 - built the note by hand
 

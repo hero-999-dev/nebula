@@ -416,14 +416,70 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     return saw;
   }
 
+  /**
+   * Switch a mark off where there is nothing to select.
+   *
+   * Formatting carries across Enter, so a new line inherits the wrappers of the
+   * line above. Every one of these controls needs a SELECTION — that was the
+   * fix for "a colour I did not ask for took the whole line" — and on a fresh
+   * empty line there is nothing to select, so the mark could not be switched
+   * off at all: "the underline part will not close", six times.
+   *
+   * With the caret inside a wrapper of the family and nothing selected: an
+   * empty wrapper is taken away, and a wrapper with words in it is stepped out
+   * of, so what comes next is typed outside it.
+   *
+   * @returns {boolean} whether it dealt with the press
+   */
+  function clearAtCaret(classes, extra = '') {
+    const range = selectionInEditor();
+    if (!range || !range.collapsed) return false;
+    const sel = [...classes.map((c) => `.${c}`), ...(extra ? [extra] : [])].join(',');
+    let node = range.startContainer;
+    if (node.nodeType !== Node.ELEMENT_NODE) node = node.parentElement;
+    const wrapper = node?.closest?.(sel);
+    if (!wrapper || !editorEl.contains(wrapper)) return false;
+
+    history?.push();
+    if (!wrapper.textContent.trim()) {
+      // Nothing in it: take it away and leave the line able to hold a caret.
+      const block = wrapper.parentElement;
+      wrapper.replaceWith(...wrapper.childNodes);
+      if (block && !block.textContent.trim() && !block.querySelector('br')) {
+        block.appendChild(document.createElement('br'));
+      }
+      const r = document.createRange();
+      r.setStart(block ?? editorEl, 0);
+      r.collapse(true);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    } else {
+      // Step out of it, so the next thing typed is not inside it.
+      const r = document.createRange();
+      r.setStartAfter(wrapper);
+      r.collapse(true);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    }
+    dirty();
+    return true;
+  }
+
   const applyUnderline = (cls) => withSelection(() => {
     const want = cls === 'none' ? '' : cls;
+    if (clearAtCaret(U_STYLES, 'u')) return;
     applyExclusive(U_STYLES, alreadyApplied(want) ? '' : want, 'u');
   });
-  const applyTextColor = (cls) => withSelection(() =>
-    applyToBlockOrSelection(colorClasses(TEXT_COLORS), alreadyApplied(cls) ? '' : cls));
-  const applyHilite = (cls) => withSelection(() =>
-    applyToBlockOrSelection(colorClasses(HILITE_COLORS), alreadyApplied(cls) ? '' : cls));
+  const applyTextColor = (cls) => withSelection(() => {
+    if (clearAtCaret(colorClasses(TEXT_COLORS))) return;
+    applyToBlockOrSelection(colorClasses(TEXT_COLORS), alreadyApplied(cls) ? '' : cls);
+  });
+  const applyHilite = (cls) => withSelection(() => {
+    if (clearAtCaret(colorClasses(HILITE_COLORS))) return;
+    applyToBlockOrSelection(colorClasses(HILITE_COLORS), alreadyApplied(cls) ? '' : cls);
+  });
 
   /** What a colour class actually paints in the theme that is on right now. */
   function tokenValue(cls, prop) {

@@ -1140,10 +1140,16 @@ body.resizing webview { pointer-events: none; }
 
 /* The shape menu: the mark in a column of its own, the name beside it, and no
    empty half down the right — it was as wide as the font list. */
-.tb-menu--shapes { min-width: 0; }
+/* Wide enough for the longest name.
+   `min-width: 0` was put here when the menu was asked to be less wide, and it
+   crushed the name column to zero: every label was still in the markup, at
+   13px, measuring 0 x 18. "Write the shapes' names next to the arrow, I have
+   asked dozens of times" — they were there and invisible, and checking that the
+   text existed rather than that it RENDERED is why it survived. */
+.tb-menu--shapes { min-width: 146px; }
 .tb-menu--shapes button {
   display: grid;
-  grid-template-columns: 18px 1fr;
+  grid-template-columns: 18px minmax(0, auto);
   align-items: center;
   gap: 8px;
   text-align: left;

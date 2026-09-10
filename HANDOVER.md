@@ -256,7 +256,12 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    overflowing, so it stops scrolling and its scrollTop goes to zero.
 44. **`execCommand` list commands leave the list inside the caret's block.**
    `normalizeLists` lifts it out of any wrapper that is not an `<li>`.
-45. **Anything written into a note's markup is frozen in old notes.** The
+45. **A control that needs a selection cannot be switched OFF at a bare
+   caret.** Formatting carries across Enter, so the new line inherits it and
+   there is nothing to select — handle the collapsed case explicitly.
+46. **Assert that a label RENDERS, not that it exists.** The shape names sat in
+   the markup at zero width for several releases while every check passed.
+47. **Anything written into a note's markup is frozen in old notes.** The
    code block's ✕ is created with the block, so blocks written before it existed
    never got one — `paintAllCode` tops the header up on every load. Any new
    in-note control needs the same treatment.

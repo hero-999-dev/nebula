@@ -1303,6 +1303,99 @@ try {
     check('and it selects the shape', after.selected);
   }
 
+  /**
+   * A mark can be switched off where there is nothing to select.
+   *
+   * Formatting carries across Enter, so a new line inherits the wrappers of the
+   * line above. Every one of these controls needs a SELECTION — that was the
+   * answer to "a colour I did not ask for took the whole line" — and on a fresh
+   * empty line there is nothing to select, so the mark could not be switched
+   * off at all. Reported six times as "the underline part will not close", and
+   * found for certain only by building the user's own note from scratch with
+   * the keyboard: every line after an underlined one came out underlined too.
+   */
+  {
+    const trail = await win.evaluate(async () => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p id="lead">first line</p>';
+      ed.dispatchEvent(new Event('input', { bubbles: true }));
+      const r = document.createRange();
+      r.selectNodeContents(document.getElementById('lead'));
+      const s = getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+      ed.focus();
+      await new Promise((res) => setTimeout(res, 120));
+      document.querySelector('.toolbar [data-act="underline"]').click();
+      await new Promise((res) => setTimeout(res, 200));
+      // caret at the end of the underlined run, as if you had just typed it
+      const span = ed.querySelector('.u-single');
+      const r2 = document.createRange();
+      r2.selectNodeContents(span);
+      r2.collapse(false);
+      s.removeAllRanges();
+      s.addRange(r2);
+      return !!span;
+    });
+    check('the first line is underlined to begin with', trail);
+
+    await win.keyboard.press('Enter');
+    await win.waitForTimeout(200);
+    await win.evaluate(() => document.querySelector('.toolbar [data-act="underline"]').click());
+    await win.waitForTimeout(200);
+    await win.keyboard.type('plain text now', { delay: 3 });
+    await win.waitForTimeout(300);
+
+    const typed = await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      const walk = document.createTreeWalker(ed, NodeFilter.SHOW_TEXT);
+      const out = [];
+      let n;
+      while ((n = walk.nextNode())) {
+        if (!n.nodeValue.trim()) continue;
+        out.push({ text: n.nodeValue.trim(),
+                   under: !!n.parentElement.closest('.u-single,u') });
+      }
+      return out;
+    });
+    const first = typed.find((t) => t.text.startsWith('first'));
+    const after = typed.find((t) => t.text.startsWith('plain'));
+    check('underline switches off on a new line with nothing selected',
+      !!after && after.under === false, JSON.stringify(typed));
+    check('and the line it was applied to keeps it',
+      !!first && first.under === true, JSON.stringify(typed));
+  }
+
+  /**
+   * The shape menu's names are actually drawn.
+   *
+   * They were in the markup all along, at 13px, measuring 0 x 18: `min-width: 0`
+   * was added when the menu was asked to be narrower and crushed the name
+   * column to nothing. "Write the shapes' names next to the arrow, I have asked
+   * dozens of times" — checking that the text EXISTED rather than that it
+   * rendered is why it survived several rounds.
+   */
+  {
+    await press(win, '[data-menu="menu-shapes"]');
+    await win.waitForTimeout(250);
+    const rows = await win.evaluate(() => {
+      const m = document.getElementById('menu-shapes');
+      const box = m.getBoundingClientRect();
+      return [...m.querySelectorAll('[data-shape-add]')].map((b) => {
+        const lab = b.querySelector('.label');
+        const r = lab?.getBoundingClientRect();
+        return { kind: b.dataset.shapeAdd, text: lab?.textContent ?? '',
+                 w: r ? Math.round(r.width) : 0,
+                 inside: !!r && r.right <= box.right + 1 };
+      });
+    });
+    check('every shape row shows its name, wide enough to read',
+      rows.length === 6 && rows.every((r) => r.text && r.w > 30 && r.inside),
+      JSON.stringify(rows.map((r) => `${r.text}:${r.w}`)));
+    await press(win, '[data-menu="menu-shapes"]');
+    await win.waitForTimeout(150);
+  }
+
   // A shape's text: a caret to see, and room to grow into.
   {
     await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>x</p>'; });

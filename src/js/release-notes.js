@@ -13,6 +13,28 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.7.4': {
+    headline: 'Underline switches off, and the shape names are visible.',
+    items: [
+      {
+        title: 'Underline, colour and highlight switch off on a new line',
+        text: 'Formatting carries across Enter, and these controls need a '
+          + 'selection — so on a fresh empty line there was nothing to select '
+          + 'and no way to turn the mark off. Every line after an underlined one '
+          + 'came out underlined.',
+      },
+      {
+        title: 'The shape names are readable again',
+        text: 'They were in the menu the whole time at zero width, squeezed out '
+          + 'when the menu was made narrower.',
+      },
+      {
+        title: 'Untitled 2',
+        text: 'A copy of your bug report note, built from scratch in the test '
+          + 'build with the mouse and keyboard, to compare against.',
+      },
+    ],
+  },
   '0.7.3': {
     headline: 'Built the note by hand, and fixed what that turned up.',
     items: [

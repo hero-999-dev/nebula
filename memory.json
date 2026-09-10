@@ -1,8 +1,8 @@
 {
   "projectName": "Nebula",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "lastUpdated": "2026-09-10",
-  "currentPhase": "v0.7.3 - the note was built by hand with a pointer instead of read about: clicking a shape no longer throws the view to the top, and lists, to-dos and dividers stay separate blocks instead of nesting inside one another.",
+  "currentPhase": "v0.7.4 - the user's own note was copied from scratch with the pointer, which found that underline could not be switched off on a new line and that the shape names were rendering at zero width.",
   "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, search, i18n.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
@@ -32,7 +32,7 @@
   },
   "quality": {
     "unitTests": 309,
-    "smokeChecks": 169,
+    "smokeChecks": 173,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
@@ -83,7 +83,9 @@
     "A declared 1.6px border is rounded to a whole pixel and an SVG stroke is not — declare the same used width on both or the lines differ.",
     "Never set min-height on a scrolling element: it stops overflowing, stops scrolling, and its scrollTop goes to zero.",
     "execCommand's list commands leave the list inside the caret's own block; normalizeLists lifts it out of any wrapper that is not an <li>.",
-    "Drive the real app with a pointer in the order a person works — a clean-start trace can pass while the real sequence fails."
+    "Drive the real app with a pointer in the order a person works — a clean-start trace can pass while the real sequence fails.",
+    "A control that needs a selection must handle the collapsed caret too, or an inherited mark can never be switched off on a new line.",
+    "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
     {
