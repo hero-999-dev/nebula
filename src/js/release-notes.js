@@ -13,6 +13,37 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.7.2': {
+    headline: 'Toolbar marks that tell the truth, and one outline weight.',
+    items: [
+      {
+        title: 'Bold no longer looks stuck',
+        text: 'With the cursor next to a bold word the Bold button lit up on '
+          + 'plain text. The marks now show what the cursor is standing in.',
+      },
+      {
+        title: 'Underline shows at the start of a line',
+        text: 'At the very beginning of an underlined line there was no mark at '
+          + 'all, because the cursor sits just outside the underline there.',
+      },
+      {
+        title: 'A blank line under a divider goes first',
+        text: 'The divider was offered while the empty row beneath it stayed put, '
+          + 'so the gap could never be closed. The row goes, then the divider.',
+      },
+      {
+        title: 'Every shape has the same outline',
+        text: 'The diamond and triangle are stroked properly now instead of being '
+          + 'drawn as a fill inset from the edge, which made their line a '
+          + 'different weight from the square’s and thinner at a sharp corner.',
+      },
+      {
+        title: 'A shape no longer moves the bottom of the note',
+        text: 'While one is being dragged the note holds its size, so the page '
+          + 'does not shift under your hand.',
+      },
+    ],
+  },
   '0.7.1': {
     headline: 'Deleting near a shape, and dragging one, both behave.',
     items: [

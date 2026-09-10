@@ -557,7 +557,10 @@
   pointer-events: auto;
   min-width: 48px;
   min-height: 34px;
-  border: 1.6px solid rgba(28, 26, 22, 0.62);
+  /* 1px, not 1.6: the browser rounds a border to whole pixels anyway, and an
+     SVG stroke does not — declaring the same number gave the stroked kinds a
+     visibly heavier line than the square's. One value, both crisp. */
+  border: 1px solid rgba(28, 26, 22, 0.62);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -582,44 +585,37 @@
   border: none;
   background-color: rgba(28, 26, 22, 0.62) !important;
 }
-.shape.diamond { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
-.shape.triangle { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-/* The fill is clipped to its OWN polygon, drawn just inside the outer one —
-   not to a box inset of the same shape.
-   A box inset moves each edge perpendicular to the BOX, and on a diagonal that
-   is not the same as moving it perpendicular to the EDGE: the diamond came out
-   a touch thicker than the square and the triangle's line went uneven, thin at
-   the apex where the inset degenerates. Two parallel polygons give one even
-   line, the same weight as the 1.6px border the other kinds carry. */
-.shape.diamond::before, .shape.triangle::before {
-  content: '';
+/* No clip-path any more: it would cut the outer half of the SVG stroke away and
+   put the line back to looking thinner than the square's. The silhouette is the
+   polygon the SVG draws. */
+/* The clipped kinds are stroked as SVG.
+   A clip-path cuts a border off, so these used to be drawn as two layers with
+   the fill inset from the edge — and an inset moves each edge perpendicular to
+   the BOX, which on a diagonal is not perpendicular to the EDGE. The line came
+   out a different weight from the square's, thinner still at a sharp corner.
+   One stroke, mitred, held at 1.6px however the shape is stretched. */
+.shape.diamond, .shape.triangle {
+  border: none;
+  background: none !important;
+}
+.shape-svg {
   position: absolute;
   inset: 0;
-  background: var(--shape-fill, #E8CDBD);
+  width: 100%;
+  height: 100%;
+  overflow: visible;
   pointer-events: none;
 }
-/* In PIXELS, not percentages. A percentage inset scales with the shape, so the
-   same rule that looked like a hairline on a small diamond drew a four-pixel
-   band on a 150x90 one — "the triangle's edge is not a clean line, the diamond
-   is a touch thick, make them all the weight of the square". 2.2px along the
-   axes is about 1.6px measured across a 45-degree edge, which is the border the
-   other kinds carry. */
-.shape.diamond::before {
-  clip-path: polygon(
-    50% 2.2px,
-    calc(100% - 2.2px) 50%,
-    50% calc(100% - 2.2px),
-    2.2px 50%);
+.shape-svg polygon {
+  fill: var(--shape-fill, #E8CDBD);
+  stroke: rgba(28, 26, 22, 0.62);
+  stroke-width: 1;
+  stroke-linejoin: miter;
+  vector-effect: non-scaling-stroke;
 }
-.shape.triangle::before {
-  clip-path: polygon(
-    50% 3.4px,
-    calc(100% - 2.6px) calc(100% - 1.7px),
-    2.6px calc(100% - 1.7px));
-}
-/* Outline off: the fill runs to the edge and there is nothing left to show. */
-.shape.diamond.no-outline::before { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
-.shape.triangle.no-outline::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.shape.no-outline .shape-svg polygon { stroke: none; }
+.shape.diamond .shape-text, .shape.triangle .shape-text { position: relative; z-index: 1; }
+.shape.diamond .shape-text { max-width: 55%; }
 .shape.no-outline { border-color: transparent; }
 .shape.triangle .shape-text, .shape.diamond .shape-text { position: relative; z-index: 1; }
 .shape.diamond .shape-text { max-width: 55%; }

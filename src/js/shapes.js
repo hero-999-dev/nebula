@@ -13,6 +13,30 @@ export const SHAPE_KINDS = ['rect', 'square', 'ellipse', 'circle', 'diamond', 't
 export const EQUILATERAL = new Set(['square', 'circle']);
 
 /**
+ * The kinds drawn as an SVG outline rather than with a border.
+ *
+ * A `clip-path` cuts a border off, so these were drawn as two layers: the
+ * element painted the outline colour and a pseudo-element inset from the edge
+ * carried the fill. An inset moves each edge perpendicular to the BOX, and on a
+ * diagonal that is not perpendicular to the EDGE — so the line came out a
+ * different weight from the square's, and thinner still at a sharp corner where
+ * the inset degenerates. Reported three times, each time correctly.
+ *
+ * An SVG stroke has none of that: one width, mitred corners, and
+ * `vector-effect: non-scaling-stroke` keeps it at that width however the shape
+ * is stretched.
+ */
+export const STROKED = { diamond: '50,0 100,50 50,100 0,50', triangle: '50,0 100,100 0,100' };
+
+/** The outline layer for a kind that has one, or an empty string. */
+export function outlineSvg(kind) {
+  const points = STROKED[kind];
+  if (!points) return '';
+  return '<svg class="shape-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">'
+    + `<polygon points="${points}" /></svg>`;
+}
+
+/**
  * Two overlays, created lazily as the note's first children: one painted under
  * the text and one over it. "Send behind text" moves a shape between them —
  * with a single layer it could only ever be faded, never actually behind.
@@ -58,7 +82,8 @@ export function makeShape(kind = 'rect', color = SHAPE_COLORS[0], at = null) {
   // that you may type.
   // contenteditable="false" until it is actually being edited: otherwise the
   // caret walks in from the paragraph next to it on an arrow key.
-  el.innerHTML = '<div class="shape-text" contenteditable="false"><br></div>'
+  el.innerHTML = outlineSvg(kind)
+    + '<div class="shape-text" contenteditable="false"><br></div>'
     + '<span class="shape-rot" title="Rotate"></span>'
     + '<span class="shape-h" title="Resize"></span>';
   return el;
@@ -191,6 +216,15 @@ export function initShapes(editorEl, { history } = {}) {
       w: shape.offsetWidth,
       h: shape.offsetHeight,
     };
+    // Freeze how far the note reaches while a shape is being dragged.
+    //
+    // A shape is absolutely positioned, so the one furthest down decides the
+    // editor's scroll height: moving it moved the bottom of the note under the
+    // hand, and the scrollbar appearing or vanishing shifted everything
+    // sideways as well. Held still for the length of the gesture and released
+    // afterwards, so a shape can still be put anywhere.
+    editorEl.style.minHeight = `${editorEl.scrollHeight}px`;
+    editorEl.style.minWidth = `${editorEl.scrollWidth}px`;
   });
 
   window.addEventListener('mousemove', (e) => {
@@ -250,6 +284,8 @@ export function initShapes(editorEl, { history } = {}) {
     if (!drag) return;
     const { el, moved, wasSelected } = drag;
     drag = null;
+    editorEl.style.minHeight = '';
+    editorEl.style.minWidth = '';
     if (moved) { dirty(); return; }
 
     // A press that never moved is a click. On a shape that was ALREADY

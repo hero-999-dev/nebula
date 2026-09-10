@@ -5,7 +5,7 @@ What is tested, what each test proves, and what is knowingly untested.
 | | |
 |---|---|
 | **Unit** | 303 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 155 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Electron smoke** | 160 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -35,7 +35,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
 | `tests/export.test.js` | 18 | A note as Markdown or as a standalone HTML file |
 | `tests/import.test.js` | 18 | A Markdown or HTML file read back as a note, sanitised |
-| `tests/e2e/smoke.mjs` | 155 | The real app, six launches |
+| `tests/e2e/smoke.mjs` | 160 | The real app, six launches |
 
 ---
 
@@ -84,6 +84,50 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-10] v0.7.2 - the indicator, read from two screenshots
+
+**Smoke 155 -> 160.**
+
+The user sent two screenshots rather than another list, and they settled three
+things a week of prose had not.
+
+**"Gösterge" was never the caret.** "Where I said the underline does not close,
+right at the start there is no indicator at all" — the *toolbar mark*, not the
+text cursor. Measured, and two separate faults fell out of it:
+
+- `queryCommandState('bold')` reports the TYPING state, which Chromium carries
+  across a boundary. With the caret at the start of a line whose first word is
+  bold, Bold lit up on plain text: "bold is stuck here, it will not turn off".
+- A caret at offset 0 of a paragraph sits OUTSIDE the span holding the line's
+  formatting, so `closest()` from that node found nothing and the underline mark
+  never appeared at the beginning of an underlined line.
+
+Both are answered by asking which element is at the caret — stepping into the
+child it sits beside — and reading the DOM for all four marks rather than asking
+the browser what it would type next.
+
+**The outlines, at last, by looking at them.** The screenshot shows the diamond
+and triangle carrying a visibly lighter line than the square, which is what
+"make them all the weight of the square" meant, said three times. The
+inset-fill trick was replaced with a real SVG stroke and a `non-scaling-stroke`
+vector-effect — one width, mitred corners, at any size. Then the measurement
+caught the last part: a declared `1.6px` border is rounded to a whole pixel by
+the browser and an SVG stroke is not, so declaring the same number gave the
+stroked kinds a heavier line than the square's. Both are 1px now, and the smoke
+suite asserts the set of weights has exactly one member.
+
+**The divider's blank line.** "It selects the divider, but the empty white row
+underneath is still there" — arming it while a blank line sat in between meant
+the gap could never be closed, which was the whole point of getting close to it.
+The blank row goes on the first press, the divider is offered on the second.
+Finding that row had to come from the SELECTION, not from `getTargetRanges()`:
+the range a backward delete reports starts in the block BEFORE the caret.
+
+**A shape holds the note still while it is dragged.** The clamp reverted in
+0.7.1 is not back; instead the editor's own extent is frozen for the length of
+the gesture and released afterwards, so a shape can still be put anywhere but
+the bottom of the note stops moving under the hand.
 
 ### [2026-09-10] v0.7.1 - what is actually about to be deleted
 

@@ -918,18 +918,37 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       const tag = block.tagName.toLowerCase();
       outlineSel.value = ['h1', 'h2', 'h3', 'blockquote'].includes(tag) ? tag : 'p';
     }
-    // Underline is ours, not Chromium's: it is a class, so queryCommandState
-    // knows nothing about it and the button never lit up the way Bold and
-    // Italic do. Ask the DOM instead — and accept a native <u> from an older
-    // note, which is still an underline as far as the reader is concerned.
-    const underlined = !!el.closest(`${U_STYLES.map((c) => `.${c}`).join(',')},u`);
+    /**
+     * What the caret is standing IN, not what the browser would type next.
+     *
+     * Two faults, one cause. `queryCommandState('bold')` reports the typing
+     * state, which Chromium carries across a boundary: with the caret at the
+     * very start of a line whose first word happens to be bold, the Bold button
+     * lit up on plain text — "bold is stuck here, it will not turn off".
+     *
+     * And a caret at offset 0 of a paragraph sits OUTSIDE the span that holds
+     * the line's formatting, so `closest()` from that node found nothing and
+     * the underline mark never appeared at the start of an underlined line —
+     * "right at the beginning there is no indicator at all".
+     *
+     * Both are answered by asking which element is at the caret, stepping into
+     * the child it sits beside, and reading the DOM from there.
+     */
+    let at = range.startContainer;
+    if (at.nodeType === Node.ELEMENT_NODE) {
+      at = at.childNodes[range.startOffset] ?? at.childNodes[range.startOffset - 1] ?? at;
+    }
+    const caretEl = at.nodeType === Node.ELEMENT_NODE ? at : at.parentElement;
+    const wearing = (selector) => !!caretEl?.closest?.(selector);
+    const MARKS = {
+      bold: 'b,strong',
+      italic: 'i,em',
+      strike: 's,strike,del',
+      underline: `${U_STYLES.map((c) => `.${c}`).join(',')},u`,
+    };
     toolbar.querySelectorAll('[data-act]').forEach((b) => {
-      const a = b.dataset.act;
-      if (a === 'underline') { b.classList.toggle('active', underlined); return; }
-      const map = { bold: 'bold', italic: 'italic', strike: 'strikeThrough' };
-      if (map[a]) {
-        try { b.classList.toggle('active', document.queryCommandState(map[a])); } catch { /* ignore */ }
-      }
+      const mark = MARKS[b.dataset.act];
+      if (mark) b.classList.toggle('active', wearing(mark));
     });
   }
   document.addEventListener('selectionchange', () => {
@@ -1015,6 +1034,38 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     if (hrs.length === 1) {
       e.preventDefault();
       const hr = hrs[0];
+
+      // An empty line between the caret and the divider goes first.
+      //
+      // "It selects the divider, but the empty white row underneath is still
+      // there" — arming it while a blank line sat in between meant the gap
+      // could never be closed, which was the whole point of getting close to
+      // the divider. The blank line goes on this press; the divider is offered
+      // on the next one.
+      // From the SELECTION, not from the target range: the range a backward
+      // delete reports starts in the block BEFORE the caret, so reading it gave
+      // the wrong line and the blank one was never the one removed.
+      const caret = window.getSelection();
+      let block = caret && caret.rangeCount ? caret.getRangeAt(0).startContainer : null;
+      if (block && block.nodeType !== Node.ELEMENT_NODE) block = block.parentElement;
+      while (block && block.parentElement !== editorEl) block = block.parentElement;
+      if (block && block !== hr && !block.textContent.trim()
+        && block.previousElementSibling === hr) {
+        history?.push();
+        const after = block.nextElementSibling;
+        block.remove();
+        if (after) {
+          const r = document.createRange();
+          r.setStart(after, 0);
+          r.collapse(true);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(r);
+        }
+        dirty();
+        return;
+      }
+
       if (hr.classList.contains('armed')) {
         // Removed here rather than left to the browser: at this boundary its own
         // backward delete merges the blocks around the divider and leaves the

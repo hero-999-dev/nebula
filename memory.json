@@ -1,8 +1,8 @@
 {
   "projectName": "Nebula",
-  "version": "0.7.1",
-  "lastUpdated": "2026-09-09",
-  "currentPhase": "v0.7.1 - deletions are guarded in beforeinput rather than guessed from the caret, so no delete key can take a shape layer and a divider really does need two presses; the shape drag limit from 0.7.0 is reverted.",
+  "version": "0.7.2",
+  "lastUpdated": "2026-09-10",
+  "currentPhase": "v0.7.2 - the toolbar marks read the DOM at the caret instead of the browser's typing state, every shape carries the same outline weight, and a blank line under a divider goes before the divider is offered.",
   "next": "Port Nebula Demo features into the rewrite one at a time via the bus/disk-store/storage hooks: graph, flashcards, search, i18n.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
@@ -32,7 +32,7 @@
   },
   "quality": {
     "unitTests": 303,
-    "smokeChecks": 155,
+    "smokeChecks": 160,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
@@ -78,7 +78,9 @@
     "Shape outline geometry must be in px, not %, or it scales with the shape.",
     "A shape is absolutely positioned: clamp a drag to the note's own extent, measured before the drag, or the scroll height follows the shape.",
     "Guard deletions in beforeinput using getTargetRanges(), not in keydown: Chromium selects a non-editable island on the first Backspace and removes it on the second.",
-    "range.intersectsNode cannot see a void element such as <hr> beside a boundary; read the boundary instead."
+    "range.intersectsNode cannot see a void element such as <hr> beside a boundary; read the boundary instead.",
+    "Toolbar state marks read the DOM at the caret; queryCommandState reports the typing state and carries across a boundary.",
+    "A declared 1.6px border is rounded to a whole pixel and an SVG stroke is not — declare the same used width on both or the lines differ."
   ],
   "history": [
     {

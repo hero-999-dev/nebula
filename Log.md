@@ -30,6 +30,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-10 02:00] v0.7.2 - by claude
+
+the indicator, read from two screenshots
+
+* Site: the generated page for v0.7.1
+
+---
+
 ## [2026-09-10 00:43] v0.7.1 - by claude
 
 what is actually about to be deleted

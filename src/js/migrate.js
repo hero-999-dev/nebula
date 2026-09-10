@@ -15,6 +15,7 @@
  */
 
 import { ensureHeadControls, paintCode } from './codeblock.js';
+import { outlineSvg } from './shapes.js';
 
 /** Bumped whenever a step is added, so the log line means something. */
 export const MARKUP_VERSION = '0.6.3';
@@ -124,6 +125,19 @@ export function migrateShapes(root, fitShape) {
     if (text && text.getAttribute('contenteditable') !== 'false') {
       text.setAttribute('contenteditable', 'false');
       changed = true;
+    }
+
+    // 0.7.2 — the clipped kinds are stroked as SVG now, so their line is one
+    // weight at any size instead of a box inset that grew with the shape.
+    const kind = shape.dataset.kind;
+    if (!shape.querySelector('.shape-svg')) {
+      const svg = outlineSvg(kind);
+      if (svg) {
+        const holder = shape.ownerDocument.createElement('div');
+        holder.innerHTML = svg;
+        shape.insertBefore(holder.firstElementChild, shape.firstChild);
+        changed = true;
+      }
     }
 
     // 0.6.9 — shapes can be turned, so every one needs the grip that turns it.

@@ -711,17 +711,17 @@ try {
       const s = document.querySelector('#editor .shape.triangle');
       return {
         fill: s.style.getPropertyValue('--shape-fill'),
-        clip: getComputedStyle(s, '::before').clipPath,
-        outerClip: getComputedStyle(s).clipPath,
-        outline: getComputedStyle(s).backgroundColor,
+        poly: !!s.querySelector('.shape-svg polygon'),
+        effect: s.querySelector('.shape-svg polygon')
+          ? getComputedStyle(s.querySelector('.shape-svg polygon')).vectorEffect : null,
       };
     });
-    // The fill is clipped to its OWN polygon, drawn parallel just inside the
-    // outer one. A box inset moves each edge perpendicular to the BOX, which on
-    // a diagonal is not perpendicular to the EDGE: the diamond came out heavier
+    // Stroked as SVG. A clip-path cuts a border off, and the inset-fill trick it
+    // was replaced with moved each edge perpendicular to the BOX, which on a
+    // diagonal is not perpendicular to the EDGE — the diamond came out heavier
     // than the square and the triangle went thin at its point.
-    check('the triangle is drawn with an outline layer under its fill',
-      shape.fill !== '' && shape.clip.startsWith('polygon') && shape.clip !== shape.outerClip,
+    check('the triangle is drawn as a stroked outline, not a clipped fill',
+      shape.fill !== '' && shape.poly && shape.effect === 'non-scaling-stroke',
       JSON.stringify(shape));
     check('and the shape bar can turn that outline off',
       await win.evaluate(() => !!document.querySelector('#shape-bar [data-shape="outline"]')));
@@ -1068,6 +1068,120 @@ try {
     await win.waitForTimeout(200);
     check('and the second press takes it',
       await win.evaluate(() => document.querySelectorAll('#editor hr').length === 0));
+  }
+
+  /**
+   * The toolbar's marks say what the caret is standing IN.
+   *
+   * `queryCommandState('bold')` reports the TYPING state, which Chromium
+   * carries across a boundary: with the caret at the start of a line whose
+   * first word is bold, Bold lit up on plain text — "bold is stuck here, it
+   * will not turn off". And a caret at offset 0 of a paragraph sits outside the
+   * span holding the line's formatting, so the underline mark never appeared at
+   * the beginning of an underlined line — "right at the start there is no
+   * indicator at all".
+   */
+  {
+    await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p id="mk-b"><b>bold run</b> plain</p>'
+        + '<p id="mk-u"><span class="u-single">underlined line</span></p>';
+      ed.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await win.waitForTimeout(200);
+
+    const marks = () => win.evaluate(() => {
+      const on = (a) => document.querySelector(`.toolbar [data-act="${a}"]`)
+        ?.classList.contains('active');
+      return { bold: on('bold'), underline: on('underline') };
+    });
+    const caretIn = (selector, offset, intoElement) => win.evaluate(([s, o, ie]) => {
+      const el = document.querySelector(s);
+      const r = document.createRange();
+      if (ie) r.setStart(el, o);
+      else r.setStart(el.firstChild, o);
+      r.collapse(true);
+      const sel = getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      document.getElementById('editor').focus();
+    }, [selector, offset, intoElement]);
+
+    await caretIn('#mk-b', 1, true);
+    await win.waitForTimeout(220);
+    const plain = await marks();
+    check('Bold is dark on plain text beside a bold run', plain.bold === false,
+      JSON.stringify(plain));
+
+    await caretIn('#mk-b b', 3, false);
+    await win.waitForTimeout(220);
+    check('and lit inside the bold run', (await marks()).bold === true);
+
+    await caretIn('#mk-u', 0, true);
+    await win.waitForTimeout(220);
+    const atStart = await marks();
+    check('Underline is lit at the very start of an underlined line',
+      atStart.underline === true, JSON.stringify(atStart));
+  }
+
+  /**
+   * A blank line under a divider goes before the divider is offered.
+   *
+   * Arming the divider while a blank line sat between it and the caret meant
+   * the gap could never be closed — "it selects the divider, but the empty
+   * white row underneath is still there".
+   */
+  {
+    const started = await win.evaluate(async () => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p>above</p><hr class="blk-hr"><p id="gap"><br></p><p id="under">below</p>';
+      ed.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 150));
+      const gap = document.getElementById('gap');
+      const r = document.createRange();
+      r.setStart(gap, 0);
+      r.collapse(true);
+      const sel = getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      ed.focus();
+      return ed.querySelectorAll('p').length;
+    });
+    await win.keyboard.press('Backspace');
+    await win.waitForTimeout(220);
+    const gone = await win.evaluate(() => ({
+      paras: document.querySelectorAll('#editor p').length,
+      hrs: document.querySelectorAll('#editor hr').length,
+      armed: document.querySelectorAll('#editor hr.armed').length,
+    }));
+    check('the blank line under a divider goes on the first press',
+      started === 3 && gone.paras === 2 && gone.hrs === 1 && gone.armed === 0,
+      JSON.stringify(gone));
+  }
+
+  /**
+   * One line weight for every shape.
+   *
+   * A declared 1.6px border is rounded to a whole pixel and an SVG stroke is
+   * not, so declaring the same number gave the stroked kinds a visibly heavier
+   * line than the square's.
+   */
+  {
+    const weights = {};
+    for (const kind of ['square', 'diamond', 'triangle']) {
+      await win.evaluate((k) => {
+        document.getElementById('editor').innerHTML = '<p>x</p>';
+        document.querySelector(`[data-shape-add="${k}"]`).click();
+      }, kind);
+      await win.waitForTimeout(300);
+      weights[kind] = await win.evaluate((k) => {
+        const s = document.querySelector(`#editor .shape.${k}`);
+        const poly = s?.querySelector('.shape-svg polygon');
+        return poly ? getComputedStyle(poly).strokeWidth : getComputedStyle(s).borderTopWidth;
+      }, kind);
+    }
+    check('every shape is outlined at the same weight',
+      new Set(Object.values(weights)).size === 1, JSON.stringify(weights));
   }
 
   // A shape's text: a caret to see, and room to grow into.

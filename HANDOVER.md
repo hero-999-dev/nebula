@@ -242,7 +242,13 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    island, and Chromium takes such an island on the SECOND Backspace.
 39. **`intersectsNode` cannot see a void element** beside a boundary — an
    `<hr>` next to a collapsed range does not "intersect" it. Read the boundary.
-40. **Anything written into a note's markup is frozen in old notes.** The
+40. **A toolbar mark must read the DOM at the caret, never
+   `queryCommandState`.** That reports the TYPING state, which carries across a
+   boundary, and a caret at offset 0 sits outside the span holding the line's
+   formatting — step into the child beside it first.
+41. **A declared 1.6px border is rounded to a whole pixel; an SVG stroke is
+   not.** Declaring the same number on both gives two different lines.
+42. **Anything written into a note's markup is frozen in old notes.** The
    code block's ✕ is created with the block, so blocks written before it existed
    never got one — `paintAllCode` tops the header up on every load. Any new
    in-note control needs the same treatment.
