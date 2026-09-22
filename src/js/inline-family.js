@@ -2,6 +2,30 @@
 const BLOCKS = 'p,div,h1,h2,h3,h4,h5,h6,li,blockquote,pre';
 const familySelector = (classes, extra) => [...classes.map((cls) => `.${cls}`), extra].filter(Boolean).join(',');
 
+const UNDERLINES = ['u-single', 'u-double', 'u-bold', 'u-wavy', 'u-dash'];
+
+/** A decoration painted by an outer span keeps that span's colour even when
+ * its child changes ink. Place the decoration on each actual text run. */
+export function normalizeUnderlineInk(root) {
+  const marks = [...root.querySelectorAll(UNDERLINES.map(c => '.' + c).join(','))].reverse();
+  for (const mark of marks) {
+    if (!mark.children.length || mark.closest('.code-head')) continue;
+    const classes = UNDERLINES.filter(c => mark.classList.contains(c));
+    const walker = mark.ownerDocument.createTreeWalker(mark, 4);
+    const texts = [];
+    while (walker.nextNode()) if (walker.currentNode.textContent) texts.push(walker.currentNode);
+    for (const text of texts) {
+      const span = mark.ownerDocument.createElement('span');
+      span.classList.add(...classes);
+      text.before(span);
+      span.appendChild(text);
+    }
+    mark.classList.remove(...classes);
+    if (!mark.className) mark.removeAttribute('class');
+    if (mark.tagName === 'SPAN' && !mark.attributes.length) mark.replaceWith(...mark.childNodes);
+  }
+}
+
 function stripMark(el, classes, extra) {
   el.classList.remove(...classes);
   if (!el.className) el.removeAttribute('class');
@@ -89,7 +113,10 @@ export function applyInlineFamily(root, parts, classes, cls = '', extra = '') {
       const span = doc.createElement('span');
       span.className = cls;
       span.appendChild(fragment);
-      end.before(span);
+      const holder = doc.createDocumentFragment();
+      holder.appendChild(span);
+      if (UNDERLINES.includes(cls)) normalizeUnderlineInk(holder);
+      end.before(holder);
     } else end.before(fragment);
     bookmarks.unshift({ start, end });
   }

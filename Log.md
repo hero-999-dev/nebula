@@ -3,6 +3,38 @@
 One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
+## [2026-09-22 23:55] v0.7.6 - by Codex
+
+Fix editing in the two Untitled report notes
+
+* (no commits since the last release)
+
+---
+
+## [2026-09-22 18:25] v0.7.6 - by Codex
+
+<!-- agent-note: gpt6astra tarafından eklendi -->
+
+Asked to start with the problems written in the current Untitled 1 and 2 notes.
+Read both originals and reproduced their structures on temporary profiles.
+
+- Legacy overlays no longer block native prose joins; loose marked text receives
+  a real paragraph, preserving its words and formatting.
+- Underline decoration now lives at the actual text run, so coloured text and
+  its line share ink. Wavy underline no longer forces the accent colour.
+- The overlay deletion guard allows edits inside shape text; Backspace and undo
+  work without deleting the shape.
+- Divider handling uses the nearest paragraph, not a whole outer wrapper:
+  remove the blank line, select the divider, then delete it on the next press.
+- Shifted the code language box left and added an 8px text inset, retaining its
+  dropdown arrow background.
+- Added eight unit and sixteen Electron regressions, including both highlighted
+  line starts. Both original report files stayed byte-identical. The bottom
+  square drag already worked in this reproduction and was left unchanged.
+
+---
+
+
 ## [2026-09-22 17:33] v0.7.5 - by Codex
 
 Safer saving, precise formatting and stable shape dragging

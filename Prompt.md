@@ -117,7 +117,7 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.7.5)
+## Current implementation state (v0.7.6)
 
 **Working:** the whole editor described above — dock pad, two-row toolbar,
 mini toolbar, slash menu, code blocks with syntax colours, free-floating shapes,
@@ -152,7 +152,13 @@ positioned against the viewport for every toolbar dock. Dragging the lowest
 shape preserves canvas extent on the shape layer, never on the scrolling editor.
 Markdown export preserves nested prose and code blank lines/long fences.
 
-**Quality:** 338 unit tests, 187 Electron smoke checks against the real app
+**Reported legacy notes:** move root overlays out of the text-merge path and
+wrap loose prose into real paragraphs, after unwrapping invalid block-containing
+spans. Keep underline on actual text runs so it inherits their ink. Shape-text
+deletions are nested edits, not deletion of the overlay. Divider handling starts
+at the nearest paragraph, even inside a formatting wrapper.
+
+**Quality:** 346 unit tests, 203 Electron smoke checks against the real app
 (including "an unreadable vault seeds nothing", verified by breaking the guard
 on purpose and watching the suite go red).
 

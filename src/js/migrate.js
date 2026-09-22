@@ -16,9 +16,10 @@
 
 import { ensureHeadControls, paintCode } from './codeblock.js';
 import { outlineSvg } from './shapes.js';
+import { normalizeUnderlineInk } from './inline-family.js';
 
 /** Bumped whenever a step is added, so the log line means something. */
-export const MARKUP_VERSION = '0.6.3';
+export const MARKUP_VERSION = '0.7.6';
 
 /**
  * @param {Element} root the editor
@@ -29,12 +30,37 @@ export const MARKUP_VERSION = '0.6.3';
  */
 export function migrateNote(root, { fitShape } = {}) {
   if (!root) return { shapes: 0, code: 0, wrappers: 0, blanks: 0 };
+  const wrappers = unwrapBlockSwallowingSpans(root);
+  normalizeProse(root);
+  normalizeUnderlineInk(root);
   return {
     shapes: migrateShapes(root, fitShape),
     code: migrateCodeBlocks(root),
-    wrappers: unwrapBlockSwallowingSpans(root),
+    wrappers,
     blanks: migrateBlankLines(root),
   };
+}
+
+/** Old notes mixed anonymous text lines with non-editable overlays. Give each
+ * prose run a real block and keep overlays outside the native merge path. */
+export function normalizeProse(root) {
+  const layers = [...root.querySelectorAll('.shape-layer')];
+  for (const layer of layers.reverse()) {
+    // Empty nested overlays have no local geometry to preserve.
+    if (layer.parentElement === root || !layer.querySelector('.shape')) root.prepend(layer);
+  }
+  let paragraph = null;
+  for (const node of [...root.childNodes]) {
+    if (node.nodeType === 1 && BLOCK_TAGS.has(node.tagName)) { paragraph = null; continue; }
+    if (node.nodeType === 1 && node.tagName === 'SPAN' && !node.textContent
+      && !node.querySelector('br,img,.inline-eq')) { node.remove(); continue; }
+    if (node.nodeType === 3 && !node.textContent.trim() && !paragraph) continue;
+    if (!paragraph) {
+      paragraph = root.ownerDocument.createElement('p');
+      node.before(paragraph);
+    }
+    paragraph.appendChild(node);
+  }
 }
 
 /** Tags that lay their contents out as a block, whatever the stylesheet says. */

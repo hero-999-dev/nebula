@@ -13,6 +13,31 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.7.6': {
+    headline: 'The remaining editing problems in the two report notes.',
+    items: [
+      {
+        title: 'Backspace joins the old note lines',
+        text: 'Invisible shape layers no longer sit between ordinary text lines. Older highlighted and underlined text gets a proper paragraph you can click and type into.',
+      },
+      {
+        title: 'Underline uses the colour of its words',
+        text: 'The line follows coloured text, including wavy underline. Removing the underline keeps the other formatting.',
+      },
+      {
+        title: 'Shape text can be erased normally',
+        text: 'Backspace removes characters inside a shape instead of being blocked by the protection for the whole shape. Undo restores the text.',
+      },
+      {
+        title: 'Close the gap before removing a divider',
+        text: 'Backspace removes the empty line first, selects the divider next, and removes it only on the following press, including in older nested notes.',
+      },
+      {
+        title: 'More room inside the code language picker',
+        text: 'The box sits closer to the left edge, with space between its own edge and the language name.',
+      },
+    ],
+  },
   '0.7.5': {
     headline: 'Safer saving, precise formatting, and shapes that follow the pointer.',
     items: [

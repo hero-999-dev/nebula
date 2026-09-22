@@ -15,6 +15,7 @@ import os from 'node:os';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { runRecoveryChecks } from './recovery.mjs';
+import { runReportedChecks } from './reported.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mainJs = path.join(root, 'dist-electron', 'main.js');
@@ -2312,6 +2313,7 @@ try {
     fs.readFileSync(path.join(broken, 'storage', 'notes'), 'utf8') === 'not a directory');
   await app.close();
   await runRecoveryChecks(check);
+  await runReportedChecks(check);
 } catch (err) {
   failure = err;
   check('smoke run completed', false, err.message);

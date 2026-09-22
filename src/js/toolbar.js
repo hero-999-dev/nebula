@@ -1024,6 +1024,9 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
    * is about to delete, before it deletes it.
    */
   editorEl.addEventListener('beforeinput', (e) => {
+    // Editing a nested text host intersects its ancestor overlay too, but is
+    // not a request to delete that overlay.
+    if (e.target.closest('.shape-text, .code-src')) return;
     if (!e.inputType?.startsWith('delete')) {
       editorEl.querySelectorAll('hr.blk-hr.armed').forEach((h) => h.classList.remove('armed'));
       return;
@@ -1098,8 +1101,9 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       const caret = window.getSelection();
       let block = caret && caret.rangeCount ? caret.getRangeAt(0).startContainer : null;
       if (block && block.nodeType !== Node.ELEMENT_NODE) block = block.parentElement;
-      while (block && block.parentElement !== editorEl) block = block.parentElement;
+      block = block?.closest('p,div,h1,h2,h3,h4,h5,h6,li,blockquote');
       if (block && block !== hr && !block.textContent.trim()
+        && !block.querySelector('hr,.blk-code,.shape-layer,img')
         && block.previousElementSibling === hr) {
         history?.push();
         const after = block.nextElementSibling;
@@ -1111,6 +1115,12 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
           const sel = window.getSelection();
           sel.removeAllRanges();
           sel.addRange(r);
+        } else {
+          const r = document.createRange();
+          r.setStartAfter(hr);
+          r.collapse(true);
+          caret.removeAllRanges();
+          caret.addRange(r);
         }
         dirty();
         return;
@@ -1151,6 +1161,9 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
   editorEl.addEventListener('keydown', (e) => {
     if (e.target.closest('.code-src')) return; // code blocks own their keys
     const mod = e.ctrlKey || e.metaKey;
+    // Shape text owns normal editing keys. App undo/save shortcuts below still
+    // apply, but paragraph/list/divider handlers must not escape this host.
+    if (e.target.closest('.shape-text') && !mod) return;
 
     /**
      * The caret stays in the note.

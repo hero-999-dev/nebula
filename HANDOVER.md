@@ -30,7 +30,7 @@ GitHub Releases, and updates itself in place on Windows.
 | Renderer | `src/` — no framework, no build magic beyond Vite |
 | Main | `electron/main.js` + `electron/preload.js` — the only place with disk access |
 | Storage | `<userData>/storage/notes/<id>.json`, mirrored from `localStorage` |
-| Tests | `npm test` (338 unit) · `npm run smoke` (187 Electron checks against the real app) |
+| Tests | `npm test` (346 unit) · `npm run smoke` (203 Electron checks against the real app) |
 
 It is a deliberate rewrite of `../Nebula Demo/` (v0.5.7, feature-complete but
 sprawling), pairing that project's plumbing with `../Ember/`'s visual language.
@@ -313,6 +313,17 @@ Every one of these is silent — the app builds, installs and runs while wrong.
   reads a real note into a throwaway profile and verifies the source is unchanged.
 - Documentation comments prefixed `agent-note:` are repository-only:
   `publicDocSource()` strips them before the public site is rendered.
+- A delete range inside `.shape-text` also intersects its ancestor overlay.
+  Handle that nested editing host before the overlay deletion guard.
+- Old root overlays interspersed with prose prevent native Backspace joins.
+  `normalizeProse()` moves root/empty overlays ahead of prose and wraps loose
+  inline runs, without relocating nonempty nested shapes to new coordinates.
+- Unwrap invalid block-containing spans BEFORE normalizing prose. Keep underline
+  on text runs inside colour wrappers, or its ink comes from the outer wrapper.
+- A divider's blank paragraph may be nested. Never climb to the editor's direct
+  child when testing whether that individual line is empty.
+- `tests/e2e/reported.mjs` is part of smoke. Optional `NEBULA_REPORT_NOTES`
+  takes a JSON array of two file paths and uses temporary copies only.
 
 **Four ways to launch, four separate vaults** (`electron/user-data.js`):
 

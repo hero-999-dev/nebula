@@ -439,7 +439,7 @@
 .u-single { text-decoration: underline; }
 .u-double { text-decoration: underline; text-decoration-style: double; }
 .u-bold { text-decoration: underline; text-decoration-thickness: 3px; }
-.u-wavy { text-decoration: underline; text-decoration-style: wavy; text-decoration-color: var(--clay); }
+.u-wavy { text-decoration: underline; text-decoration-style: wavy; }
 .u-dash { text-decoration: underline; text-decoration-style: dashed; }
 
 /* ---------- code blocks (markdown-style, per-language colors) ---------- */
@@ -455,10 +455,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  /* Lined up with the code itself, which sits inside the <pre>'s own padding —
-     matching the block's outer edge put the picker visibly left of everything
-     under it. */
-  padding: 5px 8px 5px 14px;
+  /* Keep the box near the left edge; its text has its own inset below. */
+  padding: 5px 8px;
   border-bottom: 1px solid var(--rule);
   background: var(--paper-raised);
 }
@@ -466,9 +464,10 @@
   font: inherit;
   font-size: 11.5px;
   height: 23px;
+  padding-left: 8px;
   border: 1px solid var(--rule);
   border-radius: 6px;
-  background: var(--paper-sunken);
+  background-color: var(--paper-sunken);
   color: var(--ink);
   outline: none;
 }

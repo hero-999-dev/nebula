@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 338 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 187 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 346 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 203 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -39,7 +39,8 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/recovery.test.js` | 11 | Pending buffer ownership on archive/trash, synchronous save retry, wrapped Markdown text, long fences, unsafe URL schemes and code-block edge detection |
 | `tests/updater.test.js` | 3 | Nebula-version comparisons, failed save/backup blocks install, successful preparation precedes silent install |
 | `tests/docs.test.js` | 1 | Repository attribution is removed from public documentation without removing real content |
-| `tests/e2e/smoke.mjs` + `tests/e2e/recovery.mjs` | 187 | Original 173 checks plus 14 recovery checks, all using throwaway profiles |
+| `tests/reported.test.js` | 8 | Legacy prose normalization is idempotent and preserves shapes; underline follows coloured text without losing formatting or selection |
+| `tests/e2e/smoke.mjs`, `recovery.mjs`, `reported.mjs` | 203 | Original 173, 14 save-recovery and 16 reported-note checks, all using throwaway profiles |
 
 ---
 
@@ -88,6 +89,36 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-22] v0.7.6 - the two current Untitled reports
+
+<!-- agent-note: gpt6astra tarafından eklendi -->
+
+Read the current two report notes from the Test vault. Baseline reproduction
+failed prose joining, loose underline paragraph structure, underline colour,
+nested-divider blank removal, code-picker spacing and Backspace inside shapes.
+The lowest square's upward drag already passed; no speculative drag change.
+
+After repair, the sixteen reported-note Electron checks cover joining while
+preserving layers, real paragraphs, matching underline/text ink, pointer placement
+and typing at BOTH highlighted starts, None and undo, the nested-divider
+blank/arm/delete sequence, picker inset, shape-text Backspace and undo, and bottom
+dragging. The optional actual-note run also verifies both source files remain
+byte-identical. Screenshots are retained only in the temporary test profile.
+
+The initial caret geometry probe used a collapsed ELEMENT range, which returns
+no text rectangle; corrected it to use the first text node before asserting
+pointer placement. Do not interpret a zero element-range rectangle as proof of
+a missing painted caret.
+
+Eight unit cases cover overlay ordering, idempotence, empty nested layers,
+preservation of nonempty nested-layer coordinates, block-unwrapping order and
+old/new underline normalization. Fixtures retain the reported DOM structure
+but contain no private report prose.
+
+Focused command after building: `node tests/e2e/reported.mjs`.
+Optional `NEBULA_REPORT_NOTES` is a JSON array of the two source file paths.
+Only their temporary copies are edited.
 
 ### [2026-09-22] v0.7.5 - interrupted work recovered
 
