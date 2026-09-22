@@ -36,6 +36,7 @@ let getWindow = () => null;
 let beforeInstall = async () => {};
 let status = { state: 'none', version: null, percent: 0, error: null, url: RELEASES_PAGE, mode: 'manual' };
 let checking = false;
+let currentVersion = '';
 
 function setStatus(next) {
   status = { ...status, error: null, ...next, mode };
@@ -50,7 +51,7 @@ async function fetchLatestRelease() {
   const res = await net.fetch(API_LATEST, {
     headers: {
       Accept: 'application/vnd.github+json',
-      'User-Agent': `Nebula/${app.getVersion()}`,
+      'User-Agent': `Nebula/${currentVersion}`,
     },
   });
   if (!res.ok) throw new Error(`GitHub API returned ${res.status}`);
@@ -65,7 +66,7 @@ async function checkManual() {
   setStatus({ state: 'checking', percent: 0 });
   try {
     const latest = await fetchLatestRelease();
-    if (latest.version && isNewerVersion(latest.version, app.getVersion())) {
+    if (latest.version && isNewerVersion(latest.version, currentVersion)) {
       return setStatus({ state: 'manual', version: latest.version, url: latest.url });
     }
     return setStatus({ state: 'none', version: null, url: RELEASES_PAGE });
@@ -127,10 +128,12 @@ async function runCheck() {
  * @param {object} opts
  * @param {() => Electron.BrowserWindow|null} opts.getWindow  window to push status to
  * @param {() => Promise<void>} opts.beforeInstall            runs right before the app quits to install
+ * @param {string} opts.version                              resolved Nebula package version, including dev runs
  */
 export async function initUpdater(opts = {}) {
   getWindow = opts.getWindow ?? getWindow;
   beforeInstall = opts.beforeInstall ?? beforeInstall;
+  currentVersion = opts.version ?? app.getVersion();
 
   // Only an installed Windows build may replace itself. A test build is
   // packaged and on Windows too, so "packaged and win32" is not enough.
@@ -168,6 +171,7 @@ export async function initUpdater(opts = {}) {
       await beforeInstall();
     } catch (err) {
       console.warn('[nebula] pre-update snapshot failed:', err.message);
+      return setStatus({ state: 'error', error: err?.message ?? String(err) });
     }
     // (isSilent, isForceRunAfter). isSilent MUST be true: with false the NSIS
     // assisted installer opens its wizard and waits for clicks, so the user

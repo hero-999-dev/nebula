@@ -4,7 +4,7 @@
  * wrong file was targeted (and it threw).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { initDiskStorage, flushDisk, hasDiskStorage } from '../src/js/disk-store.js';
+import { initDiskStorage, flushDisk, hasDiskStorage, getDiskStatus } from '../src/js/disk-store.js';
 import { saveJson } from '../src/js/storage.js';
 
 function fakeVault({ writeDelay = () => 0 } = {}) {
@@ -107,16 +107,90 @@ describe('disk mirror', () => {
     expect(vault.api.write.mock.calls.length).toBe(first);
   });
 
-  it('loads notes from disk at boot and ignores a corrupt file', async () => {
+  it('protects a partially corrupt vault and preserves the previous cache', async () => {
     const vault = fakeVault();
     vault.files.set('good.json', JSON.stringify(note('good', 'ok')));
     vault.files.set('bad.json', '{ "id": "bad", trunca');
+    localStorage.setItem('nebula:notes', JSON.stringify([note('cached', 'last known state')]));
     window.nebula = { storage: vault.api };
-    await initDiskStorage();
+    const status = await initDiskStorage();
 
     const loaded = JSON.parse(localStorage.getItem('nebula:notes'));
     expect(loaded).toHaveLength(1);
-    expect(loaded[0].id).toBe('good');
+    expect(loaded[0].id).toBe('cached');
+    expect(status).toMatchObject({ ok: false, empty: false });
+    expect(hasDiskStorage()).toBe(false);
+    saveJson('nebula:notes', [note('cached', 'edited')]);
+    await flushDisk();
+    expect(vault.api.write).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed write and retries identical content on the next save', async () => {
+    const vault = fakeVault();
+    vault.api.write.mockResolvedValueOnce({ ok: false, error: 'disk full' });
+    window.nebula = { storage: vault.api };
+    await initDiskStorage();
+    const statuses = [];
+    const onStatus = (event) => statuses.push(event.detail);
+    window.addEventListener('nebula-storage-status', onStatus);
+    try {
+      saveJson('nebula:notes', [note('n1', 'unchanged')]);
+      expect(getDiskStatus().pending).toBe(true);
+      await expect(flushDisk()).rejects.toThrow('disk full');
+      expect(getDiskStatus()).toEqual({ ok: false, pending: false, error: 'disk full' });
+      saveJson('nebula:notes', [note('n1', 'unchanged')]);
+      await flushDisk();
+      expect(JSON.parse(vault.files.get('n1.json')).content).toBe('unchanged');
+      expect(vault.api.write).toHaveBeenCalledTimes(2);
+      expect(statuses.at(-1)).toEqual({ ok: true, pending: false, error: null });
+    } finally {
+      window.removeEventListener('nebula-storage-status', onStatus);
+    }
+  });
+
+  it('retries a rejected bridge call on flush, keeping the latest state', async () => {
+    const vault = fakeVault();
+    vault.api.write.mockRejectedValueOnce(new Error('bridge failed'));
+    window.nebula = { storage: vault.api };
+    await initDiskStorage();
+    saveJson('nebula:notes', [note('n1', 'first')]);
+    await expect(flushDisk()).rejects.toThrow('bridge failed');
+    await flushDisk();
+    expect(JSON.parse(vault.files.get('n1.json')).content).toBe('first');
+    expect(getDiskStatus()).toEqual({ ok: true, pending: false, error: null });
+
+    vault.api.write.mockRejectedValueOnce(new Error('transient'));
+    saveJson('nebula:notes', [note('n1', 'second')]);
+    saveJson('nebula:notes', [note('n1', 'latest')]);
+    await flushDisk();
+    expect(JSON.parse(vault.files.get('n1.json')).content).toBe('latest');
+  });
+
+  it('retries a failed deletion and never resurrects its old write', async () => {
+    const vault = fakeVault();
+    window.nebula = { storage: vault.api };
+    await initDiskStorage();
+    saveJson('nebula:notes', [note('gone', 'body')]);
+    await flushDisk();
+    vault.api.remove.mockResolvedValueOnce({ ok: false, error: 'locked file' });
+    saveJson('nebula:notes', []);
+    await expect(flushDisk()).rejects.toThrow('locked file');
+    expect(vault.files.has('gone.json')).toBe(true);
+    await flushDisk();
+    expect(vault.files.has('gone.json')).toBe(false);
+    expect(vault.api.remove).toHaveBeenCalledTimes(2);
+  });
+
+  it('queues a return to the acknowledged value behind an unfinished newer write', async () => {
+    const vault = fakeVault({ writeDelay: () => 3 });
+    window.nebula = { storage: vault.api };
+    await initDiskStorage();
+    saveJson('nebula:notes', [note('n1', 'original')]);
+    await flushDisk();
+    saveJson('nebula:notes', [note('n1', 'temporary')]);
+    saveJson('nebula:notes', [note('n1', 'original')]);
+    await flushDisk();
+    expect(JSON.parse(vault.files.get('n1.json')).content).toBe('original');
   });
 
   it('browser (no bridge) stays in memory and never throws', async () => {

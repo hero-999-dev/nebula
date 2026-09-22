@@ -2,9 +2,8 @@
 
 ## What you see
 
-Nebula checks for a new version 10 seconds after it starts and every 6 hours
-after that. You can also check any time: **Check for updates**, bottom of the
-sidebar.
+Nebula checks for a new version shortly after it starts and every 6 hours
+after that. You can also use **Check for updates** in the About panel.
 
 ### Windows (installed with `Nebula-Setup-*.exe`)
 
@@ -82,6 +81,23 @@ touches the folder above. Even **uninstalling** leaves it alone
    open the folder. It does not decide you are a new user.
 
 ## Restoring from a backup
+
+<!-- agent-note: gpt6astra tarafından eklendi -->
+
+### If the latest changes could not be saved
+
+Choose **Keep editing** and leave Nebula open. Copy important unsaved text
+somewhere safe before restarting anything. The **Not saved** indicator means
+the disk has not confirmed the write. Check free disk space and whether the
+notes folder is available, then press **Retry saving** in the error banner.
+Continue closing only after the indicator returns to **Saved**.
+
+Native close waits for pending title and body edits. If saving fails or times
+out, the app stays open. An update likewise stops if saving or the pre-update
+backup fails. These checks cannot flush pending edits after an abrupt power loss.
+Do not reset the profile or delete note files to dismiss a save error.
+
+### Restore a stored snapshot
 
 1. Close Nebula.
 2. Open the profile folder (the app: **Open notes folder** in the red bar, or

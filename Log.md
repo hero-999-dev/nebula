@@ -3,6 +3,45 @@
 One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
+## [2026-09-22 17:33] v0.7.5 - by Codex
+
+Safer saving, precise formatting and stable shape dragging
+
+* (no commits since the last release)
+
+---
+
+## [2026-09-22 17:20] v0.7.5 - by Codex
+
+<!-- agent-note: gpt6astra tarafından eklendi -->
+
+Recovered the interrupted Astra request from history and completed the existing
+editor/save changes without resetting the worktree or the user's note vaults.
+
+- Saves now wait for disk acknowledgement; failed writes remain retryable and
+  cannot silently show Saved. Closing and installing an update flush title and
+  body first, keep the app open on failure, and require the pre-update backup.
+- Pending buffers retain their original note ID through archive, trash and
+  switching. A partially unreadable vault stays protected against seeding.
+- Inline formatting uses exact DOM boundaries, including repeated words and
+  native underline wrappers; docked menus stay clickable inside the viewport.
+- Markdown export keeps wrapped/raw text and code blank lines; longer code
+  fences round-trip, unsafe imported URL schemes are rejected, and code-block
+  editing uses the real caret boundary and undo history.
+- Reproduced the lowest shape sticking at the bottom while dragging. Preserve
+  canvas extent on its non-scrolling layer; release that space after the last
+  shape is deleted.
+- Added unit and real Electron recovery coverage. The original reported note
+  was copied only into a temporary test profile and remained byte-identical.
+- Development attribution stays in these source comments and is removed from
+  the generated public site. Existing unrelated USB-mirror changes are preserved.
+
+Validation: 338 unit tests; 187 standard Electron checks. See tests.md for the
+failure-before/fix-after measurements and the optional real-note reproduction.
+
+---
+
+
 
 
 

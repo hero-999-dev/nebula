@@ -192,6 +192,33 @@ function savedBounds() {
 }
 
 let mainWindow = null;
+let quitRequested = false;
+let saveRequestId = 0;
+const rendererSavers = new Map();
+
+/** Resolve only when the renderer has flushed its buffers and disk queue. */
+function requestRendererSave(win) {
+  if (!win || win.isDestroyed()) return Promise.resolve();
+  const saver = rendererSavers.get(win.webContents.id);
+  // No editable note exists before boot registers the save listener.
+  if (!saver) return Promise.resolve();
+  if (saver.pending) return saver.pending.promise;
+  const requestId = ++saveRequestId;
+  let finish;
+  const promise = new Promise((resolve, reject) => {
+    finish = (error) => error ? reject(new Error(error)) : resolve();
+  });
+  const timeout = setTimeout(() => {
+    if (saver.pending?.requestId !== requestId) return;
+    saver.pending = null;
+    finish('Saving did not finish. Please try again before closing Nebula.');
+  }, 15_000);
+  saver.pending = { requestId, promise, finish, timeout };
+  win.webContents.send('lifecycle:save', requestId);
+  return promise;
+}
+
+app.on('before-quit', () => { quitRequested = true; });
 
 /** The test build carries its own mark so the two are told apart at a glance. */
 function windowIconPath() {
@@ -261,7 +288,30 @@ function createWindow() {
   win.on('move', remember);
   win.on('maximize', remember);
   win.on('unmaximize', remember);
-  win.on('close', remember);
+  let allowClose = false;
+  let closing = false;
+  win.on('close', (event) => {
+    remember();
+    if (allowClose || !rendererSavers.has(win.webContents.id)) return;
+    event.preventDefault();
+    if (closing) return;
+    closing = true;
+    void requestRendererSave(win).then(() => {
+      if (win.isDestroyed()) return;
+      allowClose = true;
+      if (quitRequested) app.quit();
+      else win.close();
+    }).catch(async (error) => {
+      quitRequested = false;
+      closing = false;
+      if (win.isDestroyed()) return;
+      await dialog.showMessageBox(win, {
+        type: 'error', buttons: ['Keep editing'],
+        message: 'Your latest changes could not be saved.',
+        detail: `${error.message}\nThe window has stayed open so you can retry saving.`,
+      });
+    });
+  });
 
   // The page's own title bar needs to know, so its maximise button can show
   // the right icon.
@@ -293,6 +343,19 @@ function createWindow() {
   });
 
   mainWindow = win;
+  const contentsId = win.webContents.id;
+  win.webContents.on('did-start-loading', () => {
+    // Reload registers a fresh listener once its store has booted.
+    if (!rendererSavers.get(contentsId)?.pending) rendererSavers.delete(contentsId);
+  });
+  win.webContents.once('destroyed', () => {
+    const pending = rendererSavers.get(contentsId)?.pending;
+    if (pending) {
+      clearTimeout(pending.timeout);
+      pending.finish('The window closed before saving finished.');
+    }
+    rendererSavers.delete(contentsId);
+  });
   win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
   return win;
 }
@@ -306,6 +369,20 @@ function createWindow() {
  */
 function registerShellHandlers() {
   const from = (event) => BrowserWindow.fromWebContents(event.sender);
+
+  ipcMain.handle('lifecycle:ready', (event) => {
+    if (from(event) !== mainWindow) return false;
+    if (!rendererSavers.has(event.sender.id)) rendererSavers.set(event.sender.id, { pending: null });
+    return true;
+  });
+  ipcMain.on('lifecycle:saved', (event, result) => {
+    const saver = rendererSavers.get(event.sender.id);
+    const pending = saver?.pending;
+    if (!pending || result?.requestId !== pending.requestId) return;
+    clearTimeout(pending.timeout);
+    saver.pending = null;
+    pending.finish(result.ok === true ? null : String(result.error || 'Saving failed.'));
+  });
 
   ipcMain.handle('window:minimize', (e) => { from(e)?.minimize(); return true; });
   ipcMain.handle('window:close', (e) => { from(e)?.close(); return true; });
@@ -643,10 +720,13 @@ app.whenReady().then(async () => {
   }
 
   await initUpdater({
+    version: APP_VERSION,
     canSelfUpdate: canSelfUpdate(CHANNEL),
     getWindow: () => mainWindow,
     beforeInstall: async () => {
-      snapshotStorage({ label: `pre-update-${APP_VERSION}-${Date.now()}` });
+      await requestRendererSave(mainWindow);
+      const backup = snapshotStorage({ label: `pre-update-${APP_VERSION}-${Date.now()}` });
+      if (!backup) throw new Error('The backup could not be created. The update has not been installed.');
     },
   });
 

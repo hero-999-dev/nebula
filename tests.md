@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 309 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 173 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 338 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 187 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -25,17 +25,21 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/release-notes.test.js` | 17 | What each release says for itself |
 | `tests/inline-format.test.js` | 18 | Enter and Backspace out of an inline wrapper |
 | `tests/highlight.test.js` | 14 | Per-language tokens, and that only SQL is case-insensitive |
-| `tests/disk-store.test.js` | 6 | Rapid saves serialize per file, every mirrored file is valid JSON, deleting a note deletes *its* file, unchanged notes are skipped, boot loads from disk and survives one corrupt file, browser mode never throws |
-| `tests/seed-guard.test.js` | 10 | The distinction between an empty vault and an unreadable one |
+| `tests/disk-store.test.js` | 10 | Serialized acknowledged writes, retry of failed writes/deletions, latest state wins, and a partially corrupt vault disables the mirror without replacing its cache |
+| `tests/seed-guard.test.js` | 13 | Empty versus unreadable vault, including malformed files and rejected note reads |
 | `tests/user-data.test.js` | 8 | Which vault each build channel gets, and which one may replace itself |
 | `tests/version-compare.test.js` | 7 | `0.3.10 > 0.3.9`, `v` prefixes, pre-releases, unparseable tags refuse rather than guess |
 | `tests/find.test.js` | 9 | Finding text in a note without editing it |
 | `tests/history.test.js` | 21 | The editor's own undo stack |
 | `tests/notes-archive.test.js` | 14 | Pin, archive, trash and restore |
 | `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
-| `tests/export.test.js` | 18 | A note as Markdown or as a standalone HTML file |
+| `tests/export.test.js` | 30 | A note as Markdown or as a standalone HTML file |
 | `tests/import.test.js` | 18 | A Markdown or HTML file read back as a note, sanitised |
-| `tests/e2e/smoke.mjs` | 173 | The real app, six launches |
+| `tests/inline-family.test.js` | 7 | Exact selected occurrence, native underline removal, cross-block wrapping, collapsed caret and clean serialization |
+| `tests/recovery.test.js` | 11 | Pending buffer ownership on archive/trash, synchronous save retry, wrapped Markdown text, long fences, unsafe URL schemes and code-block edge detection |
+| `tests/updater.test.js` | 3 | Nebula-version comparisons, failed save/backup blocks install, successful preparation precedes silent install |
+| `tests/docs.test.js` | 1 | Repository attribution is removed from public documentation without removing real content |
+| `tests/e2e/smoke.mjs` + `tests/e2e/recovery.mjs` | 187 | Original 173 checks plus 14 recovery checks, all using throwaway profiles |
 
 ---
 
@@ -84,6 +88,39 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-22] v0.7.5 - interrupted work recovered
+
+<!-- agent-note: gpt6astra tarafından eklendi -->
+
+The existing interrupted changes were preserved and completed. The 338 unit
+tests cover acknowledged disk writes, partially unreadable vault protection,
+note-bound title/body buffers, precise inline formatting, Markdown round trips,
+import sanitization and update preparation failures.
+
+Fourteen new Electron checks now run as part of the standard smoke command:
+archive before autosave; the next note stays intact; recolour only the selected
+repeated word; colour-menu hit-testing at all four dock positions; real disk
+failure and retry; native close refuses failed saving; bottom-shape dragging;
+deleting its last shape frees the reserved canvas; immediate close flushes both
+title and body; and restart preserves both.
+
+The bottom-shape regression failed before the fix: moving the pointer up 60px
+also moved scrollTop from 752 to 692, leaving the shape at the same screen y.
+Reserving the extent on the non-scrolling shape layer keeps scrollTop at 752
+and moves the rendered shape from y=684 to y=624. Never reserve on the editor.
+
+An optional real-note reproduction uses `NEBULA_REPRO_NOTE` with
+`node tests/e2e/recovery.mjs`. It reads the supplied note into a temporary
+profile, verifies a real pointer drag and checks the source stays byte-identical.
+The user's reported note passed; no private note is committed as a fixture.
+Failure dialogs in this suite are intercepted so automated checks do not leave
+a misleading native save-error popup on the user's desktop.
+
+The sidebar test now waits for its target width rather than an animation delay.
+Repository-only attribution comments are stripped by the docs build and tested.
+Windows Electron behaviour is exercised locally; macOS packaging is checked by CI,
+not by claiming a local macOS runtime test.
 
 ### [2026-09-10] v0.7.4 - the note, copied by hand
 

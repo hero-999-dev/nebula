@@ -97,7 +97,9 @@ export class NoteStore {
 
     const active = this.get(this.activeId);
     if (!active || active.deletedAt || active.archivedAt) {
-      this.activeId = this.sorted()[0]?.id ?? this.notes[0]?.id ?? null;
+      this.activeId = this.sorted()[0]?.id ?? null;
+      if (this.activeId) localStorage.setItem(STORAGE_KEY_ACTIVE, this.activeId);
+      else localStorage.removeItem(STORAGE_KEY_ACTIVE);
     }
   }
 
@@ -175,7 +177,11 @@ export class NoteStore {
   }
 
   updateActive(partial) {
-    const note = this.active();
+    this.updateNote(this.activeId, partial);
+  }
+
+  updateNote(id, partial) {
+    const note = this.get(id);
     if (!note) return;
     Object.assign(note, partial, { updatedAt: Date.now() });
     this.save();

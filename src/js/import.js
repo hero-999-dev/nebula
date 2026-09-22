@@ -42,7 +42,10 @@ export function sanitize(html) {
       const name = attr.name.toLowerCase();
       // on* handlers, style, and anything not on the list.
       if (!ALLOWED_ATTRS.has(name)) { el.removeAttribute(attr.name); continue; }
-      if ((name === 'href' || name === 'src') && /^\s*(javascript|data|vbscript):/i.test(attr.value)) {
+      // URL parsing ignores embedded tabs/newlines and leading controls.
+      // Inspect the same normalized scheme, including decoded HTML entities.
+      const url = attr.value.replace(/[\u0000-\u0020\u007f]/g, '');
+      if ((name === 'href' || name === 'src') && /^(javascript|data|vbscript):/i.test(url)) {
         el.removeAttribute(attr.name);
       }
     }
@@ -98,13 +101,14 @@ export function fromMarkdown(md, { skipTitle = true } = {}) {
     const line = lines[i];
 
     // fenced code — consume through the closing fence
-    const fence = line.match(/^```\s*([\w+#-]*)\s*$/);
+    const fence = line.match(/^(`{3,}|~{3,})\s*([\w+#-]*)\s*$/);
     if (fence) {
       flushList();
-      const lang = fence[1] || 'plain';
+      const lang = fence[2] || 'plain';
+      const close = new RegExp(`^${fence[1][0]}{${fence[1].length},}\\s*$`);
       const body = [];
       i += 1;
-      while (i < lines.length && !/^```/.test(lines[i])) { body.push(lines[i]); i += 1; }
+      while (i < lines.length && !close.test(lines[i])) { body.push(lines[i]); i += 1; }
       out.push(`<div class="blk-code" data-block-type="code" data-lang="${esc(lang)}"`
         + ` data-code="${encodeURIComponent(body.join('\n'))}" contenteditable="false"></div>`);
       continue;

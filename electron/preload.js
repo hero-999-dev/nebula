@@ -15,6 +15,23 @@ contextBridge.exposeInMainWorld('nebula', {
     reveal: (rel) => ipcRenderer.invoke('storage:reveal', rel),
     root: () => ipcRenderer.invoke('storage:root'),
   },
+  lifecycle: {
+    onSave: (fn) => {
+      const handler = async (_event, requestId) => {
+        try {
+          await fn();
+          ipcRenderer.send('lifecycle:saved', { requestId, ok: true });
+        } catch (error) {
+          ipcRenderer.send('lifecycle:saved', {
+            requestId, ok: false, error: error?.message ?? String(error),
+          });
+        }
+      };
+      ipcRenderer.on('lifecycle:save', handler);
+      void ipcRenderer.invoke('lifecycle:ready');
+      return () => ipcRenderer.off('lifecycle:save', handler);
+    },
+  },
   // The app draws its own File/Edit/View/Window/Help beside the logo, so it
   // needs what the native menu roles used to do. Each call acts on the window
   // that sent it — the renderer cannot name another one.

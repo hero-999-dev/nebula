@@ -38,7 +38,7 @@ screen are obviously the same product.
   styles (single, double, bold, wavy, dashed) · strikethrough · inline code
   (Ctrl+E) · equation (Ctrl+Q, typeset with KaTeX and framed like inline code) ·
   four alignments. The font button and the size box show what the caret is
-  actually in; with nothing selected a font applies to the whole line.
+  actually in; fonts and sizes apply to selected text only.
 - **Right-click a selection** for a compact mini toolbar.
 - **`/` opens a block menu** — headings, lists, to-do, quote, code, divider,
   shapes.
@@ -117,7 +117,7 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.7.4)
+## Current implementation state (v0.7.5)
 
 **Working:** the whole editor described above — dock pad, two-row toolbar,
 mini toolbar, slash menu, code blocks with syntax colours, free-floating shapes,
@@ -138,7 +138,21 @@ stamp, and a dev profile at `<repo>/.dev-profile` that development cannot escape
 on Windows and notify-and-download elsewhere; `npm run push` is the whole
 release ritual.
 
-**Quality:** 309 unit tests, 173 Electron smoke checks against the real app
+<!-- agent-note: gpt6astra tarafından eklendi -->
+
+**Recovery:** title and body buffers are bound to their note ID, not whichever
+note becomes active during a delayed save. Saved means disk writes were
+acknowledged; failures remain retryable. Native close and update wait for the
+renderer flush, and installation also requires a successful backup. A partially
+unreadable vault disables disk mirroring rather than creating sample notes.
+
+**Editor boundaries:** inline-family changes split exact DOM selection
+boundaries, including repeated words and legacy underline tags. Menus are
+positioned against the viewport for every toolbar dock. Dragging the lowest
+shape preserves canvas extent on the shape layer, never on the scrolling editor.
+Markdown export preserves nested prose and code blank lines/long fences.
+
+**Quality:** 338 unit tests, 187 Electron smoke checks against the real app
 (including "an unreadable vault seeds nothing", verified by breaking the guard
 on purpose and watching the suite go red).
 

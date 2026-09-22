@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
+import { runRecoveryChecks } from './recovery.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mainJs = path.join(root, 'dist-electron', 'main.js');
@@ -322,7 +323,8 @@ try {
       rail.notes && rail.newNote && rail.themes && rail.initial === 'W',
       JSON.stringify(rail));
     await press(win, '#side-toggle');
-    await win.waitForTimeout(250);
+    await win.waitForFunction((target) => Math.abs(document.getElementById('side').getBoundingClientRect().width - target) < 1,
+      wide, { polling: 50, timeout: 10_000 });
     check('and comes back',
       await win.evaluate(() => document.getElementById('note-list').getBoundingClientRect().width > 100));
   }
@@ -1288,7 +1290,8 @@ try {
     const before = await win.evaluate(() => Math.round(document.getElementById('editor').scrollTop));
     const at = await win.evaluate(() => {
       const r = document.querySelector('#editor .shape').getBoundingClientRect();
-      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + 14),
+      const hit = document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + 14));
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + 14), hit: hit?.outerHTML.slice(0, 200),
                onScreen: r.top > 0 && r.bottom < window.innerHeight };
     });
     check('the shape is on screen to be clicked', at.onScreen);
@@ -1300,7 +1303,7 @@ try {
     }));
     check('clicking a shape does not throw the view to the top',
       Math.abs(after.top - before) < 20, `${before} -> ${after.top}`);
-    check('and it selects the shape', after.selected);
+    check('and it selects the shape', after.selected, JSON.stringify(at));
   }
 
   /**
@@ -2308,6 +2311,7 @@ try {
   check('unreadable vault is left exactly as it was',
     fs.readFileSync(path.join(broken, 'storage', 'notes'), 'utf8') === 'not a directory');
   await app.close();
+  await runRecoveryChecks(check);
 } catch (err) {
   failure = err;
   check('smoke run completed', false, err.message);

@@ -114,6 +114,12 @@ export function initShapes(editorEl, { history } = {}) {
     if (selected) positionBar();
   }
 
+  function releaseEmptyCanvases() {
+    for (const layer of editorEl.querySelectorAll('.shape-layer')) {
+      if (!layer.querySelector('.shape')) layer.style.removeProperty('min-height');
+    }
+  }
+
   function positionBar() {
     const bar = document.getElementById('shape-bar');
     if (!bar || !selected) return;
@@ -215,18 +221,12 @@ export function initShapes(editorEl, { history } = {}) {
       top: parseFloat(shape.style.top) || 0,
       w: shape.offsetWidth,
       h: shape.offsetHeight,
+      layer: shape.closest('.shape-layer'),
+      extent: editorEl.scrollHeight,
     };
-    // Nothing is done to the editor's own size here, and that is deliberate.
-    //
-    // 0.7.2 froze it for the length of the drag, to stop the bottom of the note
-    // moving under the hand. A min-height on the element that SCROLLS stops it
-    // overflowing, so it stops scrolling — and its scrollTop went to zero. Since
-    // this runs on mousedown, every click on a shape threw the view to the top
-    // of the note: "I press a shape and the screen suddenly jumps up." Measured
-    // at 820 -> 0.
-    //
-    // Second attempt at that report, second worse fault. It stays out until
-    // there is a reproduction of the original to work from.
+    // Reserve the canvas, never the scrolling editor. Its lowest shape can
+    // define scrollHeight; moving it up otherwise clamps scrollTop on every
+    // mousemove and makes the shape appear glued to the bottom of the window.
   });
 
   window.addEventListener('mousemove', (e) => {
@@ -234,6 +234,8 @@ export function initShapes(editorEl, { history } = {}) {
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
     if (Math.abs(e.clientX - drag.downX) > 2 || Math.abs(e.clientY - drag.downY) > 2) drag.moved = true;
+    if (!drag.moved) return;
+    if (drag.layer) drag.layer.style.minHeight = `${drag.extent}px`;
     if (drag.kind === 'rotate') {
       // Shift snaps to 15 degrees, the way every drawing tool does it.
       let deg = drag.rot + (angleTo(drag.el, e.clientX, e.clientY) - drag.grabAngle);
@@ -455,7 +457,7 @@ export function initShapes(editorEl, { history } = {}) {
         history?.push();
         selected.classList.toggle('no-outline');
         dirty();
-      } else if (act === 'del') { history?.push(); selected.remove(); select(null); dirty(); }
+      } else if (act === 'del') { history?.push(); selected.remove(); releaseEmptyCanvases(); select(null); dirty(); }
       else if (act === 'back' || act === 'front') {
         history?.push();
         const behind = act === 'back';
@@ -475,6 +477,7 @@ export function initShapes(editorEl, { history } = {}) {
       e.preventDefault();
       history?.push();
       selected.remove();
+      releaseEmptyCanvases();
       select(null);
       dirty();
     }

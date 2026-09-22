@@ -17,6 +17,9 @@ const escapeHtml = (s) => s
   .replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;');
 
+/** Repository-only authorship annotations must not appear on the docs site. */
+export const publicDocSource = (src) => src.replace(/<!--\s*agent-note:[\s\S]*?-->/g, '');
+
 /** Slug for heading anchors and the in-page outline. */
 export const slug = (s) => s
   .toLowerCase()

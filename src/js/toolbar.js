@@ -10,6 +10,7 @@ import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
 import { normalizeLists, exitListOnEmptyItem, liftListItemAtStart } from './lists.js';
 import { enterOutOfWrapper, backspaceOutOfWrapper } from './inline-format.js';
+import { applyInlineFamily, clearInlineFamilyAtCaret, cleanTypingMarkers } from './inline-family.js';
 import { initEquation } from './equation.js';
 import { on } from './bus.js';
 import { toMarkdown, toHtml, toPrintDocument, safeFileName, FORMATS } from './export.js';
@@ -288,72 +289,17 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
   }
 
   /**
-   * Remove every wrapper of one family touching the selection, keeping the
-   * text. A family is a set of classes only one of which may apply at a time:
-   * the five underline styles, the nine text colours, the nine highlights.
-   */
-  function stripFamily(classes, extra = '') {
-    const sel = [...classes.map((c) => `.${c}`), ...(extra ? [extra] : [])].join(',');
-    const range = selectionInEditor();
-    if (!range || !sel) return;
-    history?.push();
-    // wrappers fully inside the selection
-    if (range.cloneContents().querySelector?.(sel)) {
-      const span = document.createElement('span');
-      span.appendChild(range.extractContents());
-      span.querySelectorAll(sel).forEach((el) => el.replaceWith(...el.childNodes));
-      range.insertNode(span);
-      span.replaceWith(...span.childNodes);
-    }
-    // an ancestor wrapper around the selection
-    let node = range.commonAncestorContainer;
-    if (node.nodeType !== Node.ELEMENT_NODE) node = node.parentElement;
-    const anc = node?.closest?.(sel);
-    if (anc && editorEl.contains(anc)) anc.replaceWith(...anc.childNodes);
-    editorEl.normalize();
-  }
-
-  /**
    * One class from `classes`, replacing whichever one was already there — never
    * nesting them. An empty `cls` just clears the family.
    */
   function applyExclusive(classes, cls, extra = '') {
     const range = selectionInEditor();
     if (!range || range.collapsed) return;
-    const text = range.toString();
-    // Stripping can drop the selection. Its boundary points usually survive,
-    // and putting them back is exact — the content search below cannot find a
-    // run that spans two blocks, so without this the whole action was a no-op
-    // on exactly the selections that needed it most.
-    const saved = range.cloneRange();
-    stripFamily(classes, extra);
-    if (!cls) { dirty(); return; }
-    const sel = window.getSelection();
-    if ((sel.isCollapsed || !selectionInEditor())
-        && saved.startContainer.isConnected && saved.endContainer.isConnected) {
-      try {
-        sel.removeAllRanges();
-        sel.addRange(saved);
-      } catch { /* boundaries no longer form a range; fall through */ }
-    }
-    // re-find the same text after stripping, then wrap it once
-    if (sel.isCollapsed && text) {
-      // the strip can drop the selection — restore it by content search
-      const walker = document.createTreeWalker(editorEl, NodeFilter.SHOW_TEXT);
-      let n;
-      while ((n = walker.nextNode())) {
-        const i = n.textContent.indexOf(text);
-        if (i !== -1) {
-          const r = document.createRange();
-          r.setStart(n, i);
-          r.setEnd(n, i + text.length);
-          sel.removeAllRanges();
-          sel.addRange(r);
-          break;
-        }
-      }
-    }
-    wrapSelection(cls);
+    const parts = blockRanges(range);
+    if (!parts.length) return;
+    history?.push();
+    applyInlineFamily(editorEl, parts, classes, cls, extra);
+    dirty();
   }
 
   /**
@@ -434,38 +380,14 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
   function clearAtCaret(classes, extra = '') {
     const range = selectionInEditor();
     if (!range || !range.collapsed) return false;
-    const sel = [...classes.map((c) => `.${c}`), ...(extra ? [extra] : [])].join(',');
-    let node = range.startContainer;
-    if (node.nodeType !== Node.ELEMENT_NODE) node = node.parentElement;
-    const wrapper = node?.closest?.(sel);
-    if (!wrapper || !editorEl.contains(wrapper)) return false;
-
     history?.push();
-    if (!wrapper.textContent.trim()) {
-      // Nothing in it: take it away and leave the line able to hold a caret.
-      const block = wrapper.parentElement;
-      wrapper.replaceWith(...wrapper.childNodes);
-      if (block && !block.textContent.trim() && !block.querySelector('br')) {
-        block.appendChild(document.createElement('br'));
-      }
-      const r = document.createRange();
-      r.setStart(block ?? editorEl, 0);
-      r.collapse(true);
-      const s = window.getSelection();
-      s.removeAllRanges();
-      s.addRange(r);
-    } else {
-      // Step out of it, so the next thing typed is not inside it.
-      const r = document.createRange();
-      r.setStartAfter(wrapper);
-      r.collapse(true);
-      const s = window.getSelection();
-      s.removeAllRanges();
-      s.addRange(r);
-    }
+    if (!clearInlineFamilyAtCaret(editorEl, range, classes, extra)) return false;
     dirty();
     return true;
   }
+
+  editorEl.addEventListener('input', () => cleanTypingMarkers(editorEl, { preserveActive: true }));
+  document.addEventListener('selectionchange', () => cleanTypingMarkers(editorEl, { preserveActive: true }));
 
   const applyUnderline = (cls) => withSelection(() => {
     const want = cls === 'none' ? '' : cls;
@@ -780,20 +702,55 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     aj: () => cmd('justifyFull'),
   };
 
-  toolbar.addEventListener('mousedown', (e) => {
-    if (!e.target.closest('input, select')) e.preventDefault(); // keep the selection
-  });
+  const toolbarMenus = [...toolbar.querySelectorAll('.tb-menu')];
+  // A scrolling rail clips descendants even when they have a high z-index.
+  // Keep the menus in the viewport and keep their event delegation with them.
+  for (const menu of toolbarMenus) {
+    document.body.appendChild(menu);
+    Object.assign(menu.style, { position: 'fixed', right: 'auto', bottom: 'auto', zIndex: '160' });
+  }
+  let openMenu = null;
+  let menuAnchor = null;
 
-  toolbar.addEventListener('click', (e) => {
+  function positionMenu() {
+    if (!openMenu || openMenu.hidden || !menuAnchor) return;
+    const anchor = menuAnchor.getBoundingClientRect();
+    const shell = document.getElementById('edit-shell');
+    const margin = 8;
+    openMenu.style.maxHeight = `${Math.min(520, window.innerHeight - 2 * margin)}px`;
+    const rect = openMenu.getBoundingClientRect();
+    let x = anchor.left;
+    let y = anchor.bottom + 4;
+    if (shell?.classList.contains('bar-left')) { x = anchor.right + 4; y = anchor.top; }
+    else if (shell?.classList.contains('bar-right')) { x = anchor.left - rect.width - 4; y = anchor.top; }
+    else if (shell?.classList.contains('bar-bottom')) y = anchor.top - rect.height - 4;
+    else if (y + rect.height > window.innerHeight - margin && anchor.top > rect.height) y = anchor.top - rect.height - 4;
+    openMenu.style.left = `${Math.max(margin, Math.min(x, window.innerWidth - rect.width - margin))}px`;
+    openMenu.style.top = `${Math.max(margin, Math.min(y, window.innerHeight - rect.height - margin))}px`;
+  }
+
+  function keepSelection(e) {
+    if (!e.target.closest('input, select')) e.preventDefault(); // keep the selection
+  }
+  toolbar.addEventListener('mousedown', keepSelection);
+  toolbarMenus.forEach((menu) => menu.addEventListener('mousedown', keepSelection));
+
+  function toolbarClick(e) {
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act && ACTIONS[act]) { closeMenus(); ACTIONS[act](); return; }
 
     const menuBtn = e.target.closest('[data-menu]');
     if (menuBtn) {
       const menu = document.getElementById(menuBtn.dataset.menu);
+      if (!menu) return;
       const wasOpen = !menu.hidden;
       closeMenus();
       menu.hidden = wasOpen;
+      if (!wasOpen) {
+        openMenu = menu;
+        menuAnchor = menuBtn;
+        positionMenu();
+      }
       return;
     }
     const ustyle = e.target.closest('[data-ustyle]')?.dataset.ustyle;
@@ -801,14 +758,21 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
 
     const shapeKind = e.target.closest('[data-shape-add]')?.dataset.shapeAdd;
     if (shapeKind) { lastShape = shapeKind; insertShape(shapeKind); closeMenus(); }
-  });
+  }
+  toolbar.addEventListener('click', toolbarClick);
+  toolbarMenus.forEach((menu) => menu.addEventListener('click', toolbarClick));
 
   function closeMenus() {
-    toolbar.querySelectorAll('.tb-menu').forEach((m) => { m.hidden = true; });
+    toolbarMenus.forEach((m) => { m.hidden = true; });
+    openMenu = null;
+    menuAnchor = null;
   }
   document.addEventListener('mousedown', (e) => {
-    if (!e.target.closest('.tb-wrap')) closeMenus();
+    if (!e.target.closest('.tb-wrap, .tb-menu')) closeMenus();
   });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenus(); });
+  window.addEventListener('resize', positionMenu);
+  toolbar.addEventListener('scroll', positionMenu);
 
   // ----- color menus (Notion-style names + swatches) -----
   // The swatch shows the class rendered in the theme that is on, so the menu

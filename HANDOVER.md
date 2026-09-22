@@ -30,7 +30,7 @@ GitHub Releases, and updates itself in place on Windows.
 | Renderer | `src/` — no framework, no build magic beyond Vite |
 | Main | `electron/main.js` + `electron/preload.js` — the only place with disk access |
 | Storage | `<userData>/storage/notes/<id>.json`, mirrored from `localStorage` |
-| Tests | `npm test` (61 unit) · `npm run smoke` (22 Electron checks against the real app) |
+| Tests | `npm test` (338 unit) · `npm run smoke` (187 Electron checks against the real app) |
 
 It is a deliberate rewrite of `../Nebula Demo/` (v0.5.7, feature-complete but
 sprawling), pairing that project's plumbing with `../Ember/`'s visual language.
@@ -65,6 +65,7 @@ src/js/
   note-actions.js    the per-note menu and the archive/trash drawers
   lists.js           repairs what execCommand's list commands leave behind
   inline-format.js   Enter/Backspace out of an inline wrapper
+  inline-family.js   exact inline selection boundaries and clean typing markers
   equation.js        KaTeX, rendered from data-tex on every load
   ai-panel.js        webview tabs (deliberately isolated from everything else)
   updater.js         the update card
@@ -90,7 +91,7 @@ everyone else. Nothing reads the DOM to find out what a note contains.
 | `npm run pack:win` | `release/Nebula-Setup-*.exe` + `Nebula-portable-*.exe` |
 | `npm run icons` | Regenerate `build/icon.png` from `build/source-mark.png` (Windows) |
 | `npm run site` | Rebuild `site/index.html` (docs + mind maps) |
-| `npm run push` | The release ritual — **only when the user says "push"** |
+| `npm run push` | Release finished work automatically under the owner's standing instruction in AGENTS.md |
 | `npm run sync-flash` | Mirror the repo to the USB drive if it is plugged in |
 | `npm run reset` | Wipe the **dev** notes (backs them up first) |
 
@@ -291,6 +292,27 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 ---
 
 ## 7. Where things live at runtime
+
+<!-- agent-note: gpt6astra tarafından eklendi -->
+
+### Recovery rules added after the interrupted editor repair
+
+- Editor and title buffers retain their originating note ID. Archive/trash can
+  change the active note before a debounce fires; never save through active.
+- Disk mirroring advances its acknowledged state only after a successful bridge
+  response. Failed writes/deletes stay pending and `flushDisk()` must reject if
+  retry fails. An unreadable file disables the entire mirror, preserving cache.
+- Native close, quit and update use the preload lifecycle save handshake.
+  A timeout or failed save keeps the window open; update also requires backup.
+- Inline-family changes split DOM boundaries, never find selected text by value.
+  Strip temporary typing markers from the serialized clone, not the live caret.
+- Preserve the lowest shape's canvas extent on `.shape-layer` after movement
+  begins, never on `#editor`; release the reserve when its last shape is deleted.
+- The smoke suite imports `tests/e2e/recovery.mjs`. Run that file alone after
+  building for focused save/close/drag checks. Optional `NEBULA_REPRO_NOTE`
+  reads a real note into a throwaway profile and verifies the source is unchanged.
+- Documentation comments prefixed `agent-note:` are repository-only:
+  `publicDocSource()` strips them before the public site is rendered.
 
 **Four ways to launch, four separate vaults** (`electron/user-data.js`):
 

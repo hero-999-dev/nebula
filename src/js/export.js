@@ -1,3 +1,5 @@
+import { cleanTypingMarkers } from './inline-family.js';
+
 /**
  * A note, as Markdown or as a standalone HTML file.
  *
@@ -30,6 +32,7 @@ const ESCAPE_MD = /([\\`*_[\]])/g;
 /** A DOM to read from. DOMParser documents are inert — nothing loads or runs. */
 function parse(html) {
   const doc = new DOMParser().parseFromString(String(html ?? ''), 'text/html');
+  cleanTypingMarkers(doc.body);
   doc.body.querySelectorAll(DROP).forEach((el) => el.remove());
   return doc;
 }
@@ -91,6 +94,52 @@ function listMd(list, depth = 0) {
   return out.join('\n');
 }
 
+const BLOCK_SELECTOR = 'p,div,h1,h2,h3,h4,h5,h6,ul,ol,li,blockquote,pre,hr,section,article,figure,figcaption,table,tr,td,th';
+
+/** Preserve raw text and block boundaries through editor/font wrappers. */
+function childrenMd(parent, skip = null) {
+  const parts = [];
+  let inline = '';
+  const flush = () => {
+    if (inline.trim()) parts.push(inline.trim());
+    inline = '';
+  };
+  for (const child of parent.childNodes) {
+    if (child === skip) continue;
+    if (child.nodeType === Node.ELEMENT_NODE
+      && (child.matches(BLOCK_SELECTOR) || child.querySelector(BLOCK_SELECTOR))) {
+      flush();
+      parts.push(...blockMd(child));
+    } else inline += inlineMd(child);
+  }
+  flush();
+  return parts;
+}
+
+function blockMd(el) {
+  const tag = el.tagName.toLowerCase();
+  if (el.classList.contains('blk-code') || tag === 'pre') {
+    let code = el.querySelector('pre')?.textContent ?? el.textContent;
+    if (el.hasAttribute('data-code')) {
+      try { code = decodeURIComponent(el.dataset.code); } catch { /* keep visible source */ }
+    }
+    const lang = el.dataset.lang && el.dataset.lang !== 'plain' ? el.dataset.lang : '';
+    const longestFence = Math.max(2, ...(code.match(/`+/g) ?? []).map((run) => run.length));
+    const fence = '`'.repeat(longestFence + 1);
+    return [`${fence}${lang}\n${code}\n${fence}`];
+  }
+  if (el.classList.contains('blk-todo')) {
+    return [`- [${el.classList.contains('done') ? 'x' : ' '}] ${inlineMd(el).trim()}`];
+  }
+  if (tag === 'hr') return ['---'];
+  if (tag === 'ul' || tag === 'ol') return [listMd(el)];
+  if (tag === 'blockquote') {
+    return [childrenMd(el).join('\n\n').split('\n').map((line) => `> ${line}`).join('\n')];
+  }
+  if (/^h[1-6]$/.test(tag)) return [`${'#'.repeat(Number(tag[1]))} ${inlineMd(el).trim()}`];
+  return childrenMd(el);
+}
+
 /**
  * @param {string} html the note's stored content
  * @param {string} [title] written as the first `# heading`, the way Notion does
@@ -107,36 +156,8 @@ export function toMarkdown(html, title = '') {
     && first?.tagName === 'H1'
     && first.textContent.trim() === String(title).trim();
 
-  for (const el of Array.from(doc.body.children)) {
-    if (skipFirst && el === first) continue;
-    const tag = el.tagName.toLowerCase();
-
-    if (el.classList.contains('blk-code')) {
-      let code = '';
-      try { code = decodeURIComponent(el.dataset.code ?? ''); } catch { code = el.textContent; }
-      const lang = el.dataset.lang && el.dataset.lang !== 'plain' ? el.dataset.lang : '';
-      parts.push(`\`\`\`${lang}\n${code}\n\`\`\``);
-      continue;
-    }
-    if (el.classList.contains('blk-todo')) {
-      parts.push(`- [${el.classList.contains('done') ? 'x' : ' '}] ${inlineMd(el).trim()}`);
-      continue;
-    }
-    if (tag === 'hr') { parts.push('---'); continue; }
-    if (tag === 'ul' || tag === 'ol') { parts.push(listMd(el)); continue; }
-    if (tag === 'blockquote') {
-      parts.push(inlineMd(el).trim().split('\n').map((l) => `> ${l}`).join('\n'));
-      continue;
-    }
-    if (/^h[1-6]$/.test(tag)) {
-      parts.push(`${'#'.repeat(Number(tag[1]))} ${inlineMd(el).trim()}`);
-      continue;
-    }
-    const text = inlineMd(el).trim();
-    if (text) parts.push(text);
-  }
-
-  return `${parts.join('\n\n').replace(/\n{3,}/g, '\n\n').trim()}\n`;
+  parts.push(...childrenMd(doc.body, skipFirst ? first : null));
+  return `${parts.join('\n\n').trim()}\n`;
 }
 
 /**

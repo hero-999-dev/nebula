@@ -222,6 +222,7 @@ export function initCodeBlocks(editorEl, { history } = {}) {
     if (!sel || !sel.rangeCount) return;
     const range = sel.getRangeAt(0);
     if (!src.contains(range.startContainer)) return;
+    history?.push();
     range.deleteContents();
 
     const after = document.createRange();
@@ -309,12 +310,10 @@ export function initCodeBlocks(editorEl, { history } = {}) {
 
     // The block on the side the key is pointing at, when the caret sits at the
     // very edge of the text next to it.
-    const atStart = range.startOffset === 0;
     const node = range.startContainer;
-    const atEnd = node.nodeType === Node.TEXT_NODE
-      ? range.startOffset === node.nodeValue.length
-      : range.startOffset === node.childNodes.length;
     const here = blockOf(node);
+    const atStart = here && caretAtBlockEdge(range, here, 'before');
+    const atEnd = here && caretAtBlockEdge(range, here, 'after');
     const block = e.key === 'Backspace' && atStart ? codeBlockIn(neighbourOf(here, 'before'), 'before')
       : e.key === 'Delete' && atEnd ? codeBlockIn(neighbourOf(here, 'after'), 'after')
         : null;
@@ -366,14 +365,11 @@ export function initCodeBlocks(editorEl, { history } = {}) {
   function codeBlockIn(el, side) {
     if (!el) return null;
     if (el.classList?.contains('blk-code')) return el;
-    // Any depth: a wrapper can hold a wrapper. The old two-level selector
-    // missed a block that had been coloured and then given a font.
-    const inner = [...(el.querySelectorAll?.('.blk-code') ?? [])];
-    if (!inner.length) return null;
-    // Reaching backwards takes the block nearest the caret, which is the last
-    // one in the wrapper; reaching forwards takes the first. A wrapper holding
-    // text as well keeps its text — only the block goes.
-    return side === 'before' ? inner[inner.length - 1] : inner[0];
+    // Only the touching edge counts. A wrapper can contain a code block AND
+    // prose after it; deleting beside that prose must not jump over its text.
+    const children = [...el.childNodes].filter((n) => n.nodeType !== Node.TEXT_NODE || n.nodeValue.length);
+    const edge = side === 'before' ? children.at(-1) : children[0];
+    return edge?.nodeType === Node.ELEMENT_NODE ? codeBlockIn(edge, side) : null;
   }
 
   /**
@@ -414,10 +410,24 @@ export function initCodeBlocks(editorEl, { history } = {}) {
   function neighbourOf(el, side) {
     let cur = el;
     while (cur && cur !== editorEl) {
-      const sib = side === 'before' ? cur.previousElementSibling : cur.nextElementSibling;
+      let sib = side === 'before' ? cur.previousSibling : cur.nextSibling;
+      while (sib?.nodeType === Node.TEXT_NODE && !sib.nodeValue.length) {
+        sib = side === 'before' ? sib.previousSibling : sib.nextSibling;
+      }
       if (sib) return sib;
       cur = cur.parentElement;
     }
     return null;
   }
+}
+
+/** Node offset zero is not the start of a block when earlier inline text exists. */
+export function caretAtBlockEdge(range, block, side) {
+  if (!range.collapsed || !block.contains(range.startContainer)) return false;
+  const probe = block.ownerDocument.createRange();
+  probe.selectNodeContents(block);
+  if (side === 'before') probe.setEnd(range.startContainer, range.startOffset);
+  else probe.setStart(range.endContainer, range.endOffset);
+  const fragment = probe.cloneContents();
+  return !fragment.textContent.length && !fragment.querySelector('br,img,hr,.blk-code,.shape-layer,.inline-eq');
 }

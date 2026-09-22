@@ -9,8 +9,9 @@
  *   - robocopy exits 1 when it copied files. Anything under 8 is success;
  *     treating "non-zero" as failure reports every successful sync as broken.
  *
- * Nothing secret is written: build output, node_modules and .git are excluded,
- * and this project holds no credentials of its own.
+ * Nothing secret is written: build output, node_modules, .git and the Chromium
+ * profile (Nebula-data, which holds cookies) are excluded, and this project
+ * holds no credentials of its own.
  *
  *   npm run sync-flash
  *   npm run sync-flash -- --machine LegionGo
@@ -28,7 +29,10 @@ const MACHINE = machineIdx >= 0 ? args[machineIdx + 1] : 'AcerSwift';
 const LABEL = 'HeroAI64GB';
 const WORKSPACE = 'Cursor X Antigravity';
 
-const EXCLUDE_DIRS = ['node_modules', 'dist', 'dist-electron', 'release', '.dev-profile', '.git'];
+// Nebula-data is a Chromium profile: cookies for the embedded AI panels, local storage, caches. The drive's rules
+// ban session cookies and local addresses, and a 2026-09-21 audit found eight cookie databases there that this
+// script had copied on every push. test-build is a regenerable 400 MB test build.
+const EXCLUDE_DIRS = ['node_modules', 'dist', 'dist-electron', 'release', '.dev-profile', '.git', 'Nebula-data', 'test-build'];
 
 if (process.platform !== 'win32') {
   console.log('sync-flash currently supports Windows only.');

@@ -263,7 +263,7 @@ const bullets = subjects
 const logPath = path.join(ROOT, 'Log.md');
 const header = fs.existsSync(logPath) ? '' : '# Nebula release log\n\nOne entry per release. Written by `npm run push`.\n';
 const entry = [
-  `## [${timestamp()}] ${tag} - by claude`,
+  `## [${timestamp()}] ${tag} - by ${process.env.NEBULA_RELEASE_AUTHOR || 'release-script'}`,
   '',
   headline ? `${headline}\n` : '',
   bullets.length ? bullets.join('\n') : '* (no commits since the last release)',

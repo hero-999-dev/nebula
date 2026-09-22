@@ -12,7 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT } from './paths.js';
-import { renderMarkdown } from './markdown.js';
+import { renderMarkdown, publicDocSource } from './markdown.js';
 import { buildDiagrams } from './diagrams.js';
 
 const OUT_DIR = path.join(ROOT, 'site');
@@ -93,7 +93,7 @@ for (const doc of DOCS) {
     console.warn(`  skip ${doc.file} (not found)`);
     continue;
   }
-  const { html, outline } = renderMarkdown(fs.readFileSync(full, 'utf8'));
+  const { html, outline } = renderMarkdown(publicDocSource(fs.readFileSync(full, 'utf8')));
   tabs.push({ id: doc.id, label: doc.label });
   panels.push({ id: doc.id, html, outline });
 }

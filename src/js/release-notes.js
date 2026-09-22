@@ -13,6 +13,31 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.7.5': {
+    headline: 'Safer saving, precise formatting, and shapes that follow the pointer.',
+    items: [
+      {
+        title: 'Unsaved changes stay visible',
+        text: 'Failed saves offer a retry. Closing waits for your latest title and text, and stays open if saving fails. Updates also stop if the safety backup cannot be made.',
+      },
+      {
+        title: 'Edits stay with the right note',
+        text: 'Archiving or switching immediately after typing no longer sends pending changes to the next note.',
+      },
+      {
+        title: 'Formatting changes exactly what you selected',
+        text: 'Repeated words, older underline marks and turning a style off at the cursor are handled precisely. Colour menus remain clickable on every side of the window.',
+      },
+      {
+        title: 'The lowest shape moves up normally',
+        text: 'Dragging a shape up from the bottom no longer scrolls the paper in the opposite direction and makes the shape look stuck.',
+      },
+      {
+        title: 'Markdown keeps more of your note',
+        text: 'Export keeps wrapped text and blank lines inside code. Code containing backticks can be imported again without cutting the block short.',
+      },
+    ],
+  },
   '0.7.4': {
     headline: 'Underline switches off, and the shape names are visible.',
     items: [

@@ -1,4 +1,4 @@
-import { initDiskStorage } from './disk-store.js';
+import { initDiskStorage, flushDisk, getDiskStatus } from './disk-store.js';
 import { NoteStore, plainSnippet, relativeTime } from './notes.js';
 import { GUIDE_NOTE, GUIDE_VERSION, addGuide } from './seed-notes.js';
 import { migrateNote } from './migrate.js';
@@ -72,13 +72,52 @@ async function boot() {
   const editorEl = $('editor');
 
   let listFilter = '';
+  let titleTimer = null;
+  let titleNoteId = null;
 
-  function setSaveState(state) {
-    saveEl.textContent = state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : '';
-    saveEl.classList.toggle('saving', state === 'saving');
+  function showSaveError(error) {
+    const banner = $('demo-banner');
+    banner.className = 'demo-banner storage-error';
+    banner.dataset.writeError = 'true';
+    banner.textContent = `Your latest changes could not be saved. ${error?.message ?? error ?? ''} `;
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.textContent = 'Retry saving';
+    retry.addEventListener('click', () => { void saveCurrent().catch(showSaveError); });
+    banner.appendChild(retry);
+    banner.hidden = false;
+    saveEl.textContent = 'Not saved';
+    saveEl.classList.remove('saving');
+  }
+
+  function setSaveState(state, error) {
+    const status = getDiskStatus();
+    if (state === 'error') { showSaveError(error); return; }
+    if (!status.ok) {
+      saveEl.textContent = 'Not saved';
+      saveEl.classList.remove('saving');
+      if (disk.ok) showSaveError(status.error);
+      return;
+    }
+    const saving = state === 'saving' || status.pending || titleTimer !== null || editor.pending;
+    saveEl.textContent = saving ? 'Saving…' : state === 'saved' ? 'Saved' : '';
+    saveEl.classList.toggle('saving', saving);
+    const banner = $('demo-banner');
+    if (!saving && banner.dataset.writeError) {
+      banner.hidden = true;
+      delete banner.dataset.writeError;
+    }
   }
 
   const editor = bindEditor(editorEl, store, setSaveState);
+  window.addEventListener('nebula-storage-status', () => setSaveState('saved'));
+
+  async function saveCurrent() {
+    flushTitle();
+    editor.flush();
+    await flushDisk();
+    setSaveState('saved');
+  }
 
   initDock();
   // The app's own undo stack. Everything that edits the note by script
@@ -100,10 +139,11 @@ async function boot() {
   const toolbar = initToolbar(editorEl, {
     shapes,
     history,
-    onSave: () => { editor.flush(); setSaveState('saved'); },
+    onSave: () => { void saveCurrent().catch(showSaveError); },
     noteTitle: () => store.active()?.title ?? '',
     // An imported file becomes a new note, never an edit to the open one.
     onImport: ({ title, content }) => {
+      flushTitle();
       editor.flush();
       const note = store.createNote(title || 'Imported note');
       store.updateActive({ content });
@@ -173,6 +213,7 @@ async function boot() {
     editor.flush();
     store.setActive(id);
     const note = store.active();
+    titleNoteId = note?.id ?? null;
     titleEl.value = note?.title ?? '';
     titleEl.disabled = !note;
     editor.load(note);
@@ -191,8 +232,6 @@ async function boot() {
     renderList();
   }
 
-  let titleTimer = null;
-
   /**
    * Write a pending title now.
    *
@@ -205,19 +244,20 @@ async function boot() {
   function flushTitle() {
     if (!titleTimer) return;
     clearTimeout(titleTimer);
+    if (store.get(titleNoteId)) store.updateNote(titleNoteId, { title: titleEl.value || 'Untitled' });
+    // A failed local save leaves the buffer eligible for the Retry action.
     titleTimer = null;
-    if (!store.active()) return;
-    store.updateActive({ title: titleEl.value || 'Untitled' });
   }
 
   titleEl.addEventListener('input', () => {
     setSaveState('saving');
     clearTimeout(titleTimer);
     titleTimer = setTimeout(() => {
-      titleTimer = null;
-      store.updateActive({ title: titleEl.value || 'Untitled' });
-      setSaveState('saved');
-      renderList();
+      try {
+        flushTitle();
+        setSaveState('saved');
+        renderList();
+      } catch (err) { showSaveError(err); }
     }, AUTOSAVE_MS);
   });
 
@@ -325,6 +365,18 @@ async function boot() {
   on('note-changed', () => renderList());
 
   openNote(store.activeId);
+
+  // Native close/quit/update waits for both debounce buffers AND the disk
+  // acknowledgements. The old window could disappear inside the 400ms delay.
+  window.nebula?.lifecycle?.onSave(async () => {
+    try { await saveCurrent(); }
+    catch (err) { showSaveError(err); throw err; }
+  });
+  // Reloads and browser previews still commit the synchronous local buffers.
+  window.addEventListener('beforeunload', () => {
+    flushTitle();
+    editor.flush();
+  });
 
   // Last, and guarded: this is the only part of the app that loads third-party
   // pages, and a throw in it used to abort the rest of boot() — leaving no

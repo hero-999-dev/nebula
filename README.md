@@ -4,7 +4,7 @@ Calm notes with a real editor. An Electron desktop app for **Windows and macOS**
 that keeps every note as a plain JSON file in your own profile, and updates
 itself without ever touching them.
 
-**Version v0.7.4** ·
+**Version v0.7.5** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 
@@ -35,10 +35,10 @@ So this README describes a small app on purpose. What is here is finished.
   any number you type · text colour (`Ctrl+T`) · highlight (`Ctrl+H`) ·
   **B I U** with five underline styles · strikethrough · inline code
   (`Ctrl+E`) · **equations** typeset with KaTeX (`Ctrl+Q`) · four alignments.
-  The font button and the size box show what the caret is actually in; with
-  nothing selected, a font applies to the whole line.
+  The font button and the size box show what the caret is actually in;
+  fonts and sizes apply to the selected text.
 - **Colours are stored as names, not values**, so a note written on one theme
-  stays readable on the other two — and a highlight always sets its own ink.
+  stays readable across themes — and a highlight always sets its own ink.
 - **Ctrl+F finds text in the note**, painted rather than marked up, so a search
   never edits what it searches. The sidebar filter searches every note's whole
   body, not just its first lines.
@@ -76,10 +76,6 @@ So this README describes a small app on purpose. What is here is finished.
   the whole product on one page: eight sections, each with something to try, and
   a working code sample for all fifteen languages. A vault that predates it is
   given a copy — added, never overwriting anything already there.
-- **Three themes**, picked from a segmented control that shows which one is on:
-  **Main**, a violet dark theme that is the app's own identity and the default;
-  **Dark**, warm paper-and-ink inverted; **Light**, the same warm palette
-  upright. Serif content, sans chrome, one accent each.
 
 The app icon is drawn from vector geometry at every size it ships — 16 through
 256 in a real multi-size `.ico` — so the title bar and the taskbar are as sharp
@@ -134,6 +130,14 @@ losing one:
 Full detail, including how to restore from a backup:
 **[docs/UPDATING.md](docs/UPDATING.md)**.
 
+<!-- agent-note: gpt6astra tarafından eklendi -->
+
+**Saved means acknowledged on disk.** A failed write shows **Not saved** and
+offers **Retry saving**. Closing flushes pending title and body edits first;
+if that fails, the window stays open. Updates also stop if the pre-update backup
+fails. These safeguards do not replace backups or protect an unsaved edit from
+an abrupt power loss.
+
 ---
 
 ## Architecture
@@ -141,7 +145,7 @@ Full detail, including how to restore from a backup:
 ```
 electron/
   main.js             window, IPC, vault, snapshots, path guard, AppUserModelId
-  preload.js          the only bridge — window.nebula.{storage,updates,paths,reveal}
+  preload.js          the only bridge — storage, updates, paths, window and lifecycle save requests
   updater.js          auto (Windows installer) / manual (macOS, portable, dev)
   version-compare.js  pure semver comparison
 src/js/
@@ -151,6 +155,7 @@ src/js/
   storage.js          loadJson/saveJson + the saveHook the mirror installs
   bus.js              note-changed / note-opened
   editor.js           contenteditable + debounced autosave
+  inline-family.js    exact DOM boundaries for exclusive formatting families
   toolbar.js dock.js slash-menu.js shapes.js codeblock.js highlight.js
   ai-panel.js         webview tabs, isolated from note data
   updater.js about.js dialog.js icons.js theme.js seed-notes.js
@@ -177,8 +182,8 @@ happens between a keystroke and a file.
 npm install
 npm run preflight   # START HERE — version, phase, what changed, what is stale
 npm run dev         # dev app on its OWN profile
-npm test            # 309 unit tests
-npm run build && npm run smoke   # 173 checks against the real Electron app
+npm test            # 338 unit tests
+npm run build && npm run smoke   # 187 checks against the real Electron app
 npm run check:versions           # every surface agrees with package.json
 npm run pack:win    # release/Nebula-Setup-*.exe + Nebula-portable-*.exe
 npm run site        # rebuild site/index.html (docs + mind maps)

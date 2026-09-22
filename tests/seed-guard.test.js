@@ -130,6 +130,26 @@ describe('vault status', () => {
     expect(JSON.parse(localStorage.getItem('nebula:notes'))).toHaveLength(1);
   });
 
+  it('a rejected note read reports an unreadable vault instead of aborting boot', async () => {
+    const v = vault({ read: vi.fn(async () => { throw new Error('read bridge failed'); }) });
+    v.files.set('n1.json', JSON.stringify(note('n1')));
+    window.nebula = { storage: v.api };
+    await expect(initDiskStorage()).resolves.toMatchObject({ ok: false, empty: false, error: 'read bridge failed' });
+    expect(hasDiskStorage()).toBe(false);
+  });
+
+  it.each(['{broken', '{}'])('an existing invalid note file is never a first run: %s', async (raw) => {
+    const v = vault();
+    v.files.set('broken.json', raw);
+    window.nebula = { storage: v.api };
+    const status = await initDiskStorage();
+    expect(status).toMatchObject({ ok: false, empty: false });
+    const store = new NoteStore({ allowSeed: seedDecision(status) });
+    expect(store.notes).toEqual([]);
+    expect(v.files.get('broken.json')).toBe(raw);
+    expect(v.api.write).not.toHaveBeenCalled();
+  });
+
   it('notes only in localStorage are pushed to disk, not reseeded', async () => {
     const v = vault();
     localStorage.setItem('nebula:notes', JSON.stringify([note('legacy', 'from an older build')]));
