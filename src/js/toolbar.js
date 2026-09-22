@@ -1102,19 +1102,39 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       let block = caret && caret.rangeCount ? caret.getRangeAt(0).startContainer : null;
       if (block && block.nodeType !== Node.ELEMENT_NODE) block = block.parentElement;
       block = block?.closest('p,div,h1,h2,h3,h4,h5,h6,li,blockquote');
-      if (block && block !== hr && !block.textContent.trim()
-        && !block.querySelector('hr,.blk-code,.shape-layer,img')
-        && block.previousElementSibling === hr) {
+
+      const isEmptyBlock = (el) => el && el !== hr && !el.textContent.trim()
+        && !el.querySelector('hr,.blk-code,.shape-layer,img');
+      const placeCaretAtStart = (el) => {
+        if (!el) return;
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        const text = walker.nextNode();
+        const r = document.createRange();
+        if (text) r.setStart(text, 0);
+        else r.setStart(el, 0);
+        r.collapse(true);
+        caret.removeAllRanges();
+        caret.addRange(r);
+      };
+
+      // The caret is often at the start of the text block AFTER the blank
+      // paragraph.  Looking only at `block.previousElementSibling === hr`
+      // therefore armed the divider while the gap remained in place.
+      const gap = block?.previousElementSibling;
+      if (block && gap && isEmptyBlock(gap) && gap.previousElementSibling === hr) {
+        history?.push();
+        gap.remove();
+        placeCaretAtStart(block);
+        dirty();
+        return;
+      }
+
+      if (isEmptyBlock(block) && block.previousElementSibling === hr) {
         history?.push();
         const after = block.nextElementSibling;
         block.remove();
         if (after) {
-          const r = document.createRange();
-          r.setStart(after, 0);
-          r.collapse(true);
-          const sel = window.getSelection();
-          sel.removeAllRanges();
-          sel.addRange(r);
+          placeCaretAtStart(after);
         } else {
           const r = document.createRange();
           r.setStartAfter(hr);

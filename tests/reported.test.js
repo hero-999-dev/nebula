@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { migrateNote, normalizeProse } from '../src/js/migrate.js';
 import { normalizeUnderlineInk, applyInlineFamily } from '../src/js/inline-family.js';
+import { codeBlockHtml, initCodeBlocks, paintCode, setCode } from '../src/js/codeblock.js';
 
 const root = html => { const el = document.createElement('div'); el.innerHTML = html; return el; };
 
@@ -65,6 +66,28 @@ describe('underline ink follows the actual text run', () => {
     applyInlineFamily(el, [range], ['u-single', 'u-double'], 'u-single', 'u');
     expect(el.querySelector('.c-red > .u-single').textContent).toBe('red');
     expect(getSelection().toString()).toBe('plainred');
+    el.remove();
+  });
+});
+
+describe('code block editing hint', () => {
+  it('is visible only until the first source character is typed', () => {
+    const el = root(codeBlockHtml('', 'javascript'));
+    document.body.appendChild(el);
+    const block = el.querySelector('.blk-code');
+    const hint = block.querySelector('.code-hint');
+    paintCode(block);
+    expect(hint.hidden).toBe(false);
+
+    initCodeBlocks(el);
+    const src = block.querySelector('.code-src');
+    src.textContent = 'x';
+    src.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(hint.hidden).toBe(true);
+
+    setCode(block, '');
+    paintCode(block);
+    expect(hint.hidden).toBe(false);
     el.remove();
   });
 });

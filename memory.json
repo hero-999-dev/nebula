@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.7.6",
+  "version": "0.7.7",
   "lastUpdated": "2026-09-22",
-  "currentPhase": "v0.7.6 - repaired the actual Untitled report structures: prose joins around overlays, editable highlighted line starts, underline ink, nested-divider blank lines, shape-text Backspace and code-picker spacing.",
-  "next": "Collect feedback on the repaired editor and save recovery before porting further Nebula Demo features through the existing hooks.",
+  "currentPhase": "v0.7.7 - closes the remaining blank line before a divider, keeps the caret on the text line, and hides the Markdown code hint as soon as source is typed.",
+  "next": "Collect feedback on the completed Untitled 1/2 editor repairs before porting further Nebula Demo features through the existing hooks.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -31,8 +31,8 @@
     "releasePolicy": "Standing instruction (2026-09-07): release finished work with npm run push without being asked, and never ask which platforms to build - the repo is public, so Actions is free on both Windows and macOS runners. npm run push also refreshes Nebula Test.exe in the project root."
   },
   "quality": {
-    "unitTests": 346,
-    "smokeChecks": 203,
+    "unitTests": 347,
+    "smokeChecks": 211,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
@@ -88,6 +88,12 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "version": "0.7.7",
+      "date": "2026-09-23",
+      "by": "Codex",
+      "what": "Finished the remaining Untitled 1/2 editor edges: a Backspace now closes a blank divider gap before arming the divider, the caret is placed at the text line, and the Markdown code hint grows slightly and hides on first input. Added unit and Electron edge checks; original report files remained byte-identical."
+    },
     {
       "version": "0.7.6",
       "date": "2026-09-22",

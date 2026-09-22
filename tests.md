@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 346 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 203 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 347 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 211 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -39,8 +39,8 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/recovery.test.js` | 11 | Pending buffer ownership on archive/trash, synchronous save retry, wrapped Markdown text, long fences, unsafe URL schemes and code-block edge detection |
 | `tests/updater.test.js` | 3 | Nebula-version comparisons, failed save/backup blocks install, successful preparation precedes silent install |
 | `tests/docs.test.js` | 1 | Repository attribution is removed from public documentation without removing real content |
-| `tests/reported.test.js` | 8 | Legacy prose normalization is idempotent and preserves shapes; underline follows coloured text without losing formatting or selection |
-| `tests/e2e/smoke.mjs`, `recovery.mjs`, `reported.mjs` | 203 | Original 173, 14 save-recovery and 16 reported-note checks, all using throwaway profiles |
+| `tests/reported.test.js` | 9 | Legacy prose normalization is idempotent and preserves shapes; underline follows coloured text without losing formatting or selection; the code hint follows source input |
+| `tests/e2e/smoke.mjs`, `recovery.mjs`, `reported.mjs`, `editing-edges.mjs` | 211 | Original 173, 14 save-recovery, 16 reported-note and 8 divider/code-hint edge checks, all using throwaway profiles |
 
 ---
 
@@ -89,6 +89,19 @@ added** · the vault is left exactly as it was.
 ---
 
 ## Log
+
+### [2026-09-23] v0.7.7 - the remaining Untitled editor edges
+
+The real Untitled 1 and Untitled 2 files are copied only into temporary Electron
+profiles. A Backspace at the text below a divider now removes the intervening
+blank paragraph first; the next press arms the divider and the following press
+removes it. The caret is restored to the text line after the gap is consumed.
+
+The Markdown-style code hint is 12px instead of 10.5px, hides immediately on
+input, and is hidden on load for a block whose source is already non-empty. The
+code source has a larger left/right inset. `editing-edges.mjs` runs these checks
+against both generic fixtures and the two real report originals; the originals
+remained byte-identical. Focused command: `node tests/e2e/editing-edges.mjs`.
 
 ### [2026-09-22] v0.7.6 - the two current Untitled reports
 

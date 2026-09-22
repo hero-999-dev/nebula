@@ -13,6 +13,19 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.7.7': {
+    headline: 'The last divider and code-block details are tidier.',
+    items: [
+      {
+        title: 'Backspace closes divider gaps first',
+        text: 'When a blank line sits between your text and a divider, the first Backspace removes that gap. The divider is selected only on the next press, and the caret stays at the text line.',
+      },
+      {
+        title: 'The code hint gets out of the way',
+        text: 'The Markdown-style editing hint is easier to read, disappears as soon as you type source, and stays hidden for code that already has content.',
+      },
+    ],
+  },
   '0.7.6': {
     headline: 'The remaining editing problems in the two report notes.',
     items: [

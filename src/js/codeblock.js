@@ -35,12 +35,18 @@ export function setCode(block, code) {
   block.dataset.code = encodeURIComponent(code);
 }
 
+function updateHint(block, code = getCode(block)) {
+  const hint = block?.querySelector('.code-hint');
+  if (hint) hint.hidden = Boolean(code.trim());
+}
+
 /** Paint one block from its raw source + language. */
 export function paintCode(block) {
   const code = getCode(block);
   const lang = block.dataset.lang || 'plain';
   const src = block.querySelector('.code-src');
   if (src) src.innerHTML = highlight(code, lang) || '<br>';
+  updateHint(block, code);
 }
 
 /** Fill a language <select> with the full list (stored notes ship it empty). */
@@ -155,6 +161,9 @@ export function initCodeBlocks(editorEl, { history } = {}) {
     if (!src) return;
     const block = src.closest('.blk-code');
     setCode(block, src.textContent ?? '');
+    // Hide the instructional copy as soon as typing starts; waiting for the
+    // syntax-colour debounce made it look as though the hint was still active.
+    updateHint(block);
     clearTimeout(repaintTimer);
     repaintTimer = setTimeout(() => {
       if (!document.activeElement || !src.contains(document.activeElement) && document.activeElement !== src) {

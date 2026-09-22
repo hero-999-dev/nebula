@@ -117,7 +117,7 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.7.6)
+## Current implementation state (v0.7.7)
 
 **Working:** the whole editor described above — dock pad, two-row toolbar,
 mini toolbar, slash menu, code blocks with syntax colours, free-floating shapes,
@@ -156,11 +156,17 @@ Markdown export preserves nested prose and code blank lines/long fences.
 wrap loose prose into real paragraphs, after unwrapping invalid block-containing
 spans. Keep underline on actual text runs so it inherits their ink. Shape-text
 deletions are nested edits, not deletion of the overlay. Divider handling starts
-at the nearest paragraph, even inside a formatting wrapper.
+at the nearest paragraph, even inside a formatting wrapper, consumes a blank gap
+before arming the divider, and places the caret at the surviving text line.
 
-**Quality:** 346 unit tests, 203 Electron smoke checks against the real app
-(including "an unreadable vault seeds nothing", verified by breaking the guard
-on purpose and watching the suite go red).
+**Code blocks:** the Markdown-style edit hint is larger and is hidden whenever
+the block has source, including immediately after the first typed character.
+Source text has a clear inset from the code panel edge.
+
+**Quality:** 347 unit tests, 211 Electron smoke checks against the real app
+(including "an unreadable vault seeds nothing", the divider-gap sequence and
+code-hint input, verified by breaking the guards on purpose and watching the
+suite go red).
 
 **Not built yet, by choice:** graph map, mind map, sheets, flashcards, forums,
 calendar, projects, command palette, full-text search, i18n. All of these exist

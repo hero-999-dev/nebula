@@ -3,6 +3,15 @@
 One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
+
+## [2026-09-23 01:04] v0.7.7 - by release-script
+
+The remaining Untitled editor edges
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-22 23:55] v0.7.6 - by Codex
 
 Fix editing in the two Untitled report notes

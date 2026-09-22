@@ -16,6 +16,7 @@ import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { runRecoveryChecks } from './recovery.mjs';
 import { runReportedChecks } from './reported.mjs';
+import { runEdgeChecks } from './editing-edges.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mainJs = path.join(root, 'dist-electron', 'main.js');
@@ -2314,6 +2315,7 @@ try {
   await app.close();
   await runRecoveryChecks(check);
   await runReportedChecks(check);
+  await runEdgeChecks(check);
 } catch (err) {
   failure = err;
   check('smoke run completed', false, err.message);
