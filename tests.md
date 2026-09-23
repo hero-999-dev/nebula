@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 347 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 211 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 351 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 217 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -23,7 +23,8 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/lists.test.js` | 36 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
 | `tests/migrate.test.js` | 30 | Bringing a stored note up to what this version writes |
 | `tests/release-notes.test.js` | 17 | What each release says for itself |
-| `tests/inline-format.test.js` | 18 | Enter and Backspace out of an inline wrapper |
+| `tests/inline-format.test.js` | 19 | Enter and Backspace out of an inline wrapper, including stable caret placement |
+| `tests/rich-paste.test.js` | 3 | Safe URL normalization, image MIME detection and compact link-card labels |
 | `tests/highlight.test.js` | 14 | Per-language tokens, and that only SQL is case-insensitive |
 | `tests/disk-store.test.js` | 10 | Serialized acknowledged writes, retry of failed writes/deletions, latest state wins, and a partially corrupt vault disables the mirror without replacing its cache |
 | `tests/seed-guard.test.js` | 13 | Empty versus unreadable vault, including malformed files and rejected note reads |
@@ -40,7 +41,7 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/updater.test.js` | 3 | Nebula-version comparisons, failed save/backup blocks install, successful preparation precedes silent install |
 | `tests/docs.test.js` | 1 | Repository attribution is removed from public documentation without removing real content |
 | `tests/reported.test.js` | 9 | Legacy prose normalization is idempotent and preserves shapes; underline follows coloured text without losing formatting or selection; the code hint follows source input |
-| `tests/e2e/smoke.mjs`, `recovery.mjs`, `reported.mjs`, `editing-edges.mjs` | 211 | Original 173, 14 save-recovery, 16 reported-note and 8 divider/code-hint edge checks, all using throwaway profiles |
+| `tests/e2e/smoke.mjs`, `recovery.mjs`, `reported.mjs`, `editing-edges.mjs`, `rich-paste.mjs` | 217 | Original 173, 14 save-recovery, 16 reported-note, 8 divider/code-hint and 6 link/image checks, all using throwaway profiles |
 
 ---
 

@@ -106,7 +106,7 @@ export function parseSize(raw) {
   return Math.min(400, Math.max(6, Math.round(n)));
 }
 
-export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onImport } = {}) {
+export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onImport, onPaste } = {}) {
   const toolbar = document.getElementById('toolbar');
   const miniBar = document.getElementById('mini-bar');
   if (!toolbar || !editorEl) return null;
@@ -679,7 +679,7 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
     'export-pdf': () => void exportNote('pdf'),
     cut: () => cmd('cut'),
     copy: () => cmd('copy'),
-    paste: () => void pasteFromClipboard(),
+    paste: () => void (onPaste ? onPaste() : pasteFromClipboard()),
     // Through the shapes controller when there is one, so a new shape arrives
     // selected with its colour bar open — adding one and then having to hunt
     // for it to recolour it is not the point of a shape button.
@@ -1046,7 +1046,7 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
 
     // A shape layer is not text. Nothing typed, and no delete, removes one —
     // the shape bar's own ✕ is the way, and it is undoable.
-    if (touching('.shape-layer').length) {
+    if (touching('.shape-layer, .image-layer, .link-block').length) {
       e.preventDefault();
       return;
     }
@@ -1104,7 +1104,7 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       block = block?.closest('p,div,h1,h2,h3,h4,h5,h6,li,blockquote');
 
       const isEmptyBlock = (el) => el && el !== hr && !el.textContent.trim()
-        && !el.querySelector('hr,.blk-code,.shape-layer,img');
+        && !el.querySelector('hr,.blk-code,.shape-layer,.image-layer,.link-block,img');
       const placeCaretAtStart = (el) => {
         if (!el) return;
         const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);

@@ -172,6 +172,10 @@ export const BLOCK_HELP = {
   code: 'Code block with a language picker and colours',
   divider: 'A horizontal rule',
   shape: 'A floating shape you can drag anywhere',
+  embed: 'A safe clickable embed card for a URL',
+  bookmark: 'A bookmark card for a URL',
+  url: 'An inline URL link',
+  mention: 'An inline @mention link',
 };
 
 export function initBlocks() {

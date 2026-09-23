@@ -132,13 +132,25 @@ export function backspaceOutOfWrapper(root, selection) {
   if (!empty && !caretAtWrapperStart(range, wrapper)) return false;
 
   const doc = wrapper.ownerDocument;
+  const parent = wrapper.parentNode;
   const marker = doc.createTextNode('');
   wrapper.before(marker);
   if (empty) wrapper.remove();
   else unwrap(wrapper);
 
+  // A zero-length text node before the wrapper has no line box. Chromium then
+  // paints the caret at the block's extreme left edge — the reported jump in
+  // the two Untitled screenshots. Anchor to the first real character instead;
+  // the visible line start is stable even when the wrapper was nested in a
+  // colour or highlight span.
+  const walker = parent ? doc.createTreeWalker(parent, NodeFilter.SHOW_TEXT) : null;
+  let firstText = null;
+  while (walker && (firstText = walker.nextNode())) {
+    if (firstText.textContent.length) break;
+  }
   const next = doc.createRange();
-  next.setStart(marker, 0);
+  if (firstText?.textContent.length) next.setStart(firstText, 0);
+  else next.setStart(marker, 0);
   next.collapse(true);
   selection.removeAllRanges();
   selection.addRange(next);

@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { runRecoveryChecks } from './recovery.mjs';
 import { runReportedChecks } from './reported.mjs';
 import { runEdgeChecks } from './editing-edges.mjs';
+import { runRichPasteChecks } from './rich-paste.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mainJs = path.join(root, 'dist-electron', 'main.js');
@@ -394,7 +395,7 @@ try {
       await win.evaluate(() => {
         const rows = document.querySelectorAll('#blocks-body .blocks-table tr');
         const icons = document.querySelectorAll('#blocks-body .bl-ic svg');
-        return !document.getElementById('ov-blocks').hidden && rows.length === 11 && icons.length === 11;
+        return !document.getElementById('ov-blocks').hidden && rows.length === 15 && icons.length === 15;
       }));
     await win.keyboard.press('Escape');
   }
@@ -2316,6 +2317,7 @@ try {
   await runRecoveryChecks(check);
   await runReportedChecks(check);
   await runEdgeChecks(check);
+  await runRichPasteChecks(check);
 } catch (err) {
   failure = err;
   check('smoke run completed', false, err.message);

@@ -15,7 +15,7 @@
 const FORBIDDEN = 'script, style, link, meta, iframe, object, embed, form, input, button, svg, math';
 
 /** Kept, per element. Anything else is dropped. */
-const ALLOWED_ATTRS = new Set(['href', 'src', 'alt', 'title', 'class', 'data-lang', 'data-code', 'data-tex', 'data-ind', 'colspan', 'rowspan']);
+const ALLOWED_ATTRS = new Set(['href', 'src', 'alt', 'title', 'target', 'rel', 'class', 'data-lang', 'data-code', 'data-tex', 'data-ind', 'data-block-type', 'data-url', 'data-kind', 'data-ratio', 'colspan', 'rowspan']);
 
 /** Classes the editor gives meaning to. An imported file may not invent others. */
 const ALLOWED_CLASSES = new Set([
@@ -23,6 +23,7 @@ const ALLOWED_CLASSES = new Set([
   'u-single', 'u-double', 'u-bold', 'u-wavy', 'u-dash',
   'c-gray', 'c-brown', 'c-orange', 'c-yellow', 'c-green', 'c-blue', 'c-purple', 'c-pink', 'c-red',
   'h-gray', 'h-brown', 'h-orange', 'h-yellow', 'h-green', 'h-blue', 'h-purple', 'h-pink', 'h-red',
+  'image-layer', 'image-layer--behind', 'note-image', 'link-block', 'link-embed', 'link-bookmark', 'link-url', 'link-mention',
 ]);
 
 const esc = (s) => String(s ?? '')
@@ -45,7 +46,8 @@ export function sanitize(html) {
       // URL parsing ignores embedded tabs/newlines and leading controls.
       // Inspect the same normalized scheme, including decoded HTML entities.
       const url = attr.value.replace(/[\u0000-\u0020\u007f]/g, '');
-      if ((name === 'href' || name === 'src') && /^(javascript|data|vbscript):/i.test(url)) {
+      const safeDataImage = name === 'src' && /^data:image\/(?:png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(attr.value.trim());
+      if ((name === 'href' || name === 'src') && /^(javascript|data|vbscript):/i.test(url) && !safeDataImage) {
         el.removeAttribute(attr.name);
       }
     }

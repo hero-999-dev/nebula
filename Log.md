@@ -4,6 +4,15 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-23 02:43] v0.8.0 - by release-script
+
+Links, images and steadier caret editing
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-23 01:04] v0.7.7 - by release-script
 
 The remaining Untitled editor edges

@@ -152,6 +152,16 @@ describe('Backspace', () => {
     expect(root.textContent).toBe('acode');
   });
 
+  it('keeps the caret on the first visible character after unwrapping', () => {
+    mount('<p><span class="inline-code">code</span></p>');
+    const sel = caret('.inline-code', 0);
+    expect(backspaceOutOfWrapper(root, sel)).toBe(true);
+    const range = sel.getRangeAt(0);
+    expect(range.startContainer.nodeType).toBe(Node.TEXT_NODE);
+    expect(range.startContainer.nodeValue).toBe('code');
+    expect(range.startOffset).toBe(0);
+  });
+
   it('removes an empty wrapper outright — the line Enter carried down', () => {
     mount('<p><span class="u-wavy"></span></p>');
     const range = document.createRange();

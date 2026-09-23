@@ -16,6 +16,10 @@ export const SLASH_ITEMS = [
   { id: 'code', ic: 'codeblock', label: 'Code block' },
   { id: 'divider', ic: 'divider', label: 'Divider' },
   { id: 'shape', ic: 'shapes', label: 'Shape' },
+  { id: 'embed', ic: 'link', label: 'Embed' },
+  { id: 'bookmark', ic: 'bookmark', label: 'Bookmark' },
+  { id: 'url', ic: 'link', label: 'URL' },
+  { id: 'mention', ic: 'link', label: 'Mention' },
 ];
 
 /** Find a live "/query" immediately before the caret. Pure — tested. */
@@ -30,7 +34,7 @@ export function filterSlash(query) {
   return SLASH_ITEMS.filter((it) => it.label.toLowerCase().includes(q) || it.id.includes(q));
 }
 
-export function initSlashMenu(editorEl, { history, shapes } = {}) {
+export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
   const menu = document.getElementById('slash-menu');
   if (!menu || !editorEl) return;
 
@@ -87,6 +91,11 @@ export function initSlashMenu(editorEl, { history, shapes } = {}) {
     removeSlashText();
     hide();
     editorEl.focus();
+    if (links && ['embed', 'bookmark', 'url', 'mention'].includes(id)) {
+      links.open(id);
+      dirty();
+      return;
+    }
     // Every block this menu inserts is one undo step. Nothing here used to touch
   // history at all — the module did not even import it — so `/` could add a
   // code block, a divider or a shape and Ctrl+Z would skip straight past it to

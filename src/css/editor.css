@@ -547,7 +547,180 @@
 
 /* Everything the user writes sits above the back layer and below the front one.
    z-index needs a position; relative moves nothing. */
-.editor > *:not(.shape-layer) { position: relative; z-index: 2; }
+.editor > *:not(.shape-layer):not(.image-layer) { position: relative; z-index: 2; }
+
+/* ---------- pasted images ---------- */
+/* Images use the same two-layer model as shapes: a back layer is genuinely
+   behind prose, while the front layer remains grab-able above it. */
+.image-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+.image-layer--behind { z-index: 1; }
+.note-image {
+  position: absolute;
+  margin: 0;
+  min-width: 100px;
+  min-height: 60px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--paper-raised);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .12);
+  overflow: visible;
+  pointer-events: auto;
+  cursor: grab;
+  user-select: none;
+}
+.note-image:active { cursor: grabbing; }
+.note-image.sel { outline: 2px solid var(--clay); outline-offset: 2px; }
+.note-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 5px;
+  pointer-events: none;
+}
+.image-h { display: none; }
+.note-image.sel .image-h {
+  display: block;
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--paper-raised);
+  border-radius: 3px 0 3px 0;
+  background: var(--clay);
+  cursor: nwse-resize;
+}
+.image-bar {
+  position: fixed;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 1.4px solid var(--ink);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  box-shadow: 0 10px 26px var(--shadow);
+}
+.image-bar button {
+  min-width: 25px;
+  height: 23px;
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  background: var(--paper-sunken);
+  color: var(--ink-soft);
+  font-size: 11px;
+  cursor: pointer;
+}
+.image-bar button:hover { border-color: var(--clay); color: var(--clay); }
+
+/* ---------- pasted links ---------- */
+.link-block {
+  display: flex;
+  align-items: stretch;
+  width: min(560px, 100%);
+  min-height: 66px;
+  margin: 8px 0 12px;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: var(--paper-raised);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .07);
+  overflow: hidden;
+}
+.link-embed { border-style: dashed; }
+.link-card {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 9px 12px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.link-card:hover { background: var(--paper-sunken); }
+.link-card__kind {
+  color: var(--clay);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.link-card__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.link-card__url {
+  overflow: hidden;
+  color: var(--ink-faint);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.link-del {
+  align-self: center;
+  flex: 0 0 auto;
+  width: 25px;
+  height: 25px;
+  margin-right: 7px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.link-del:hover { border-color: var(--rule); background: var(--paper-sunken); color: var(--ink); }
+.link-url, .link-mention {
+  color: var(--clay);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.link-mention {
+  display: inline-block;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--clay-soft);
+  text-decoration: none;
+}
+.link-menu {
+  width: min(360px, calc(100vw - 16px));
+  min-width: 300px;
+  max-height: none;
+  overflow: visible;
+}
+.link-menu__title {
+  padding: 5px 8px 7px;
+  color: var(--ink-soft);
+  font-family: var(--serif);
+  font-size: 13px;
+}
+.link-menu input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 9px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  outline: none;
+  background: var(--paper-sunken);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+.link-menu input:focus { border-color: var(--clay); }
+.link-menu__options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 7px; }
+.link-menu__options button { justify-content: center; padding: 7px 4px; font-size: 12px; }
+.link-menu__hint { padding: 7px 8px 3px; color: var(--ink-faint); font-size: 11px; }
 /* A shape's fill is always one of six light pastels, so its border and its text
    are fixed dark tones rather than var(--ink): on the dark themes an --ink
    border was a pale outline around a pale fill with dark text inside it, three
@@ -907,7 +1080,7 @@ body.resizing webview { pointer-events: none; }
 
 @media print {
   .titlebar, #app-menu, .side, .pad, .toolbar, .ai-panel, .demo-banner,
-  .mini-bar, .float-menu, .savestate, .shape-bar, .code-head, .find-bar,
+  .mini-bar, .float-menu, .savestate, .shape-bar, .image-bar, .code-head, .find-bar,
   .update-card, .overlay, .note-menu, .eq-pop { display: none !important; }
 
   /* The sheet itself, margins and all.
@@ -991,7 +1164,9 @@ body.resizing webview { pointer-events: none; }
   p, li, blockquote { orphans: 2; widows: 2; }
   .blk-hr { border-color: #bbb !important; }
   /* A shape is positioned over the text; on paper it stays where it was. */
-  .shape-layer { position: absolute !important; }
+  .shape-layer, .image-layer { position: relative !important; inset: auto !important; }
+  .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; margin: 8px 0; }
+  .image-h, .link-del { display: none !important; }
 }
 
 /* ---------- note colours ----------

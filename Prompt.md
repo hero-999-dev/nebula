@@ -41,7 +41,10 @@ screen are obviously the same product.
   actually in; fonts and sizes apply to selected text only.
 - **Right-click a selection** for a compact mini toolbar.
 - **`/` opens a block menu** — headings, lists, to-do, quote, code, divider,
-  shapes.
+  shapes, plus Embed, Bookmark, URL and Mention link blocks.
+- **Rich paste** — pasting a web link opens four Paste as choices; pasted or
+  dropped images float over the note and can be dragged, resized, sent behind
+  text or brought back to the front.
 - **Code blocks** are markdown-style, with a language picker and syntax colours
   for JS, TS, Python, Java, C, C++, C#, Dart (Flutter), Ruby, HTML, CSS, JSON,
   SQL, Bash and Markdown.
@@ -117,11 +120,12 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.7.7)
+## Current implementation state (v0.8.0)
 
 **Working:** the whole editor described above — dock pad, two-row toolbar,
 mini toolbar, slash menu, code blocks with syntax colours, free-floating shapes,
-AI panel with tabs and custom sites, the Main/Dark/Light/White theme picker, and one
+floating pasted images, four-way link paste, AI panel with tabs and custom sites,
+the Main/Dark/Light/White theme picker, and one
 starter note - `Welcome to Nebula Guide`, the same page in every build, with a
 working sample for every code language.
 
@@ -163,7 +167,12 @@ before arming the divider, and places the caret at the surviving text line.
 the block has source, including immediately after the first typed character.
 Source text has a clear inset from the code panel edge.
 
-**Quality:** 347 unit tests, 211 Electron smoke checks against the real app
+**Rich paste:** web URLs are stored as safe external links or non-fetching
+  Embed/Bookmark cards, and `/embed`, `/bookmark`, `/url`, `/mention` open the
+  same picker. Clipboard and dropped images are stored as data images in their
+  own front/behind layers with undoable drag, resize, delete and ordering.
+
+**Quality:** 351 unit tests, 217 Electron smoke checks against the real app
 (including "an unreadable vault seeds nothing", the divider-gap sequence and
 code-hint input, verified by breaking the guards on purpose and watching the
 suite go red).

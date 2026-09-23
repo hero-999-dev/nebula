@@ -19,7 +19,7 @@ import { outlineSvg } from './shapes.js';
 import { normalizeUnderlineInk } from './inline-family.js';
 
 /** Bumped whenever a step is added, so the log line means something. */
-export const MARKUP_VERSION = '0.7.6';
+export const MARKUP_VERSION = '0.8.0';
 
 /**
  * @param {Element} root the editor
@@ -44,10 +44,10 @@ export function migrateNote(root, { fitShape } = {}) {
 /** Old notes mixed anonymous text lines with non-editable overlays. Give each
  * prose run a real block and keep overlays outside the native merge path. */
 export function normalizeProse(root) {
-  const layers = [...root.querySelectorAll('.shape-layer')];
+  const layers = [...root.querySelectorAll('.shape-layer, .image-layer')];
   for (const layer of layers.reverse()) {
     // Empty nested overlays have no local geometry to preserve.
-    if (layer.parentElement === root || !layer.querySelector('.shape')) root.prepend(layer);
+    if (layer.parentElement === root || !layer.querySelector('.shape, .note-image')) root.prepend(layer);
   }
   let paragraph = null;
   for (const node of [...root.childNodes]) {
@@ -94,7 +94,7 @@ export function unwrapBlockSwallowingSpans(root) {
     if (!span.parentNode) continue;   // already taken apart by an outer pass
     if (!span.className && !span.getAttribute('style')) continue;
     if (![...span.children].some((c) => BLOCK_TAGS.has(c.tagName))) continue;
-    if (span.closest('.blk-code, .shape-layer')) continue;
+    if (span.closest('.blk-code, .shape-layer, .image-layer')) continue;
 
     const classes = span.className ? span.className.split(/\s+/).filter(Boolean) : [];
     const style = span.getAttribute('style') || '';
@@ -211,11 +211,11 @@ export function migrateShapes(root, fitShape) {
 export function migrateBlankLines(root) {
   let touched = 0;
   for (const el of root.querySelectorAll('p, div, h1, h2, h3, h4, li, blockquote')) {
-    if (el.closest('.blk-code, .shape-layer, .code-head')) continue;
+    if (el.closest('.blk-code, .shape-layer, .image-layer, .code-head')) continue;
     if (el.classList.contains('shape-text')) continue;
     if (el.textContent.length) continue;                 // it has words
     if (el.querySelector('br') && el.children.length === 1) continue;   // already blank
-    if (el.querySelector('img, hr, .blk-code, .inline-eq, .shape-layer')) continue;
+    if (el.querySelector('img, hr, .blk-code, .inline-eq, .shape-layer, .image-layer, .note-image')) continue;
 
     // Everything inside is empty formatting. Clear it and leave one <br>.
     //

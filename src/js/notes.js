@@ -35,7 +35,7 @@ export function noteText(html) {
   let text;
   if (typeof DOMParser === 'function') {
     const doc = new DOMParser().parseFromString(src, 'text/html');
-    doc.body.querySelectorAll('.shape-layer').forEach((el) => el.remove());
+    doc.body.querySelectorAll('.shape-layer, .image-layer').forEach((el) => el.remove());
     // textContent joins blocks with nothing at all, so a heading ran straight
     // into the paragraph under it ("Welcome to NebulaA calm place"). Inline
     // elements must NOT get one, or a word split across <strong> comes apart.

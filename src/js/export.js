@@ -17,7 +17,7 @@ import { cleanTypingMarkers } from './inline-family.js';
  */
 
 /** Elements that are not prose and never reach a document. */
-const DROP = '.shape-layer, .code-head, .find-bar, script, style, iframe, object, embed';
+const DROP = '.shape-layer, .code-head, .image-h, .image-del, .link-del, .find-bar, script, style, iframe, object, embed';
 
 /**
  * Only what would change meaning if left alone.
@@ -258,7 +258,7 @@ export function toPrintDocument({ title = 'Untitled', body = '', css = '', margi
   });
   // The shape layer is positioned against the editor, and the resize grips and
   // code-block buttons are controls, not content.
-  doc.body.querySelectorAll('.shape-h, .code-copy, .code-del, .code-hint').forEach((el) => el.remove());
+  doc.body.querySelectorAll('.shape-h, .code-copy, .code-del, .code-hint, .image-h, .link-del').forEach((el) => el.remove());
 
   const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -295,7 +295,8 @@ export function toPrintDocument({ title = 'Untitled', body = '', css = '', margi
     border: 0;
     background: none;
   }
-  .shape-layer { position: relative; }
+  .shape-layer, .image-layer { position: relative; }
+  .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; }
 </style>
 </head>
 <body>

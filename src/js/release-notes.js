@@ -13,6 +13,23 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.8.0': {
+    headline: 'Links and images now paste like real note blocks.',
+    items: [
+      {
+        title: 'Paste links four ways',
+        text: 'Paste a web link and choose Embed, Bookmark, URL or Mention. The same four choices are available from the slash menu.',
+      },
+      {
+        title: 'Images can float over a note',
+        text: 'Copy or drop an image into a note, then drag it, resize it, or send it behind and bring it back above your text.',
+      },
+      {
+        title: 'Backspace keeps the caret steady',
+        text: 'Leaving inline formatting at the start of a line keeps the caret on the first visible character instead of jumping to the block edge.',
+      },
+    ],
+  },
   '0.7.7': {
     headline: 'The last divider and code-block details are tidier.',
     items: [

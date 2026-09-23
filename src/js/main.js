@@ -20,6 +20,7 @@ import { initAbout } from './about.js';
 import { initSideToggle } from './side-toggle.js';
 import { initFind } from './find.js';
 import { initHistory } from './history.js';
+import { initRichPaste } from './rich-paste.js';
 import { initNoteActions } from './note-actions.js';
 import { initAppMenu } from './app-menu.js';
 import { initPalette, initShortcuts, initBlocks } from './palette.js';
@@ -122,6 +123,7 @@ async function boot() {
   initDock();
   // The app's own undo stack. Everything that edits the note by script
   // announces itself to this first; Chromium's stack cannot see any of it.
+  let richPaste = null;
   const history = initHistory(editorEl, {
     onRestore: () => {
       // A restored snapshot is just markup — code blocks and equations are
@@ -129,6 +131,8 @@ async function boot() {
       paintAllCode(editorEl);
       paintAllEquations(editorEl);
       shapes?.reset();
+      richPaste?.reset();
+      richPaste?.refresh();
       editor.flush();
       renderList();
     },
@@ -139,6 +143,7 @@ async function boot() {
   const toolbar = initToolbar(editorEl, {
     shapes,
     history,
+    onPaste: () => richPaste?.paste(),
     onSave: () => { void saveCurrent().catch(showSaveError); },
     noteTitle: () => store.active()?.title ?? '',
     // An imported file becomes a new note, never an edit to the open one.
@@ -157,7 +162,8 @@ async function boot() {
     const separate = e.inputType !== 'insertText';
     history?.typed({ separate });
   });
-  initSlashMenu(editorEl, { history, shapes });
+  richPaste = initRichPaste(editorEl, { history });
+  initSlashMenu(editorEl, { history, shapes, links: richPaste });
   initCodeBlocks(editorEl, { history });
   const find = initFind(editorEl);
 
@@ -226,6 +232,8 @@ async function boot() {
     paintAllCode(editorEl);
     paintAllEquations(editorEl);
     shapes?.reset();
+    richPaste?.reset();
+    richPaste?.refresh();
     history?.reset(); // this note's history is not the next note's
     find?.close();    // its ranges point into the note that just closed
     setSaveState('');

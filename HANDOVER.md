@@ -30,7 +30,7 @@ GitHub Releases, and updates itself in place on Windows.
 | Renderer | `src/` — no framework, no build magic beyond Vite |
 | Main | `electron/main.js` + `electron/preload.js` — the only place with disk access |
 | Storage | `<userData>/storage/notes/<id>.json`, mirrored from `localStorage` |
-| Tests | `npm test` (346 unit) · `npm run smoke` (203 Electron checks against the real app) |
+| Tests | `npm test` (351 unit) · `npm run smoke` (217 Electron checks against the real app) |
 
 It is a deliberate rewrite of `../Nebula Demo/` (v0.5.7, feature-complete but
 sprawling), pairing that project's plumbing with `../Ember/`'s visual language.
@@ -59,6 +59,7 @@ src/js/
   find.js            Ctrl+F; paints matches, never edits the note
   export.js          a note as Markdown or one standalone HTML file
   import.js          a .md/.html file back into a note, sanitised
+  rich-paste.js      safe link Paste as choices and floating pasted images
   history.js         the editor's own undo/redo; every scripted edit pushes
   app-menu.js        File/Edit/View/Window/Help; also the palette's source
   palette.js         Ctrl+K, and the keyboard-shortcut sheet
