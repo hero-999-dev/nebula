@@ -98,7 +98,8 @@ jobs:
           version=$(node -p "require('./package.json').version")
           test -s "release/Nebula-${version}-mac.dmg"
           test -s "release/Nebula-${version}-mac.zip"
-          lipo -verify_arch arm64 x86_64 "release/mac-universal/Nebula.app/Contents/MacOS/Nebula"
+          # lipo takes the input file first, then the command.
+          lipo "release/mac-universal/Nebula.app/Contents/MacOS/Nebula" -verify_arch arm64 x86_64
 
       - uses: actions/upload-artifact@v4
         with:

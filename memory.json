@@ -1,8 +1,8 @@
 {
   "projectName": "Nebula",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "lastUpdated": "2026-09-23",
-  "currentPhase": "v0.8.1 - audits rich paste: working sandboxed embeds, link selection/deletion, note-bound async images, undo/redo, safe import geometry, proportional resize and caret boundaries; clearer Mac upgrade and generated GitHub release instructions.",
+  "currentPhase": "v0.8.2 - publishes the v0.8.1 audit (whose Mac CI check failed): audits rich paste: working sandboxed embeds, link selection/deletion, note-bound async images, undo/redo, safe import geometry, proportional resize and caret boundaries; clearer Mac upgrade and generated GitHub release instructions.",
   "next": "Perform a hands-on DMG upgrade on a Mac (CI packaging is not a manual upgrade test). Collect any remaining feedback with exact reproduction steps; keep large embedded-image storage limits and third-party iframe restrictions explicit.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
@@ -88,6 +88,12 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "version": "0.8.2",
+      "date": "2026-09-23",
+      "by": "Claude",
+      "what": "v0.8.1 never published: the new Mac CI assertion passed lipo its file after -verify_arch. Fixed the order and moved the 0.8.1 release notes to 0.8.2. No app code changed."
+    },
     {
       "version": "0.8.1",
       "date": "2026-09-23",

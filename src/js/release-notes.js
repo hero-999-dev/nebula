@@ -13,7 +13,9 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
-  '0.8.1': {
+  // v0.8.1 was tagged but its Mac CI check failed, so it never published;
+  // these notes ship with the next release instead.
+  '0.8.2': {
     headline: 'Links, images and Mac upgrade instructions checked more deeply.',
     items: [
       { title: 'Link blocks behave like edits', text: 'Cards insert at your selection, can be deleted and support undo/redo. Embed now loads a sandboxed preview with an external-link fallback for sites that block it.' },

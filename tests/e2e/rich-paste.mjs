@@ -180,7 +180,7 @@ export async function runRichPasteChecks(check) {
 
     const savedImage = await win.locator('.note-image').evaluate((el) => ({ src: el.querySelector('img').src, left: el.style.left, top: el.style.top, width: el.style.width }));
     await win.evaluate(() => document.querySelector('[data-act="save"]').click());
-    await win.waitForFunction(() => document.getElementById('savestate').textContent === 'Saved');
+    await win.waitForFunction(() => document.getElementById('savestate').textContent === 'Saved', null, { polling: 50, timeout: 10_000 });
     await app.close();
     app = await launch(profile); win = await app.firstWindow();
     await win.waitForSelector('.note-image');

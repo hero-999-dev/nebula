@@ -3,6 +3,15 @@
 One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
+
+## [2026-09-23 17:34] v0.8.2 - by Claude
+
+Publish the v0.8.1 audit: fix the Mac CI lipo check
+
+* (no commits since the last release)
+
+---
+
 ## [2026-09-23 17:18] v0.8.1 - by Claude
 
 Audit rich paste, strengthen regressions and clarify Mac upgrades
@@ -10,6 +19,16 @@ Audit rich paste, strengthen regressions and clarify Mac upgrades
 * (no commits since the last release)
 
 ---
+
+## [2026-09-23 17:30] v0.8.2 - by Claude
+
+v0.8.1 was tagged and pushed, but the new macOS CI assertion called
+`lipo -verify_arch <arch> <file>`; lipo wants the file first, so build-mac
+failed and no release was published. Fixed the argument order and moved the
+0.8.1 release notes to 0.8.2 so 0.8.0 users see them. No app code changed.
+The rich-paste restart check waited for "Saved" on requestAnimationFrame,
+which stalls in an uncomposited window (full-run-only timeout); it now polls
+every 50ms like recovery.mjs.
 
 ## [2026-09-23 08:20] v0.8.1 - by Codex, finished by Claude
 
