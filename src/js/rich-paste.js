@@ -1,21 +1,20 @@
 /**
  * Rich paste and floating images.
  *
- * A URL pasted into a note is deliberately not fetched here. Fetching arbitrary
- * pages from the renderer makes a note a tiny browser and turns an innocent
- * paste into a network/security problem. Nebula stores the URL and paints a
- * useful, clickable card instead; the normal external-link handler opens it.
+ * Bookmark/URL/mention never fetch a page. Embed is explicitly chosen and
+ * renders in a sandbox without same-origin privileges; its link remains a
+ * fallback for sites which refuse framing. Async paste is bound to a note.
  */
 
 const LINK_KINDS = ['embed', 'bookmark', 'url', 'mention'];
 
 export function normalizeUrl(raw) {
   const value = String(raw ?? '').trim();
-  if (!value) return '';
+  if (!value || /\s/.test(value)) return '';
   const candidate = /^www\./i.test(value) ? `https://${value}` : value;
   try {
     const url = new URL(candidate);
-    if (!/^https?:$/.test(url.protocol)) return '';
+    if (!/^https?:$/.test(url.protocol) || url.username || url.password) return '';
     return url.href;
   } catch {
     return '';
@@ -23,7 +22,7 @@ export function normalizeUrl(raw) {
 }
 
 export function isImageMime(mime) {
-  return /^image\/(?:png|jpe?g|gif|webp|bmp|svg\+xml)$/i.test(String(mime ?? ''));
+  return /^image\/(?:png|jpe?g|gif|webp)$/i.test(String(mime ?? ''));
 }
 
 export function linkLabel(raw) {
@@ -119,10 +118,10 @@ function readBlob(blob) {
 }
 
 function imageSize(src) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve({ width: image.naturalWidth || 420, height: image.naturalHeight || 280 });
-    image.onerror = () => resolve({ width: 420, height: 280 });
+    image.onerror = () => reject(new Error('Image could not be decoded'));
     image.src = src;
   });
 }
@@ -180,6 +179,21 @@ function makeLinkBlock(url, kind) {
   remove.title = 'Remove link';
   remove.textContent = '×';
   card.append(anchor, remove);
+  if (kind === 'embed') {
+    const frame = document.createElement('iframe');
+    frame.className = 'link-frame';
+    frame.title = `Embedded ${linkLabel(url)}`;
+    frame.setAttribute('sandbox', 'allow-scripts');
+    frame.setAttribute('referrerpolicy', 'no-referrer');
+    // The user explicitly chose Embed. Do not defer navigation to an
+    // intersection callback: Electron can suspend it for an occluded window.
+    frame.loading = 'eager';
+    frame.src = url;
+    const hint = document.createElement('small');
+    hint.className = 'link-embed-hint';
+    hint.textContent = 'Preview blocked or blank? Open the link above. Some sites do not allow embedding.';
+    card.append(frame, hint);
+  }
   return card;
 }
 
@@ -190,6 +204,8 @@ export function initRichPaste(editor, { history } = {}) {
   let drag = null;
   const claimed = new WeakSet();
   let imageCascade = 0;
+  let generation = 0;
+  let preferredKind = '';
 
   const dirty = () => editor.dispatchEvent(new Event('input', { bubbles: true }));
 
@@ -216,7 +232,7 @@ export function initRichPaste(editor, { history } = {}) {
       const button = document.createElement('button');
       button.type = 'button';
       button.dataset.linkKind = kind;
-      button.textContent = kind[0].toUpperCase() + kind.slice(1);
+      button.textContent = kind === 'url' ? 'URL' : kind[0].toUpperCase() + kind.slice(1);
       options.appendChild(button);
     }
     const hint = document.createElement('div');
@@ -245,6 +261,7 @@ export function initRichPaste(editor, { history } = {}) {
   }
 
   function open(kind = '', url = '') {
+    preferredKind = kind;
     pendingRange = currentRange(editor);
     linkInput.value = url || '';
     linkHint.textContent = url ? 'Choose how this link should appear.' : 'Paste a URL, then choose a format.';
@@ -253,7 +270,7 @@ export function initRichPaste(editor, { history } = {}) {
     });
     linkMenu.hidden = false;
     positionLinkMenu();
-    requestAnimationFrame(() => { linkInput.focus(); linkInput.select(); });
+    requestAnimationFrame(() => { if (!linkMenu.hidden) { linkInput.focus(); linkInput.select(); } });
   }
 
   function hideLinkMenu() {
@@ -275,18 +292,28 @@ export function initRichPaste(editor, { history } = {}) {
 
   function insertBlockLink(url, kind, range) {
     const card = makeLinkBlock(url, kind);
-    const block = directBlock(editor, range.startContainer);
+    range.deleteContents();
+    let block = directBlock(editor, range.startContainer);
+    while (block && block.parentElement !== editor) block = block.parentElement;
     if (block && block.parentElement === editor) {
-      block.parentNode.insertBefore(card, block.nextSibling);
-      const blank = document.createElement('p');
-      blank.appendChild(document.createElement('br'));
+      const tail = document.createRange();
+      tail.selectNodeContents(block);
+      tail.setStart(range.startContainer, range.startOffset);
+      const blank = block.cloneNode(false);
+      blank.removeAttribute('id');
+      blank.appendChild(tail.extractContents());
+      if (!blank.textContent && !blank.querySelector('img')) blank.innerHTML = '<br>';
+      if (/^(UL|OL)$/.test(blank.tagName) && !blank.querySelector('li')) blank.innerHTML = '<li><br></li>';
+      block.after(card);
       card.after(blank);
-      if (!block.textContent.trim() && !block.querySelector('br, img')) block.remove();
+      if (!block.textContent.trim() && !block.querySelector('img')) block.remove();
       placeCaretIn(blank);
     } else {
-      range.deleteContents();
       range.insertNode(card);
-      placeCaretAfter(card);
+      const blank = document.createElement('p');
+      blank.innerHTML = '<br>';
+      card.after(blank);
+      placeCaretIn(blank);
     }
   }
 
@@ -312,6 +339,20 @@ export function initRichPaste(editor, { history } = {}) {
   linkMenu.addEventListener('click', (event) => {
     const kind = event.target.closest('[data-link-kind]')?.dataset.linkKind;
     if (kind) applyLink(kind);
+  });
+  linkInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') { event.preventDefault(); applyLink(preferredKind || 'url'); }
+  });
+  editor.addEventListener('mousedown', (event) => {
+    if (event.target.closest('[data-link-remove]')) event.preventDefault();
+  });
+  editor.addEventListener('click', (event) => {
+    const card = event.target.closest('[data-link-remove]')?.closest('.link-block');
+    if (!card || !editor.contains(card)) return;
+    event.preventDefault();
+    history?.push();
+    card.remove();
+    dirty();
   });
 
   function ensureImageBar() {
@@ -358,6 +399,13 @@ export function initRichPaste(editor, { history } = {}) {
   }
 
   function refreshImages() {
+    for (const layer of editor.querySelectorAll('.image-layer')) layer.contentEditable = 'false';
+    for (const card of editor.querySelectorAll('.link-block')) {
+      if (!card.querySelector('.link-del') || (card.dataset.kind === 'embed' && !card.querySelector('iframe'))) {
+        const url = normalizeUrl(card.dataset.url);
+        if (url) card.replaceWith(makeLinkBlock(url, card.dataset.kind === 'embed' ? 'embed' : 'bookmark'));
+      }
+    }
     for (const image of editor.querySelectorAll('.note-image')) {
       image.setAttribute('contenteditable', 'false');
       if (!image.querySelector('.image-h')) {
@@ -391,9 +439,11 @@ export function initRichPaste(editor, { history } = {}) {
 
   async function insertImageBlob(blob, at) {
     if (!blob || !isImageMime(blob.type)) return null;
+    const started = generation;
     try {
       const src = await readBlob(blob);
       const dimensions = await imageSize(src);
+      if (started !== generation) return null;
       return insertImageData(src, dimensions, at);
     } catch {
       return null;
@@ -403,14 +453,20 @@ export function initRichPaste(editor, { history } = {}) {
   editor.addEventListener('mousedown', (event) => {
     const handle = event.target.closest('.image-h');
     let image = event.target.closest('.note-image');
-    if (!image) image = behindImageAt(event.clientX, event.clientY);
+    if (!image && !event.target.closest('.shape, .link-block')) {
+      const behind = behindImageAt(event.clientX, event.clientY);
+      if (behind !== selectedImage || event.altKey) image = behind;
+    }
     if (!image) return;
     claimed.add(event);
+    history?.push();
     selectImage(image);
     event.preventDefault();
-    history?.push();
+    event.stopPropagation();
     drag = {
       image,
+      layer: image.parentElement,
+      extent: editor.scrollHeight,
       kind: handle ? 'resize' : 'move',
       moved: false,
       downX: event.clientX,
@@ -419,11 +475,11 @@ export function initRichPaste(editor, { history } = {}) {
       startY: event.clientY,
       left: parseFloat(image.style.left) || 0,
       top: parseFloat(image.style.top) || 0,
-      width: image.offsetWidth,
-      height: image.offsetHeight,
+      width: parseFloat(image.style.width) || image.offsetWidth,
+      height: parseFloat(image.style.height) || image.offsetHeight,
       ratio: Number(image.dataset.ratio) || image.offsetWidth / Math.max(1, image.offsetHeight),
     };
-  });
+  }, true);
 
   window.addEventListener('mousemove', (event) => {
     if (!drag) return;
@@ -431,22 +487,30 @@ export function initRichPaste(editor, { history } = {}) {
     const dy = event.clientY - drag.startY;
     if (Math.abs(event.clientX - drag.downX) > 2 || Math.abs(event.clientY - drag.downY) > 2) drag.moved = true;
     if (!drag.moved) return;
+    drag.layer.style.minHeight = `${drag.extent}px`;
+    editor.classList.add('image-dragging');
     if (drag.kind === 'move') {
       drag.image.style.left = `${Math.max(0, drag.left + dx)}px`;
       drag.image.style.top = `${Math.max(0, drag.top + dy)}px`;
     } else {
-      const width = Math.max(100, drag.width + dx);
+      const delta = Math.abs(dx) >= Math.abs(dy * drag.ratio) ? dx : dy * drag.ratio;
+      const width = Math.max(Math.min(100, 60 * drag.ratio), drag.width + delta);
       drag.image.style.width = `${Math.round(width)}px`;
       drag.image.style.height = `${Math.round(width / drag.ratio)}px`;
     }
     positionImageBar();
   });
 
-  window.addEventListener('mouseup', () => {
+  function finishDrag() {
     if (!drag) return;
+    drag.layer.style.minHeight = '';
+    if (!drag.layer.getAttribute('style')) drag.layer.removeAttribute('style');
+    editor.classList.remove('image-dragging');
     if (drag.moved) dirty();
     drag = null;
-  });
+  }
+  window.addEventListener('mouseup', finishDrag);
+  window.addEventListener('blur', finishDrag);
 
   imageBar.addEventListener('mousedown', (event) => event.preventDefault());
   imageBar.addEventListener('click', (event) => {
@@ -468,6 +532,7 @@ export function initRichPaste(editor, { history } = {}) {
   });
 
   document.addEventListener('mousedown', (event) => {
+    if (!linkMenu.hidden && !event.target.closest('#link-menu, #slash-menu')) hideLinkMenu();
     if (claimed.has(event)) return;
     if (event.target.closest('.note-image, #image-bar')) return;
     if (selectedImage) selectImage(null);
@@ -477,15 +542,17 @@ export function initRichPaste(editor, { history } = {}) {
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !linkMenu.hidden) { hideLinkMenu(); return; }
+    if (event.key === 'Escape') selectImage(null);
     if ((event.key === 'Delete' || event.key === 'Backspace') && selectedImage
       && !event.target.closest('input, textarea, .code-src, .shape-text')) {
       event.preventDefault();
+      event.stopPropagation();
       history?.push();
       selectedImage.remove();
       selectImage(null);
       dirty();
     }
-  });
+  }, true);
 
   editor.addEventListener('paste', (event) => {
     if (event.target.closest('.code-src, .shape-text, .link-block, .note-image')) return;
@@ -505,7 +572,8 @@ export function initRichPaste(editor, { history } = {}) {
   });
 
   editor.addEventListener('dragover', (event) => {
-    if ([...(event.dataTransfer?.types || [])].includes('Files')) event.preventDefault();
+    const types = [...(event.dataTransfer?.types || [])];
+    if (types.includes('Files') || types.includes('text/uri-list') || types.includes('text/plain')) event.preventDefault();
   });
   editor.addEventListener('drop', (event) => {
     const file = [...(event.dataTransfer?.files || [])].find((item) => isImageMime(item.type));
@@ -517,29 +585,37 @@ export function initRichPaste(editor, { history } = {}) {
     const text = event.dataTransfer?.getData('text/plain') || '';
     if (normalizeUrl(text)) {
       event.preventDefault();
+      const range = document.caretRangeFromPoint?.(event.clientX, event.clientY);
+      if (range) restoreRange(editor, range);
       open('', text);
     }
   });
 
   async function paste() {
-    pendingRange = currentRange(editor);
+    const savedRange = currentRange(editor);
+    const started = generation;
     editor.focus();
     try {
       if (navigator.clipboard?.read) {
-        const items = await navigator.clipboard.read();
+        const items = await navigator.clipboard.read().catch(() => []);
+        if (started !== generation) return;
         for (const clipboardItem of items) {
           const type = clipboardItem.types.find((item) => isImageMime(item));
           if (type) {
             const blob = await clipboardItem.getType(type);
+            if (started !== generation) return;
             await insertImageBlob(blob, null);
             return;
           }
         }
       }
       const text = await navigator.clipboard.readText();
+      if (started !== generation || !restoreRange(editor, savedRange)) return;
       if (normalizeUrl(text)) { open('', text); return; }
-      if (text) document.execCommand('insertText', false, text);
+      if (text) { history?.push(); document.execCommand('insertText', false, text); dirty(); }
     } catch {
+      if (started !== generation) return;
+      restoreRange(editor, savedRange);
       try { document.execCommand('paste'); } catch { /* browser preview */ }
     }
   }
@@ -550,7 +626,7 @@ export function initRichPaste(editor, { history } = {}) {
     open,
     paste,
     refresh: refreshImages,
-    reset: () => { selectImage(null); hideLinkMenu(); },
+    reset: () => { generation += 1; drag = null; editor.classList.remove('image-dragging'); selectImage(null); hideLinkMenu(); },
     insertImageBlob,
   };
 }

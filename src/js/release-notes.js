@@ -13,6 +13,14 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.8.1': {
+    headline: 'Links, images and Mac upgrade instructions checked more deeply.',
+    items: [
+      { title: 'Link blocks behave like edits', text: 'Cards insert at your selection, can be deleted and support undo/redo. Embed now loads a sandboxed preview with an external-link fallback for sites that block it.' },
+      { title: 'Safer image paste and editing', text: 'A pending image cannot land in another note after you switch. Corrupt images are rejected, proportions are preserved, and HTML imports keep safe image positions and sizes.' },
+      { title: 'Caret and update guidance', text: 'Leaving inline formatting no longer jumps over preceding text. The Mac guide explains saving, backing up, replacing the app, security warnings and checking the new version.' },
+    ],
+  },
   '0.8.0': {
     headline: 'Links and images now paste like real note blocks.',
     items: [

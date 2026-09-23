@@ -562,8 +562,8 @@
 .note-image {
   position: absolute;
   margin: 0;
-  min-width: 100px;
-  min-height: 60px;
+  min-width: 1px;
+  min-height: 1px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: var(--paper-raised);
@@ -633,7 +633,10 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, .07);
   overflow: hidden;
 }
-.link-embed { border-style: dashed; }
+.link-embed { display: grid; grid-template-columns: 1fr auto; }
+.link-frame { grid-column: 1 / -1; width: 100%; height: 300px; border: 0; background: white; }
+.image-dragging .link-frame { pointer-events: none; }
+.link-embed-hint { grid-column: 1 / -1; padding: 8px 12px; color: var(--ink); }
 .link-card {
   display: flex;
   flex: 1;
@@ -1164,7 +1167,8 @@ body.resizing webview { pointer-events: none; }
   p, li, blockquote { orphans: 2; widows: 2; }
   .blk-hr { border-color: #bbb !important; }
   /* A shape is positioned over the text; on paper it stays where it was. */
-  .shape-layer, .image-layer { position: relative !important; inset: auto !important; }
+  .shape-layer { position: absolute !important; }
+  .image-layer { position: relative !important; inset: auto !important; }
   .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; margin: 8px 0; }
   .image-h, .link-del { display: none !important; }
 }

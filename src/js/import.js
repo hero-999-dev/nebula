@@ -39,6 +39,15 @@ export function sanitize(html) {
   doc.body.querySelectorAll(FORBIDDEN).forEach((el) => el.remove());
 
   for (const el of Array.from(doc.body.querySelectorAll('*'))) {
+    // Image geometry is the only imported style we retain: numeric pixels,
+    // bounded, on a recognised image figure. Never accept arbitrary CSS.
+    const geometry = {};
+    if (el.matches('figure.note-image')) {
+      for (const key of ['left', 'top', 'width', 'height']) {
+        const value = el.style[key];
+        if (/^\d+(?:\.\d+)?px$/.test(value) && parseFloat(value) <= 100000) geometry[key] = value;
+      }
+    }
     for (const attr of Array.from(el.attributes)) {
       const name = attr.name.toLowerCase();
       // on* handlers, style, and anything not on the list.
@@ -57,6 +66,7 @@ export function sanitize(html) {
       }
       if (!el.classList.length) el.removeAttribute('class');
     }
+    Object.assign(el.style, geometry);
   }
   return doc.body.innerHTML;
 }
@@ -72,7 +82,11 @@ const inline = (text) => esc(text)
   .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
   .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
   .replace(/~~([^~]+)~~/g, '<s>$1</s>')
-  .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2">$1</a>');
+  .replace(/(!?)\[([^\]]+)\]\(([^)\s]+)\)/g, (_, image, label, url) => {
+    const attribute = (s) => s.replace(/"/g, '&quot;');
+    return image ? `<img alt="${attribute(label)}" src="${attribute(url)}">`
+      : `<a href="${attribute(url)}">${label}</a>`;
+  });
 
 /**
  * Markdown → the editor's HTML.

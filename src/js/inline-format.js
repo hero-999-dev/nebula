@@ -133,8 +133,8 @@ export function backspaceOutOfWrapper(root, selection) {
 
   const doc = wrapper.ownerDocument;
   const parent = wrapper.parentNode;
-  const marker = doc.createTextNode('');
-  wrapper.before(marker);
+  const index = Array.prototype.indexOf.call(parent.childNodes, wrapper);
+  const first = wrapper.firstChild;
   if (empty) wrapper.remove();
   else unwrap(wrapper);
 
@@ -143,14 +143,12 @@ export function backspaceOutOfWrapper(root, selection) {
   // the two Untitled screenshots. Anchor to the first real character instead;
   // the visible line start is stable even when the wrapper was nested in a
   // colour or highlight span.
-  const walker = parent ? doc.createTreeWalker(parent, NodeFilter.SHOW_TEXT) : null;
-  let firstText = null;
-  while (walker && (firstText = walker.nextNode())) {
-    if (firstText.textContent.length) break;
-  }
+  // Search only the former wrapper, never earlier text in its parent.
+  const firstText = !empty && first?.nodeType === 3 ? first
+    : !empty && first ? doc.createTreeWalker(first, NodeFilter.SHOW_TEXT).nextNode() : null;
   const next = doc.createRange();
   if (firstText?.textContent.length) next.setStart(firstText, 0);
-  else next.setStart(marker, 0);
+  else next.setStart(parent, Math.min(index, parent.childNodes.length));
   next.collapse(true);
   selection.removeAllRanges();
   selection.addRange(next);

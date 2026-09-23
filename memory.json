@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "lastUpdated": "2026-09-23",
-  "currentPhase": "v0.8.0 - adds Notion-style Paste as link choices, floating pasted images with resize/front/back controls, and the final caret placement fix from the three feedback screenshots.",
-  "next": "Collect feedback on link cards, pasted-image positioning and the remaining Untitled editor edges before porting another Nebula Demo feature.",
+  "currentPhase": "v0.8.1 - audits rich paste: working sandboxed embeds, link selection/deletion, note-bound async images, undo/redo, safe import geometry, proportional resize and caret boundaries; clearer Mac upgrade and generated GitHub release instructions.",
+  "next": "Perform a hands-on DMG upgrade on a Mac (CI packaging is not a manual upgrade test). Collect any remaining feedback with exact reproduction steps; keep large embedded-image storage limits and third-party iframe restrictions explicit.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -31,15 +31,15 @@
     "releasePolicy": "Standing instruction (2026-09-07): release finished work with npm run push without being asked, and never ask which platforms to build - the repo is public, so Actions is free on both Windows and macOS runners. npm run push also refreshes Nebula Test.exe in the project root."
   },
   "quality": {
-    "unitTests": 351,
-    "smokeChecks": 217,
+    "unitTests": 370,
+    "smokeChecks": 231,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
   "invariants": [
     "The dev app and the installed app never share a profile — npm run dev sets NEBULA_USER_DATA to <repo>/.dev-profile.",
     "Sample notes are seeded only when the vault was read successfully AND came back empty. An unreadable vault disables the disk mirror instead.",
-    "The vault is copied to backups/pre-update-<version>-<time> immediately before an update installs.",
+    "The Windows in-app installer copies the vault to backups/pre-update-<version>-<time>. Manual Mac and portable replacement does not invoke this hook; take a closed-profile backup first.",
     "electron-updater stays in dependencies and external in vite.config.js; CI asserts both latest.yml and its presence in the asar.",
     "win.signAndEditExecutable must stay unset — false also disables rcedit, which is what writes the exe's icon and version info.",
     "The `hidden` attribute is only a UA display:none - any author `display` rule beats it. app.css carries [hidden]{display:none!important}; assert computed display in tests, never el.hidden.",
@@ -66,7 +66,7 @@
     "A page's margin band cannot be painted from the app: Chromium fills it from a cached document background colour. Use @page { margin: 0 } and pad the content.",
     "cmd() must not call editorEl.focus() when the caret is already inside the editor — a shape's text is a nested editable and focusing the editor discards the selection.",
     "styleWithCSS is a sticky, document-wide flag; applyFont leaves it on, so reset it before any other execCommand.",
-    "macOS: the app is ad-hoc signed in build/after-pack.cjs so it is never reported as damaged; the notarization warning needs a paid Developer ID and cannot be removed for free.",
+    "macOS: identity is null, no custom after-pack signing hook exists, and the build is not Developer ID signed/notarized. The updater explicitly gates automatic installation to win32. Never promise a warning proves safety or cannot recur.",
     "printToPDF needs preferCSSPageSize: true, or Chromium rounds the page box and leaves a sub-point strip of the document background along the top of every page.",
     "execCommand('insertText', '\\n') is discarded in a contenteditable; insert the newline as a text node and double it at the end of a block.",
     "::marker is right-aligned in list-style-position: outside — a bullet and a number start at different x however well the text aligns. Draw markers as ::before in a fixed column.",
@@ -88,6 +88,12 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "version": "0.8.1",
+      "date": "2026-09-23",
+      "by": "Codex",
+      "what": "Audited the prior rich-paste release, fixed selection-aware cards/removal, sandboxed Embed, stale async images, proportional resize, image drag extent, import geometry and caret boundaries. Added 19 unit and 14 Electron checks, release-body generation and Mac CI assertions. Updated ProjectNotes, handover, README and upgrade/release guides; user profiles were not edited."
+    },
     {
       "version": "0.8.0",
       "date": "2026-09-23",

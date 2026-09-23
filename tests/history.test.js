@@ -107,6 +107,29 @@ describe('the caret', () => {
 });
 
 describe('undo and redo', () => {
+  it('does not create undo entries merely for selecting an image', () => {
+    mount('<figure class="note-image"><img></figure><p>text</p>');
+    const h = initHistory(editor);
+    editor.querySelector('figure').classList.add('sel');
+    h.push();
+    expect(h.canUndo()).toBe(false);
+    editor.querySelector('figure').style.width = '200px';
+    h.undo();
+    expect(editor.querySelector('figure').style.width).toBe('');
+    expect(h.canRedo()).toBe(true);
+    h.redo();
+    expect(editor.querySelector('figure').style.width).toBe('200px');
+  });
+
+  it('keeps redo through control rehydration in onRestore', () => {
+    const h = initHistory(editor, { onRestore: () => { editor.querySelector('p').classList.add('painted'); } });
+    h.push(); editor.querySelector('p').textContent = 'two';
+    h.push(); editor.querySelector('p').textContent = 'three';
+    h.undo(); h.undo();
+    expect(editor.textContent).toBe('one');
+    h.redo(); h.redo();
+    expect(editor.textContent).toBe('three');
+  });
   it('takes back a scripted edit — the case Chromium could never see', () => {
     const h = initHistory(editor);
     const before = editor.innerHTML;

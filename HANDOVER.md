@@ -8,6 +8,18 @@ is the *map*.
 
 ## 1. First 60 seconds
 
+Latest audit and explicit verification limits: [ProjectNotes.md](ProjectNotes.md).
+Rich-paste async work is cancelled by `reset()` on note switches/history restore.
+Image selection is excluded from history snapshots; rehydration must finish
+before history captures its restored present, or repeated undo can lose redo.
+Imported frames are removed; Embed is rebuilt from a validated URL and a fixed
+sandbox. Always keep the open-link fallback because sites may refuse framing.
+`node tests/e2e/rich-paste.mjs` runs the focused subset, also in normal smoke.
+
+Mac: no custom after-pack signing hook exists. `identity: null` and the explicit
+win32 auto-update gate mean manual replacement. GitHub release text comes from
+`scripts/release-body.js`; do not restore old blanket backup/safety claims.
+
 ```bash
 npm install
 npm run preflight     # version, phase, what the last session did, what changed
@@ -30,7 +42,7 @@ GitHub Releases, and updates itself in place on Windows.
 | Renderer | `src/` — no framework, no build magic beyond Vite |
 | Main | `electron/main.js` + `electron/preload.js` — the only place with disk access |
 | Storage | `<userData>/storage/notes/<id>.json`, mirrored from `localStorage` |
-| Tests | `npm test` (351 unit) · `npm run smoke` (217 Electron checks against the real app) |
+| Tests | `npm test` (370 unit) · `npm run smoke` (231 Electron checks against the real app) |
 
 It is a deliberate rewrite of `../Nebula Demo/` (v0.5.7, feature-complete but
 sprawling), pairing that project's plumbing with `../Ember/`'s visual language.

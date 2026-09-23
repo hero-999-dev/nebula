@@ -17,7 +17,7 @@ import { cleanTypingMarkers } from './inline-family.js';
  */
 
 /** Elements that are not prose and never reach a document. */
-const DROP = '.shape-layer, .code-head, .image-h, .image-del, .link-del, .find-bar, script, style, iframe, object, embed';
+const DROP = '.shape-layer, .code-head, .image-h, .image-del, .link-del, .link-embed-hint, .find-bar, script, style, iframe, object, embed';
 
 /**
  * Only what would change meaning if left alone.
@@ -118,6 +118,10 @@ function childrenMd(parent, skip = null) {
 
 function blockMd(el) {
   const tag = el.tagName.toLowerCase();
+  if (el.classList.contains('link-block')) {
+    const anchor = el.querySelector('a');
+    if (anchor) return [`[${(el.querySelector('.link-card__title')?.textContent || anchor.textContent).replace(ESCAPE_MD, '\\$1')}](${anchor.getAttribute('href')})`];
+  }
   if (el.classList.contains('blk-code') || tag === 'pre') {
     let code = el.querySelector('pre')?.textContent ?? el.textContent;
     if (el.hasAttribute('data-code')) {
@@ -201,6 +205,8 @@ export function toHtml(html, title = 'Note') {
   blockquote { margin: 1em 0; padding-left: 1rem; border-left: 3px solid #d8d4cc; color: #4a4a44; }
   hr { border: none; border-top: 1px solid #ddd; margin: 2em 0; }
   img { max-width: 100%; }
+  .note-image { position: relative !important; left: auto !important; top: auto !important; max-width: 100%; }
+  .note-image img { width: 100%; height: 100%; object-fit: contain; }
   .blk-todo { list-style: none; }
 </style>
 </head>
@@ -295,7 +301,8 @@ export function toPrintDocument({ title = 'Untitled', body = '', css = '', margi
     border: 0;
     background: none;
   }
-  .shape-layer, .image-layer { position: relative; }
+  .shape-layer { position: absolute; }
+  .image-layer { position: relative; }
   .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; }
 </style>
 </head>

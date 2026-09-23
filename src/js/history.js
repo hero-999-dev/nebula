@@ -102,12 +102,18 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
 
   let past = [];
   let future = [];
-  let present = { html: editorEl.innerHTML, caret: null };
+  const snapshotHtml = () => {
+    if (!editorEl.querySelector('.note-image.sel')) return editorEl.innerHTML;
+    const copy = editorEl.cloneNode(true);
+    copy.querySelectorAll('.note-image.sel').forEach((el) => el.classList.remove('sel'));
+    return copy.innerHTML;
+  };
+  let present = { html: snapshotHtml(), caret: null };
   let typingTimer = null;
   let restoring = false;
 
   const now = () => ({
-    html: editorEl.innerHTML,
+    html: snapshotHtml(),
     caret: readCaret(editorEl, editorEl.ownerDocument.defaultView?.getSelection?.()),
   });
 
@@ -151,9 +157,10 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
     restoring = true;
     editorEl.innerHTML = state.html;
     writeCaret(editorEl, state.caret, editorEl.ownerDocument.defaultView?.getSelection?.());
-    present = { html: editorEl.innerHTML, caret: state.caret };
-    restoring = false;
     onRestore?.(state.html);
+    // Rehydrating controls must not look like a new edit and discard redo.
+    present = { html: snapshotHtml(), caret: state.caret };
+    restoring = false;
   }
 
   function undo() {
@@ -187,7 +194,7 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
     redo,
     reset,
     commit,
-    canUndo: () => past.length > 0 || editorEl.innerHTML !== present.html,
+    canUndo: () => past.length > 0 || snapshotHtml() !== present.html,
     canRedo: () => future.length > 0,
     depth: () => ({ past: past.length, future: future.length }),
     bytes: () => past.reduce((n, step) => n + step.html.length, 0),

@@ -20,6 +20,9 @@ export async function runRecoveryChecks(check) {
     });
     await win.waitForFunction(() => document.querySelector('.note-row.active') && document.querySelector('#editor')?.isContentEditable,
       null, { polling: 50, timeout: 20_000 });
+    // The card opens only once the version IPC answers, after the note list is
+    // drawn; under a loaded full smoke run that lands after an early close.
+    await win.waitForFunction(() => !document.getElementById('ov-whats-new')?.hidden, null, { polling: 50, timeout: 5000 }).catch(() => {});
     await win.evaluate(() => document.querySelector('#whats-new-close')?.click());
   };
   const press = selector => win.evaluate(sel => document.querySelector(sel).click(), selector);

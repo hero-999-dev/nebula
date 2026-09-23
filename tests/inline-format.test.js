@@ -144,6 +144,24 @@ describe('Enter', () => {
 });
 
 describe('Backspace', () => {
+  it('does not jump over preceding prose when unwrapping nested text', () => {
+    mount('<p>prefix <span class="inline-code"><b>code</b></span> suffix</p>');
+    const sel = caret('b', 0);
+    expect(backspaceOutOfWrapper(root, sel)).toBe(true);
+    expect(sel.anchorNode.textContent).toBe('code');
+    expect(sel.anchorOffset).toBe(0);
+    expect(root.textContent).toBe('prefix code suffix');
+  });
+
+  it('leaves an empty wrapper caret at its former boundary, not the line start', () => {
+    mount('<p>prefix <span class="inline-code">\u200b</span>suffix</p>');
+    const sel = caret('.inline-code', 0);
+    expect(backspaceOutOfWrapper(root, sel)).toBe(true);
+    const prefix = document.createRange();
+    prefix.selectNodeContents(root.querySelector('p'));
+    prefix.setEnd(sel.anchorNode, sel.anchorOffset);
+    expect(prefix.toString()).toBe('prefix ');
+  });
   it('removes the format at the start of a wrapper and keeps the text', () => {
     mount('<p>a<span class="inline-code">code</span></p>');
     const sel = caret('.inline-code', 0);

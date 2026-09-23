@@ -3,6 +3,43 @@
 One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
+## [2026-09-23 17:18] v0.8.1 - by Claude
+
+Audit rich paste, strengthen regressions and clarify Mac upgrades
+
+* (no commits since the last release)
+
+---
+
+## [2026-09-23 08:20] v0.8.1 - by Codex, finished by Claude
+
+Codex hit its usage limit at `npm run push`; nothing had been committed. Claude
+reviewed the uncommitted diff, re-ran `npm test` (370/370) and the full
+`npm run build && npm run smoke` (231/231; the earlier TimeoutError no longer
+reproduces), then released.
+
+User asked to audit Luna's work, verify features/remaining bugs, extend regular
+tests, update project memory and explain GitHub/macOS upgrades more clearly.
+
+- Fixed inert link deletion, Embed behaving like a bookmark, block insertion
+  ignoring selection, stale image decoding after note switches, corrupt-image
+  placeholders, aspect ratio/drag extent, selection polluting undo, rehydration
+  disrupting undo/redo, lost imported image geometry, and inline Backspace
+  jumping over preceding prose.
+- Added sandboxed previews with an external-link fallback; non-embed links
+  remain network-free. Supported raster images survive HTML geometry import;
+  Markdown images return as images. Document exports omit live frames/controls.
+- Added 19 regular unit and 14 Electron checks, including actual embedded
+  content, real pointer drag, deletion/undo/redo and image restart persistence.
+- Added generated release bodies, Mac unit/artifact/universal-architecture CI
+  checks and save/backup/replace/verify/security guidance. Corrected old claims
+  about Mac automatic updates, nonexistent signing hooks and snapshots.
+- Updated ProjectNotes, README, Prompt, HANDOVER, tests and memory. Temporary
+  test profiles only; user notes were not edited. A hands-on Mac upgrade remains
+  unverified on this Windows host; external sites may still refuse an iframe.
+
+
+
 
 
 ## [2026-09-23 02:43] v0.8.0 - by release-script

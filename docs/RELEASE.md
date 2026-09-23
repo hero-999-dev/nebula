@@ -8,7 +8,7 @@ npm run push
 
 That is the release. It:
 
-1. runs `npm test` and `npm run build` — **and stops if either fails**, before
+1. runs `npm test`, `npm run build` and `npm run smoke` — **and stops on failure**, before
    anything is committed, so a broken build can never become a tag that
    installed apps try to update to;
 2. bumps the version in `package.json` (patch by default);
@@ -39,8 +39,8 @@ npm run push -- --dry-run          # everything except commit/tag/push
 npm run push -- --no-flash         # skip the USB mirror
 ```
 
-A dry run leaves `package.json` and `Log.md` modified; undo with
-`git checkout -- package.json Log.md`.
+A dry run can leave generated/version-stamped files modified. Review `git diff`
+and preserve pre-existing work; do not blindly discard whole files.
 
 ---
 
@@ -99,18 +99,36 @@ being permanently unable to update. So CI fails the build instead:
 
 ## Platform limits
 
-### macOS cannot auto-update, and this is not a bug we can fix in code
+### macOS uses manual updates by design
 
-Squirrel.Mac replaces a running app only if it is signed with an Apple
-Developer certificate and the new copy carries the same signature. There is no
-certificate for this project, so the honest behaviour is what the app does:
-detect the new version through the GitHub API and send the user to the download
-page.
+`electron/updater.js` explicitly allows automatic installation only for a
+packaged, non-portable **win32** build whose channel permits self-update.
+Adding signing credentials alone will **not** enable Mac auto-update.
 
-To lift it later: an Apple Developer account ($99/year), then add `mac.identity`
-and notarization credentials to the build. The updater code needs no change —
-`electron/updater.js` picks `auto` mode by platform, and macOS would simply
-qualify.
+The current Mac configuration has `identity: null`, no notarization credentials,
+and no `build/after-pack.cjs` signing hook. Do not claim the artifact is notarized
+or that warnings can never recur. For signed automatic updates, a future change
+must configure Developer ID signing/notarization, update the platform gate,
+verify manifests and signatures, and test an upgrade between two packaged Mac
+versions with saving, backup, relaunch and rollback checks.
+[Electron's signing guidance](https://www.electronjs.org/docs/latest/tutorial/code-signing)
+documents the signature requirement. User steps and warning handling live in
+[UPDATING.md](UPDATING.md#macos-install-or-update-step-by-step).
+
+### Release text and Mac checks
+
+`scripts/release-body.js` generates the GitHub body from the matching entry in
+`src/js/release-notes.js`, exact asset names and the Mac upgrade checklist.
+Missing release notes or an invalid version fail generation; update the entry
+before tagging. The publish job uses `body_path`, so these instructions and
+the actual changes ship together.
+
+The Mac job runs unit tests, builds DMG and ZIP, asserts both packages exist,
+and checks that the app executable contains both `arm64` and `x86_64` slices.
+These checks do not replace a hands-on Mac install/update check. The full
+editor smoke suite runs on Windows; this session's local host is Windows too.
+Before calling a Mac upgrade manually verified, test the DMG on a Mac, replace
+an older app, confirm About and existing notes, and record that evidence.
 
 ### The portable exe cannot auto-update either
 
@@ -136,6 +154,7 @@ self-updates — `canSelfUpdate` allows that for the installed channel only.
 ```bash
 npm test                    # unit tests
 npm run build               # renderer + main
+npm run smoke               # real Electron app, temporary profiles
 npm run pack:win            # installer + portable, locally
 ```
 

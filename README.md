@@ -1,10 +1,10 @@
 # Nebula
 
 Calm notes with a real editor. An Electron desktop app for **Windows and macOS**
-that keeps every note as a plain JSON file in your own profile, and updates
-itself without ever touching them.
+that keeps every note as a plain JSON file in your own profile. Installed Windows
+builds offer in-app updates; macOS and portable builds offer a download link.
 
-**Version v0.8.0** ·
+**Version v0.8.1** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 
@@ -57,7 +57,16 @@ So this README describes a small app on purpose. What is here is finished.
   a `.md` or `.html` file back as a new note.
 - **Right-click a selection** for a compact mini toolbar.
 - **`/` opens a block menu** — headings, lists, to-do, quote, code, divider,
-  shapes.
+  shapes, Embed, Bookmark, URL and Mention.
+- **Paste a web link** and choose **Paste as → Embed / Bookmark / URL / Mention**.
+  Embed loads a sandboxed preview; sites that block embedding can still be opened
+  through the visible link. Bookmark is an offline link card (no fetched thumbnail);
+  URL is the full address, and Mention is a compact `@hostname` link, not a person tag.
+- **Paste or drop PNG, JPEG, GIF or WebP images.** Drag to move, use the corner
+  grip to resize proportionally, and the image bar to send behind/bring forward
+  or delete. Escape deselects. Once a behind-text image is selected, click again
+  to edit the text; Alt-drag selects the image instead. Images are stored inside
+  the note, so large images also increase note/backup size.
 - **Code blocks** are markdown-style with a language picker and syntax colours
   for JS, TS, Python, Java, C, C++, C#, Dart (Flutter), Ruby, HTML, CSS, JSON,
   SQL, Bash and Markdown — every one of them with a sample in the guide.
@@ -90,7 +99,7 @@ and the thing on your screen are obviously the same product.
 |---|---|
 | **Windows** | `Nebula-Setup-X.Y.Z.exe`. Per-user install, no admin. **Updates itself.** |
 | **Windows, no install** | `Nebula-portable-X.Y.Z.exe`. Runs from a folder or USB stick; does not auto-update. |
-| **macOS** | `Nebula-X.Y.Z-mac.dmg`. Drag to Applications; first launch **right-click → Open** (the build is unsigned). |
+| **macOS, Apple Silicon or Intel** | `Nebula-X.Y.Z-mac.dmg` (universal). Drag to Applications. See the [Mac install/update guide](docs/UPDATING.md#macos-install-or-update-step-by-step), including security warnings. |
 
 All from the [Releases page](https://github.com/hero-999-dev/nebula/releases/latest).
 
@@ -108,12 +117,13 @@ new version it says so; you press **Update**, it downloads, you press **Restart
 and install**, and it installs silently and reopens. Nothing downloads or
 installs on its own.
 
-macOS and the portable build cannot replace themselves — Squirrel.Mac requires
-an Apple Developer signature and a portable exe has no installer — so they
-detect the new version and open the download page instead. Same UI either way.
+macOS and portable builds use manual updates: they detect a newer version and
+open its download page. On Mac, save, quit, back up your profile, and replace
+only `/Applications/Nebula.app`. Signing credentials alone do not enable Mac
+auto-updates; the current updater deliberately limits installation to Windows.
 
-**An update never touches a note.** Five independent layers stand in the way of
-losing one:
+The app and vault are separate. These safeguards reduce the risk of losing notes;
+they are not a substitute for a backup or a guarantee against hardware failure:
 
 1. **Separate vaults.** Installed, portable and development each keep their own
    notes, so neither a build you are testing nor a portable copy on a USB stick
@@ -121,8 +131,9 @@ losing one:
 2. **The seed guard.** Sample notes are written only when the vault was read
    *successfully* and came back *empty*. An unreadable vault disables the disk
    mirror entirely, shows a red bar, and offers to open the folder.
-3. **A pre-update snapshot** into `backups/pre-update-<version>-<time>`, taken
-   the moment before the installer runs, and never rotated away.
+3. **A Windows in-app pre-update snapshot** into `backups/pre-update-<version>-<time>`,
+   taken before the installer runs and never rotated away. Manual Mac and portable
+   upgrades do not trigger it; make a profile copy first.
 4. **A daily snapshot** into `backups/YYYY-MM-DD`, newest seven kept.
 5. **The files themselves** — plain JSON in your profile, not beside the app.
    Uninstalling leaves them.

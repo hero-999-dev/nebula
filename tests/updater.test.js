@@ -15,6 +15,19 @@ beforeEach(() => {
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('update safety', () => {
+  it('Mac builds notify but never download or install, even when packaged', async () => {
+    vi.stubGlobal('process', { ...process, platform: 'darwin' });
+    fake.fetch.mockResolvedValue({ ok: true, json: async () => ({ tag_name: 'v0.8.1' }) });
+    const beforeInstall = vi.fn();
+    const { initUpdater } = await import('../electron/updater.js');
+    expect(await initUpdater({ version: '0.8.0', beforeInstall })).toEqual({ mode: 'manual' });
+    expect(await fake.handlers.get('update:check')()).toMatchObject({ state: 'manual', version: '0.8.1' });
+    await fake.handlers.get('update:download')();
+    await fake.handlers.get('update:install')();
+    expect(beforeInstall).not.toHaveBeenCalled();
+    expect(fake.install).not.toHaveBeenCalled();
+    expect(fake.events.size).toBe(0);
+  });
   it('compares releases with the Nebula version, not the Electron runtime version', async () => {
     fake.fetch.mockResolvedValue({ ok: true, json: async () => ({ tag_name: 'v0.7.5', html_url: 'https://github.com/hero-999-dev/nebula/releases/tag/v0.7.5' }) });
     const { initUpdater } = await import('../electron/updater.js');

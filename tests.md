@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 351 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 217 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 370 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 231 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -16,6 +16,16 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 
 ## Suites
 
+Latest audit adds 19 unit and 14 Electron regressions. The rich-paste subset now
+checks actual sandboxed content from a deterministic intercepted page, all four
+link results, deletion/undo/redo, real image drag/drop, Escape, restart persistence
+and bottom-of-page scroll stability. It runs standalone and in normal smoke.
+The fixture disables background-window throttling; shipped launch flags are
+unchanged. Mac manual-mode tests prove that download/install never invoke the
+Windows installer hook. CI also asserts DMG/ZIP and universal executable slices.
+Hands-on Mac upgrades, all remote providers and large-image storage exhaustion
+are not covered; see [ProjectNotes.md](ProjectNotes.md).
+
 | File | Tests | Proves |
 |---|---|---|
 | `tests/notes.test.js` | 20 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body, and adds the guide to an older vault exactly once without touching what is there |
@@ -23,25 +33,26 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 | `tests/lists.test.js` | 36 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
 | `tests/migrate.test.js` | 30 | Bringing a stored note up to what this version writes |
 | `tests/release-notes.test.js` | 17 | What each release says for itself |
-| `tests/inline-format.test.js` | 19 | Enter and Backspace out of an inline wrapper, including stable caret placement |
-| `tests/rich-paste.test.js` | 3 | Safe URL normalization, image MIME detection and compact link-card labels |
+| `tests/inline-format.test.js` | 21 | Inline Enter/Backspace, preceding prose, nested text and empty-wrapper boundaries |
+| `tests/rich-paste.test.js` | 14 | Four results, selection splits, delete/undo/redo, sandbox/fallback, stale decode cancellation, corrupt input and safe imports |
+| `tests/release-body.test.js` | 3 | Actual changelog, exact assets, Mac steps and missing-version rejection |
 | `tests/highlight.test.js` | 14 | Per-language tokens, and that only SQL is case-insensitive |
 | `tests/disk-store.test.js` | 10 | Serialized acknowledged writes, retry of failed writes/deletions, latest state wins, and a partially corrupt vault disables the mirror without replacing its cache |
 | `tests/seed-guard.test.js` | 13 | Empty versus unreadable vault, including malformed files and rejected note reads |
 | `tests/user-data.test.js` | 8 | Which vault each build channel gets, and which one may replace itself |
 | `tests/version-compare.test.js` | 7 | `0.3.10 > 0.3.9`, `v` prefixes, pre-releases, unparseable tags refuse rather than guess |
 | `tests/find.test.js` | 9 | Finding text in a note without editing it |
-| `tests/history.test.js` | 21 | The editor's own undo stack |
+| `tests/history.test.js` | 23 | Undo stack, image selection excluded and redo preserved across rehydration |
 | `tests/notes-archive.test.js` | 14 | Pin, archive, trash and restore |
 | `tests/app-menu.test.js` | 10 | The five menus, and that the palette reads them |
 | `tests/export.test.js` | 30 | A note as Markdown or as a standalone HTML file |
 | `tests/import.test.js` | 18 | A Markdown or HTML file read back as a note, sanitised |
 | `tests/inline-family.test.js` | 7 | Exact selected occurrence, native underline removal, cross-block wrapping, collapsed caret and clean serialization |
 | `tests/recovery.test.js` | 11 | Pending buffer ownership on archive/trash, synchronous save retry, wrapped Markdown text, long fences, unsafe URL schemes and code-block edge detection |
-| `tests/updater.test.js` | 3 | Nebula-version comparisons, failed save/backup blocks install, successful preparation precedes silent install |
+| `tests/updater.test.js` | 4 | Version comparisons, save/backup gates, silent Windows install and manual-only Mac behavior |
 | `tests/docs.test.js` | 1 | Repository attribution is removed from public documentation without removing real content |
 | `tests/reported.test.js` | 9 | Legacy prose normalization is idempotent and preserves shapes; underline follows coloured text without losing formatting or selection; the code hint follows source input |
-| `tests/e2e/smoke.mjs`, `recovery.mjs`, `reported.mjs`, `editing-edges.mjs`, `rich-paste.mjs` | 217 | Original 173, 14 save-recovery, 16 reported-note, 8 divider/code-hint and 6 link/image checks, all using throwaway profiles |
+| `tests/e2e/smoke.mjs`, `recovery.mjs`, `reported.mjs`, `editing-edges.mjs`, `rich-paste.mjs` | 231 | Original 173, 14 save-recovery, 16 reported-note, 8 divider/code-hint and 20 link/image checks, all using throwaway profiles |
 
 ---
 
