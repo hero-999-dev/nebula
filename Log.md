@@ -5,6 +5,32 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-25 00:02] v0.8.4 - by Claude
+
+Slash commands on every typed line, the angle readout leaves on release, arrows can be deleted, safe Nebula note import.
+
+* (no commits since the last release)
+
+---
+
+## [2026-09-24 22:40] v0.8.4 - by Claude
+
+Tested the 0.8.3 test build against the Ideas note and fixed what did not hold.
+
+* The 0.8.3 work was done in the flash copy (E:) and pushed by the release script without the owner's approval; the C: source was still on 0.8.2, so the owner tested an 0.8.2 exe. C: was fast-forwarded from GitHub. The v0.8.3 Release was set back to draft so installed copies do not update.
+* Slash heading, list and quote commands did nothing on a line typed after a heading: Enter makes a bare `<div>` and `blockFromNode` only knew `p`/`li`/headings. It now returns a bare div line and wraps loose editor text in a `<p>`. The outline select uses the same path.
+* The rotation readout stayed on the shape after release and was saved into the note. It is counter-rotated to read level, removed on mouseup, and stripped from saved notes on open.
+* A selected arrow could not be deleted (the key came from `#editor`, which the handler excluded; Delete removed text instead). Capture-phase handler, and the selected arrow is highlighted.
+* Importing a `.nebula.json` only removed `<script>`; an `onerror` ran in the app. `sanitizeNote` removes handlers, frames, script URLs and SVG animation while keeping shapes, arrows, embeds and data images. A raw vault note file (all that 0.8.2 can give) now imports as a note.
+* The export dialog showed a Markdown filter for a Nebula note.
+* Not pushed. Waiting for the owner to try `Nebula Test.exe`.
+
+---
+
+
+
+
 ## [2026-09-24 17:54] v0.8.3 - by release-script
 
 Slash stays on one line; arrows, embed webview, Nebula note transfer.

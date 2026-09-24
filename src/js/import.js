@@ -181,6 +181,37 @@ export function titleFromHtml(html, fallback = 'Imported note') {
   return h || fallback;
 }
 
+/** Elements that load, run or frame something. A note's own markup never needs them. */
+const NOTE_FORBIDDEN = 'script, style, link, meta, base, iframe, frame, frameset, webview, object, embed, applet, portal, template, form, foreignObject, animate, animateMotion, animateTransform, set, use';
+/** Attributes whose value is a URL the browser will fetch or navigate to. */
+const URL_ATTRS = new Set(['href', 'src', 'xlink:href', 'action', 'formaction', 'data', 'poster', 'background', 'srcset']);
+
+/**
+ * A Nebula note moved from another copy keeps its shapes, arrows, embeds and
+ * image geometry, so `sanitize` (which drops svg and style) is too strict for
+ * it. It is still a file from outside: nothing in it may run. 0.8.3 only
+ * removed <script>, and an `onerror` on an image ran in the app.
+ * @param {string} html
+ * @returns {string}
+ */
+export function sanitizeNote(html) {
+  const doc = new DOMParser().parseFromString(`<body>${String(html ?? '')}</body>`, 'text/html');
+  doc.body.querySelectorAll(NOTE_FORBIDDEN).forEach((el) => el.remove());
+  for (const el of Array.from(doc.body.querySelectorAll('*'))) {
+    for (const attr of Array.from(el.attributes)) {
+      const name = attr.name.toLowerCase();
+      if (name.startsWith('on') || name === 'srcdoc') { el.removeAttribute(attr.name); continue; }
+      if (!URL_ATTRS.has(name)) continue;
+      const url = attr.value.replace(/[\u0000-\u0020\u007f]/g, '');
+      const safeDataImage = /^data:image\/(?:png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(attr.value.trim());
+      if (name === 'srcset' || (/^(javascript|data|vbscript):/i.test(url) && !(name === 'src' && safeDataImage))) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  }
+  return doc.body.innerHTML;
+}
+
 /**
  * One imported file → `{ title, content }` ready for `store.createNote`.
  * @param {string} name the filename, used as the title of last resort
@@ -188,7 +219,7 @@ export function titleFromHtml(html, fallback = 'Imported note') {
  */
 export function noteFromFile(name, text) {
   const native = fromNebulaNote(text);
-  if (native) return native;
+  if (native) return { title: native.title, content: sanitizeNote(native.content) };
   const base = String(name ?? '').replace(/\.[^.]+$/, '').trim() || 'Imported note';
   if (/\.html?$/i.test(name ?? '')) {
     const doc = new DOMParser().parseFromString(String(text ?? ''), 'text/html');

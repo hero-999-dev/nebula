@@ -242,11 +242,18 @@ export function toNebulaNote({ title = '', content = '' } = {}) {
   return `${JSON.stringify({ nebula: 1, title, content }, null, 2)}\n`;
 }
 
-/** @returns {{title: string, content: string}|null} */
+/**
+ * An exported Nebula note, or a note file copied straight out of a vault
+ * (`{id, title, content}`) — which is all a copy older than 0.8.3 can offer.
+ * The caller sanitises `content`; see `sanitizeNote` in import.js.
+ * @returns {{title: string, content: string}|null}
+ */
 export function fromNebulaNote(text) {
   let data;
   try { data = JSON.parse(String(text ?? '')); } catch { return null; }
-  if (!data || data.nebula !== 1 || typeof data.content !== 'string') return null;
+  if (!data || typeof data.content !== 'string') return null;
+  const vaultFile = typeof data.id === 'string' && typeof data.title === 'string';
+  if (data.nebula !== 1 && !vaultFile) return null;
   const content = data.content.replace(/<script[\s\S]*?<\/script>/gi, '');
   return { title: String(data.title ?? 'Imported note'), content };
 }

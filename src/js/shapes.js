@@ -119,6 +119,13 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
       shape.appendChild(label);
     }
     label.textContent = formatAngle(deg);
+    // Inside the shape it turns with it; turn it back so it reads level.
+    label.style.transform = `translateX(-50%) rotate(${-deg}deg)`;
+  }
+
+  /** Only while turning. Removed before the note is marked dirty, so it is never saved. */
+  function hideAngle(shape) {
+    shape?.querySelectorAll('.shape-angle').forEach((label) => label.remove());
   }
 
   function select(el) {
@@ -307,6 +314,7 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
     if (!drag) return;
     const { el, moved, wasSelected } = drag;
     drag = null;
+    hideAngle(el);
     if (moved) { onGeometry?.(); dirty(); return; }
 
     // A press that never moved is a click. On a shape that was ALREADY

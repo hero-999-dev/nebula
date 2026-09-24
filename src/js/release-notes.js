@@ -13,6 +13,15 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.8.4': {
+    headline: 'Slash commands work on every line you type, and arrows can be deleted.',
+    items: [
+      { title: 'Headings and lists on any line', text: 'Heading, list and quote commands now work on a line typed after a heading, not only on the first line of a note.' },
+      { title: 'The angle leaves when you let go', text: 'The degrees show while a shape turns and disappear when you release it. Old notes that kept a stray number are cleaned when opened.' },
+      { title: 'Delete an arrow', text: 'Click an arrow so it lights up, then press Delete or Backspace.' },
+      { title: 'Safer note import', text: 'An imported Nebula note can no longer run anything. A note file copied straight out of another Nebula can be imported as it is.' },
+    ],
+  },
   '0.8.3': {
     headline: 'Slash commands stay on one line, and a note can move to another Nebula.',
     items: [

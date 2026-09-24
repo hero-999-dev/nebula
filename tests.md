@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 382 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 231 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 392 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 243 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -15,6 +15,12 @@ cannot see: the preload bridge, the main process, the filesystem, and boot.
 ---
 
 ## Suites
+
+### `tests/e2e/ideas-note.mjs` (in smoke, 12 checks)
+
+The Ideas-note reports driven with real keys and pointer: `/h3` and `/bullet` on lines typed after a heading, the angle readout shown while turning and gone (and unsaved) after, an arrow attached to a shape following it and deleted with Delete without touching text, a crafted `.nebula.json` that must not run `onerror`, and a raw vault note file imported as a note. 10 of the 12 fail against 0.8.3.
+
+`tests/import.test.js` adds 5: `sanitizeNote` strips handlers, frames, script URLs and SVG animation, keeps shape style, arrows, embeds and data images, and `noteFromFile` applies it to exported and raw vault notes.
 
 Latest audit adds 19 unit and 14 Electron regressions. The rich-paste subset now
 checks actual sandboxed content from a deterministic intercepted page, all four
@@ -28,12 +34,12 @@ are not covered; see [ProjectNotes.md](ProjectNotes.md).
 
 | File | Tests | Proves |
 |---|---|---|
-| `tests/blocks.test.js` | 4 | A slash heading or list changes one block, and a divider nested in a list is lifted out |
+| `tests/blocks.test.js` | 8 | A slash heading or list changes one block, and a divider nested in a list is lifted out; a bare `<div>` line (Enter after a heading) and loose editor text are lines too, a container div or a shape is not |
 | `tests/arrows.test.js` | 7 | Straight, elbow and curve paths, the nearest attach point, and the degree readout |
 | `tests/notes.test.js` | 20 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body, and adds the guide to an older vault exactly once without touching what is there |
 | `tests/editor.test.js` | 41 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and the guide note's completeness |
 | `tests/lists.test.js` | 36 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |
-| `tests/migrate.test.js` | 30 | Bringing a stored note up to what this version writes |
+| `tests/migrate.test.js` | 31 | Bringing a stored note up to what this version writes, including dropping the rotation readout and arrow selection 0.8.3 saved |
 | `tests/release-notes.test.js` | 17 | What each release says for itself |
 | `tests/inline-format.test.js` | 21 | Inline Enter/Backspace, preceding prose, nested text and empty-wrapper boundaries |
 | `tests/rich-paste.test.js` | 14 | Four results, selection splits, delete/undo/redo, sandbox/fallback, stale decode cancellation, corrupt input and safe imports |

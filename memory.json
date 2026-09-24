@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "lastUpdated": "2026-09-24",
-  "currentPhase": "v0.8.3 - slash commands change one line, dividers stay at the top level, headings share the paragraph margin, the title-bar overlay matches the strip, shapes show their angle, arrows can point at blocks, embeds use a webview, and a Nebula note file moves a note intact. Test exe only; not pushed.",
-  "next": "Wait for the owner to try Nebula Test.exe and approve before npm run push.",
+  "currentPhase": "v0.8.4 - fixes found by testing the 0.8.3 test build: slash heading/list/quote commands work on bare <div> lines (what Enter makes after a heading) and on text typed straight into the editor; the rotation readout is removed on release and stripped from saved notes; a selected arrow is highlighted and deletable while the editor has focus; an imported .nebula.json is sanitised (0.8.3 ran onerror) and a raw vault note file imports as a note. Test exe only; not pushed. v0.8.3 is tagged on GitHub but its Release was set back to draft.",
+  "next": "Owner tries Nebula Test.exe (C: source tree). On approval: npm run push for 0.8.4, and delete or leave the draft v0.8.3 Release.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -88,6 +88,12 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "version": "0.8.4",
+      "date": "2026-09-24",
+      "by": "Claude",
+      "what": "Tested 0.8.3 in the real app and fixed what failed. blockFromNode now returns a bare <div> line and wraps loose editor text in a <p>, so /h1-/h3, /bullet, /numbered, /quote and the outline select work on typed lines. Rotation readout counter-rotated, removed on mouseup, stripped by migrate (MARKUP_VERSION 0.8.4). Arrow keydown moved to capture phase and no longer excludes #editor; selected arrow gets .is-selected. sanitizeNote() for .nebula.json and raw vault files. Export dialog filter for Nebula notes. New e2e module tests/e2e/ideas-note.mjs (12 checks, 10 fail on 0.8.3). Not released."
+    },
     {
       "version": "0.8.3",
       "date": "2026-09-24",

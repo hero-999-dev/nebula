@@ -460,7 +460,9 @@ function registerShellHandlers() {
     if (!win || typeof content !== 'string') return { ok: false };
     const filters = format === 'html'
       ? [{ name: 'HTML', extensions: ['html'] }]
-      : [{ name: 'Markdown', extensions: ['md'] }];
+      : format === 'nebula'
+        ? [{ name: 'Nebula note', extensions: ['json'] }]
+        : [{ name: 'Markdown', extensions: ['md'] }];
     const { canceled, filePath } = await dialog.showSaveDialog(win, {
       title: 'Export note',
       defaultPath: String(suggested ?? 'Untitled'),

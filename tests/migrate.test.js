@@ -255,6 +255,14 @@ describe('migrateNote', () => {
     expect(migrateNote(null)).toEqual({ shapes: 0, code: 0, wrappers: 0, blanks: 0 });
   });
 
+  it('drops a rotation readout and arrow selection that 0.8.3 saved into a note', () => {
+    const el = root('<div class="shape-layer" contenteditable="false"><div class="shape rect" data-rot="-75"><span class="shape-angle">285°</span></div>'
+      + '<svg class="note-arrow is-selected"></svg></div><p>text</p>');
+    migrateNote(el);
+    expect(el.querySelector('.shape-angle')).toBeNull();
+    expect(el.querySelector('.note-arrow').classList.contains('is-selected')).toBe(false);
+  });
+
   it('carries a version, so a log line means something', () => {
     expect(MARKUP_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
   });

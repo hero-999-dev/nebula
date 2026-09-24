@@ -172,12 +172,17 @@ export function initArrows(editorEl, { history } = {}) {
 
   let drag = null;
   let selected = null;
+  function select(arrow) {
+    selected?.classList.remove('is-selected');
+    selected = arrow;
+    arrow?.classList.add('is-selected');
+  }
   editorEl.addEventListener('mousedown', (e) => {
     const handle = e.target.closest?.('.arrow-end');
     const arrow = e.target.closest?.('.note-arrow');
-    if (!arrow) { selected = null; return; }
+    if (!arrow) { select(null); return; }
     e.preventDefault();
-    selected = arrow;
+    select(arrow);
     history?.push();
     drag = {
       arrow,
@@ -226,15 +231,20 @@ export function initArrows(editorEl, { history } = {}) {
   });
 
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && selected) { select(null); return; }
+    // The editor keeps focus when an arrow is pressed (mousedown is cancelled
+    // so the caret does not jump), so the key arrives from #editor. Excluding
+    // #editor here made a selected arrow impossible to delete (0.8.3).
     if ((e.key === 'Delete' || e.key === 'Backspace') && selected?.isConnected
-      && !e.target.closest?.('.shape-text, .code-src, #editor')) {
+      && !e.target.closest?.('.shape-text, .code-src, input, textarea, select')) {
       e.preventDefault();
+      e.stopImmediatePropagation();
       history?.push();
       selected.remove();
       selected = null;
       dirty();
     }
-  });
+  }, true); // capture: before the editor's own Backspace handling edits text
 
   return { add, reflow };
 }

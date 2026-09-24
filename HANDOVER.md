@@ -16,6 +16,10 @@ Imported frames are removed; Embed is rebuilt from a validated URL and a fixed
 sandbox. Always keep the open-link fallback because sites may refuse framing.
 `node tests/e2e/rich-paste.mjs` runs the focused subset, also in normal smoke.
 
+A typed line after a heading is a bare `<div>`, not a `<p>`: block commands go
+through `blockFromNode` (blocks.js), which must keep handling it. An imported
+`.nebula.json` goes through `sanitizeNote`, never straight into the vault.
+
 Mac: no custom after-pack signing hook exists. `identity: null` and the explicit
 win32 auto-update gate mean manual replacement. GitHub release text comes from
 `scripts/release-body.js`; do not restore old blanket backup/safety claims.

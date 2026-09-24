@@ -893,6 +893,7 @@
   pointer-events: none;
 }
 .note-arrow .arrow-line { pointer-events: stroke; }
+.note-arrow.is-selected .arrow-line { stroke: var(--clay); stroke-width: 2.4; }
 .note-arrow .arrow-end {
   pointer-events: all;
   fill: var(--paper-raised);

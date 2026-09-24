@@ -103,7 +103,8 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
   // whatever was typed before.
   history?.push();
   const exec = (n, v = null) => document.execCommand(n, false, v);
-  const block = blockFromNode(window.getSelection()?.anchorNode, editorEl);
+  const restyles = ['text', 'h1', 'h2', 'h3', 'quote', 'bullet', 'numbered'].includes(id);
+  const block = restyles ? blockFromNode(window.getSelection()?.anchorNode, editorEl) : null;
   const turned = block && convertBlock(block, id);
   if (turned) {
     const range = document.createRange();

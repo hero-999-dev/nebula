@@ -7,7 +7,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  sanitize, fromMarkdown, titleFromMarkdown, titleFromHtml, noteFromFile,
+  sanitize, sanitizeNote, fromMarkdown, titleFromMarkdown, titleFromHtml, noteFromFile,
 } from '../src/js/import.js';
 import { toNebulaNote } from '../src/js/export.js';
 
@@ -128,5 +128,48 @@ describe('noteFromFile', () => {
     expect(note.title).toBe('Ideas');
     expect(note.content).toContain('data-kind="rect"');
     expect(note.content).not.toContain('<script');
+  });
+});
+
+describe('sanitizeNote (a Nebula note from another copy)', () => {
+  it('runs nothing: handlers, scripts, frames and script URLs are removed', () => {
+    const out = sanitizeNote('<p>hi</p><img src="x" onerror="window.__pwned=1">'
+      + '<a href="javascript:alert(1)">a</a><iframe src="https://x"></iframe><webview src="https://x" nodeintegration></webview>'
+      + '<svg><foreignObject><img src=x onerror=1></foreignObject><animate attributeName="href" to="javascript:1"/></svg>'
+      + '<script>bad()</script><object data="x"></object><p srcdoc="x" onclick="1">t</p>');
+    expect(out).not.toMatch(/onerror|onclick|javascript:|<script|<iframe|<webview|<object|foreignObject|<animate|srcdoc/i);
+    expect(out).toContain('<p>hi</p>');
+  });
+
+  it('keeps what a note is made of: shapes with style, arrows, embeds, data images', () => {
+    const html = '<div class="shape-layer" contenteditable="false"><div class="shape rect" data-kind="rect" data-rot="15" style="left:10px;top:20px;width:90px;height:40px">'
+      + '<svg class="shape-svg" viewBox="0 0 100 100"><rect width="100" height="100"></rect></svg></div>'
+      + '<svg class="note-arrow" data-kind="curve" data-to="a-1"><defs><marker id="m"><path d="M0 0L6 3L0 6z"></path></marker></defs><path class="arrow-line" marker-end="url(#m)"></path></svg></div>'
+      + '<div class="link-block" data-kind="embed" data-url="https://example.com/"></div>'
+      + '<figure class="note-image"><img src="data:image/png;base64,iVBORw0KGgo="></figure>';
+    const out = sanitizeNote(html);
+    expect(out).toContain('style="left:10px;top:20px;width:90px;height:40px"');
+    expect(out).toContain('class="note-arrow"');
+    expect(out).toContain('marker-end="url(#m)"');
+    expect(out).toContain('data-url="https://example.com/"');
+    expect(out).toContain('src="data:image/png;base64,iVBORw0KGgo="');
+  });
+
+  it('is what noteFromFile applies to an exported note', () => {
+    const note = noteFromFile('n.nebula.json', toNebulaNote({ title: 'T', content: '<img src="x" onerror="1"><p>ok</p>' }));
+    expect(note.content).not.toContain('onerror');
+    expect(note.content).toContain('<p>ok</p>');
+  });
+
+  it('opens a note file copied straight out of a vault (0.8.2 has no Nebula export)', () => {
+    const raw = JSON.stringify({ id: 'n-1', title: 'Ideas', content: '<h1>Ideas</h1><p onclick="x()">line</p>', createdAt: 1, updatedAt: 2 });
+    const note = noteFromFile('n-1.json', raw);
+    expect(note.title).toBe('Ideas');
+    expect(note.content).toBe('<h1>Ideas</h1><p>line</p>');
+  });
+
+  it('leaves other JSON alone', () => {
+    const note = noteFromFile('data.json', '{"a":1}');
+    expect(note.title).toBe('data');
   });
 });
