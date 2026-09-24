@@ -180,11 +180,15 @@ function makeLinkBlock(url, kind) {
   remove.textContent = '×';
   card.append(anchor, remove);
   if (kind === 'embed') {
-    const frame = document.createElement('iframe');
+    const frame = document.createElement('webview');
     frame.className = 'link-frame';
     frame.title = `Embedded ${linkLabel(url)}`;
-    frame.setAttribute('sandbox', 'allow-scripts');
-    frame.setAttribute('referrerpolicy', 'no-referrer');
+    frame.setAttribute('partition', 'persist:embed');
+    frame.setAttribute('allowpopups', '');
+    frame.setAttribute('webpreferences', 'contextIsolation=yes,nodeIntegration=no');
+    frame.setAttribute('useragent', navigator.userAgent
+      .replace(/ Electron\/[\d.]+/i, '')
+      .replace(/ Nebula(?: Test)?\/[\d.]+/i, ''));
     // The user explicitly chose Embed. Do not defer navigation to an
     // intersection callback: Electron can suspend it for an occluded window.
     frame.loading = 'eager';
@@ -401,7 +405,7 @@ export function initRichPaste(editor, { history } = {}) {
   function refreshImages() {
     for (const layer of editor.querySelectorAll('.image-layer')) layer.contentEditable = 'false';
     for (const card of editor.querySelectorAll('.link-block')) {
-      if (!card.querySelector('.link-del') || (card.dataset.kind === 'embed' && !card.querySelector('iframe'))) {
+      if (!card.querySelector('.link-del') || (card.dataset.kind === 'embed' && !card.querySelector('webview'))) {
         const url = normalizeUrl(card.dataset.url);
         if (url) card.replaceWith(makeLinkBlock(url, card.dataset.kind === 'embed' ? 'embed' : 'bookmark'));
       }

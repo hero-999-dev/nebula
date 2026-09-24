@@ -242,7 +242,7 @@ function titleBarOptions() {
   if (process.platform === 'darwin') return { titleBarStyle: 'hiddenInset' };
   return {
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: WINDOW_BG, symbolColor: '#EDE7F7', height: 38 },
+    titleBarOverlay: { color: '#100C1E', symbolColor: '#EDE7F7', height: 37 },
   };
 }
 
@@ -409,7 +409,7 @@ function registerShellHandlers() {
       win.setTitleBarOverlay({
         color: String(colors.color ?? '#17122A'),
         symbolColor: String(colors.symbolColor ?? '#EDE7F7'),
-        height: 38,
+        height: 37,
       });
       return true;
     } catch {
@@ -439,6 +439,13 @@ function registerShellHandlers() {
     return true;
   });
   ipcMain.handle('app:quit', () => { app.quit(); return true; });
+  ipcMain.handle('app:open-external', (e, url) => {
+    let parsed;
+    try { parsed = new URL(String(url)); } catch { return false; }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+    shell.openExternal(parsed.href);
+    return true;
+  });
 
   /**
    * Saving a note out, and reading one in.
@@ -583,7 +590,7 @@ function registerShellHandlers() {
       title: 'Import a note',
       properties: ['openFile'],
       filters: [
-        { name: 'Notes', extensions: ['md', 'markdown', 'html', 'htm', 'txt'] },
+        { name: 'Notes', extensions: ['md', 'markdown', 'html', 'htm', 'txt', 'json'] },
         { name: 'All files', extensions: ['*'] },
       ],
     });
@@ -600,6 +607,9 @@ function registerShellHandlers() {
 }
 
 app.whenReady().then(async () => {
+  app.userAgentFallback = app.userAgentFallback
+    .replace(/ Electron\/[\d.]+/gi, '')
+    .replace(/ Nebula(?: Test)?\/[\d.]+/gi, '');
   // The app draws its own menus beside the logo, so the native bar goes.
   Menu.setApplicationMenu(null);
   registerShellHandlers();

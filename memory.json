@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.8.2",
-  "lastUpdated": "2026-09-23",
-  "currentPhase": "v0.8.2 - publishes the v0.8.1 audit (whose Mac CI check failed): audits rich paste: working sandboxed embeds, link selection/deletion, note-bound async images, undo/redo, safe import geometry, proportional resize and caret boundaries; clearer Mac upgrade and generated GitHub release instructions.",
-  "next": "Perform a hands-on DMG upgrade on a Mac (CI packaging is not a manual upgrade test). Collect any remaining feedback with exact reproduction steps; keep large embedded-image storage limits and third-party iframe restrictions explicit.",
+  "version": "0.8.3",
+  "lastUpdated": "2026-09-24",
+  "currentPhase": "v0.8.3 - slash commands change one line, dividers stay at the top level, headings share the paragraph margin, the title-bar overlay matches the strip, shapes show their angle, arrows can point at blocks, embeds use a webview, and a Nebula note file moves a note intact. Test exe only; not pushed.",
+  "next": "Wait for the owner to try Nebula Test.exe and approve before npm run push.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -31,7 +31,7 @@
     "releasePolicy": "Standing instruction (2026-09-07): release finished work with npm run push without being asked, and never ask which platforms to build - the repo is public, so Actions is free on both Windows and macOS runners. npm run push also refreshes Nebula Test.exe in the project root."
   },
   "quality": {
-    "unitTests": 370,
+    "unitTests": 382,
     "smokeChecks": 231,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
@@ -88,6 +88,12 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "version": "0.8.3",
+      "date": "2026-09-24",
+      "by": "Cursor",
+      "what": "Slash and outline commands restyle one block. Nested dividers are lifted on open. Backspace inside a line no longer arms the divider. Headings share the paragraph's left edge. Title-bar overlay is 37px so the rule sits under the window buttons. Shapes show a degree readout. Straight, elbow and curved arrows can attach to shapes, links, images and text. Embeds are webviews. A .nebula.json file round-trips a note. AI sessions use a Chrome user agent, with Sign in in browser when a site refuses the embedded view. Not released."
+    },
     {
       "version": "0.8.2",
       "date": "2026-09-23",

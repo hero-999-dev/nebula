@@ -17,9 +17,10 @@
 import { ensureHeadControls, paintCode } from './codeblock.js';
 import { outlineSvg } from './shapes.js';
 import { normalizeUnderlineInk } from './inline-family.js';
+import { liftNestedDividers } from './blocks.js';
 
 /** Bumped whenever a step is added, so the log line means something. */
-export const MARKUP_VERSION = '0.8.0';
+export const MARKUP_VERSION = '0.8.3';
 
 /**
  * @param {Element} root the editor
@@ -31,6 +32,7 @@ export const MARKUP_VERSION = '0.8.0';
 export function migrateNote(root, { fitShape } = {}) {
   if (!root) return { shapes: 0, code: 0, wrappers: 0, blanks: 0 };
   const wrappers = unwrapBlockSwallowingSpans(root);
+  liftNestedDividers(root);
   normalizeProse(root);
   normalizeUnderlineInk(root);
   return {

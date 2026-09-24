@@ -11,8 +11,8 @@
  * part of the vault. `sanitize` is not optional.
  */
 
-/** Removed outright, with everything inside them. */
-const FORBIDDEN = 'script, style, link, meta, iframe, object, embed, form, input, button, svg, math';
+import { fromNebulaNote } from './export.js';
+const FORBIDDEN = 'script, style, link, meta, iframe, webview, object, embed, form, input, button, svg, math';
 
 /** Kept, per element. Anything else is dropped. */
 const ALLOWED_ATTRS = new Set(['href', 'src', 'alt', 'title', 'target', 'rel', 'class', 'data-lang', 'data-code', 'data-tex', 'data-ind', 'data-block-type', 'data-url', 'data-kind', 'data-ratio', 'colspan', 'rowspan']);
@@ -187,6 +187,8 @@ export function titleFromHtml(html, fallback = 'Imported note') {
  * @param {string} text the file's contents
  */
 export function noteFromFile(name, text) {
+  const native = fromNebulaNote(text);
+  if (native) return native;
   const base = String(name ?? '').replace(/\.[^.]+$/, '').trim() || 'Imported note';
   if (/\.html?$/i.test(name ?? '')) {
     const doc = new DOMParser().parseFromString(String(text ?? ''), 'text/html');

@@ -127,7 +127,7 @@ describe('FORMATS', () => {
   it('offers exactly Markdown, HTML and PDF', () => {
     // No CSV: Notion's CSV is for database views and Nebula has no table block,
     // so it would be an empty file with a confident name.
-    expect(FORMATS.map((f) => f.id)).toEqual(['md', 'html', 'pdf']);
+    expect(FORMATS.map((f) => f.id)).toEqual(['md', 'html', 'pdf', 'nebula']);
     expect(FORMATS.every((f) => f.label && f.ext)).toBe(true);
   });
 });

@@ -9,11 +9,12 @@
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
 import { normalizeLists, exitListOnEmptyItem, liftListItemAtStart } from './lists.js';
+import { blockFromNode, convertBlock } from './blocks.js';
 import { enterOutOfWrapper, backspaceOutOfWrapper } from './inline-format.js';
 import { applyInlineFamily, clearInlineFamilyAtCaret, cleanTypingMarkers } from './inline-family.js';
 import { initEquation } from './equation.js';
 import { on } from './bus.js';
-import { toMarkdown, toHtml, toPrintDocument, safeFileName, FORMATS } from './export.js';
+import { toMarkdown, toHtml, toPrintDocument, toNebulaNote, safeFileName, FORMATS } from './export.js';
 import { noteFromFile } from './import.js';
 
 /**
@@ -106,7 +107,7 @@ export function parseSize(raw) {
   return Math.min(400, Math.max(6, Math.round(n)));
 }
 
-export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onImport, onPaste } = {}) {
+export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTitle, onImport, onPaste } = {}) {
   const toolbar = document.getElementById('toolbar');
   const miniBar = document.getElementById('mini-bar');
   if (!toolbar || !editorEl) return null;
@@ -584,8 +585,13 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       await api.pdf({ suggested: safeFileName(title, 'pdf'), document: printDocument(title) });
       return;
     }
-    const content = format === 'html' ? toHtml(editorEl.innerHTML, title) : toMarkdown(editorEl.innerHTML, title);
-    await api.export({ suggested: safeFileName(title, format), content, format });
+    const fmt = FORMATS.find((f) => f.id === format);
+    const content = format === 'html'
+      ? toHtml(editorEl.innerHTML, title)
+      : format === 'nebula'
+        ? toNebulaNote({ title, content: editorEl.innerHTML })
+        : toMarkdown(editorEl.innerHTML, title);
+    await api.export({ suggested: safeFileName(title, fmt?.ext || format), content, format });
   }
 
   /**
@@ -758,6 +764,8 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
 
     const shapeKind = e.target.closest('[data-shape-add]')?.dataset.shapeAdd;
     if (shapeKind) { lastShape = shapeKind; insertShape(shapeKind); closeMenus(); }
+    const arrowKind = e.target.closest('[data-arrow-add]')?.dataset.arrowAdd;
+    if (arrowKind) { arrows?.add(arrowKind); closeMenus(); }
   }
   toolbar.addEventListener('click', toolbarClick);
   toolbarMenus.forEach((menu) => menu.addEventListener('click', toolbarClick));
@@ -823,7 +831,11 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
   outlineSel?.addEventListener('change', (e) => {
     // A <select> has to take focus to be used, which drops the editor's
     // selection — same trap as the size field.
-    withSelection(() => cmd('formatBlock', e.target.value === 'p' ? 'p' : e.target.value));
+    withSelection(() => {
+      const kind = e.target.value === 'p' ? 'text' : e.target.value;
+      const block = blockFromNode(window.getSelection()?.anchorNode, editorEl);
+      if (block && convertBlock(block, kind)) dirty();
+    });
   });
 
   const fontBtn = document.getElementById('tb-font');
@@ -1031,6 +1043,14 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       editorEl.querySelectorAll('hr.blk-hr.armed').forEach((h) => h.classList.remove('armed'));
       return;
     }
+    const insideText = (() => {
+      if (e.inputType !== 'deleteContentBackward') return false;
+      const caret = window.getSelection();
+      if (!caret?.rangeCount || !caret.isCollapsed) return false;
+      const node = caret.getRangeAt(0).startContainer;
+      return node.nodeType === Node.TEXT_NODE && caret.getRangeAt(0).startOffset > 0
+        && !!node.textContent.trim();
+    })();
     const statics = typeof e.getTargetRanges === 'function' ? e.getTargetRanges() : [];
     if (!statics.length) return;
     const live = statics.map((r) => {
@@ -1084,7 +1104,7 @@ export function initToolbar(editorEl, { onSave, shapes, history, noteTitle, onIm
       ...touching('hr.blk-hr'),
       ...(before?.classList?.contains('blk-hr') ? [before] : []),
     ])];
-    if (hrs.length === 1) {
+    if (!insideText && hrs.length === 1) {
       e.preventDefault();
       const hr = hrs[0];
 

@@ -3,6 +3,7 @@
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
 import { icon } from './icons.js';
+import { blockFromNode, convertBlock } from './blocks.js';
 
 export const SLASH_ITEMS = [
   { id: 'text', ic: 'text', label: 'Text' },
@@ -102,14 +103,27 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
   // whatever was typed before.
   history?.push();
   const exec = (n, v = null) => document.execCommand(n, false, v);
+  const block = blockFromNode(window.getSelection()?.anchorNode, editorEl);
+  const turned = block && convertBlock(block, id);
+  if (turned) {
+    const range = document.createRange();
+    range.selectNodeContents(turned);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    dirty();
+    return;
+  }
     switch (id) {
-      case 'text': exec('formatBlock', 'p'); break;
-      case 'h1': exec('formatBlock', 'h1'); break;
-      case 'h2': exec('formatBlock', 'h2'); break;
-      case 'h3': exec('formatBlock', 'h3'); break;
-      case 'quote': exec('formatBlock', 'blockquote'); break;
-      case 'bullet': exec('insertUnorderedList'); break;
-      case 'numbered': exec('insertOrderedList'); break;
+      case 'text':
+      case 'h1':
+      case 'h2':
+      case 'h3':
+      case 'quote':
+      case 'bullet':
+      case 'numbered':
+        break;
       case 'todo': exec('insertHTML', '<div class="blk-todo"><br></div>'); break;
       case 'divider': exec('insertHTML', '<hr class="blk-hr"><p><br></p>'); break;
       case 'code': insertCodeBlock(editorEl, 'javascript', history); break;

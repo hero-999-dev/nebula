@@ -72,16 +72,17 @@ describe('rich paste editing regressions', () => {
     expect(anchor.href).toBe('https://example.com/docs');
     expect(anchor.textContent).toBe(kind === 'url' ? anchor.href : '@example.com');
     expect(editor.querySelectorAll('p')).toHaveLength(1);
-    expect(editor.querySelector('iframe')).toBeNull();
+    expect(editor.querySelector('webview, iframe')).toBeNull();
     history.undo();
     expect(editor.textContent).toBe('before selected after');
   });
 
-  it('embeds only in an opaque sandbox with a permanent external fallback', () => {
+  it('embeds in a webview so sites that refuse frames can still load', () => {
     insert('embed');
-    const frame = editor.querySelector('iframe');
-    expect(frame.getAttribute('sandbox')).toBe('allow-scripts');
-    expect(frame.getAttribute('referrerpolicy')).toBe('no-referrer');
+    const frame = editor.querySelector('webview');
+    expect(frame.getAttribute('partition')).toBe('persist:embed');
+    expect(frame.getAttribute('webpreferences')).toContain('nodeIntegration=no');
+    expect(editor.querySelector('iframe')).toBeNull();
     expect(editor.querySelector('a').href).toBe(frame.src);
     expect(editor.querySelector('.link-embed-hint').textContent).toContain('do not allow');
   });
@@ -99,16 +100,16 @@ describe('rich paste editing regressions', () => {
     insert('embed');
     const exported = toHtml(editor.innerHTML);
     expect(exported).not.toContain('<iframe');
+    expect(exported).not.toContain('<webview');
     editor.innerHTML = sanitize(exported);
     rich.refresh();
     expect(editor.querySelectorAll('.link-del')).toHaveLength(1);
-    expect(editor.querySelector('iframe').getAttribute('sandbox')).toBe('allow-scripts');
+    expect(editor.querySelector('webview').getAttribute('webpreferences')).toContain('nodeIntegration=no');
     expect(toMarkdown(editor.innerHTML)).toContain('[example.com/docs](https://example.com/docs)');
-    // Old versions saved an Embed label and delete button, but no real frame.
-    editor.querySelector('iframe').remove();
+    editor.querySelector('webview').remove();
     rich.refresh(); rich.refresh();
-    expect(editor.querySelectorAll('iframe')).toHaveLength(1);
-    expect(editor.querySelector('iframe').getAttribute('sandbox')).toBe('allow-scripts');
+    expect(editor.querySelectorAll('webview')).toHaveLength(1);
+    expect(editor.querySelector('iframe')).toBeNull();
   });
 
   it('cancels an image decode if the active note changed', async () => {

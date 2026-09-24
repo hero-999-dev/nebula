@@ -10,6 +10,7 @@ import { initDock } from './dock.js';
 import { initToolbar } from './toolbar.js';
 import { initSlashMenu } from './slash-menu.js';
 import { initShapes } from './shapes.js';
+import { initArrows } from './arrows.js';
 import { initCodeBlocks, paintAllCode } from './codeblock.js';
 import { paintAllEquations } from './equation.js';
 import { initAiPanel } from './ai-panel.js';
@@ -139,9 +140,11 @@ async function boot() {
   });
   // Shapes first: the toolbar's shape buttons go through this controller so a
   // new shape arrives selected, with its colour bar already open.
-  const shapes = initShapes(editorEl, { history });
+  const shapes = initShapes(editorEl, { history, onGeometry: () => arrows?.reflow() });
+  const arrows = initArrows(editorEl, { history });
   const toolbar = initToolbar(editorEl, {
     shapes,
+    arrows,
     history,
     onPaste: () => richPaste?.paste(),
     onSave: () => { void saveCurrent().catch(showSaveError); },

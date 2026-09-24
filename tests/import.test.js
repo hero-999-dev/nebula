@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
 import {
   sanitize, fromMarkdown, titleFromMarkdown, titleFromHtml, noteFromFile,
 } from '../src/js/import.js';
+import { toNebulaNote } from '../src/js/export.js';
 
 describe('sanitize', () => {
   it('removes scripts, styles and frames entirely', () => {
@@ -116,5 +117,16 @@ describe('noteFromFile', () => {
     expect(note.content).toContain('<h2>Section</h2>');
     expect(note.content).toContain('<ul><li>one</li><li>two</li></ul>');
     expect(note.content).toContain('data-lang="js"');
+  });
+
+  it('opens a Nebula note file with its shapes and text intact', () => {
+    const file = toNebulaNote({
+      title: 'Ideas',
+      content: '<h1>Ideas</h1><div class="shape rect" data-kind="rect">box</div><script>bad()</script>',
+    });
+    const note = noteFromFile('Ideas.nebula.json', file);
+    expect(note.title).toBe('Ideas');
+    expect(note.content).toContain('data-kind="rect"');
+    expect(note.content).not.toContain('<script');
   });
 });

@@ -9,6 +9,12 @@ export const SHAPE_COLORS = ['#E8CDBD', '#D6E4D0', '#D3E0EA', '#E2D7E8', '#F0D2C
 
 export const SHAPE_KINDS = ['rect', 'square', 'ellipse', 'circle', 'diamond', 'triangle'];
 
+/** Degrees shown while a shape turns, rounded to the nearest whole degree. */
+export function formatAngle(deg) {
+  const n = Math.round(Number(deg) || 0);
+  return `${((n % 360) + 360) % 360}°`;
+}
+
 /** The kinds that must stay as wide as they are tall. */
 export const EQUILATERAL = new Set(['square', 'circle']);
 
@@ -98,12 +104,22 @@ export function addShape(editorEl, kind, history) {
   return shape;
 }
 
-export function initShapes(editorEl, { history } = {}) {
+export function initShapes(editorEl, { history, onGeometry } = {}) {
   if (!editorEl) return null;
   let drag = null;
   let selected = null;
 
   const dirty = () => editorEl.dispatchEvent(new Event('input', { bubbles: true }));
+
+  function showAngle(shape, deg) {
+    let label = shape.querySelector('.shape-angle');
+    if (!label) {
+      label = document.createElement('span');
+      label.className = 'shape-angle';
+      shape.appendChild(label);
+    }
+    label.textContent = formatAngle(deg);
+  }
 
   function select(el) {
     editorEl.querySelectorAll('.shape.sel').forEach((s) => s.classList.remove('sel'));
@@ -243,7 +259,9 @@ export function initShapes(editorEl, { history } = {}) {
       deg = Math.round(deg * 10) / 10;
       drag.el.dataset.rot = String(deg);
       drag.el.style.transform = deg ? `rotate(${deg}deg)` : '';
+      showAngle(drag.el, deg);
       positionBar();
+      onGeometry?.();
       return;
     }
     if (drag.kind === 'move') {
@@ -271,6 +289,7 @@ export function initShapes(editorEl, { history } = {}) {
       }
     }
     positionBar();
+    onGeometry?.();
   });
 
   /** The angle from a shape's centre to a point, in degrees. */
@@ -288,7 +307,7 @@ export function initShapes(editorEl, { history } = {}) {
     if (!drag) return;
     const { el, moved, wasSelected } = drag;
     drag = null;
-    if (moved) { dirty(); return; }
+    if (moved) { onGeometry?.(); dirty(); return; }
 
     // A press that never moved is a click. On a shape that was ALREADY
     // selected it means "let me at what is here": the shape's own text if the

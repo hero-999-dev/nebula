@@ -186,6 +186,7 @@ export function toHtml(html, title = 'Note') {
     eq.textContent = `$${eq.dataset.tex ?? ''}$`;
   });
   doc.body.querySelectorAll('[contenteditable]').forEach((el) => el.removeAttribute('contenteditable'));
+  doc.body.querySelectorAll('iframe, webview').forEach((el) => el.remove());
 
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return `<!doctype html>
@@ -233,7 +234,22 @@ export const FORMATS = [
   { id: 'md', label: 'Markdown (.md)', ext: 'md' },
   { id: 'html', label: 'HTML (.html)', ext: 'html' },
   { id: 'pdf', label: 'PDF (.pdf)', ext: 'pdf' },
+  { id: 'nebula', label: 'Nebula note (.nebula.json)', ext: 'nebula.json' },
 ];
+
+/** The open note, as the JSON another Nebula can open without losing shapes or embeds. */
+export function toNebulaNote({ title = '', content = '' } = {}) {
+  return `${JSON.stringify({ nebula: 1, title, content }, null, 2)}\n`;
+}
+
+/** @returns {{title: string, content: string}|null} */
+export function fromNebulaNote(text) {
+  let data;
+  try { data = JSON.parse(String(text ?? '')); } catch { return null; }
+  if (!data || data.nebula !== 1 || typeof data.content !== 'string') return null;
+  const content = data.content.replace(/<script[\s\S]*?<\/script>/gi, '');
+  return { title: String(data.title ?? 'Imported note'), content };
+}
 
 /**
  * A standalone document for the PDF writer.
@@ -255,7 +271,7 @@ export function toPrintDocument({ title = 'Untitled', body = '', css = '', margi
   const doc = parse(body);
   // Nothing executable travels into the print window. It has JavaScript turned
   // off as well; this is the belt to that pair of braces.
-  doc.body.querySelectorAll('script, iframe, object, embed, link, meta').forEach((el) => el.remove());
+  doc.body.querySelectorAll('script, iframe, webview, object, embed, link, meta').forEach((el) => el.remove());
   doc.body.querySelectorAll('*').forEach((el) => {
     for (const attr of [...el.attributes]) {
       if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);

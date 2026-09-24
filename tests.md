@@ -4,7 +4,7 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 370 passing — `npm test` (Vitest, jsdom) |
+| **Unit** | 382 passing — `npm test` (Vitest, jsdom) |
 | **Electron smoke** | 231 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
@@ -28,6 +28,8 @@ are not covered; see [ProjectNotes.md](ProjectNotes.md).
 
 | File | Tests | Proves |
 |---|---|---|
+| `tests/blocks.test.js` | 4 | A slash heading or list changes one block, and a divider nested in a list is lifted out |
+| `tests/arrows.test.js` | 7 | Straight, elbow and curve paths, the nearest attach point, and the degree readout |
 | `tests/notes.test.js` | 20 | `NoteStore` seeds once (not once per note), creates/switches/updates, refuses to delete the last note, filters title + body, and adds the guide to an older vault exactly once without touching what is there |
 | `tests/editor.test.js` | 41 | Toolbar actions, outline formats, indent, underline styles, code blocks, shapes, slash menu, icons, the font stacks, and the guide note's completeness |
 | `tests/lists.test.js` | 36 | The tree Chromium's list commands actually leave behind, and leaving a list from an empty item |

@@ -94,6 +94,10 @@ export function initAiPanel({ askText } = {}) {
     if (!service) return;
     active = id;
     localStorage.setItem(ACTIVE_KEY, id);
+    const browser = document.getElementById('ai-browser');
+    if (browser) {
+      browser.onclick = () => { void window.nebula?.openExternal?.(service.url); };
+    }
     renderTabs();
     // NOT `hidden`. A <webview> with display:none is detached from its guest and
     // reloads when it comes back, which logs you out of the site you had just

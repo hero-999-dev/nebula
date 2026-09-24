@@ -13,6 +13,18 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.8.3': {
+    headline: 'Slash commands stay on one line, and a note can move to another Nebula.',
+    items: [
+      { title: 'Headings and lists stay put', text: 'A slash command changes only the line you are on. A divider no longer slides inside a list, and Backspace deletes a slash instead of jumping to the rule.' },
+      { title: 'Headings line up with the text', text: 'Heading 1, 2 and 3 start at the same left edge as a paragraph.' },
+      { title: 'The window buttons match the bar', text: 'Minimise, maximise and close sit on the same strip as the menus, and the line under them runs along the bottom.' },
+      { title: 'Shapes show their angle', text: 'While you turn a shape, the angle is shown in degrees.' },
+      { title: 'Arrows', text: 'Straight, elbow and curved arrows sit with the shapes. Drag either end onto a shape, a link, an image or a line of text.' },
+      { title: 'Embeds open the real page', text: 'An embed loads in its own view, so a site that refuses a frame can still show its page and its sign-in form. If a chat still calls this app insecure, use Sign in in browser.' },
+      { title: 'Move a note intact', text: 'Export as a Nebula note and import that file in the other copy. Shapes, images and embeds come with it. Older notes are repaired when you open them.' },
+    ],
+  },
   // v0.8.1 was tagged but its Mac CI check failed, so it never published;
   // these notes ship with the next release instead.
   '0.8.2': {

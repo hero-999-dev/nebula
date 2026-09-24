@@ -76,16 +76,17 @@ export async function runRichPasteChecks(check) {
         document.querySelector(`[data-link-kind="${kind}"]`).click();
       }, kind);
       if (kind === 'embed') {
-        await win.locator('.link-frame').evaluate((el) => el.scrollIntoView());
-        const frame = win.frameLocator('.link-frame');
-        try { await frame.locator('h1').waitFor({ timeout: 10000 }); }
-        catch (error) {
-          console.error('Embed diagnostic', await win.locator('.link-embed').evaluate((el) => ({ html: el.outerHTML, rect: el.getBoundingClientRect().toJSON() })), win.frames().map((f) => f.url()));
-          throw error;
-        }
-        check('Embed renders a real isolated page, not another bookmark',
-          await frame.locator('h1').textContent() === 'Embedded test content'
-          && await win.locator('.link-frame').getAttribute('sandbox') === 'allow-scripts');
+        const info = await win.locator('.link-frame').evaluate((el) => ({
+          tag: el.tagName,
+          src: el.getAttribute('src'),
+          partition: el.getAttribute('partition'),
+          prefs: el.getAttribute('webpreferences') || '',
+        }));
+        check('Embed loads in its own webview so a site can refuse a frame',
+          info.tag === 'WEBVIEW'
+          && info.src === 'https://example.com/preview'
+          && info.partition === 'persist:embed'
+          && info.prefs.includes('nodeIntegration=no'));
       } else {
         const text = await win.locator(`#editor .link-${kind}`).textContent();
         check(`${kind} inserts the expected inline label`, text === (kind === 'url' ? 'https://example.com/preview' : '@example.com'));

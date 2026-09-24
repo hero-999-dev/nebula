@@ -4,6 +4,29 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-24 17:54] v0.8.3 - by release-script
+
+Slash stays on one line; arrows, embed webview, Nebula note transfer.
+
+* (no commits since the last release)
+
+---
+
+## [2026-09-24 06:55] v0.8.3 - by Cursor
+
+The Ideas note: slash commands, the title bar, arrows, embeds, and moving a note.
+
+* A slash heading or list changes only the line under the caret. A divider nested in a list or heading is lifted out when the note opens.
+* Backspace in the middle of a line, including on a slash, deletes that character instead of arming the divider above.
+* Headings have no extra left padding. The Windows caption overlay is 37px tall so its colour matches the bar and the bottom rule is not drawn through the buttons.
+* Rotating a shape shows the angle. Straight, elbow and curved arrows can be dragged and their ends can attach to a shape, link, image or text block.
+* Embed uses a webview with its own partition, so a page that refuses an iframe can still load. Chat sign-in that still rejects the embedded browser can be opened with Sign in in browser.
+* Export and import a Nebula note (`.nebula.json`) so the installed vault's note can be opened in Nebula Test without losing shapes or images.
+* Not pushed. Waiting for the owner to try `Nebula Test.exe`.
+
+---
+
 ## [2026-09-23 17:34] v0.8.2 - by Claude
 
 Publish the v0.8.1 audit: fix the Mac CI lipo check
