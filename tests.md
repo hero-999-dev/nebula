@@ -27,7 +27,7 @@ A different kind of test: not "does this handler work" but "can Nebula write thi
 | 0.8.4 | 65.2% | Enter could not leave a quote, so the rest of the note was quoted; italic came back after Enter; videos embedded the watch page |
 | 0.8.5 | 100% | All of the above fixed; links on words (44/44) and image captions (6/6) built; /divider no longer nests in an empty line |
 
-Reports, screens and the rebuilt note stay in `test-results/` (gitignored): they hold the article.
+Reports, screens and the rebuilt note stay in `test-results/` (gitignored): they hold the article. The rebuilt note is also written into Nebula Test's vault (`Nebula-data`, gitignored) as `rebuild-<page>`, replaced on every run, so Nebula Test always shows the page as the current version wrote it (`--no-vault` skips this).
 
 ### `tests/e2e/rebuild-findings.mjs` (in smoke, 11 checks)
 
