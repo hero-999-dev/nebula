@@ -834,6 +834,10 @@
   vector-effect: non-scaling-stroke;
 }
 .shape.no-outline .shape-svg polygon { stroke: none; }
+/* Selected, the diamond and the triangle outline their own edges, as the box
+   and the ellipse do — not a rectangle around them (0.8.9). */
+.shape.diamond.sel, .shape.triangle.sel { box-shadow: none; }
+.shape.diamond.sel .shape-svg polygon, .shape.triangle.sel .shape-svg polygon { stroke: var(--clay); stroke-width: 2.5; }
 .shape.diamond .shape-text, .shape.triangle .shape-text { position: relative; z-index: 1; }
 .shape.diamond .shape-text { max-width: 55%; }
 .shape.no-outline { border-color: transparent; }
@@ -883,7 +887,6 @@
   border-radius: 3px 0 0 0;
   cursor: nwse-resize;
 }
-.shape.diamond .shape-h { right: calc(50% - 6px); bottom: 2px; }
 
 /* Turn the shape. Bottom-left, opposite the resize grip at the bottom-right,
    so the two are never mistaken for each other. */
@@ -905,7 +908,6 @@
   border-right-color: transparent;
   border-radius: 50%;
 }
-.shape.diamond .shape-rot { left: calc(50% - 6px); top: 2px; bottom: auto; }
 
 .shape-angle {
   position: absolute;
@@ -932,6 +934,8 @@
 }
 .note-arrow .arrow-line { pointer-events: stroke; }
 .note-arrow.is-selected .arrow-line { stroke: var(--clay); stroke-width: 2.4; }
+/* What a dragged arrow end will hold on to when released (0.8.9). */
+.arrow-target { outline: 2px dashed var(--clay); outline-offset: 4px; }
 .note-arrow .arrow-end {
   pointer-events: all;
   fill: var(--paper-raised);

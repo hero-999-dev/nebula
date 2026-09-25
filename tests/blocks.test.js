@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { convertBlock, liftNestedDividers, blockFromNode, exitQuoteOnEmptyLine } from '../src/js/blocks.js';
+import { convertBlock, liftNestedDividers, blockFromNode, exitQuoteOnEmptyLine, tidyAfterDelete, beforeDelete } from '../src/js/blocks.js';
 
 const root = (html) => {
   const el = document.createElement('div');
@@ -109,5 +109,59 @@ describe('exitQuoteOnEmptyLine', () => {
     const el = mount('<blockquote>text</blockquote><p><br></p>');
     expect(exitQuoteOnEmptyLine(el, caretIn(el.querySelector('blockquote').firstChild))).toBe(false);
     expect(exitQuoteOnEmptyLine(el, caretIn(el.querySelector('p')))).toBe(false);
+  });
+});
+
+describe('tidyAfterDelete (long-note trials, 0.8.9)', () => {
+  const setup = (html, pick) => {
+    document.body.innerHTML = `<div id="ed">${html}</div>`;
+    const root = document.getElementById('ed');
+    const [node, offset] = pick(root);
+    const r = document.createRange(); r.setStart(node, offset); r.collapse(true);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    return { root, sel };
+  };
+
+  it('unwraps the style span Chromium leaves when two lines are joined, keeping the caret', () => {
+    const { root, sel } = setup('<p>stands apart <span style="font-style: normal;">from the text</span></p>',
+      (ed) => [ed.querySelector('span').firstChild, 4]);
+    expect(tidyAfterDelete(root, sel)).toBe(true);
+    expect(root.innerHTML).toBe('<p>stands apart from the text</p>');
+    const r = sel.getRangeAt(0);
+    expect(r.startContainer.nodeValue).toBe('from the text');
+    expect(r.startOffset).toBe(4);
+  });
+
+  it('leaves Nebula\'s own classed spans alone', () => {
+    const { root, sel } = setup('<p>a <span class="u-single" style="x">b</span></p>', (ed) => [ed.querySelector('p').firstChild, 1]);
+    expect(tidyAfterDelete(root, sel)).toBe(false);
+    expect(root.querySelector('.u-single')).not.toBeNull();
+  });
+
+  it('joins the two lists a lifted and re-merged item left behind', () => {
+    const { root, sel } = setup('<ul><li>one two</li></ul><ul><li>three</li></ul>', (ed) => [ed.querySelector('li').firstChild, 3]);
+    expect(tidyAfterDelete(root, sel)).toBe(true);
+    expect(root.innerHTML).toBe('<ul><li>one two</li><li>three</li></ul>');
+  });
+
+  it('does not join lists of different kinds', () => {
+    const { root, sel } = setup('<ul><li>one</li></ul><ol><li>two</li></ol>', (ed) => [ed.querySelector('li').firstChild, 1]);
+    expect(tidyAfterDelete(root, sel)).toBe(false);
+  });
+});
+
+describe('tidyAfterDelete puts back a span Chromium dropped (0.8.9)', () => {
+  it('rewraps the upright words of a quote after Enter and Backspace joined it', () => {
+    document.body.innerHTML = '<div id="ed"><blockquote>tam anlamıyla görünüyor<span style="font-style: normal;">.</span></blockquote></div>';
+    const root = document.getElementById('ed');
+    const before = beforeDelete(root);
+    before.blocks += 1;                                   // there were two quotes before the join
+    root.querySelector('blockquote').innerHTML = 'tam anlamıyla görünüyor.';
+    const t = root.querySelector('blockquote').firstChild;
+    const r = document.createRange(); r.setStart(t, 4); r.collapse(true);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    expect(tidyAfterDelete(root, sel, before)).toBe(true);
+    expect(root.innerHTML).toBe('<blockquote>tam anlamıyla görünüyor<span style="font-style: normal;">.</span></blockquote>');
+    expect(sel.getRangeAt(0).startOffset).toBe(4);
   });
 });

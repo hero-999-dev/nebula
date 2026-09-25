@@ -70,6 +70,7 @@ export function buildMenus(ctx) {
         { id: 'view.ai', label: 'Toggle AI panel', run: () => toggleAi?.() },
         { separator: true },
         { id: 'view.fullscreen', label: 'Full screen', hint: 'F11', run: () => shell?.window?.fullscreen() },
+        { id: 'view.snapshot', label: 'Window snapshot', hint: 'F12', run: () => window.nebula?.window?.snapshot?.() },
         { id: 'view.devtools', label: 'Developer tools', run: () => shell?.view?.devtools() },
       ],
     },

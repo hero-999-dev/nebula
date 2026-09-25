@@ -219,7 +219,7 @@ if (!fs.existsSync(rebuildScript)) {
   console.log('\n> npm run rebuild');
   process.env.NEBULA_REBUILD_VERSION = version;
   const code = runSoft('node', [rebuildScript]);
-  if (code === 1) fail('The page rebuild scored lower than the previous version. Nothing was committed.\n  See test-results/rebuild/ for what went down.');
+  if (code === 1) fail('The page rebuild scored lower than the previous version, or a long-note trial failed in a rebuilt article. Nothing was committed.\n  See the output above and test-results/rebuild/.');
   if (code === 3) console.warn('\n  ! page rebuild skipped: no source (offline, nothing cached).\n');
   else if (code !== 0) console.warn(`\n  ! page rebuild could not finish (exit ${code}); not blocking the release.\n`);
 }

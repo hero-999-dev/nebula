@@ -24,6 +24,9 @@ export async function runRichPasteChecks(check) {
     await win.waitForTimeout(500);
 
     const prepareBlank = () => win.evaluate(() => {
+      // A fresh vault opens its guide in Only view (0.8.9); unlock it with the badge.
+      const chip = document.getElementById('readonly-chip');
+      if (chip && !chip.hidden) chip.click();
       const editor = document.getElementById('editor');
       editor.innerHTML = '<p><br></p>';
       const text = editor.querySelector('p').firstChild;

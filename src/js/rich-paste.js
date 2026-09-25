@@ -912,8 +912,22 @@ export function initRichPaste(editor, { history, onGeometry } = {}) {
       event.preventDefault();
       event.stopPropagation();
       history?.push();
+      // An image in the text leaves the caret where the image was: at the end
+      // of the line it went under. The caret stayed wherever the click had
+      // left it, and the next word typed landed at the end of the note
+      // (long-note trials, 0.8.9).
+      const inText = selectedImage.classList.contains('note-image--inline');
+      const above = inText ? selectedImage.previousElementSibling : null;
       selectedImage.remove();
       selectImage(null);
+      if (above && !above.matches('.shape-layer, .image-layer, .note-image, .link-block, .blk-code, hr')) {
+        const r = document.createRange();
+        r.selectNodeContents(above);
+        r.collapse(false);
+        editor.focus({ preventScroll: true });
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(r);
+      }
       dirty();
     }
   }, true);

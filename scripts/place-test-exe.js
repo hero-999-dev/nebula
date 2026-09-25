@@ -45,6 +45,33 @@ if (place()) {
   }
 }
 
+/**
+ * The guide is regenerated with every build (owner, 0.8.9): Nebula Test's vault
+ * gets this version's "Welcome to Nebula Guide", locked, in place of whatever it
+ * had — so the page opened in the test build is always the page this build
+ * ships. tests/e2e/guide.mjs checks that same page in the app on every smoke run.
+ */
+async function regenerateGuide() {
+  const { GUIDE_NOTE } = await import(new URL('../src/js/seed-notes.js', import.meta.url).href);
+  const dir = path.join(ROOT, 'Nebula-data', 'storage', 'notes');
+  fs.mkdirSync(dir, { recursive: true });
+  const now = Date.now();
+  let written = 0;
+  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const full = path.join(dir, file);
+    let note;
+    try { note = JSON.parse(fs.readFileSync(full, 'utf8')); } catch { continue; }
+    if (note?.title !== GUIDE_NOTE.title || note.deletedAt) continue;
+    fs.writeFileSync(full, JSON.stringify({ ...note, content: GUIDE_NOTE.content, readOnly: true, updatedAt: now }));
+    written += 1;
+  }
+  if (!written) {
+    fs.writeFileSync(path.join(dir, 'n-guide.json'), JSON.stringify({ id: 'n-guide', title: GUIDE_NOTE.title, content: GUIDE_NOTE.content, readOnly: true, createdAt: now, updatedAt: now }));
+  }
+  console.log(`  Guide regenerated in Nebula Test (${written || 'new'}).`);
+}
+await regenerateGuide();
+
 const mb = (fs.statSync(placed).size / 1024 / 1024).toFixed(1);
 console.log(`\n  Nebula Test.exe  ${mb} MB  in ${ROOT}`);
 console.log(`  Double-click it. Its notes live in ${path.join(ROOT, 'Nebula-data')}`);

@@ -33,6 +33,7 @@
       <div class="note-menu" id="note-menu" hidden>
         <button type="button" data-note-act="pin"></button>
         <button type="button" data-note-act="archive"></button>
+        <button type="button" data-note-act="readonly" role="menuitemcheckbox" aria-checked="false"><span class="nm-check" aria-hidden="true"></span>Only view</button>
         <button type="button" data-note-act="trash">Move to trash</button>
       </div>
 
@@ -67,6 +68,7 @@
       <div class="demo-banner" id="demo-banner" hidden>Browser preview — notes stay in memory only. Use the desktop app for disk storage.</div>
       <header class="page-head">
         <input id="title" class="title-input" placeholder="Untitled" autocomplete="off" spellcheck="true" />
+        <button type="button" class="readonly-chip" id="readonly-chip" hidden title="This note is view-only. Click to allow editing.">🔒 Only view</button>
         <span class="savestate" id="savestate"></span>
         <div class="pad" id="pad" role="group" aria-label="Move the editing bar">
           <button type="button" data-pad="top"    title="Editing bar: top"><span data-icon="up"></span></button>
@@ -222,6 +224,7 @@
     </aside>
   </div>
 
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <div id="mini-bar" class="mini-bar" hidden>
     <button type="button" data-act="bold" title="Bold"><span data-icon="bold"></span></button>
     <button type="button" data-act="italic" title="Italic"><span data-icon="italic"></span></button>

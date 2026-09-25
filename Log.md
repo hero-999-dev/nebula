@@ -5,6 +5,31 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+## [2026-09-26 00:15] v0.8.9 - by Claude
+
+Only view, arrows that snap on, F12 window snapshot, diamond/triangle outlines, a fuller guide with dividers; long-note trials and the undo, Backspace, underline and block fixes they found.
+
+* (no commits since the last release)
+
+---
+
+## [2026-09-25 19:30] v0.8.9 - by Claude
+
+The owner's list for the guide, shapes, arrows and a snapshot key.
+
+* **Only view.** A note's ⋯ menu has an *Only view* checkbox; the 🔒 badge by the title shows it and unlocks it with a click. The note still reads, scrolls, selects, copies, opens links with Ctrl+click and plays its videos. `contenteditable` alone was not enough — code, shape text and captions are editable islands, and the app's own Enter/Backspace/drag handlers edit by script — so the lock is in the capture phase (input, keys, paste, cut, drop, the handles of shapes, pictures and arrows), in the toolbar's actions and in undo/redo. The guide seeds, and refreshes, locked.
+* **Arrows snap on,** XMind-style: an end brought inside an object or within 28px of its edge is outlined and snaps to its side while still being dragged; letting go joins them. Before, it had to be dropped within 18px of the target's centre. Objects win over text, and with the pointer over several, the one painted on top; a text line only holds an end from inside.
+* **Shapes.** Selected, the diamond and the triangle outline their own edges instead of a box ring; the diamond's turn and resize handles sit at the bottom corners like every other shape's.
+* **F12** saves a picture of the window as a PNG in Pictures\\Nebula and copies it; a toast says where. Caught in the main process on every web contents, so it works with the focus inside an embed too.
+* **The guide** now covers every part of the app (the window, the note list and ⋯ menu, Only view, find, palette, undo, the / menu, quotes and dividers, all four ways of pasting a link, import/export/print), and its order is the owner's: Where your notes live is 9, Code blocks 10 and last, Markdown the first sample. From now on new features go in above Code blocks.
+* The guide has a divider before every section heading, and it is regenerated with every build: `pack:test` writes this build's guide, locked, into Nebula Test's vault, and the new smoke module `tests/e2e/guide.mjs` (8 checks) opens it in the app — locked, a divider before each section and never two in a row, Where your notes live and Code blocks last with Markdown first, every sample coloured, every equation typeset, the shapes clear of the text at three widths, no page error.
+* New smoke module `tests/e2e/view-snap.mjs` (22 checks).
+
+---
+
+
+
+
 ## [2026-09-25 07:51] v0.8.8 - by Claude
 
 Pictures and shapes on one canvas, sharper videos, Rust, and the link menu by keyboard.

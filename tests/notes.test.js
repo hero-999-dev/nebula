@@ -143,6 +143,19 @@ describe('NoteStore.ensureGuide', () => {
     expect(store.notes[0].content).toBe('<p>my own words</p>');
   });
 
+  it('a locked guide arrives locked, new or refreshed (0.8.9)', () => {
+    const locked = { ...GUIDE, readOnly: true };
+    const fresh = new NoteStore({ allowSeed: false });
+    fresh.ensureGuide(locked, '3.0.0');
+    expect(fresh.notes[0].readOnly).toBe(true);
+    localStorage.clear();
+    const old = new NoteStore({ allowSeed: false });
+    old.notes = [{ id: 'g', title: GUIDE.title, content: '<p>old</p>', createdAt: 1, updatedAt: 1 }];
+    old.save();
+    old.ensureGuide(locked, '3.0.0', { unedited: () => true });
+    expect(old.notes[0].readOnly).toBe(true);
+  });
+
   it('refuses without a note or a version rather than writing junk', () => {
     const store = new NoteStore({ allowSeed: false });
     expect(store.ensureGuide(null, '1.0.0')).toBe(false);
@@ -212,5 +225,26 @@ describe('NoteStore.filter searches the whole note', () => {
     store.notes = [{ id: 'a', title: 'N', content: '<div class="shape-layer"><div class="shape-text">zebra</div></div><p>hi</p>', createdAt: 1, updatedAt: 1 }];
     expect(store.filter('zebra')).toEqual([]);
     expect(store.filter('hi').map((n) => n.id)).toEqual(['a']);
+  });
+});
+
+describe('Only view (0.8.9)', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('toggles a note locked and back without counting as an edit', () => {
+    const store = new NoteStore({ allowSeed: false });
+    store.notes = [{ id: 'a', title: 'A', content: 'x', createdAt: 1, updatedAt: 5 }];
+    store.save();
+    store.toggleReadOnly('a');
+    expect(store.get('a').readOnly).toBe(true);
+    expect(store.get('a').updatedAt).toBe(5);
+    store.setReadOnly('a', false);
+    expect(store.get('a').readOnly).toBe(false);
+  });
+
+  it('the seeded guide opens locked', () => {
+    const store = new NoteStore();
+    expect(store.notes[0].title).toBe('Welcome to Nebula Guide');
+    expect(store.notes[0].readOnly).toBe(true);
   });
 });

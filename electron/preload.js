@@ -40,6 +40,12 @@ contextBridge.exposeInMainWorld('nebula', {
     maximize: () => ipcRenderer.invoke('window:maximize'),
     close: () => ipcRenderer.invoke('window:close'),
     fullscreen: () => ipcRenderer.invoke('window:fullscreen'),
+    snapshot: () => ipcRenderer.invoke('window:snapshot'),
+    onSnapshot: (handler) => {
+      const listener = (_e, result) => handler(result);
+      ipcRenderer.on('window:snapshot-taken', listener);
+      return () => ipcRenderer.off('window:snapshot-taken', listener);
+    },
     state: () => ipcRenderer.invoke('window:state'),
     overlay: (colors) => ipcRenderer.invoke('window:overlay', colors),
     onChanged: (fn) => {

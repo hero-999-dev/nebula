@@ -18,8 +18,10 @@ export async function runRecoveryChecks(check) {
       dialog.showMessageBox = async () => ({ response: 0 });
       BrowserWindow.getAllWindows()[0].setTitle('Nebula automated test - temporary notes');
     });
-    await win.waitForFunction(() => document.querySelector('.note-row.active') && document.querySelector('#editor')?.isContentEditable,
-      null, { polling: 50, timeout: 20_000 });
+    await win.waitForFunction(() => document.querySelector('.note-row.active'), null, { polling: 50, timeout: 20_000 });
+    // A fresh vault's guide opens in Only view (0.8.9); unlock it with the badge.
+    await win.evaluate(() => { const chip = document.getElementById('readonly-chip'); if (chip && !chip.hidden) chip.click(); });
+    await win.waitForFunction(() => document.querySelector('#editor')?.isContentEditable, null, { polling: 50, timeout: 20_000 });
     // The card opens only once the version IPC answers, after the note list is
     // drawn; under a loaded full smoke run that lands after an early close.
     await win.waitForFunction(() => !document.getElementById('ov-whats-new')?.hidden, null, { polling: 50, timeout: 5000 }).catch(() => {});
@@ -131,7 +133,7 @@ export async function runRecoveryChecks(check) {
       JSON.stringify({ edgeScroll, edgeScrollDuring, beforeY: edgeBefore.y, duringY: edgeDuring.y }));
     await press('[data-shape="del"]');
     check('deleting the last shape releases its reserved canvas space', await win.evaluate(() =>
-      !document.querySelector('#editor .shape') && !document.querySelector('#editor .shape-layer').style.minHeight));
+      !document.querySelector('#editor .shape') && !document.querySelector('#editor .shape-layer')?.style.minHeight));
 
     // Read the user's reported note only if supplied; never write its vault or
     // put its contents into a committed fixture.

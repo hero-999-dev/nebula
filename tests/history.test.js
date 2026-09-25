@@ -65,6 +65,24 @@ describe('paths survive innerHTML', () => {
   });
 });
 
+describe('pictures in the stack (0.8.9)', () => {
+  it('keeps many steps of a note whose pictures alone are over the size ceiling', () => {
+    const picture = `data:image/png;base64,${'A'.repeat(3_000_000)}`;
+    mount(`<p>start</p><figure class="note-image"><img src="${picture}"></figure>`);
+    const h = initHistory(editor);
+    for (let i = 1; i <= 5; i++) {
+      h.push();
+      editor.querySelector('p').textContent = `step ${i}`;
+    }
+    h.commit();
+    expect(h.depth().past).toBe(5);
+    expect(h.bytes()).toBeLessThan(10_000);
+    for (let i = 0; i < 5; i++) h.undo();
+    expect(editor.querySelector('p').textContent).toBe('start');
+    expect(editor.querySelector('img').getAttribute('src')).toBe(picture);
+  });
+});
+
 describe('the caret', () => {
   it('is restored to the same character after a round trip', () => {
     mount('<p>hello world</p>');
@@ -76,6 +94,37 @@ describe('the caret', () => {
     const now = window.getSelection().getRangeAt(0);
     expect(now.startContainer.nodeValue).toBe('hello world');
     expect(now.startOffset).toBe(6);
+  });
+
+  // Typing and pasting split text nodes and leave empty ones; parsing the saved
+  // HTML merges and drops them. The caret must land on the same character.
+  it('survives split and empty text nodes, which the saved HTML does not have', () => {
+    mount('<blockquote></blockquote>');
+    const q = editor.firstChild;
+    const link = document.createElement('a');
+    link.textContent = '@example.com';
+    q.append('A quote ', 'stands apart ', '', link, 'from the text.');
+    const sel = window.getSelection();
+    const r = document.createRange();
+    r.setStartAfter(link); r.collapse(true);           // (blockquote, 4) live; (blockquote, 2) parsed
+    sel.removeAllRanges(); sel.addRange(r);
+    const saved = readCaret(editor, sel);
+    editor.innerHTML = editor.innerHTML;
+    expect(writeCaret(editor, saved, sel)).toBe(true);
+    const now = sel.getRangeAt(0);
+    expect(now.startContainer).toBe(editor.firstChild);
+    expect(editor.firstChild.childNodes[now.startOffset - 1].textContent).toBe('@example.com');
+
+    // Inside the second of two text nodes: counted from the start of the merged one.
+    mount('<p></p>');
+    editor.firstChild.append('A quote ', 'stands apart');
+    const second = document.createRange();
+    second.setStart(editor.firstChild.childNodes[1], 7); second.collapse(true);
+    sel.removeAllRanges(); sel.addRange(second);
+    const inRun = readCaret(editor, sel);
+    editor.innerHTML = editor.innerHTML;
+    writeCaret(editor, inRun, sel);
+    expect(sel.getRangeAt(0).startOffset).toBe(15);    // "A quote stands |apart"
   });
 
   it('clamps an offset the text is now too short for, rather than throwing', () => {
@@ -239,6 +288,22 @@ describe('typing is one step, not one per character', () => {
     expect(h.depth().past).toBe(1);
     h.undo();
     expect(editor.innerHTML).toBe('<p>one</p>');   // the whole run, at once
+    vi.useRealTimers();
+  });
+
+  it('undo and redo do nothing while the note is locked (Only view, 0.8.9)', () => {
+    let locked = false;
+    const h = initHistory(editor, { isLocked: () => locked });
+    h.typed();
+    editor.innerHTML = '<p>one two</p>';
+    vi.advanceTimersByTime(TYPING_COALESCE_MS + 10);
+    locked = true;
+    expect(h.undo()).toBe(false);
+    expect(editor.innerHTML).toBe('<p>one two</p>');
+    locked = false;
+    expect(h.undo()).toBe(true);
+    locked = true;
+    expect(h.redo()).toBe(false);
     vi.useRealTimers();
   });
 

@@ -37,6 +37,7 @@ export function migrateNote(root, { fitShape } = {}) {
   // 0.8.3 saved the rotation readout ("285°") into the shape it labelled.
   root.querySelectorAll('.shape-angle').forEach((label) => label.remove());
   root.querySelectorAll('.note-arrow.is-selected').forEach((arrow) => arrow.classList.remove('is-selected'));
+  root.querySelectorAll('.arrow-target').forEach((el) => el.classList.remove('arrow-target'));
   normalizeProse(root);
   normalizeUnderlineInk(root);
   return {

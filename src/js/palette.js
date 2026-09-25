@@ -16,6 +16,7 @@ export const SHORTCUTS = [
     ['Ctrl+F', 'Find in this note'],
     ['Ctrl+K', 'Command palette'],
     ['Ctrl+P', 'Print'],
+    ['F12', 'Window snapshot (saved and copied)'],
   ]],
   ['Writing', [
     ['Ctrl+B', 'Bold'],

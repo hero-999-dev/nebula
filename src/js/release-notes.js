@@ -13,6 +13,20 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.8.9': {
+    headline: 'Lock a note to read it, arrows that snap on, and F12 for a picture of the window.',
+    items: [
+      { title: 'Only view', text: 'Tick Only view in a note\'s ⋯ menu and it can be read, copied and played but not changed. The guide starts that way; the 🔒 badge by the title unlocks it.' },
+      { title: 'Arrows snap on', text: 'Bring an arrow\'s end near a shape, a picture or a link card: it is outlined and the end takes hold of its side. Let go and they stay joined.' },
+      { title: 'F12', text: 'Takes a picture of the window, saves it in Pictures\\Nebula and copies it.' },
+      { title: 'Diamonds and triangles', text: 'Selected, they outline their own edges, and a diamond\'s handles sit at its corners like every other shape\'s.' },
+      { title: 'A fuller guide', text: 'Welcome to Nebula Guide now covers every part of the app, from the ⋯ menu and the / menu to every way of pasting a link, with a divider between its sections.' },
+      { title: 'Undo in long notes', text: 'Ctrl+Z goes back step by step in a note full of pictures (it used to stop after one), and after Ctrl+Z or Ctrl+Y the caret is where the change was, so the next key does not land in other words.' },
+      { title: 'Backspace gives the line back', text: 'Enter and then Backspace leaves the line as it was: no stray styles, and a list stays one list. An emptied code block goes with Backspace, and after deleting a divider or a picture the caret is back on your line.' },
+      { title: 'Ctrl+U as you type', text: 'Ctrl+U with nothing selected underlines what you type next, like Ctrl+B and Ctrl+I.' },
+      { title: 'No blank line above new blocks', text: '/todo and /code take the place of the empty line they were typed on.' },
+    ],
+  },
   // 0.8.7 was a test build only; its notes ship here.
   '0.8.8': {
     headline: 'Pictures and shapes share one canvas, and videos are sharp.',

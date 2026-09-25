@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, dialog, shell, ipcMain, session } from 'electron';
+import { app, BrowserWindow, Menu, dialog, shell, ipcMain, session, clipboard } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
@@ -396,6 +396,7 @@ function registerShellHandlers() {
     const win = from(e);
     return { maximized: !!win?.isMaximized(), fullScreen: !!win?.isFullScreen() };
   });
+  ipcMain.handle('window:snapshot', (e) => takeSnapshot(from(e)));
   ipcMain.handle('window:fullscreen', (e) => {
     const win = from(e);
     if (!win) return false;
@@ -607,6 +608,45 @@ function registerShellHandlers() {
     }
   });
 }
+
+/**
+ * F12: a picture of the window (0.8.9). Saved as a PNG in Pictures\Nebula and
+ * put on the clipboard. Caught in the main process on every web contents —
+ * the window and each embedded page or video — so it works wherever the
+ * focus is; a key listener in the page would miss it inside an embed.
+ */
+export function snapshotName(date = new Date()) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `Nebula ${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}.${p(date.getMinutes())}.${p(date.getSeconds())}.png`;
+}
+
+async function takeSnapshot(win) {
+  if (!win || win.isDestroyed()) return { ok: false };
+  try {
+    const image = await win.webContents.capturePage();
+    clipboard.writeImage(image);
+    // NEBULA_SNAPSHOT_DIR lets the tests keep their pictures out of the user's folder.
+    const dir = process.env.NEBULA_SNAPSHOT_DIR || path.join(app.getPath('pictures'), 'Nebula');
+    await fs.mkdir(dir, { recursive: true });
+    let file = path.join(dir, snapshotName());
+    for (let n = 2; fsSync.existsSync(file); n += 1) file = file.replace(/( \(\d+\))?\.png$/, ` (${n}).png`);
+    await fs.writeFile(file, image.toPNG());
+    win.webContents.send('window:snapshot-taken', { ok: true, path: file });
+    return { ok: true, path: file };
+  } catch (err) {
+    win.webContents.send('window:snapshot-taken', { ok: false, error: err.message });
+    return { ok: false, error: err.message };
+  }
+}
+
+app.on('web-contents-created', (_event, contents) => {
+  contents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.key !== 'F12' || input.control || input.alt || input.shift || input.meta) return;
+    event.preventDefault();
+    const host = contents.hostWebContents || contents;
+    void takeSnapshot(BrowserWindow.fromWebContents(host));
+  });
+});
 
 app.whenReady().then(async () => {
   app.userAgentFallback = app.userAgentFallback

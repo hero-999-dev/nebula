@@ -45,6 +45,7 @@ export function initNoteActions({ store, onChanged, openNote }) {
     forId = id;
     menu.querySelector('[data-note-act="pin"]').textContent = LABELS.pin(note);
     menu.querySelector('[data-note-act="archive"]').textContent = LABELS.archive(note);
+    menu.querySelector('[data-note-act="readonly"]')?.setAttribute('aria-checked', String(!!note.readOnly));
     menu.hidden = false;
     // Below the button, pulled back inside the window if there is no room.
     const r = button.getBoundingClientRect();
@@ -61,6 +62,7 @@ export function initNoteActions({ store, onChanged, openNote }) {
     const id = forId;
     close();
     if (act === 'pin') store.togglePin(id);
+    else if (act === 'readonly') store.toggleReadOnly(id);
     else if (act === 'archive') store.archive(id);
     else if (act === 'trash') store.trash(id);
     onChanged?.();

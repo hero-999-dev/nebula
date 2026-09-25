@@ -87,6 +87,7 @@ export class NoteStore {
         id: generateId('n'),
         title: note.title,
         content: note.content,
+        ...(note.readOnly ? { readOnly: true } : {}),
         createdAt: now - i,
         updatedAt: now - i,
       }));
@@ -129,6 +130,7 @@ export class NoteStore {
     if (existing && existing.content !== note.content && unedited?.(existing.content)) {
       existing.content = note.content;
       existing.updatedAt = Date.now();
+      if (note.readOnly) existing.readOnly = true;   // the guide arrives locked (0.8.9)
       this.save();
     }
 
@@ -140,6 +142,7 @@ export class NoteStore {
         id: generateId('n'),
         title: note.title,
         content: note.content,
+        ...(note.readOnly ? { readOnly: true } : {}),
         createdAt: now,
         updatedAt: now,
       });
@@ -247,6 +250,20 @@ export class NoteStore {
     this.save();
     emit('note-changed', { id });
     return note;
+  }
+
+  /**
+   * Only view: the note opens for reading and nothing edits it until this is
+   * turned off again (the note's ⋯ menu, or the badge by its title). A flag,
+   * like pinning — not an edit, so `updatedAt` stays.
+   */
+  setReadOnly(id, on) {
+    return this.#mark(id, { readOnly: !!on });
+  }
+
+  toggleReadOnly(id) {
+    const note = this.get(id);
+    return note ? this.#mark(id, { readOnly: !note.readOnly }) : null;
   }
 
   togglePin(id) {

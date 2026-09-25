@@ -33,6 +33,42 @@ export function nearestAnchor(point, anchors, max = 18) {
   return best;
 }
 
+/** How near (px) an arrow end must come to an object's edge before it snaps on. */
+export const MAGNET = 28;
+
+/**
+ * What an arrow end would hold on to at `point` — the XMind way: an object
+ * catches the end once the pointer is inside it or within `magnet` pixels of
+ * its edge, so it is enough to bring the arrow close (0.8.9). Until then the
+ * end had to be dropped within 18px of the object's CENTRE.
+ *
+ * Objects (shapes, images, link cards) come before lines of text, and a text
+ * line only catches the end from inside it — text runs everywhere and would
+ * otherwise take every drop. With the pointer inside several objects, the one
+ * painted on top (the highest `z`) wins — what the user sees under the pointer;
+ * otherwise the nearest edge.
+ *
+ * @param {{x: number, y: number}} point
+ * @param {{id: string, kind: 'object'|'text', z?: number, box: {left: number, top: number, width: number, height: number}}[]} anchors
+ * @returns {typeof anchors[number]|null}
+ */
+export function magnetTarget(point, anchors, magnet = MAGNET) {
+  let best = null;
+  let bestScore = Infinity;
+  for (const anchor of anchors) {
+    const b = anchor.box;
+    const dx = Math.max(b.left - point.x, 0, point.x - (b.left + b.width));
+    const dy = Math.max(b.top - point.y, 0, point.y - (b.top + b.height));
+    const distance = Math.hypot(dx, dy);
+    const text = anchor.kind === 'text';
+    if (distance > (text ? 0 : magnet)) continue;
+    // Text last; then inside before near; inside, higher z first; near, closer first.
+    const score = (text ? 2e12 : 0) + (distance > 0 ? 1e12 + distance * 1e6 : -(anchor.z ?? 0) * 1e3) + (b.width * b.height) / 1e6;
+    if (score < bestScore) { best = anchor; bestScore = score; }
+  }
+  return best;
+}
+
 /** Where an arrow should meet a box: the side that faces `toward`. */
 export function anchorPoint(box, toward) {
   const cy = box.top + box.height / 2;
@@ -132,12 +168,18 @@ export function initArrows(editorEl, { history } = {}) {
   function boxes() {
     const origin = layer().getBoundingClientRect();
     const out = [];
+    let order = 0;
     for (const el of editorEl.querySelectorAll('.shape, .link-block, .note-image, p, h1, h2, h3, li')) {
+      order += 1;
       if (!el.textContent.trim() && !el.matches('.shape, .link-block, .note-image')) continue;
       const r = el.getBoundingClientRect();
       if (!r.width && !r.height) continue;
       out.push({
         id: ensureAnchor(el),
+        el,
+        kind: el.matches('.shape, .link-block, .note-image') ? 'object' : 'text',
+        // Paint order: the back canvas, then the text, then the front canvas, each in DOM order.
+        z: (el.closest('.shape-layer--behind') ? 0 : el.closest('.shape-layer') ? 200000 : 100000) + order,
         x: r.left + r.width / 2 - origin.left,
         y: r.top + r.height / 2 - origin.top,
         box: {
@@ -187,6 +229,9 @@ export function initArrows(editorEl, { history } = {}) {
     drag = {
       arrow,
       end: handle?.dataset.end || 'move',
+      // Measured once: nothing else moves while an arrow end is dragged.
+      targets: handle ? boxes() : null,
+      target: null,
       x: e.clientX,
       y: e.clientY,
       x1: num(arrow, 'x1', 0),
@@ -205,12 +250,21 @@ export function initArrows(editorEl, { history } = {}) {
       drag.arrow.dataset.y1 = String(Math.round(drag.y1 + dy));
       drag.arrow.dataset.x2 = String(Math.round(drag.x2 + dx));
       drag.arrow.dataset.y2 = String(Math.round(drag.y2 + dy));
-    } else if (drag.end === 'from') {
-      drag.arrow.dataset.x1 = String(Math.round(drag.x1 + dx));
-      drag.arrow.dataset.y1 = String(Math.round(drag.y1 + dy));
     } else {
-      drag.arrow.dataset.x2 = String(Math.round(drag.x2 + dx));
-      drag.arrow.dataset.y2 = String(Math.round(drag.y2 + dy));
+      const from = drag.end === 'from';
+      const point = { x: (from ? drag.x1 : drag.x2) + dx, y: (from ? drag.y1 : drag.y2) + dy };
+      const hit = magnetTarget(point, drag.targets || []);
+      if (hit?.el !== drag.target?.el) {
+        drag.target?.el.classList.remove('arrow-target');
+        hit?.el.classList.add('arrow-target');
+      }
+      drag.target = hit;
+      // Held: the end sits on the target's edge, facing the other end, while
+      // still being dragged — so it is visible that it has taken hold.
+      const other = from ? { x: num(drag.arrow, 'x2', 0), y: num(drag.arrow, 'y2', 0) } : { x: num(drag.arrow, 'x1', 0), y: num(drag.arrow, 'y1', 0) };
+      const at = hit ? anchorPoint(hit.box, other) : point;
+      drag.arrow.dataset[from ? 'x1' : 'x2'] = String(Math.round(at.x));
+      drag.arrow.dataset[from ? 'y1' : 'y2'] = String(Math.round(at.y));
     }
     paint(drag.arrow);
     placeHandles(drag.arrow);
@@ -219,9 +273,8 @@ export function initArrows(editorEl, { history } = {}) {
   window.addEventListener('mouseup', (e) => {
     if (!drag) return;
     if (drag.end !== 'move') {
-      const origin = layer().getBoundingClientRect();
-      const point = { x: e.clientX - origin.left, y: e.clientY - origin.top };
-      const hit = nearestAnchor(point, boxes());
+      const hit = drag.target;
+      drag.target?.el.classList.remove('arrow-target');
       if (hit) drag.arrow.dataset[drag.end] = hit.id;
       else delete drag.arrow.dataset[drag.end];
       reflow();

@@ -9,7 +9,7 @@
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
 import { normalizeLists, exitListOnEmptyItem, liftListItemAtStart } from './lists.js';
-import { blockFromNode, convertBlock, exitQuoteOnEmptyLine, insertDivider as insertDividerAt } from './blocks.js';
+import { blockFromNode, convertBlock, exitQuoteOnEmptyLine, insertDivider as insertDividerAt, tidyAfterDelete, beforeDelete } from './blocks.js';
 import { enterOutOfWrapper, backspaceOutOfWrapper, formatsAt, dropFormatsOnEmptyLine } from './inline-format.js';
 import { applyInlineFamily, clearInlineFamilyAtCaret, cleanTypingMarkers } from './inline-family.js';
 import { initEquation } from './equation.js';
@@ -387,12 +387,52 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     return true;
   }
 
+  // A delete that joined two lines: Chromium's style spans and a list split in two (blocks.js).
+  let beforeThisDelete = null;
+  editorEl.addEventListener('beforeinput', (e) => {
+    beforeThisDelete = e.inputType?.startsWith('delete') ? beforeDelete(editorEl) : null;
+  }, true);
+  editorEl.addEventListener('input', (e) => {
+    if (e.inputType?.startsWith('delete')) tidyAfterDelete(editorEl, window.getSelection(), beforeThisDelete);
+  });
   editorEl.addEventListener('input', () => cleanTypingMarkers(editorEl, { preserveActive: true }));
   document.addEventListener('selectionchange', () => cleanTypingMarkers(editorEl, { preserveActive: true }));
+
+  /**
+   * Underline what is typed next, with nothing selected.
+   *
+   * Ctrl+B and Ctrl+I then typing gave bold and italic words; Ctrl+U then
+   * typing gave plain ones, because underline needs a selection (above). The
+   * caret now steps into an empty underline wrapper held open by a zero-width
+   * marker, which the first typed letter replaces — the same marker Ctrl+U
+   * uses to step out again (long-note trials, 0.8.9).
+   */
+  function underlineAtCaret(cls) {
+    const range = selectionInEditor();
+    if (!range || !range.collapsed) return false;
+    const host = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
+    if (host?.closest('.blk-code, .code-src')) return false;
+    history?.push();
+    const span = document.createElement('span');
+    span.className = cls;
+    span.dataset.formatCaret = '';
+    const text = document.createTextNode('​');
+    span.appendChild(text);
+    range.insertNode(span);
+    const caret = document.createRange();
+    caret.setStart(text, 1);
+    caret.collapse(true);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(caret);
+    dirty();
+    return true;
+  }
 
   const applyUnderline = (cls) => withSelection(() => {
     const want = cls === 'none' ? '' : cls;
     if (clearAtCaret(U_STYLES, 'u')) return;
+    if (want && underlineAtCaret(want)) return;
     applyExclusive(U_STYLES, alreadyApplied(want) ? '' : want, 'u');
   });
   const applyTextColor = (cls) => withSelection(() => {
@@ -694,6 +734,16 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     ar: () => cmd('justifyRight'),
     aj: () => cmd('justifyFull'),
   };
+  // Only view (0.8.9): every action that would change the note does nothing;
+  // the ones that read it — save, print, export, copy — and import (a new note) stay.
+  {
+    const READING = new Set(['save', 'print', 'export-md', 'export-html', 'export-pdf', 'copy', 'import']);
+    for (const name of Object.keys(ACTIONS)) {
+      if (READING.has(name)) continue;
+      const run = ACTIONS[name];
+      ACTIONS[name] = (...args) => (editorEl.dataset.readonly === 'true' ? undefined : run(...args));
+    }
+  }
 
   const toolbarMenus = [...toolbar.querySelectorAll('.tb-menu')];
   // A scrolling rail clips descendants even when they have a high z-index.
@@ -1140,7 +1190,9 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
         history?.push();
         const after = block.nextElementSibling;
         block.remove();
-        if (after) {
+        // Only into a line of text: at the start of a picture or a code block
+        // the next Backspace worked on that instead of the divider (0.8.9).
+        if (after && !after.matches('.note-image, .blk-code, .link-block, hr, .shape-layer, .image-layer')) {
           placeCaretAtStart(after);
         } else {
           const r = document.createRange();
@@ -1158,7 +1210,24 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
         // backward delete merges the blocks around the divider and leaves the
         // divider itself alone, so the second press appeared to do nothing.
         history?.push();
+        const above = hr.previousElementSibling;
         hr.remove();
+        // Backspace goes backwards: with the divider gone the caret joins the
+        // end of the line above, where it was before Enter and /divider. It
+        // stayed at the start of the line below, so the next word typed landed
+        // in the wrong paragraph (long-note trials, 0.8.9).
+        if (above && !above.matches('.shape-layer, .image-layer, .link-block, .blk-code, hr, .note-image')) {
+          const r = document.createRange();
+          r.selectNodeContents(above);
+          r.collapse(false);
+          const walker = document.createTreeWalker(above, NodeFilter.SHOW_TEXT);
+          let last = null;
+          for (let t = walker.nextNode(); t; t = walker.nextNode()) if (t.nodeValue.trim()) last = t;
+          if (last) r.setStart(last, last.nodeValue.replace(/\s+$/, '').length);
+          r.collapse(true);
+          caret.removeAllRanges();
+          caret.addRange(r);
+        }
         dirty();
       } else {
         editorEl.querySelectorAll('hr.blk-hr.armed').forEach((h) => h.classList.remove('armed'));
@@ -1185,8 +1254,26 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   });
 
   // ----- shortcuts -----
+  /**
+   * Ctrl+Z / Ctrl+Y are the note's, wherever the key lands.
+   *
+   * A code block owns its keys, so Ctrl+Z there reached Chromium's own undo,
+   * which knows the insertHTML that made the block and nothing Nebula did by
+   * script: undo took the code block out behind Nebula's back, and the next
+   * Ctrl+Z or Ctrl+Y — pressed with the focus gone to the page, since the
+   * block that had it was gone — brought it back (long-note trials, 0.8.9).
+   * @returns {boolean} whether the key was undo or redo
+   */
+  const undoKey = (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return false;
+    const k = e.key.toLowerCase();
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); ACTIONS.undo(); return true; }
+    if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); ACTIONS.redo(); return true; }
+    return false;
+  };
+
   editorEl.addEventListener('keydown', (e) => {
-    if (e.target.closest('.code-src')) return; // code blocks own their keys
+    if (e.target.closest('.code-src')) { undoKey(e); return; } // code blocks own their other keys
     const mod = e.ctrlKey || e.metaKey;
     // Shape text owns normal editing keys. App undo/save shortcuts below still
     // apply, but paragraph/list/divider handlers must not escape this host.
@@ -1328,6 +1415,8 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { if (miniBar) miniBar.hidden = true; closeMenus(); }
+    // Nothing focused (the page itself): Chromium's undo would edit the note unseen.
+    if (e.target === document.body || e.target === document.documentElement) undoKey(e);
   });
 
   return { actions: ACTIONS, syncState };

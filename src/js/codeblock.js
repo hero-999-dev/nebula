@@ -210,6 +210,27 @@ export function initCodeBlocks(editorEl, { history } = {}) {
       e.preventDefault();
       e.stopPropagation();
       insertNewline(src);
+    } else if (e.key === 'Backspace' && !src.textContent.replace(/\n/g, '')) {
+      // Backspace in an empty block turns it back into the empty line it was
+      // made on. With the code typed and deleted again, no key took the block
+      // away — only its ✕ (long-note trials, 0.8.9).
+      e.preventDefault();
+      e.stopPropagation();
+      const block = src.closest('.blk-code');
+      if (!block) return;
+      history?.push();
+      const next = block.nextElementSibling;
+      const reuse = next?.matches('p') && !next.textContent.trim() && !next.querySelector(':not(br)');
+      const line = reuse ? next : document.createElement('p');
+      if (!reuse) { line.innerHTML = '<br>'; block.after(line); }
+      removeBlock(block);
+      editorEl.focus({ preventScroll: true });
+      const r = document.createRange();
+      r.setStart(line, 0);
+      r.collapse(true);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(r);
+      dirty();
     }
   }, true);
 

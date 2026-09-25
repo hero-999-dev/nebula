@@ -112,6 +112,68 @@ async function boot() {
   }
 
   const editor = bindEditor(editorEl, store, setSaveState);
+
+  /* ---------- Only view (0.8.9) ----------
+   * A note marked view-only reads and scrolls, selects and copies, opens links
+   * with Ctrl+click and plays its videos — and nothing edits it. contenteditable
+   * alone is not enough: code, shape text and captions are editable islands of
+   * their own, and the app's Enter/Backspace/drag handlers change the DOM by
+   * script. So the lock sits in front of all of them, in the capture phase. */
+  const isReadOnly = () => editorEl.dataset.readonly === 'true';
+  const readonlyChip = $('readonly-chip');
+
+  // F12 is caught in the main process for real key presses (and then never
+  // reaches the page). This is for a press the main process did not see —
+  // one synthesised by a test driver, or from an assistive tool.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'F12' || e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) return;
+    e.preventDefault();
+    void window.nebula?.window?.snapshot?.();
+  });
+  // F12 (caught in the main process): say where the picture went.
+  const toast = $('toast');
+  let toastTimer = null;
+  window.nebula?.window?.onSnapshot?.((result) => {
+    if (!toast) return;
+    toast.textContent = result?.ok
+      ? `Snapshot saved to ${result.path} and copied`
+      : 'Snapshot failed';
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast.hidden = true; }, 3500);
+  });
+  function applyReadOnly() {
+    const note = store.active();
+    const ro = !!note?.readOnly;
+    editorEl.dataset.readonly = ro ? 'true' : '';
+    editorEl.contentEditable = String(!!note && !ro);
+    titleEl.readOnly = ro;
+    document.body.classList.toggle('note-readonly', ro);
+    if (readonlyChip) readonlyChip.hidden = !ro;
+    if (ro) { shapes?.reset(); richPaste?.reset(); }
+  }
+  readonlyChip?.addEventListener('click', () => { if (store.activeId) store.setReadOnly(store.activeId, false); });
+  on('note-changed', ({ id } = {}) => { if (id === store.activeId) { applyReadOnly(); renderList(); } });
+  const READING_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown', 'Escape', 'Shift', 'Control', 'Alt', 'Meta', 'F12']);
+  const stop = (e) => { e.preventDefault(); e.stopImmediatePropagation(); };
+  editorEl.addEventListener('beforeinput', (e) => { if (isReadOnly()) stop(e); }, true);
+  editorEl.addEventListener('keydown', (e) => {
+    if (!isReadOnly() || READING_KEYS.has(e.key)) return;
+    const k = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && ['c', 'a', 'f', 'k', 's', 'p'].includes(k)) return;   // copy, select all, find, palette, save, print
+    stop(e);
+  }, true);
+  for (const type of ['paste', 'cut', 'drop', 'dragstart', 'dblclick', 'change']) {
+    editorEl.addEventListener(type, (e) => { if (isReadOnly()) stop(e); }, true);
+  }
+  const HANDLES = '.shape, .note-image, .note-arrow, .image-h, .shape-h, .shape-rot, .arrow-end, .link-del, .code-del, .code-lang, .blk-todo';
+  for (const type of ['mousedown', 'click']) {
+    editorEl.addEventListener(type, (e) => {
+      if (!isReadOnly() || e.target.closest('.code-copy')) return;
+      if (e.target.closest(HANDLES)) stop(e);
+    }, true);
+  }
+  titleEl.addEventListener('beforeinput', (e) => { if (isReadOnly()) e.preventDefault(); });
   window.addEventListener('nebula-storage-status', () => setSaveState('saved'));
 
   async function saveCurrent() {
@@ -126,6 +188,8 @@ async function boot() {
   // announces itself to this first; Chromium's stack cannot see any of it.
   let richPaste = null;
   const history = initHistory(editorEl, {
+    // Only view: the menu's Undo/Redo must not change a locked note either.
+    isLocked: isReadOnly,
     onRestore: () => {
       // A restored snapshot is just markup — code blocks and equations are
       // painted from their stored source, the same as when a note opens.
@@ -231,6 +295,7 @@ async function boot() {
     // this version writes. A fix that lives in a note's HTML never reaches the
     // notes written before it otherwise — see migrate.js.
     migrateNote(editorEl, { fitShape: shapes?.fit });
+    applyReadOnly();
     // Both are regenerated from their stored source, never trusted from the
     // saved HTML — and the shape bar belongs to a note that is now gone.
     paintAllCode(editorEl);

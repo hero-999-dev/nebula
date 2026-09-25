@@ -116,6 +116,14 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
     dirty();
     return;
   }
+    // The empty line the command was typed on. Inserting a block into it with
+    // insertHTML splits it and leaves the empty half above the new block, so a
+    // to-do or a code block always came with a blank line over it (long-note
+    // trials, 0.8.9). It goes once the block is in.
+    const line = blockFromNode(window.getSelection()?.anchorNode, editorEl);
+    const blank = (el) => el?.isConnected && el !== editorEl && el.matches('p, div:not([class])')
+      && !el.textContent.replace(/​/g, '').trim() && !el.querySelector(':not(br)');
+    const dropBlankLine = () => { if (blank(line)) line.remove(); };
     switch (id) {
       case 'text':
       case 'h1':
@@ -125,7 +133,7 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
       case 'bullet':
       case 'numbered':
         break;
-      case 'todo': exec('insertHTML', '<div class="blk-todo"><br></div>'); break;
+      case 'todo': exec('insertHTML', '<div class="blk-todo"><br></div>'); dropBlankLine(); break;
       case 'divider': {
         // At the top level, as the toolbar's divider is; insertHTML nested it in the line.
         const line = insertDivider(editorEl, window.getSelection());
@@ -136,7 +144,7 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
         window.getSelection().addRange(r);
         break;
       }
-      case 'code': insertCodeBlock(editorEl, 'javascript', history); break;
+      case 'code': insertCodeBlock(editorEl, 'javascript', history); dropBlankLine(); break;
       // Through the controller, so it arrives selected like the toolbar's does.
     case 'shape': shapes ? shapes.addShape('rect') : addShape(editorEl, 'rect', history); break;
     }

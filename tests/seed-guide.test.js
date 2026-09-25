@@ -42,8 +42,34 @@ describe('guide page', () => {
   it('tells what the current release added, and covers every feature since 0.6.0', () => {
     const text = doc.body.textContent;
     expect(text).toContain(`New in ${GUIDE_VERSION}`);
-    for (const feature of ['Four themes', 'Arrows', 'angle shows', 'Link any words', 'Ctrl+click', 'Videos', 'caption', 'behind the text', 'one canvas', 'Rust', 'Nebula note (.json)', 'bookmark']) {
+    for (const feature of ['Four themes', 'Arrows', 'angle shows', 'Link any words', 'Ctrl+click', 'Videos', 'caption', 'behind the text', 'one canvas', 'Rust', 'Nebula note (.json)', 'Bookmark',
+      'Embed', 'Mention', 'Only view', 'F12', 'snaps', 'Ctrl+F', 'Ctrl+K', 'Archive', 'Restore', 'Pin to top', 'The / menu', 'Quotes and dividers', 'Import', 'PDF']) {
       expect(text).toContain(feature);
     }
+  });
+});
+
+describe('guide order (owner, 0.8.9)', () => {
+  const doc = new DOMParser().parseFromString(`<body>${GUIDE_NOTE.content}</body>`, 'text/html');
+  const h2 = [...doc.querySelectorAll('h2')].map((h) => h.textContent);
+
+  it('ends with Where your notes live as 9 and Code blocks as 10, the last section', () => {
+    expect(h2.at(-2)).toBe('9 · Where your notes live');
+    expect(h2.at(-1)).toBe('10 · Code blocks');
+  });
+
+  it('opens the code samples with Markdown', () => {
+    const codeHeading = [...doc.querySelectorAll('h2')].find((h) => h.textContent === '10 · Code blocks');
+    let el = codeHeading.nextElementSibling;
+    while (el && el.tagName !== 'H3') el = el.nextElementSibling;
+    expect(el.textContent).toBe('Markdown');
+  });
+
+  it('closes every section with a divider before its heading (owner, 0.8.9)', () => {
+    for (const h of doc.querySelectorAll('h2')) expect(h.previousElementSibling?.matches('hr.blk-hr')).toBe(true);
+  });
+
+  it('is locked when it is seeded', () => {
+    expect(GUIDE_NOTE.readOnly).toBe(true);
   });
 });

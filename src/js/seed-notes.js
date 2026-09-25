@@ -303,7 +303,7 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '0.8.8';
+export const GUIDE_VERSION = '0.8.9';
 
 /**
  * The guide's words, without its markup, shapes, code or equations — so a
@@ -332,6 +332,7 @@ export const GUIDE_SIGNATURES = {
   '0.8.6': '66f979f9',
   '0.8.7': '2ef83bbb',
   '0.8.8': 'c4a8a567',
+  '0.8.9': 'b32ad974',
 };
 
 /** Whether a vault's guide is one we shipped and nobody has typed in. */
@@ -339,6 +340,8 @@ export const guideUnedited = (html) => Object.values(GUIDE_SIGNATURES).includes(
 
 export const GUIDE_NOTE = {
   title: 'Welcome to Nebula Guide',
+  // Opens in Only view so a stray key cannot change it (0.8.9); ⋯ -> Only view unlocks it.
+  readOnly: true,
   content:
     // Shapes live on layers at the top of the note; the behind-layer is a real
     // second layer, not a class, so it can be painted under the text.
@@ -359,29 +362,44 @@ export const GUIDE_NOTE = {
     '<h1>Welcome to Nebula</h1>' +
     '<p>A calm place for notes. Everything auto-saves — there is no save button to forget, though <span class="inline-code">Ctrl+S</span> works if you want one.</p>' +
     '<p>This is the whole guide in one page. Every section has something you can try on the spot; the text you are reading is an ordinary note, so edit it, break it, or delete it once you are done. Your own notes are never touched by an update — and this page updates itself only while you have not written in it.</p>' +
+    '<p>This page opens in <strong>Only view</strong> (the 🔒 badge by its title), so nothing here changes by accident. To try things on it, click the badge or choose ⋯ → Only view in the note list — or try them in a new note.</p>' +
 
     // Each release adds its features here (features, not fixes) and in the
     // section they belong to. See GUIDE_SIGNATURES before changing any text.
-    '<h2>New in 0.8.8</h2>' +
+    // A divider closes each section before the next heading (owner, 0.8.9).
+    '<hr class="blk-hr">' +
+    '<h2>New in 0.8.9</h2>' +
     '<ul>' +
-    '<li><strong>Pictures and shapes on one canvas.</strong> A floating picture and a shape can lie over or under each other; ▴ puts whichever you picked on top of the rest — section 6.</li>' +
-    '<li><strong>Three places for a picture:</strong> behind the text, above it, or in it — one button each on the picture’s bar — section 7.</li>' +
-    '<li><strong>Sharper videos</strong> that fill the width of the text — section 7.</li>' +
-    '<li><strong>Rust</strong> in code blocks — section 9. <strong>The link menu by keyboard:</strong> ↓, then ← → and Enter — section 7.</li>' +
-    '<li>Recently: <strong>images that sit in your text</strong> and an <strong>arrow menu</strong> (0.8.6); <strong>links on any words</strong>, <strong>image captions</strong>, <strong>videos that play in the note</strong> (0.8.5); <strong>arrows</strong>, a <strong>rotation readout</strong> and <strong>moving a note to another Nebula</strong> (0.8.3).</li>' +
+    '<li><strong>Only view.</strong> Lock any note from its ⋯ menu so it can be read and copied but not changed; this guide starts locked — section 1.</li>' +
+    '<li><strong>Arrows snap on.</strong> Bring an arrow’s end near a shape, a picture or a link card and it takes hold, the way mind-map apps do — section 6.</li>' +
+    '<li><strong>F12 takes a picture of the window</strong>, saves it and copies it — section 1.</li>' +
+    '<li>Recently: <strong>pictures and shapes on one canvas</strong>, <strong>three places for a picture</strong>, <strong>sharper videos</strong>, <strong>Rust</strong> and <strong>the link menu by keyboard</strong> (0.8.8); <strong>images that sit in your text</strong> and an <strong>arrow menu</strong> (0.8.6); <strong>links on any words</strong>, <strong>image captions</strong> (0.8.5).</li>' +
     '</ul>' +
 
-    '<h2>1 · The window</h2>' +
+    '<hr class="blk-hr">' +
+    '<h2>1 · The window and your notes</h2>' +
     '<p>The six buttons on the header line move the <strong>editing bar</strong>, not the note:</p>' +
     '<ul>' +
     '<li><strong>↑</strong> bar on top (default) — press the active side again to come back to it</li>' +
     '<li><strong>↓</strong> bar under the note · <strong>←</strong> and <strong>→</strong> turn it into a vertical rail</li>' +
-    '<li><strong>AI</strong> opens the side panel: Claude, Gemini, ChatGPT, Mistral, DeepSeek, Copilot, Perplexity, and <strong>+</strong> adds any site. The tab strip scrolls sideways (Shift+wheel); drag the panel’s left edge to resize it.</li>' +
+    '<li><strong>AI</strong> opens the side panel: Claude, Gemini, ChatGPT, Mistral, DeepSeek, Copilot, Perplexity, and <strong>+</strong> adds any site. The tab strip scrolls sideways (Shift+wheel); drag the panel’s left edge to resize it. If a site will not let you sign in inside the app, <em>Sign in in browser</em> opens it in your browser.</li>' +
     '<li><strong>−</strong> hides the bar for a clean page</li>' +
     '</ul>' +
-    '<p>Four themes at the bottom of the sidebar: <strong>Main</strong>, <strong>Dark</strong>, <strong>Light</strong> and <strong>White</strong>. The layout and the theme both survive a restart.</p>' +
+    '<p>Four themes at the bottom of the sidebar: <strong>Main</strong>, <strong>Dark</strong>, <strong>Light</strong> and <strong>White</strong>. The layout and the theme both survive a restart. <span class="inline-code">Ctrl +</span> and <span class="inline-code">Ctrl −</span> zoom, <span class="inline-code">Ctrl 0</span> goes back to actual size, <span class="inline-code">F11</span> is full screen, and the View menu hides the note list.</p>' +
+    '<p><strong>F12</strong> takes a picture of the window: it is saved as a PNG in <em>Pictures\Nebula</em> and copied, ready to paste anywhere. A note at the bottom says where it went.</p>' +
     '<p><strong>Try it:</strong> send the bar to the left rail, restart the app, and it is still there.</p>' +
+    '<h3>Your notes</h3>' +
+    '<ul>' +
+    '<li><strong>New note</strong> under the list, or <span class="inline-code">Ctrl+N</span>. The box at the top of the list filters by title and text.</li>' +
+    '<li>Everything saves itself as you go; the word by the title says <em>Saving…</em> and then <em>Saved</em>. <span class="inline-code">Ctrl+S</span> saves at once.</li>' +
+    '<li>Each note’s <strong>⋯</strong> menu: <em>Pin to top</em>, <em>Archive</em> (out of the list, kept), <strong>Only view</strong>, and <em>Move to trash</em>. <strong>Archive</strong> and <strong>Trash</strong> under the list open their notes, with <em>Unarchive</em> or <em>Restore</em> to bring one back.</li>' +
+    '<li><strong>Only view</strong> locks a note: you can read it, scroll it, select and copy, open its links with Ctrl+click and play its videos, but no key, paste, drag or toolbar button changes it. The 🔒 badge by the title shows it, and clicking the badge unlocks it.</li>' +
+    '<li><span class="inline-code">Ctrl+F</span> finds words in the open note and steps through every match. <span class="inline-code">Ctrl+K</span> opens the command palette: type part of any command’s name and press Enter. <span class="inline-code">Ctrl+Z</span> and <span class="inline-code">Ctrl+Y</span> undo and redo, one step at a time — a move, a paste or a run of typing each count as one.</li>' +
+    '<li>Help → <em>Keyboard shortcuts</em> lists every key, and <em>What’s new</em> shows what the current version changed.</li>' +
+    '</ul>' +
+    '<p><strong>Try it:</strong> lock a note of your own with ⋯ → Only view, try to type in it, then click the 🔒 badge to unlock it.</p>' +
 
+    '<hr class="blk-hr">' +
     '<h2>2 · Writing</h2>' +
     '<p><strong>Bold</strong> · <em>italic</em> · <span class="u-single">underline</span> · <s>strikethrough</s> · <span class="inline-code">inline code</span> · <span class="inline-eq" data-tex="E = mc^2" contenteditable="false"></span></p>' +
     '<p>Underlines come in five styles from the <em>▾</em> beside the button, and they <em>replace</em> each other rather than stacking: ' +
@@ -391,6 +409,11 @@ export const GUIDE_NOTE = {
     '<p>Some <span class="inline-code">inline code</span> to practise on.</p>' +
     '<p><strong>Try it:</strong> put the caret at the <em>end</em> of that code run and press Enter — the next line starts as plain text. Put it at the <em>start</em> and press Backspace — the code formatting comes off and the words stay. You are never stuck inside a format.</p>' +
 
+    '<h3>The / menu</h3>' +
+    '<p>Type <span class="inline-code">/</span> at the start of a line (or after a space) and a menu of blocks opens; keep typing to narrow it, ↑ ↓ to choose, Enter to use. It turns the line you are on into <strong>Text</strong>, <strong>Heading 1–3</strong>, a <strong>bulleted</strong> or <strong>numbered</strong> list or a <strong>quote</strong>, and it inserts a <strong>to-do</strong>, a <strong>code block</strong>, a <strong>divider</strong>, a <strong>shape</strong>, or a link as an <strong>embed</strong>, a <strong>bookmark</strong>, a <strong>URL</strong> or a <strong>mention</strong>.</p>' +
+    '<p><strong>Try it:</strong> in a new note type <span class="inline-code">/h2</span> and Enter, then a title — only that line becomes a heading.</p>' +
+
+    '<hr class="blk-hr">' +
     '<h2>3 · Fonts, size and colour</h2>' +
     '<p><span style="font-family:Arial, Helvetica, sans-serif">Arial</span> · ' +
     '<span style="font-family:Calibri, &quot;Segoe UI&quot;, sans-serif">Calibri</span> · ' +
@@ -409,7 +432,8 @@ export const GUIDE_NOTE = {
     '<p><strong>Try it:</strong> <em>A</em> applies the last text colour and <em>H</em> the last highlight; each <em>▾</em> opens the full list. Every row lines up and the list fits without scrolling.</p>' +
     '<p><strong>Try it:</strong> switch between the four themes with that paragraph in view. Every colour repaints for the theme and stays readable — a colour is stored as a name, not as a fixed value picked against one background.</p>' +
 
-    '<h2>4 · Lists, to-dos and indent</h2>' +
+    '<hr class="blk-hr">' +
+    '<h2>4 · Lists, to-dos, quotes and dividers</h2>' +
     '<h3>Bulleted</h3><ul><li>first</li><li>second</li><li>third</li></ul>' +
     '<h3>Numbered</h3><ol><li>one</li><li>two</li><li>three</li></ol>' +
     '<h3>To-dos</h3>' +
@@ -423,6 +447,11 @@ export const GUIDE_NOTE = {
     '<p><strong>Try it:</strong> build a bulleted list and start a numbered one on the line right under it. Two separate lists, side by side — the numbered one must not end up nested inside the last bullet.</p>' +
     '<p>Tab and Shift+Tab indent any block up to six levels. The outline dropdown (paragraph, H1–H3, quote) sits before the list buttons, LibreOffice-style, and <span class="inline-code">/</span> anywhere opens the block menu.</p>' +
 
+    '<h3>Quotes and dividers</h3>' +
+    '<blockquote>A quote stands apart from the text around it.</blockquote>' +
+    '<p>A quote comes from the outline dropdown or <span class="inline-code">/quote</span>. Enter on an empty line of a quote leaves it, the way a list does. A <strong>divider</strong> — the ― button or <span class="inline-code">/divider</span> — is a line of its own; Backspace next to it first marks it, and a second Backspace removes it, so one stray key cannot.</p>' +
+
+    '<hr class="blk-hr">' +
     '<h2>5 · Equations</h2>' +
     '<p><span class="inline-code">Ctrl+Q</span> or the √x button opens a LaTeX box with a live preview. The <em>source</em> is what gets stored, and the formula is typeset again every time the note opens — nothing depends on the saved markup, so an upgrade re-renders old notes instead of freezing them.</p>' +
     '<p>Inline: <span class="inline-eq" data-tex="e^{i\\pi} + 1 = 0" contenteditable="false"></span> and ' +
@@ -431,7 +460,9 @@ export const GUIDE_NOTE = {
     '<span class="inline-eq" data-tex="\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}" contenteditable="false"></span>.</p>' +
     '<p><strong>Try it:</strong> each one sits in its own frame, like <span class="inline-code">inline code</span>, so you can see where it starts and ends. Click one — the editor reopens with its LaTeX. Close the note and come back: all four are still typeset. It works with no network.</p>' +
 
-    '<h2>6 · Shapes</h2>' +
+    '<hr class="blk-hr">' +
+    '<h2>6 · Shapes and arrows</h2>' +
+    '<p>Five kinds from the ◇ button’s <em>▾</em>: rectangle, square, ellipse, diamond and triangle (plus circle). A selected shape shows its outline in colour, the resize grip at its bottom-right corner and the turning handle at its bottom-left.</p>' +
     '<p>Shapes float over the whole note — the three at the top of this page are real ones. Drag them down here, resize from the corner handle, double-click to write inside, and turn them with the round handle: the angle shows while you turn (the green one is tilted by −6°). Text wrap is <strong>through</strong>: the words never reflow, the shape floats above or below them.</p>' +
     '<p>Selecting a shape opens its little bar: six colours, <em>▾</em> to send it behind the text, <em>▴</em> to bring it above, <em>✕</em> to delete it.</p>' +
     '<p>Shapes and floating pictures share one canvas: they stack in a single order, so either can lie over the other. <em>▴</em> on a shape’s or a picture’s bar puts it on top of everything there.</p>' +
@@ -440,11 +471,20 @@ export const GUIDE_NOTE = {
     '<p><strong>Try it:</strong> press <em>✕</em>. The shape goes and the bar goes with it — same for Esc, for clicking anywhere off a shape, and for switching notes. The bar is never left floating with nothing selected.</p>' +
     '<p>Add more from the toolbar ◇ button (<em>▾</em> for every kind) or type <span class="inline-code">/shape</span>.</p>' +
     '<h3>Arrows</h3>' +
-    '<p>The ↗ button beside the shapes adds a <strong>straight</strong> arrow; its <em>▾</em> has <strong>elbow</strong> and <strong>curved</strong> ones too. Drag an arrow’s end onto a shape, an image, a link card or a line of text and it holds on: move that thing and the arrow follows.</p>' +
-    '<p><strong>Try it:</strong> add an arrow, drop its point on the blue ellipse at the top, then drag the ellipse around. To remove an arrow, click it so it lights up and press Delete.</p>' +
+    '<p>The ↗ button beside the shapes adds a <strong>straight</strong> arrow; its <em>▾</em> has <strong>elbow</strong> and <strong>curved</strong> ones too. Drag an arrow’s end towards a shape, a picture or a link card: once it comes close — inside it, or within a finger’s width of its edge — the target is outlined and the end snaps onto its side. Let go and the two are joined; move either and the arrow follows. A line of text holds an end only when you drop it right on the words.</p>' +
+    '<p><strong>Try it:</strong> in a note of your own, add two shapes and an arrow, pull each end near a shape until it snaps, then drag the shapes apart — the arrow stretches with them. Click an arrow so it lights up and press Delete to remove it.</p>' +
 
+    '<hr class="blk-hr">' +
     '<h2>7 · Links, pictures and videos</h2>' +
-    '<p><strong>Paste a URL</strong> on its own and Nebula asks how to show it: as the <strong>URL</strong>, as a short <strong>mention</strong>, as a <strong>bookmark</strong> card, or as an <strong>embed</strong> that loads the page inside the note (with its own sign-in forms). If a site refuses, the link above it opens it in your browser.</p>' +
+    '<p><strong>Paste a web address</strong> on its own (or type <span class="inline-code">/embed</span>, <span class="inline-code">/bookmark</span>, <span class="inline-code">/url</span> or <span class="inline-code">/mention</span>) and Nebula asks how to show it:</p>' +
+    '<ul>' +
+    '<li><strong>Embed</strong> — the page itself, live inside the note, with its own scrolling and sign-in forms. A YouTube or Vimeo link embeds its player. If a site refuses to be shown this way, the card’s link opens it in your browser.</li>' +
+    '<li><strong>Bookmark</strong> — a card with the site’s address, a tidy way to keep a link without loading the page.</li>' +
+    '<li><strong>URL</strong> — the address as a link in the line of text.</li>' +
+    '<li><strong>Mention</strong> — a short @site tag in the line, for when the address itself is noise.</li>' +
+    '</ul>' +
+    '<p>The ✕ on a card removes it. Nothing is fetched until you choose Embed.</p>' +
+
     '<p>No mouse needed: in that menu press <strong>↓</strong> to reach the choices, <strong>←</strong> and <strong>→</strong> to move between them, and <strong>Enter</strong> to use the lit one. <strong>↑</strong> goes back to the address, <strong>Esc</strong> closes the menu and returns you to your text.</p>' +
     '<p><strong>Try it:</strong> copy any web address, paste it on an empty line, then ↓ → → Enter.</p>' +
     '<p><strong>Link any words:</strong> select them and paste a URL over them, or use the link button in the toolbar. <strong>Ctrl+click</strong> a link to open it; choosing the link button again with an empty address takes the link off.</p>' +
@@ -452,11 +492,21 @@ export const GUIDE_NOTE = {
     '<p><strong>Pictures:</strong> paste an image and it goes on the line you are on, part of the text, so it moves with the words at any window size. Click it for its bar, where three buttons say where it lives and the current one is lit: <em>▾</em> behind the text, <em>▴</em> above the text (floating, on top), <em>≡</em> in the text. <em>Aa</em> writes a caption under it, <em>✕</em> deletes it, and the corner handle resizes it. An image dropped from a folder floats where you drop it.</p>' +
     '<p><strong>Try it:</strong> copy any picture, click at the end of this line and paste. Give it a caption, then make the window narrow and wide — the picture stays between the same two lines.</p>' +
 
-    '<h2>8 · Moving a note to another Nebula</h2>' +
-    '<p>Export → <strong>Nebula note (.json)</strong> writes the whole note — text, shapes, arrows, images and embeds — into one file. Import that file in any other Nebula and the same note opens. A note file copied straight out of a vault folder imports too. Markdown and HTML exports are there for other apps; they cannot carry shapes.</p>' +
+    '<hr class="blk-hr">' +
+    '<h2>8 · Import, export, print and moving a note</h2>' +
+    '<p>The export button (and the File menu) writes the open note as <strong>Markdown</strong>, <strong>HTML</strong>, <strong>PDF</strong> (A4, laid out the way it looks) or a <strong>Nebula note (.json)</strong>. <span class="inline-code">Ctrl+P</span> prints. <strong>Import</strong> opens a Markdown, HTML, text or Nebula note file as a new note; anything that could run is stripped out first.</p>' +
+    '<p>To move a note to another Nebula intact, export it as a <strong>Nebula note</strong> — text, shapes, arrows, pictures and embeds in one file — and import that file there. A note file copied straight out of a vault folder imports too. Markdown and HTML are for other apps; they cannot carry shapes.</p>' +
 
-    '<h2>9 · Code blocks</h2>' +
+    '<hr class="blk-hr">' +
+    '<h2>9 · Where your notes live</h2>' +
+    '<p>Click the version number at the bottom of the sidebar to see every folder this copy uses. Notes are one JSON file each, written atomically, with a dated snapshot of the whole vault kept alongside them.</p>' +
+    '<p>An update replaces the application folder only. The vault is copied into Backups before anything installs, and <strong>nothing in it is ever deleted</strong>. The installed app, the portable copy, the test build and the dev build each keep their own separate notes.</p>' +
+    '<p><strong>File → Open notes folder</strong> shows that folder in Explorer. Pictures taken with F12 go to <em>Pictures\Nebula</em>, outside the vault.</p>' +
+
+    '<hr class="blk-hr">' +
+    '<h2>10 · Code blocks</h2>' +
     '<p>Markdown-style: pick a language and the colours follow, the way GitHub, Discord or Notion do it. Click into the code to edit it; changing the language repaints the same text; <em>Copy</em> takes the raw source. Every language Nebula knows has a sample below.</p>' +
+    '<h3>Markdown</h3>' + code(MD_SRC, 'markdown') +
     '<h3>JavaScript</h3>' + code(JS_SRC, 'javascript') +
     '<h3>TypeScript</h3>' + code(TS_SRC, 'typescript') +
     '<h3>Python</h3>' + code(PY_SRC, 'python') +
@@ -472,12 +522,7 @@ export const GUIDE_NOTE = {
     '<h3>JSON</h3>' + code(JSON_SRC, 'json') +
     '<h3>SQL</h3>' + code(SQL_SRC, 'sql') +
     '<h3>Bash</h3>' + code(BASH_SRC, 'bash') +
-    '<h3>Markdown</h3>' + code(MD_SRC, 'markdown') +
-    '<p><strong>Try it:</strong> switch the first block to Python — the same text recolours. In every sample the comment, the strings, the numbers and the keywords are coloured differently; flat grey text would mean that language’s rules failed to load.</p>' +
-
-    '<h2>10 · Where your notes live</h2>' +
-    '<p>Click the version number at the bottom of the sidebar to see every folder this copy uses. Notes are one JSON file each, written atomically, with a dated snapshot of the whole vault kept alongside them.</p>' +
-    '<p>An update replaces the application folder only. The vault is copied into Backups before anything installs, and <strong>nothing in it is ever deleted</strong>. The installed app, the portable copy, the test build and the dev build each keep their own separate notes.</p>',
+    '<p><strong>Try it:</strong> switch the JavaScript block to Python — the same text recolours. In every sample the comment, the strings, the numbers and the keywords are coloured differently; flat grey text would mean that language’s rules failed to load.</p>',
 };
 
 /**
@@ -513,6 +558,7 @@ export function addGuide(store) {
 
   const note = store.createNote(title);
   store.updateActive({ content: GUIDE_NOTE.content });
+  store.setReadOnly?.(note.id, true);
   return note.id;
 }
 

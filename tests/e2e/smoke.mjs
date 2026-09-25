@@ -21,6 +21,9 @@ import { runRichPasteChecks } from './rich-paste.mjs';
 import { runIdeasChecks } from './ideas-note.mjs';
 import { runRebuildFindingChecks } from './rebuild-findings.mjs';
 import { runCanvasChecks } from './canvas.mjs';
+import { runViewSnapChecks } from './view-snap.mjs';
+import { runGuideChecks } from './guide.mjs';
+import { runDenseChecks } from './dense.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mainJs = path.join(root, 'dist-electron', 'main.js');
@@ -59,7 +62,13 @@ const press = (win, selector) => win.evaluate((sel) => {
 }, selector);
 
 /** Focus the editor. A click there is only ever "put the caret in it". */
-const focusEditor = (win) => win.evaluate(() => document.getElementById('editor').focus());
+const focusEditor = (win) => win.evaluate(() => {
+  // A note in Only view (the guide re-added from Help arrives locked, 0.8.9) is
+  // unlocked the way a person would: the badge by the title.
+  const chip = document.getElementById('readonly-chip');
+  if (chip && !chip.hidden) chip.click();
+  document.getElementById('editor').focus();
+});
 
 /**
  * A real mousedown, without the actionability wait.
@@ -115,6 +124,11 @@ try {
   app = await launch(profile);
   win = await app.firstWindow();
   await win.waitForSelector('#app', { timeout: 20_000 });
+  // The seeded guide opens in Only view (0.8.9; view-snap.mjs checks that).
+  // This suite has always used it as its scratch note, so it unlocks it the way
+  // a person would, with the badge by the title.
+  await win.waitForFunction(() => !document.getElementById('readonly-chip')?.hidden, undefined, { timeout: 10_000 }).catch(() => {});
+  await win.evaluate(() => { const chip = document.getElementById('readonly-chip'); if (chip && !chip.hidden) chip.click(); });
 
   check('window opens with the app shell', true);
   check('window title', (await win.title()) === 'Nebula', await win.title());
@@ -776,8 +790,10 @@ try {
       document.querySelector('[data-ustyle="u-wavy"]')?.click();
       return ed.innerHTML;
     });
-    check('an underline with no selection changes nothing',
-      caretOnly === '<p>caret only here</p>', caretOnly);
+    // Since 0.8.9 it opens an empty underline at the caret for what is typed
+    // next (like Ctrl+B); the words already there stay as they were.
+    check('an underline with no selection underlines none of the words already there',
+      caretOnly.replace(/<span class="u-wavy" data-format-caret="">​<\/span>/, '') === '<p>caret only here</p>', caretOnly);
     const selected = await win.evaluate(() => {
       const ed = document.getElementById('editor');
       ed.innerHTML = '<p>underline these words</p>'; ed.focus();
@@ -1184,6 +1200,10 @@ try {
       await win.waitForTimeout(300);
       weights[kind] = await win.evaluate((k) => {
         const s = document.querySelector(`#editor .shape.${k}`);
+        // The outline itself, not the selection: selected, a diamond or a
+        // triangle strokes its edge in the accent at 2.5px (0.8.9), as the box
+        // kinds show a 2.5px ring.
+        s?.classList.remove('sel');
         const poly = s?.querySelector('.shape-svg polygon');
         return poly ? getComputedStyle(poly).strokeWidth : getComputedStyle(s).borderTopWidth;
       }, kind);
@@ -1348,9 +1368,9 @@ try {
     });
     check('the first line is underlined to begin with', trail);
 
+    // Formats stop at Enter (0.8.x), so the new line is plain without a press;
+    // pressing underline there now turns it ON for what is typed (0.8.9).
     await win.keyboard.press('Enter');
-    await win.waitForTimeout(200);
-    await win.evaluate(() => document.querySelector('.toolbar [data-act="underline"]').click());
     await win.waitForTimeout(200);
     await win.keyboard.type('plain text now', { delay: 3 });
     await win.waitForTimeout(300);
@@ -1369,7 +1389,7 @@ try {
     });
     const first = typed.find((t) => t.text.startsWith('first'));
     const after = typed.find((t) => t.text.startsWith('plain'));
-    check('underline switches off on a new line with nothing selected',
+    check('underline does not carry onto the next line',
       !!after && after.under === false, JSON.stringify(typed));
     check('and the line it was applied to keeps it',
       !!first && first.under === true, JSON.stringify(typed));
@@ -2324,6 +2344,9 @@ try {
   await runIdeasChecks(check);
   await runRebuildFindingChecks(check);
   await runCanvasChecks(check);
+  await runViewSnapChecks(check);
+  await runGuideChecks(check);
+  await runDenseChecks(check);
 } catch (err) {
   failure = err;
   check('smoke run completed', false, err.message);

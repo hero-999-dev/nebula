@@ -222,3 +222,159 @@ export function insertDivider(root, selection) {
   }
   return after;
 }
+
+/**
+ * What Chromium leaves behind when a delete joins two lines.
+ *
+ * Backspace at the start of a line merges it into the line above, and Chromium
+ * keeps the merged words looking as they did by wrapping them in a
+ * `<span style="…">` — a font size, a line height, the quote's italic undone.
+ * Nothing in Nebula makes a classless styled span, so every one is this
+ * leftover: the words carry a style the line does not have, and the note is no
+ * longer the note it was before Enter was pressed. Joining two items of a list
+ * goes through "lift the item out of the list" first, which leaves two lists
+ * where there was one once the lifted line is merged back up.
+ *
+ * Called after every delete; looks only at the line the caret is in, and
+ * touches only what this delete made: `before` (from beforeDelete) holds the
+ * spans and the side-by-side lists that were already in the note, which stay.
+ * @returns {boolean} whether anything changed
+ */
+export function tidyAfterDelete(root, selection, before = null) {
+  if (!selection?.rangeCount) return false;
+  const range = selection.getRangeAt(0);
+  let el = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
+  if (!el || !root.contains(el) || el.closest('.blk-code, .shape-layer, .image-layer, .inline-eq')) return false;
+  const block = el.closest('p, li, blockquote, h1, h2, h3, h4, h5, h6, .blk-todo, div') ?? root;
+  if (block === root) return false;
+  let changed = false;
+
+  let { startContainer: sc, startOffset: so, endContainer: ec, endOffset: eo } = range;
+  for (const span of [...block.querySelectorAll('span[style]:not([class])')]) {
+    if (before?.has(span) || before?.spans?.has(spanKey(span)) || span.attributes.length !== 1 || span.closest('.inline-eq, .katex, .link-block')) continue;
+    const parent = span.parentNode;
+    const index = Array.prototype.indexOf.call(parent.childNodes, span);
+    // The caret sits in the span's text nodes, which move with it; only a
+    // caret on the span element itself needs re-pointing to the parent.
+    if (sc === span) { sc = parent; so += index; }
+    if (ec === span) { ec = parent; eo += index; }
+    while (span.firstChild) parent.insertBefore(span.firstChild, span);
+    span.remove();
+    changed = true;
+  }
+
+  // Enter inside a styled span splits it in two; Backspace then joins the
+  // lines but drops the second half's span, so those words change style (in a
+  // quote, a span that keeps words upright: the second half went italic). The
+  // words right after the caret go back into the span they came out of.
+  if (before?.blocks !== undefined && blockCount(root) < before.blocks && range.collapsed) {
+    const at = sc.nodeType === Node.TEXT_NODE && so === 0 ? sc : sc.nodeType === Node.ELEMENT_NODE ? sc.childNodes[so] : null;
+    const span = at?.previousSibling;
+    if (at?.nodeType === Node.TEXT_NODE && span?.matches?.('span[style]:not([class])') && before.has(span)) {
+      for (let t = at; t?.nodeType === Node.TEXT_NODE;) { const next = t.nextSibling; span.appendChild(t); t = next; }
+      sc = at; so = 0; ec = at; eo = 0;
+      changed = true;
+    }
+  }
+
+  // Joining the lines, Chromium can also drop a styled span that was already
+  // there, whole: the words stay and their style goes (a quote's upright
+  // words went italic). A span that was in the note before the delete and is
+  // gone after it is put back around its words, in the line the caret is in.
+  if (before?.counts && blockCount(root) < before.blocks) {
+    const now = spanCounts(root);
+    // Splitting text moves a live range with it: let the selection carry the caret here.
+    const live = root.ownerDocument.createRange();
+    try { live.setStart(sc, so); live.setEnd(ec, eo); } catch { /* keep the captured one */ }
+    for (const [key, count] of before.counts) {
+      if ((now.get(key) ?? 0) >= count) continue;
+      const cut = key.indexOf('|');
+      const style = key.slice(0, cut);
+      const words = key.slice(cut + 1);
+      if (!words) continue;
+      // Where it was: how much of its line came after it. The words after a
+      // join are the same words, so that places it exactly — a "." is in
+      // every sentence, and searching for the text found the wrong one.
+      const lineEnd = block.textContent.length;
+      const want = (before.tails?.get(key) ?? []).map((tail) => lineEnd - tail - words.length);
+      const walker = root.ownerDocument.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+      let seen = 0;
+      for (let t = walker.nextNode(); t; seen += t.nodeValue.length, t = walker.nextNode()) {
+        const at = want.find((w) => w >= seen && w + words.length <= seen + t.nodeValue.length);
+        const i = at === undefined ? -1 : at - seen;
+        if (i < 0 || t.nodeValue.slice(i, i + words.length) !== words || t.parentElement.closest('span[style]')) continue;
+        const inside = i ? t.splitText(i) : t;
+        if (inside.nodeValue.length > words.length) inside.splitText(words.length);
+        const span = root.ownerDocument.createElement('span');
+        span.setAttribute('style', style);
+        inside.before(span);
+        span.appendChild(inside);
+        changed = true;
+        break;
+      }
+    }
+    ({ startContainer: sc, startOffset: so, endContainer: ec, endOffset: eo } = live);
+  }
+
+  const list = block.closest('ul, ol');
+  if (list && root.contains(list)) {
+    for (const other of [list.nextElementSibling, list.previousElementSibling]) {
+      if (!other || other.tagName !== list.tagName || other.className !== list.className) continue;
+      if (before?.has(other === list.nextElementSibling ? list : other)) continue;   // two lists already
+      if (other === list.nextElementSibling) { while (other.firstChild) list.appendChild(other.firstChild); }
+      else { while (other.lastChild) list.insertBefore(other.lastChild, list.firstChild); }
+      other.remove();
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    try {
+      const r = root.ownerDocument.createRange();
+      r.setStart(sc, so);
+      r.setEnd(ec, eo);
+      selection.removeAllRanges();
+      selection.addRange(r);
+    } catch { /* the caret's node is gone; Chromium's placement stands */ }
+  }
+  return changed;
+}
+
+/** What tidyAfterDelete must leave alone: read just before the delete. */
+export function beforeDelete(root) {
+  const known = new WeakSet(root.querySelectorAll('span[style]:not([class])'));
+  known.blocks = blockCount(root);
+  // By what they are too: joining lines, Chromium rebuilds a span it moves, so
+  // the one after the delete is a new element with the same style and words.
+  known.spans = new Set([...root.querySelectorAll('span[style]:not([class])')].map(spanKey));
+  known.counts = spanCounts(root);
+  known.tails = new Map();
+  for (const span of root.querySelectorAll('span[style]:not([class])')) {
+    const line = span.parentElement.closest('p, li, blockquote, h1, h2, h3, h4, h5, h6, .blk-todo, div') ?? root;
+    const after = root.ownerDocument.createRange();
+    after.selectNodeContents(line);
+    after.setStartAfter(span);
+    const key = spanKey(span);
+    known.tails.set(key, [...(known.tails.get(key) ?? []), after.toString().length]);
+  }
+  for (const list of root.querySelectorAll('ul, ol')) {
+    const next = list.nextElementSibling;
+    if (next && next.tagName === list.tagName && next.className === list.className) known.add(list);
+  }
+  return known;
+}
+
+/** Lines in the note, to tell a delete that joined two of them. */
+function blockCount(root) {
+  return root.querySelectorAll('p, li, blockquote, h1, h2, h3, h4, h5, h6, div').length;
+}
+
+function spanKey(span) {
+  return `${span.getAttribute('style')}|${span.textContent}`;
+}
+
+function spanCounts(root) {
+  const counts = new Map();
+  for (const span of root.querySelectorAll('span[style]:not([class])')) counts.set(spanKey(span), (counts.get(spanKey(span)) ?? 0) + 1);
+  return counts;
+}

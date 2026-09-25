@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.8.8",
+  "version": "0.8.9",
   "lastUpdated": "2026-09-25",
-  "currentPhase": "v0.8.8 - from the owner's test of 0.8.7 (0.8.7 was a test build only; its Rust and link-menu-keys notes ship here): floating images share the shapes' two layers (one stacking order; old .image-layer merged on open by migrate.mergeImageLayers, images after the shapes as they painted); the image bar has three placements (▾ behind, ▴ above, ≡ in the text, current lit) instead of ⇄; one selection on the canvas at a time (nebula-canvas-select); arrows follow a dragged image (rich-paste onGeometry); undo: the first key of a typing run commits the scripted change before it; the save indicator ends on Saved after an input that changed nothing; video cards fill the column up to 960px (YouTube served sddefault at 558px, maxresdefault at 958px), player first, black while loading. New e2e tests/e2e/canvas.mjs (22 checks, in smoke). Test exe first; release on the owner's go-ahead.",
-  "next": "Owner tries Nebula Test.exe 0.8.8; then npm run push.",
+  "currentPhase": "v0.8.9 - Only view (a per-note lock: ⋯ menu checkbox and a 🔒 badge; the guide seeds and refreshes locked; enforced in the capture phase for beforeinput/keys/paste/cut/drop/drag handles, plus toolbar ACTIONS and history undo/redo), arrow magnet (arrows.magnetTarget: inside or within MAGNET=28px of an object, text only from inside, objects before text, inside several the one painted on top; live snap and .arrow-target outline), diamond/triangle outline their own edge when selected and the diamond’s handles at the corners, F12 window snapshot (main-process before-input-event on every web contents + a page fallback; PNG to Pictures\\Nebula or NEBULA_SNAPSHOT_DIR, clipboard, toast), and the guide rewritten to cover every function with Where your notes live as 9 and Code blocks as 10 (Markdown first). Test exe first; release on the owner’s go-ahead.",
+  "next": "Owner tries Nebula Test.exe 0.8.9; then npm run push.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -88,6 +88,12 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "version": "0.8.9",
+      "date": "2026-09-25",
+      "by": "Claude",
+      "what": "notes.setReadOnly/toggleReadOnly (#mark, updatedAt kept), seeding and ensureGuide carry readOnly; note menu item readonly (menuitemcheckbox) and #readonly-chip; main.js applyReadOnly + capture-phase lock; toolbar ACTIONS guarded except save/print/export/copy/import; history isLocked. arrows.js MAGNET + magnetTarget, boxes() carry el/kind, drag highlights and snaps. CSS: .shape.diamond/.triangle.sel polygon stroke, diamond handle overrides removed, .arrow-target, .readonly-chip, .toast. electron/main.js takeSnapshot + web-contents-created before-input-event; preload window.snapshot/onSnapshot; app menu View -> Window snapshot; shortcut sheet F12. Guide 0.8.9 (signature b32ad974). Tests: arrows +5, notes +3, history +1, seed-guide +3 (order, Markdown first, locked) and coverage list; new e2e tests/e2e/view-snap.mjs (22)."
+    },
     {
       "version": "0.8.8",
       "date": "2026-09-25",

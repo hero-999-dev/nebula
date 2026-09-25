@@ -57,7 +57,7 @@ Every session that changed code ends with **all** of these:
 - [ ] **`tests.md`** — which tests were added or changed and what they prove
 - [ ] **`memory.json`** — version, `currentPhase`, `next`, `history[]`
 - [ ] **`Prompt.md`** — the "current state" section, if the product changed
-- [ ] **Guide note** (`src/js/seed-notes.js`) — every new *feature* (not a fix) goes into "Welcome to Nebula Guide": the "New in x.y.z" list and its own section with a "Try it". Bump `GUIDE_VERSION` and record the signature in `GUIDE_SIGNATURES` (the test says which). Demo shapes stay on the `.guide-stage` band. Owner's standing rule, 2026-09-25
+- [ ] **Guide note** (`src/js/seed-notes.js`) — every new *feature* (not a fix) goes into "Welcome to Nebula Guide": the "New in x.y.z" list and its own section with a "Try it", always ABOVE "Code blocks", which stays the last section (Markdown its first sample), with "Where your notes live" just before it. Every section ends with a divider before the next heading. The guide is regenerated into Nebula Test by every `pack:test` and checked by `tests/e2e/guide.mjs` in smoke. Bump `GUIDE_VERSION` and record the signature in `GUIDE_SIGNATURES` (the test says which). Demo shapes stay on the `.guide-stage` band. Owner's standing rule, 2026-09-25
 - [ ] **`README.md`** — if structure, scripts or workflow changed
 - [ ] **`HANDOVER.md`** — if a new trap or a new command appeared
 - [ ] `npm run push` — release the finished work; see **Releasing** below

@@ -804,3 +804,40 @@ body {
   line-height: 1.5;
   color: var(--ink-soft);
 }
+
+/* Only view (0.8.9): the badge by the title, and a toolbar that cannot edit. */
+.readonly-chip {
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper-sunken);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.readonly-chip:hover { border-color: var(--clay); color: var(--ink); }
+.note-readonly #toolbar, .note-readonly #mini-bar { opacity: .45; pointer-events: none; }
+.note-readonly .title-input { cursor: default; }
+.note-menu [data-note-act="readonly"] { display: flex; align-items: center; gap: 8px; }
+.nm-check { display: inline-block; box-sizing: border-box; width: 14px; height: 14px; flex: 0 0 14px; border: 1.4px solid var(--ink-soft); border-radius: 3px; }
+[data-note-act="readonly"][aria-checked="true"] .nm-check { background: var(--clay); border-color: var(--clay); box-shadow: inset 0 0 0 2px var(--paper-raised); }
+
+/* A short notice at the bottom (F12 snapshot, 0.8.9). */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 120;
+  transform: translateX(-50%);
+  max-width: min(640px, 90vw);
+  padding: 8px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  color: var(--ink);
+  font-size: 13px;
+  box-shadow: 0 10px 26px var(--shadow);
+  overflow-wrap: anywhere;
+}
