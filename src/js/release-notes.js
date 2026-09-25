@@ -13,6 +13,19 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  // 0.8.7 was a test build only; its notes ship here.
+  '0.8.8': {
+    headline: 'Pictures and shapes share one canvas, and videos are sharp.',
+    items: [
+      { title: 'One canvas', text: 'A floating picture and a shape can lie over or under each other and be dragged across each other. ▴ puts the one you picked on top.' },
+      { title: 'Three places for a picture', text: 'Its bar has one button each for behind the text, above the text and in the text; the lit one is where it is now.' },
+      { title: 'Sharper videos', text: 'A video fills the width of the text, so YouTube sends a sharp picture, and it is black while it loads, like on a website.' },
+      { title: 'Rust', text: 'Pick Rust for a code block: lifetimes, raw strings, macros and attributes each get their own colour. The guide has a sample.' },
+      { title: 'Choose a link with the keyboard', text: 'After pasting a URL, press the down arrow to reach the choices, left and right to move between them, and Enter to use one. Esc takes you back to your text.' },
+      { title: 'Undo in the right order', text: 'Moving a picture or a shape and then typing are two separate steps, so Ctrl+Z takes back the words first and the move next.' },
+      { title: 'Saved means saved', text: 'The indicator at the top right no longer stays on "Saving…" after a click that changed nothing.' },
+    ],
+  },
   '0.8.6': {
     headline: 'Pasted images stay in your text, and arrows have their own menu.',
     items: [

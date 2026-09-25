@@ -166,7 +166,7 @@ async function boot() {
     const separate = e.inputType !== 'insertText';
     history?.typed({ separate });
   });
-  richPaste = initRichPaste(editorEl, { history });
+  richPaste = initRichPaste(editorEl, { history, onGeometry: () => arrows?.reflow() });
   initSlashMenu(editorEl, { history, shapes, links: richPaste });
   initCodeBlocks(editorEl, { history });
   const find = initFind(editorEl);

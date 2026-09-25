@@ -108,6 +108,51 @@ describe('rich paste editing regressions', () => {
     expect(editor.textContent).toBe('before selected after');
   });
 
+  describe('the link menu by keyboard (0.8.7)', () => {
+    const key = (el, k) => el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+    const lit = () => document.querySelector('#link-menu [data-link-kind].sel')?.dataset.linkKind;
+
+    it('↓ from the address lights the first option; ← → move and wrap; ↑ goes back', () => {
+      select(editor.querySelector('p').firstChild, 21, 21);
+      rich.open('', 'https://example.com/docs');
+      const input = document.getElementById('link-url-input');
+      const order = [...document.querySelectorAll('#link-menu [data-link-kind]')].map((b) => b.dataset.linkKind);
+      expect(order).toEqual(['embed', 'bookmark', 'url', 'mention']);   // left to right on screen
+      key(input, 'ArrowDown');
+      expect(lit()).toBe('embed');
+      expect(document.activeElement.dataset.linkKind).toBe('embed');
+      key(document.activeElement, 'ArrowRight');
+      key(document.activeElement, 'ArrowRight');
+      expect(lit()).toBe('url');
+      key(document.activeElement, 'ArrowRight');
+      key(document.activeElement, 'ArrowRight');
+      expect(lit()).toBe('embed');                     // wrapped round
+      key(document.activeElement, 'ArrowLeft');
+      expect(lit()).toBe('mention');
+      key(document.activeElement, 'ArrowUp');
+      expect(document.activeElement).toBe(input);
+    });
+
+    it('Enter applies the lit option', () => {
+      select(editor.querySelector('p').firstChild, 21, 21);
+      rich.open('', 'https://example.com/docs');
+      key(document.getElementById('link-url-input'), 'ArrowDown');
+      key(document.activeElement, 'ArrowLeft');          // wraps to mention, the last
+      key(document.activeElement, 'Enter');
+      expect(document.getElementById('link-menu').hidden).toBe(true);
+      expect(editor.querySelector('a.link-mention').textContent).toBe('@example.com');
+    });
+
+    it('Esc closes the menu and gives the caret back to the note', () => {
+      select(editor.querySelector('p').firstChild, 21, 21);
+      rich.open('', 'https://example.com/docs');
+      key(document.getElementById('link-url-input'), 'ArrowDown');
+      key(document.activeElement, 'Escape');
+      expect(document.getElementById('link-menu').hidden).toBe(true);
+      expect(editor.contains(window.getSelection().anchorNode)).toBe(true);
+    });
+  });
+
   it('mention replaces a selection inline without fetching', () => {
     const kind = 'mention';
     insert(kind);
@@ -192,26 +237,51 @@ describe('rich paste editing regressions', () => {
       expect([...editor.children].map((el) => el.tagName)).toEqual(['P', 'FIGURE', 'P']);
     });
 
-    it('a dropped image still floats where it was dropped', async () => {
+    it('a dropped image floats where it was dropped, on the shapes\' canvas (0.8.8)', async () => {
       loads();
       const figure = await rich.insertImageBlob(png(), { left: 50, top: 60 });
       expect(figure.classList.contains('note-image--inline')).toBe(false);
-      expect(figure.parentElement.classList.contains('image-layer')).toBe(true);
+      expect(figure.parentElement.classList.contains('shape-layer')).toBe(true);
+      expect(figure.parentElement.classList.contains('shape-layer--behind')).toBe(false);
+      expect(editor.querySelector('.image-layer')).toBeNull();
       expect(figure.style.top).toBe('60px');
     });
 
-    it('⇄ on the image bar sets it free and puts it back in the text', async () => {
+    it('the bar offers three placements and lights the current one (0.8.8)', async () => {
       loads();
       const figure = await rich.insertImageBlob(png());
-      const flow = document.querySelector('#image-bar [data-image="flow"]');
-      flow.click();
-      expect(figure.classList.contains('note-image--inline')).toBe(false);
-      expect(figure.parentElement.classList.contains('image-layer')).toBe(true);
+      const bar = document.getElementById('image-bar');
+      const lit = () => [...bar.querySelectorAll('button.on')].map((b) => b.dataset.image);
+      expect([...bar.querySelectorAll('[data-image]')].map((b) => b.dataset.image)).toEqual(['back', 'front', 'inline', 'caption', 'del']);
+      expect(bar.querySelector('[data-image="flow"]')).toBeNull();
+      expect(lit()).toEqual(['inline']);
+
+      bar.querySelector('[data-image="front"]').click();
+      expect(figure.parentElement.matches('.shape-layer:not(.shape-layer--behind)')).toBe(true);
       expect(figure.style.left).not.toBe('');
-      flow.click();
+      expect(lit()).toEqual(['front']);
+
+      bar.querySelector('[data-image="back"]').click();
+      expect(figure.parentElement.classList.contains('shape-layer--behind')).toBe(true);
+      expect(lit()).toEqual(['back']);
+
+      bar.querySelector('[data-image="inline"]').click();
       expect(figure.classList.contains('note-image--inline')).toBe(true);
       expect(figure.parentElement).toBe(editor);
       expect(figure.style.left).toBe('');
+      expect(lit()).toEqual(['inline']);
+    });
+
+    it('shares one stacking order with the shapes: above the text means above every shape (0.8.8)', async () => {
+      loads();
+      editor.insertAdjacentHTML('afterbegin', '<div class="shape-layer" contenteditable="false"><div class="shape rect" style="left:10px;top:10px;width:80px;height:50px"></div></div>');
+      const figure = await rich.insertImageBlob(png(), { left: 20, top: 20 });
+      const canvas = editor.querySelector('.shape-layer:not(.shape-layer--behind)');
+      expect(editor.querySelectorAll('.shape-layer:not(.shape-layer--behind)')).toHaveLength(1);
+      expect(canvas.lastElementChild).toBe(figure);                      // painted over the shape
+      canvas.appendChild(canvas.querySelector('.shape'));                  // the shape bar's ▴ does this
+      expect(canvas.lastElementChild.classList.contains('shape')).toBe(true);
+      document.getElementById('image-bar').hidden = true;
     });
   });
 

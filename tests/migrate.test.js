@@ -255,6 +255,21 @@ describe('migrateNote', () => {
     expect(migrateNote(null)).toEqual({ shapes: 0, code: 0, wrappers: 0, blanks: 0 });
   });
 
+  it('moves images from their old layers onto the shapes\' canvas, above the shapes there (0.8.8)', () => {
+    const el = root('<div class="shape-layer" contenteditable="false"><div class="shape rect"></div></div>'
+      + '<div class="image-layer" contenteditable="false"><figure class="note-image" id="a"></figure><figure class="note-image" id="b"></figure></div>'
+      + '<div class="image-layer image-layer--behind" contenteditable="false"><figure class="note-image" id="c"></figure></div><p>text</p>');
+    migrateNote(el);
+    expect(el.querySelector('.image-layer')).toBeNull();
+    const front = el.querySelector('.shape-layer:not(.shape-layer--behind)');
+    expect([...front.children].map((c) => c.id || 'shape')).toEqual(['shape', 'a', 'b']);
+    expect(el.querySelector('#c').parentElement.classList.contains('shape-layer--behind')).toBe(true);
+    const once = el.innerHTML;
+    migrateNote(el);
+    expect(el.innerHTML).toBe(once);                                          // idempotent
+    expect(el.lastElementChild.tagName).toBe('P');                            // the text is untouched
+  });
+
   it('drops a rotation readout and arrow selection that 0.8.3 saved into a note', () => {
     const el = root('<div class="shape-layer" contenteditable="false"><div class="shape rect" data-rot="-75"><span class="shape-angle">285°</span></div>'
       + '<svg class="note-arrow is-selected"></svg></div><p>text</p>');

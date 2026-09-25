@@ -134,12 +134,20 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
     selected = el ?? null;
     selected?.classList.add('sel');
     document.getElementById('shape-bar')?.toggleAttribute('hidden', !selected);
-    if (selected) positionBar();
+    if (selected) {
+      positionBar();
+      // One selection on the canvas: an image that was selected lets go.
+      editorEl.dispatchEvent(new CustomEvent('nebula-canvas-select', { detail: 'shape' }));
+    }
   }
+  // ...and a shape lets go when an image is picked. The image handler stops
+  // its mousedown, so the "clicked elsewhere" listener below never saw it and
+  // both bars stayed open (0.8.8).
+  editorEl.addEventListener('nebula-canvas-select', (e) => { if (e.detail !== 'shape' && selected) select(null); });
 
   function releaseEmptyCanvases() {
     for (const layer of editorEl.querySelectorAll('.shape-layer')) {
-      if (!layer.querySelector('.shape')) layer.style.removeProperty('min-height');
+      if (!layer.querySelector('.shape, .note-image')) layer.style.removeProperty('min-height');
     }
   }
 

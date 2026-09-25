@@ -229,15 +229,29 @@ describe('typing is one step, not one per character', () => {
 
   it('coalesces a run of keystrokes', () => {
     const h = initHistory(editor);
+    // As in the app: typed() runs on beforeinput, BEFORE the key changes the note.
     for (const word of ['on', 'one', 'one ', 'one t', 'one tw', 'one two']) {
-      editor.innerHTML = `<p>${word}</p>`;
       h.typed();
+      editor.innerHTML = `<p>${word}</p>`;
       vi.advanceTimersByTime(100);
     }
     vi.advanceTimersByTime(TYPING_COALESCE_MS);
     expect(h.depth().past).toBe(1);
     h.undo();
     expect(editor.innerHTML).toBe('<p>one</p>');   // the whole run, at once
+    vi.useRealTimers();
+  });
+
+  it('a scripted change just before typing is its own step (0.8.8: an image moved, then words)', () => {
+    const h = initHistory(editor);
+    editor.innerHTML = '<p>one</p><figure style="left:80px"></figure>';   // moved by script; nothing committed
+    h.typed();                                                               // the first key of a run
+    editor.innerHTML = '<p>one two</p><figure style="left:80px"></figure>';
+    vi.advanceTimersByTime(TYPING_COALESCE_MS + 10);
+    h.undo();
+    expect(editor.innerHTML).toBe('<p>one</p><figure style="left:80px"></figure>');   // the words only
+    h.undo();
+    expect(editor.innerHTML).toBe('<p>one</p>');                                     // then the move
     vi.useRealTimers();
   });
 

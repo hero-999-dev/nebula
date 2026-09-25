@@ -15,6 +15,7 @@ export const LANGS = {
   cpp: { label: 'C++' },
   csharp: { label: 'C#' },
   dart: { label: 'Dart (Flutter)' },
+  rust: { label: 'Rust' },
   ruby: { label: 'Ruby' },
   html: { label: 'HTML' },
   css: { label: 'CSS' },
@@ -38,6 +39,7 @@ const KEYWORDS = {
   csharp: 'abstract as async await base bool break byte case catch char checked class const continue decimal default delegate do double else enum event explicit extern finally fixed float for foreach get goto if implicit in int interface internal is lock long nameof namespace new object operator out override params partial private protected public readonly record ref return sbyte sealed set short sizeof stackalloc static string struct switch this throw try typeof uint ulong unchecked unsafe ushort using var virtual void volatile while yield',
   java: 'abstract assert boolean break byte case catch char class const continue default do double else enum extends final finally float for goto if implements import instanceof int interface long native new package permits private protected public record return sealed short static strictfp super switch synchronized this throw throws transient try var void volatile while yield',
   dart: 'abstract as assert async await break case catch class const continue covariant default deferred do dynamic else enum export extends extension external factory final finally for get hide if implements import in interface is late library mixin new on operator part required rethrow return set show static super switch sync this throw try typedef var void while with yield',
+  rust: 'as async await break const continue crate dyn else enum extern fn for if impl in let loop match mod move mut pub ref return self Self static struct super trait type union unsafe use where while i8 i16 i32 i64 i128 isize u8 u16 u32 u64 u128 usize f32 f64 bool char str',
   ruby: 'alias and begin break case class def defined do else elsif end ensure for if in module next not or redo rescue retry return super then undef unless until when while yield require require_relative include extend attr_accessor attr_reader attr_writer raise lambda proc puts',
   css: '',
   html: '',
@@ -99,6 +101,26 @@ function rulesFor(lang) {
       ['fn', /\b[A-Za-z_]\w*(?=\s*\()/],
       ['klass', /\b[A-Z]\w*\b/],
       ['punct', /[{}()[\];,.]|->|::|=>|[+\-*/%=<>!&|?:~^]+/],
+    );
+  } else if (lang === 'rust') {
+    // Every group is non-capturing: `combined` numbers one group per rule, so
+    // a backreference (the usual way to match r#"…"#) would point at the wrong
+    // group. Raw strings with up to two hashes are spelled out instead.
+    common.push(
+      ['comment', /\/\/[^\n]*|\/\*[\s\S]*?\*\//],
+      ['string', /b?r##"[\s\S]*?"##|b?r#"[\s\S]*?"#|b?r"[^"]*"|b?"(?:\\.|[^"\\])*"/],
+      // A char literal closes right after one character (or escape), which is
+      // what tells 'x' apart from the lifetime in &'a str.
+      ['string', /b?'(?:\\(?:x[\da-fA-F]{2}|u\{[\da-fA-F]+\}|.)|[^'\\\n])'/],
+      ['decorator', /'[A-Za-z_]\w*/],
+      ['atrule', /#!?\[[^\]\n]*\]/],
+      ['number', /\b0[xXoObB][\da-fA-F_]+(?:[iu](?:8|16|32|64|128|size))?\b|\b\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d+)?(?:[iuf](?:8|16|32|64|128|size))?\b/],
+      ['keyword', kw],
+      ['literal', /\b(?:true|false|None|Some|Ok|Err)\b/],
+      // Macros (println!, vec!) read as calls.
+      ['fn', /\b[A-Za-z_]\w*!(?=\s*[([{])|\b[a-z_]\w*(?=\s*(?:::<[^>\n]*>)?\()/],
+      ['klass', /\b[A-Z]\w*\b/],
+      ['punct', /[{}()[\];,.]|->|=>|::|[+\-*/%=<>!&|?:~^@]+/],
     );
   } else if (lang === 'ruby') {
     common.push(

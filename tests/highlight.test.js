@@ -94,3 +94,27 @@ describe('case sensitivity', () => {
     expect(classOf('SELECT 1', 'sql', 'SELECT')).toBe('keyword');
   });
 });
+
+describe('rust (0.8.7)', () => {
+  it('is in the language picker', () => {
+    expect(LANGS.rust.label).toBe('Rust');
+  });
+
+  it('tells a char literal from a lifetime', () => {
+    expect(classOf("let c = 'x';", 'rust', "'x'")).toBe('string');
+    expect(classOf("fn f<'a>(s: &'a str) {}", 'rust', "'a")).toBe('decorator');
+  });
+
+  it('reads raw strings whole, quotes inside included', () => {
+    expect(classOf('let r = r#"a "b" c"#;', 'rust', 'r#"a "b" c"#')).toBe('string');
+  });
+
+  it('colours attributes, macros, keywords, types and number suffixes', () => {
+    expect(classOf('#[derive(Debug)]\nstruct A;', 'rust', '#[derive(Debug)]')).toBe('atrule');
+    expect(classOf('println!("{}", x);', 'rust', 'println!')).toBe('fn');
+    expect(classOf('impl Trait for A {}', 'rust', 'impl')).toBe('keyword');
+    expect(classOf('let n: u32 = 1;', 'rust', 'u32')).toBe('keyword');
+    expect(classOf('let n = 0xFFu8;', 'rust', '0xFFu8')).toBe('number');
+    expect(classOf('let o = Some(1);', 'rust', 'Some')).toBe('literal');
+  });
+});

@@ -659,6 +659,8 @@
   cursor: pointer;
 }
 .image-bar button:hover { border-color: var(--clay); color: var(--clay); }
+.image-bar button.on { border-color: var(--clay); background: var(--clay-soft); color: var(--ink); }
+.image-bar__sep { width: 1px; align-self: stretch; margin: 2px 2px; background: var(--rule); }
 
 /* ---------- pasted links ---------- */
 .link-block {
@@ -1242,7 +1244,7 @@ body.resizing webview { pointer-events: none; }
   /* A shape is positioned over the text; on paper it stays where it was. */
   .shape-layer { position: absolute !important; }
   .image-layer { position: relative !important; inset: auto !important; }
-  .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; margin: 8px 0; }
+  .note-image--inline, .image-layer .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; margin: 8px 0; }
   .note-image .image-caption { position: static; margin-top: 4px; }
   .image-h, .link-del { display: none !important; }
 }
@@ -1443,3 +1445,34 @@ body.resizing { cursor: col-resize; user-select: none; }
 /* The guide's shape stage: an empty band at the top of the guide where its demo
    shapes stand, so no line of text ever runs under them at any window width. */
 .editor .guide-stage { height: 136px; user-select: none; }
+
+/* The option chosen from the keyboard in the link menu (0.8.7). */
+.link-menu__options button.sel,
+.link-menu__options button:focus-visible {
+  outline: 2px solid var(--clay);
+  outline-offset: 1px;
+}
+
+/* A video looks like a video (0.8.8): the player first, as wide as the text
+   column (YouTube picks its picture quality by player size, and at 560px it
+   served a soft, pixelated one), black like a site's player while it loads,
+   and the link reduced to one quiet line under it. */
+.link-block.link-embed--video {
+  width: min(960px, 100%);
+  grid-template-columns: 1fr auto;
+  background: #000;
+  border-color: transparent;
+}
+.link-embed--video .link-frame { grid-row: 1; grid-column: 1 / -1; background: #000; }
+.link-embed--video .link-card {
+  grid-row: 2;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--paper-raised);
+}
+.link-embed--video .link-card__kind { display: none; }
+.link-embed--video .link-card__title { font-size: 12px; color: var(--ink-soft); }
+.link-embed--video .link-card__url { display: none; }
+.link-embed--video .link-del { grid-row: 2; align-self: center; background: var(--paper-raised); margin: 0; width: 32px; height: 100%; border-radius: 0; }

@@ -5,6 +5,41 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+## [2026-09-25 07:51] v0.8.8 - by Claude
+
+Pictures and shapes on one canvas, sharper videos, Rust, and the link menu by keyboard.
+
+* (no commits since the last release)
+
+---
+
+## [2026-09-25 06:30] v0.8.8 - by Claude
+
+The owner's findings on the 0.8.7 test build, and pictures and shapes on one canvas. 0.8.7 was never released; its notes (Rust, link menu keys) ship with this.
+
+* **Undo order.** Moving a picture and then typing were one undo step: the first key of a typing run did not close the scripted change before it. `history.typed` now commits at the start of a run, for every scripted edit (drag, resize, image bar, shape bar).
+* **"Saving…" stuck.** Every input set it; the flush after an input that changed nothing (selecting an image, clicking an arrow) returned without setting "Saved".
+* **Videos.** The card was 560px wide, and YouTube chose its 640×480 thumbnail and a low stream for that size — soft, pixelated. The card now fills the column up to 960px (the 1280×720 thumbnail), the player comes first and is black while loading, the link is one quiet line under it, and the preview-blocked hint is gone for videos.
+* **One canvas.** Floating pictures now live on the shapes' two layers (over and under the text), so a picture and a shape stack in one order and can be dragged over each other; ▴ puts the picked one on top. Old notes' image layers are merged on open, with images after the shapes, as they painted. The image bar has three placements — behind, above, in the text — the current one lit, instead of the ⇄ toggle. Found while testing and fixed: selecting a picture left a selected shape's bar open (the image handler stops its mousedown), and an arrow tied to a picture did not follow a drag.
+* New smoke module `tests/e2e/canvas.mjs` (22 checks, real pointer): the merge on open, stacking both ways, dragging each over the other, one selection at a time, an arrow following a picture, undo/redo order around a drag, resize and its undo, behind/above/in the text, switching notes, the save indicator, Delete and its undo, a restart, the video card's layout. 9 of them fail on 0.8.7.
+
+---
+
+
+
+## [2026-09-25 05:00] v0.8.7 - by Claude
+
+Two features the owner asked for.
+
+* **Rust** code blocks. The highlighter builds one regex per language with a capturing group per rule, so Rust's rules use none of their own: raw strings (`r"…"`, `r#"…"#`, `r##"…"##`) are spelled out instead of matched with a backreference; a char literal must close after one character or escape, which is what separates `'x'` from the lifetime in `&'a str`; attributes, macros (`println!`), suffixed numbers and primitive types are coloured.
+* **The link menu by keyboard.** After pasting a URL the address box has focus; ↓ lights the first choice (Embed), ← → move between them and wrap, Enter applies, ↑ returns to the address, Esc closes the menu and puts the caret back. The lit choice is outlined and the hint names the keys.
+* The guide (0.8.7) has both: "New in 0.8.7", the keys under Links, and a Rust sample under Code blocks.
+
+---
+
+
+
+
 ## [2026-09-25 03:54] v0.8.6 - by Claude
 
 Pasted images sit in the text, an arrow menu, and a guide that keeps up.

@@ -149,6 +149,11 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
   function typed({ separate = false } = {}) {
     if (restoring) return;
     if (separate) { commit(); return; }
+    // The first key of a run closes whatever was done by script since the last
+    // step — an image or shape moved, a caption, a colour — as its own step.
+    // Otherwise it was folded into the typing that followed, and one Ctrl+Z
+    // took back both the words and the move (owner's report, 0.8.7).
+    if (!typingTimer) commit();
     clearTimeout(typingTimer);
     typingTimer = setTimeout(commit, TYPING_COALESCE_MS);
   }

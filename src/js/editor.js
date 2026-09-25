@@ -21,7 +21,10 @@ export function bindEditor(el, store, onSaveState) {
       cleanTypingMarkers(copy);
       html = copy.innerHTML;
     }
-    if (html === lastHtml) return;
+    // Nothing to write, but the indicator was told "saving" when the input came
+    // in: say it is saved, or it stays on "Saving…" (0.8.7; an input event with
+    // nothing changed is routine — selecting an image, clicking an arrow).
+    if (html === lastHtml) { onSaveState?.('saved'); return; }
     store.updateNote(noteId, { content: html });
     lastHtml = html;
     onSaveState?.('saved');

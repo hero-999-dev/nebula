@@ -332,7 +332,8 @@ export function toPrintDocument({ title = 'Untitled', body = '', css = '', margi
   }
   .shape-layer { position: absolute; }
   .image-layer { position: relative; }
-  .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; }
+  /* In the text, or in an old image layer: flowed. On the canvas: where it floats, like a shape. */
+  .note-image--inline, .image-layer .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; }
   .note-image .image-caption { position: static; margin-top: 4px; font-style: italic; text-align: center; }
 </style>
 </head>

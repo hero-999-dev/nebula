@@ -12,6 +12,29 @@ const code = (src, lang) =>
   `<button type="button" class="code-del" title="Delete this code block" aria-label="Delete this code block">✕</button></div>` +
   `<pre class="code-body"><code class="code-src" contenteditable="true" spellcheck="false"></code></pre></div>`;
 
+const RUST_SRC = `// Rust — lifetimes, raw strings, macros, attributes
+use std::collections::HashMap;
+
+#[derive(Debug, Clone)]
+struct Note<'a> {
+    title: &'a str,
+    words: u32,
+}
+
+fn longest<'a>(notes: &[Note<'a>]) -> Option<&Note<'a>> {
+    notes.iter().max_by_key(|n| n.words)
+}
+
+fn main() {
+    let raw = r#"a "quoted" title"#;
+    let mut seen: HashMap<char, usize> = HashMap::new();
+    for c in raw.chars().filter(|c| c.is_alphabetic()) {
+        *seen.entry(c).or_insert(0) += 1;
+    }
+    let notes = vec![Note { title: raw, words: 0x2A }, Note { title: "short", words: 3 }];
+    println!("{:?} {}", longest(&notes).map(|n| n.title), seen.len());
+}`;
+
 const JS_SRC = `// JavaScript — strings, numbers, keywords, regex
 import { highlight } from './highlight.js';
 
@@ -274,13 +297,13 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * an installed copy. That meant the thing you were looking for was in whichever
  * note you had not opened, and the two sets drifted apart. This is a single
  * page with headings: welcome first, then every feature with something to try
- * under it, then all fifteen code languages.
+ * under it, then every code language, each with a sample.
  *
  * Bump GUIDE_VERSION whenever the content changes — `NoteStore.ensureGuide`
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '0.8.6';
+export const GUIDE_VERSION = '0.8.8';
 
 /**
  * The guide's words, without its markup, shapes, code or equations — so a
@@ -307,6 +330,8 @@ export function guideSignature(html) {
 export const GUIDE_SIGNATURES = {
   '0.6.0': 'c33a6b3a',
   '0.8.6': '66f979f9',
+  '0.8.7': '2ef83bbb',
+  '0.8.8': 'c4a8a567',
 };
 
 /** Whether a vault's guide is one we shipped and nobody has typed in. */
@@ -337,11 +362,13 @@ export const GUIDE_NOTE = {
 
     // Each release adds its features here (features, not fixes) and in the
     // section they belong to. See GUIDE_SIGNATURES before changing any text.
-    '<h2>New in 0.8.6</h2>' +
+    '<h2>New in 0.8.8</h2>' +
     '<ul>' +
-    '<li><strong>Images sit in your text.</strong> A pasted image goes on the line you are on and moves with the words at any window size; <em>⇄</em> on its bar lets it float freely — section 7.</li>' +
-    '<li><strong>An arrow menu</strong> beside the shapes: straight, elbow and curved — section 6.</li>' +
-    '<li>Recently: <strong>links on any words</strong>, <strong>image captions</strong>, <strong>videos that play in the note</strong> (0.8.5); <strong>arrows</strong>, a <strong>rotation readout</strong> and <strong>moving a note to another Nebula</strong> (0.8.3).</li>' +
+    '<li><strong>Pictures and shapes on one canvas.</strong> A floating picture and a shape can lie over or under each other; ▴ puts whichever you picked on top of the rest — section 6.</li>' +
+    '<li><strong>Three places for a picture:</strong> behind the text, above it, or in it — one button each on the picture’s bar — section 7.</li>' +
+    '<li><strong>Sharper videos</strong> that fill the width of the text — section 7.</li>' +
+    '<li><strong>Rust</strong> in code blocks — section 9. <strong>The link menu by keyboard:</strong> ↓, then ← → and Enter — section 7.</li>' +
+    '<li>Recently: <strong>images that sit in your text</strong> and an <strong>arrow menu</strong> (0.8.6); <strong>links on any words</strong>, <strong>image captions</strong>, <strong>videos that play in the note</strong> (0.8.5); <strong>arrows</strong>, a <strong>rotation readout</strong> and <strong>moving a note to another Nebula</strong> (0.8.3).</li>' +
     '</ul>' +
 
     '<h2>1 · The window</h2>' +
@@ -407,6 +434,8 @@ export const GUIDE_NOTE = {
     '<h2>6 · Shapes</h2>' +
     '<p>Shapes float over the whole note — the three at the top of this page are real ones. Drag them down here, resize from the corner handle, double-click to write inside, and turn them with the round handle: the angle shows while you turn (the green one is tilted by −6°). Text wrap is <strong>through</strong>: the words never reflow, the shape floats above or below them.</p>' +
     '<p>Selecting a shape opens its little bar: six colours, <em>▾</em> to send it behind the text, <em>▴</em> to bring it above, <em>✕</em> to delete it.</p>' +
+    '<p>Shapes and floating pictures share one canvas: they stack in a single order, so either can lie over the other. <em>▴</em> on a shape’s or a picture’s bar puts it on top of everything there.</p>' +
+    '<p><strong>Try it:</strong> paste a picture, press <em>▴</em> on its bar to set it free, drag it half over the green shape at the top, then select the shape and press <em>▴</em> — now the shape is on top.</p>' +
     '<p><strong>Try it:</strong> send the green rectangle behind the text and drag it over this paragraph — the words run <em>on top of</em> it, at full strength, not through a faded copy.</p>' +
     '<p><strong>Try it:</strong> press <em>✕</em>. The shape goes and the bar goes with it — same for Esc, for clicking anywhere off a shape, and for switching notes. The bar is never left floating with nothing selected.</p>' +
     '<p>Add more from the toolbar ◇ button (<em>▾</em> for every kind) or type <span class="inline-code">/shape</span>.</p>' +
@@ -416,9 +445,11 @@ export const GUIDE_NOTE = {
 
     '<h2>7 · Links, pictures and videos</h2>' +
     '<p><strong>Paste a URL</strong> on its own and Nebula asks how to show it: as the <strong>URL</strong>, as a short <strong>mention</strong>, as a <strong>bookmark</strong> card, or as an <strong>embed</strong> that loads the page inside the note (with its own sign-in forms). If a site refuses, the link above it opens it in your browser.</p>' +
+    '<p>No mouse needed: in that menu press <strong>↓</strong> to reach the choices, <strong>←</strong> and <strong>→</strong> to move between them, and <strong>Enter</strong> to use the lit one. <strong>↑</strong> goes back to the address, <strong>Esc</strong> closes the menu and returns you to your text.</p>' +
+    '<p><strong>Try it:</strong> copy any web address, paste it on an empty line, then ↓ → → Enter.</p>' +
     '<p><strong>Link any words:</strong> select them and paste a URL over them, or use the link button in the toolbar. <strong>Ctrl+click</strong> a link to open it; choosing the link button again with an empty address takes the link off.</p>' +
-    '<p><strong>Videos:</strong> embed a YouTube or Vimeo link and you get the player itself, sized for video — a start time in the link is kept.</p>' +
-    '<p><strong>Pictures:</strong> paste an image and it goes on the line you are on, part of the text, so it moves with the words at any window size. Click it for its bar: <em>Aa</em> writes a caption under it, <em>⇄</em> lets it float freely (then <em>▾</em>/<em>▴</em> put it behind or above the text), <em>✕</em> deletes it. The corner handle resizes it. An image dropped from a folder floats where you drop it.</p>' +
+    '<p><strong>Videos:</strong> embed a YouTube or Vimeo link and you get the player itself, as wide as the text (up to a comfortable size) so the picture is sharp, black while it loads like on any site — a start time in the link is kept.</p>' +
+    '<p><strong>Pictures:</strong> paste an image and it goes on the line you are on, part of the text, so it moves with the words at any window size. Click it for its bar, where three buttons say where it lives and the current one is lit: <em>▾</em> behind the text, <em>▴</em> above the text (floating, on top), <em>≡</em> in the text. <em>Aa</em> writes a caption under it, <em>✕</em> deletes it, and the corner handle resizes it. An image dropped from a folder floats where you drop it.</p>' +
     '<p><strong>Try it:</strong> copy any picture, click at the end of this line and paste. Give it a caption, then make the window narrow and wide — the picture stays between the same two lines.</p>' +
 
     '<h2>8 · Moving a note to another Nebula</h2>' +
@@ -434,6 +465,7 @@ export const GUIDE_NOTE = {
     '<h3>C#</h3>' + code(CSHARP_SRC, 'csharp') +
     '<h3>Java</h3>' + code(JAVA_SRC, 'java') +
     '<h3>Dart (Flutter)</h3>' + code(DART_SRC, 'dart') +
+    '<h3>Rust</h3>' + code(RUST_SRC, 'rust') +
     '<h3>Ruby</h3>' + code(RUBY_SRC, 'ruby') +
     '<h3>HTML</h3>' + code(HTML_SRC, 'html') +
     '<h3>CSS</h3>' + code(CSS_SRC, 'css') +

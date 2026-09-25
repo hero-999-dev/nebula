@@ -4,8 +4,8 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 444 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 258 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 456 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 282 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
@@ -32,11 +32,15 @@ A different kind of test: not "does this handler work" but "can Nebula write thi
 
 Reports, screens and the rebuilt note stay in `test-results/` (gitignored): they hold the article. The rebuilt note is also written into Nebula Test's vault (`Nebula-data`, gitignored) as `rebuild-<page>`, replaced on every run, so Nebula Test always shows the page as the current version wrote it (`--no-vault` skips this).
 
-### `tests/e2e/rebuild-findings.mjs` (in smoke, 15 checks)
+### `tests/e2e/canvas.mjs` (in smoke, 22 checks, new in 0.8.8)
 
-What the rebuild found and needed, offline and with keys and pointer only: Enter on an empty quote line leaves it; italic switched off before Enter stays off; a pasted YouTube link embeds the player URL with a start time, keeps the pasted link on the card, and sends a Referer; a URL pasted over selected words links them and typing after stays outside the link; Ctrl+click opens a link (shell.openExternal stubbed); the image bar adds a caption and Enter returns typing to the note; /divider on an empty line and the heading after it are top level; arrows have their own menu with icons and untruncated names; a pasted image goes into the text on the caret line and overlaps nothing at 1920 or 900 px wide.
+Pictures and shapes on one canvas, with the real pointer: an old note's image layer merged on open (the picture still over the shape), ▴ on a shape then on the picture flips the order, each drags across the other without moving it, one bar open at a time both ways, an arrow tied to a picture follows its drag, undo order around a drag (words after, the drag, words before) and redo, resize and its undo, behind/above/in the text by real clicks with the lit button, the same after switching notes, the save indicator after an input that changed nothing, Delete and its undo, all of it after a restart, and a video card that is 16:9, wider than 560px, player first, no hint. 9 fail on 0.8.7.
 
-Unit additions: `tests/rebuild.test.js` (16: plan reading, H1/H2 mapping, run spacing, scoring incl. real captions and normalised link addresses, regressions), `tests/blocks.test.js` +4 (quote exit), `tests/seed-guide.test.js` (new, 5: the shipped guide's signature is on record, 0.6.0 still known, markup-only changes still count as unedited and typed words do not, shapes stay on the stage, the guide names every feature since 0.6.0), `tests/notes.test.js` +2 (an unedited guide is refreshed in place, a written-in one never), `tests/rich-paste.test.js` +22 (a pasted image goes into the text, replaces an empty line, a dropped one floats, ⇄ both ways; `embedSource`, links on words and unlinking, captions: bar button, Enter back to the note, empty removed, Backspace never deletes the image, Markdown export), `tests/inline-format.test.js` +4 (formats off across Enter).
+### `tests/e2e/rebuild-findings.mjs` (in smoke, 17 checks)
+
+What the rebuild found and needed, offline and with keys and pointer only: Enter on an empty quote line leaves it; italic switched off before Enter stays off; a pasted YouTube link embeds the player URL with a start time, keeps the pasted link on the card, and sends a Referer; a URL pasted over selected words links them and typing after stays outside the link; Ctrl+click opens a link (shell.openExternal stubbed); the image bar adds a caption and Enter returns typing to the note; /divider on an empty line and the heading after it are top level; arrows have their own menu with icons and untruncated names; a pasted image goes into the text on the caret line and overlaps nothing at 1920 or 900 px wide; in the link menu ↓ ← Enter picks Mention by wrapping (0.8.7); the guide's Rust sample is coloured in the running app (0.8.7).
+
+Unit additions: `tests/rebuild.test.js` (16: plan reading, H1/H2 mapping, run spacing, scoring incl. real captions and normalised link addresses, regressions), `tests/blocks.test.js` +4 (quote exit), `tests/save-indicator.test.js` (new, 2: an input that changed nothing still ends on "saved"; a real change is written), `tests/history.test.js` +1 (a scripted change just before typing is its own step; the coalescing test now calls typed() before the change, as beforeinput does), `tests/migrate.test.js` +1 (image layers merge onto the canvas after the shapes, idempotent), `tests/rich-paste.test.js` three placements and one stacking order replace the ⇄ test, `tests/highlight.test.js` +4 (Rust: picker entry, char literal vs lifetime, raw strings, attributes/macros/keywords/types/suffixes), `tests/rich-paste.test.js` +3 more (link menu keys: order, ↓ ← → wrap ↑, Enter applies, Esc gives the caret back), `tests/seed-guide.test.js` (new, 5: the shipped guide's signature is on record, 0.6.0 still known, markup-only changes still count as unedited and typed words do not, shapes stay on the stage, the guide names every feature since 0.6.0), `tests/notes.test.js` +2 (an unedited guide is refreshed in place, a written-in one never), `tests/rich-paste.test.js` +22 (a pasted image goes into the text, replaces an empty line, a dropped one floats, ⇄ both ways; `embedSource`, links on words and unlinking, captions: bar button, Enter back to the note, empty removed, Backspace never deletes the image, Markdown export), `tests/inline-format.test.js` +4 (formats off across Enter).
 
 ### `tests/e2e/ideas-note.mjs` (in smoke, 12 checks)
 

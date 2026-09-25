@@ -42,7 +42,7 @@ describe('guide page', () => {
   it('tells what the current release added, and covers every feature since 0.6.0', () => {
     const text = doc.body.textContent;
     expect(text).toContain(`New in ${GUIDE_VERSION}`);
-    for (const feature of ['Four themes', 'Arrows', 'angle shows', 'Link any words', 'Ctrl+click', 'Videos', 'caption', '⇄', 'Nebula note (.json)', 'bookmark']) {
+    for (const feature of ['Four themes', 'Arrows', 'angle shows', 'Link any words', 'Ctrl+click', 'Videos', 'caption', 'behind the text', 'one canvas', 'Rust', 'Nebula note (.json)', 'bookmark']) {
       expect(text).toContain(feature);
     }
   });

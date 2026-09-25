@@ -199,6 +199,36 @@ export async function runRebuildFindingChecks(check) {
       }));
     }
     check('the image in the text never overlaps the text, wide or narrow', clear.every(Boolean), JSON.stringify(clear));
+
+    /* The link menu by keyboard (0.8.7): ↓ into the choices, ← → between them, Enter. */
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1280, 1000));
+    await win.evaluate(() => document.getElementById('editor').focus());
+    await win.keyboard.press('Control+End');
+    await win.keyboard.press('Enter');
+    await app.evaluate(({ clipboard }) => clipboard.writeText('https://example.org/keys'));
+    await win.keyboard.press('Control+v');
+    await win.waitForFunction(() => document.getElementById('link-url-input')?.offsetParent, null, { polling: 50 });
+    // The menu focuses its address on the next frame; a person reads it first.
+    await win.waitForFunction(() => document.activeElement?.id === 'link-url-input', null, { polling: 50 });
+    await win.keyboard.press('ArrowDown');
+    const first = await win.evaluate(() => document.activeElement?.dataset?.linkKind);
+    await win.keyboard.press('ArrowLeft');                 // wraps to the last: Mention
+    await win.keyboard.press('Enter');
+    const byKeys = await win.evaluate(() => ({
+      menuHidden: document.getElementById('link-menu').hidden,
+      mention: [...document.querySelectorAll('#editor a.link-mention')].some((a) => a.getAttribute('href') === 'https://example.org/keys'),
+    }));
+    check('in the link menu ↓ reaches the choices and ← → Enter picks one', first === 'embed' && byKeys.menuHidden && byKeys.mention, JSON.stringify({ first, ...byKeys }));
+
+    /* Rust (0.8.7): the guide's Rust sample is coloured in the running app. */
+    await win.evaluate(() => [...document.querySelectorAll('.note-row')].find((r) => r.textContent.includes('Welcome to Nebula Guide'))?.click());
+    await win.waitForFunction(() => document.querySelector('#editor .blk-code[data-lang="rust"] .code-src span'), null, { polling: 100, timeout: 8000 }).catch(() => {});
+    const rust = await win.evaluate(() => {
+      const src = document.querySelector('#editor .blk-code[data-lang="rust"] .code-src');
+      const has = (cls, text) => [...(src?.querySelectorAll(`.tok-${cls}`) || [])].some((t) => t.textContent === text);
+      return { block: !!src, lifetime: has('decorator', "'a"), attribute: has('atrule', '#[derive(Debug, Clone)]'), macro: has('fn', 'println!'), picker: !!document.querySelector('.code-lang option[value="rust"]') };
+    });
+    check('Rust code blocks are coloured (lifetimes, attributes, macros) and in the picker', Object.values(rust).every(Boolean), JSON.stringify(rust));
   } catch (err) {
     check('rebuild-finding checks ran to the end', false, err.message.split('\n')[0]);
   } finally {

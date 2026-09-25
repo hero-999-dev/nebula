@@ -124,19 +124,14 @@ function directBlock(editor, node) {
   return null;
 }
 
+/**
+ * Floating images share the shapes' two layers (0.8.8): one canvas above the
+ * text and one under it, where images and shapes stack in one order and can
+ * be dragged over and under each other. Until 0.8.7 images had layers of
+ * their own, always painted above every shape.
+ */
 function ensureLayer(editor, behind = false) {
-  const selector = behind
-    ? ':scope > .image-layer--behind'
-    : ':scope > .image-layer:not(.image-layer--behind)';
-  let layer = editor.querySelector(selector);
-  if (!layer) {
-    layer = document.createElement('div');
-    layer.className = behind ? 'image-layer image-layer--behind' : 'image-layer';
-    layer.setAttribute('contenteditable', 'false');
-    layer.dataset.blockType = 'image-layer';
-    editor.insertBefore(layer, editor.firstChild);
-  }
-  return layer;
+  return ensureCanvas(editor, behind);
 }
 
 function imagePoint(editor, clientX, clientY) {
@@ -254,7 +249,7 @@ function makeLinkBlock(url, kind) {
   return card;
 }
 
-export function initRichPaste(editor, { history } = {}) {
+export function initRichPaste(editor, { history, onGeometry } = {}) {
   if (!editor) return null;
   let pendingRange = null;
   let selectedImage = null;
@@ -325,7 +320,7 @@ export function initRichPaste(editor, { history } = {}) {
     linkInput.value = url || (onWords && existing ? existing.getAttribute('href') : '');
     linkHint.textContent = onWords
       ? 'URL links the selected words. Leave it empty to remove a link.'
-      : url ? 'Choose how this link should appear.' : 'Paste a URL, then choose a format.';
+      : url ? 'Choose how this link should appear — ↓, then ← → and Enter.' : 'Paste a URL, then choose a format — ↓, then ← → and Enter.';
     linkMenu.querySelectorAll('[data-link-kind]').forEach((button) => {
       button.classList.toggle('sel', button.dataset.linkKind === kind);
     });
@@ -478,8 +473,40 @@ export function initRichPaste(editor, { history } = {}) {
     const kind = event.target.closest('[data-link-kind]')?.dataset.linkKind;
     if (kind) applyLink(kind);
   });
+  /**
+   * The menu by keyboard (0.8.7): from the address, ↓ steps into the options;
+   * ← → move between them (wrapping), Enter applies the lit one, ↑ goes back
+   * to the address. Esc anywhere closes it and puts the caret back in the note.
+   */
+  const kindButtons = () => [...linkMenu.querySelectorAll('[data-link-kind]')];
+  function lightKind(button) {
+    for (const b of kindButtons()) b.classList.toggle('sel', b === button);
+    button?.focus();
+  }
   linkInput.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') { event.preventDefault(); applyLink(preferredKind || 'url'); }
+    if (event.key === 'Enter') { event.preventDefault(); applyLink(preferredKind || 'url'); return; }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      const buttons = kindButtons();
+      lightKind(buttons.find((b) => b.dataset.linkKind === preferredKind) || buttons[0]);
+    }
+  });
+  linkMenu.addEventListener('keydown', (event) => {
+    const button = event.target.closest?.('[data-link-kind]');
+    if (!button) return;
+    const buttons = kindButtons();
+    const at = buttons.indexOf(button);
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+      event.preventDefault();
+      const step = event.key === 'ArrowRight' ? 1 : -1;
+      lightKind(buttons[(at + step + buttons.length) % buttons.length]);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      linkInput.focus();
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      applyLink(button.dataset.linkKind);
+    }
   });
   editor.addEventListener('mousedown', (event) => {
     if (event.target.closest('[data-link-remove]')) event.preventDefault();
@@ -500,10 +527,13 @@ export function initRichPaste(editor, { history } = {}) {
     bar.id = 'image-bar';
     bar.className = 'image-bar';
     bar.hidden = true;
-    bar.innerHTML = '<button type="button" data-image="back" title="Send behind text">▾</button>'
-      + '<button type="button" data-image="front" title="Bring above text">▴</button>'
+    // Three placements side by side, the current one lit (owner's request,
+    // replacing the ⇄ toggle): under the text, over it, or in it.
+    bar.innerHTML = '<button type="button" data-image="back" title="Behind the text (floats)">▾</button>'
+      + '<button type="button" data-image="front" title="Above the text (floats, on top)">▴</button>'
+      + '<button type="button" data-image="inline" title="In the text (moves with the words)">≡</button>'
+      + '<span class="image-bar__sep"></span>'
       + '<button type="button" data-image="caption" title="Add or edit a caption">Aa</button>'
-      + '<button type="button" data-image="flow" title="Float freely / keep in the text">⇄</button>'
       + '<button type="button" data-image="del" title="Delete image">✕</button>';
     document.body.appendChild(bar);
     return bar;
@@ -521,17 +551,30 @@ export function initRichPaste(editor, { history } = {}) {
     imageBar.style.top = `${Math.max(8, Math.min(top, window.innerHeight - height - 8))}px`;
   }
 
+  /** Which of the three placements an image has. */
+  function placementOf(image) {
+    if (image.classList.contains('note-image--inline')) return 'inline';
+    return image.closest('.shape-layer--behind, .image-layer--behind') ? 'back' : 'front';
+  }
+
   function selectImage(image) {
     editor.querySelectorAll('.note-image.sel').forEach((node) => node.classList.remove('sel'));
     selectedImage = image || null;
     selectedImage?.classList.add('sel');
     imageBar.hidden = !selectedImage;
-    if (selectedImage) positionImageBar();
+    if (selectedImage) {
+      editor.dispatchEvent(new CustomEvent('nebula-canvas-select', { detail: 'image' }));
+      const place = placementOf(selectedImage);
+      for (const b of imageBar.querySelectorAll('[data-image="back"], [data-image="front"], [data-image="inline"]')) {
+        b.classList.toggle('on', b.dataset.image === place);
+      }
+      positionImageBar();
+    }
   }
 
   function behindImageAt(x, y) {
     let hit = null;
-    for (const image of editor.querySelectorAll('.image-layer--behind .note-image')) {
+    for (const image of editor.querySelectorAll('.shape-layer--behind .note-image, .image-layer--behind .note-image')) {
       const rect = image.getBoundingClientRect();
       if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) hit = image;
     }
@@ -721,6 +764,7 @@ export function initRichPaste(editor, { history } = {}) {
       if (!inText) drag.image.style.height = `${Math.round(width / drag.ratio)}px`;
     }
     positionImageBar();
+    onGeometry?.();
   });
 
   function finishDrag() {
@@ -730,9 +774,10 @@ export function initRichPaste(editor, { history } = {}) {
       if (!drag.layer.getAttribute('style')) drag.layer.removeAttribute('style');
     }
     editor.classList.remove('image-dragging');
-    if (drag.moved) dirty();
+    if (drag.moved) { onGeometry?.(); dirty(); }
     drag = null;
   }
+  editor.addEventListener('nebula-canvas-select', (e) => { if (e.detail !== 'image' && selectedImage) selectImage(null); });
   window.addEventListener('mouseup', finishDrag);
   window.addEventListener('blur', finishDrag);
 
@@ -809,15 +854,17 @@ export function initRichPaste(editor, { history } = {}) {
     const act = event.target.closest('[data-image]')?.dataset.image;
     if (!selectedImage || !act) return;
     if (act === 'caption') { editCaption(selectedImage); return; }
-    if (act === 'flow') {
+    if (act === 'inline') {
       history?.push();
-      setImageFloating(selectedImage, selectedImage.classList.contains('note-image--inline'));
+      setImageFloating(selectedImage, false);
       selectImage(selectedImage);
+      onGeometry?.();
       dirty();
       return;
     }
-    // Behind/above text only means something for a floating image: set it free first.
+    // Behind/above text: an image in the text is set free where it stands first.
     if ((act === 'back' || act === 'front') && selectedImage.classList.contains('note-image--inline')) {
+      history?.push();
       setImageFloating(selectedImage, true);
     }
     if (act === 'del') {
@@ -831,7 +878,8 @@ export function initRichPaste(editor, { history } = {}) {
     const behind = act === 'back';
     selectedImage.classList.toggle('behind', behind);
     ensureLayer(editor, behind).appendChild(selectedImage);
-    positionImageBar();
+    selectImage(selectedImage);
+    onGeometry?.();
     dirty();
   });
 
@@ -845,7 +893,12 @@ export function initRichPaste(editor, { history } = {}) {
   window.addEventListener('resize', () => { if (selectedImage) positionImageBar(); });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !linkMenu.hidden) { hideLinkMenu(); return; }
+    if (event.key === 'Escape' && !linkMenu.hidden) {
+      const back = pendingRange;
+      hideLinkMenu();
+      if (back) restoreRange(editor, back);
+      return;
+    }
     const cap = event.target.closest?.('.image-caption');
     if (cap && (event.key === 'Enter' || event.key === 'Escape')) {
       event.preventDefault();
@@ -960,4 +1013,5 @@ export function initRichPaste(editor, { history } = {}) {
     reset: () => { generation += 1; drag = null; editor.classList.remove('image-dragging'); selectImage(null); hideLinkMenu(); },
     insertImageBlob,
   };
-}
+}import { ensureLayer as ensureCanvas } from './shapes.js';
+

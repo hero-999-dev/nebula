@@ -15,12 +15,12 @@
  */
 
 import { ensureHeadControls, paintCode } from './codeblock.js';
-import { outlineSvg } from './shapes.js';
+import { outlineSvg, ensureLayer } from './shapes.js';
 import { normalizeUnderlineInk } from './inline-family.js';
 import { liftNestedDividers } from './blocks.js';
 
 /** Bumped whenever a step is added, so the log line means something. */
-export const MARKUP_VERSION = '0.8.4';
+export const MARKUP_VERSION = '0.8.8';
 
 /**
  * @param {Element} root the editor
@@ -31,6 +31,7 @@ export const MARKUP_VERSION = '0.8.4';
  */
 export function migrateNote(root, { fitShape } = {}) {
   if (!root) return { shapes: 0, code: 0, wrappers: 0, blanks: 0 };
+  mergeImageLayers(root);
   const wrappers = unwrapBlockSwallowingSpans(root);
   liftNestedDividers(root);
   // 0.8.3 saved the rotation readout ("285°") into the shape it labelled.
@@ -44,6 +45,26 @@ export function migrateNote(root, { fitShape } = {}) {
     wrappers,
     blanks: migrateBlankLines(root),
   };
+}
+
+/**
+ * Floating images used to have layers of their own, painted above every shape.
+ * From 0.8.8 they share the shapes' layers so the two can be stacked and moved
+ * over each other. Each image joins the matching layer AFTER the shapes there,
+ * which is exactly where its own layer used to paint it. Idempotent.
+ */
+export function mergeImageLayers(root) {
+  let moved = 0;
+  for (const old of [...root.querySelectorAll(':scope > .image-layer')]) {
+    const behind = old.classList.contains('image-layer--behind');
+    const images = [...old.querySelectorAll(':scope > .note-image')];
+    if (images.length) {
+      const canvas = ensureLayer(root, behind);
+      for (const image of images) { canvas.appendChild(image); moved += 1; }
+    }
+    if (!old.querySelector('.note-image')) old.remove();
+  }
+  return moved;
 }
 
 /** Old notes mixed anonymous text lines with non-editable overlays. Give each

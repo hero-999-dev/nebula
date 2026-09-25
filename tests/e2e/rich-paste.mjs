@@ -142,9 +142,10 @@ export async function runRichPasteChecks(check) {
     const ordered = await win.evaluate(() => {
       const image = document.querySelector('.note-image');
       document.querySelector('#image-bar [data-image="back"]').click();
-      const back = image.parentElement.classList.contains('image-layer--behind');
+      // Since 0.8.8 floating images share the shapes' layers.
+      const back = image.parentElement.classList.contains('shape-layer--behind');
       document.querySelector('#image-bar [data-image="front"]').click();
-      const front = !image.parentElement.classList.contains('image-layer--behind');
+      const front = image.parentElement.matches('.shape-layer:not(.shape-layer--behind)');
       return { back, front };
     });
     check('the image bar sends an image behind and brings it front', ordered.back && ordered.front, JSON.stringify(ordered));

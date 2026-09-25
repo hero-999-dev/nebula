@@ -120,10 +120,10 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.8.6)
+## Current implementation state (v0.8.8)
 
 **Working:** the whole editor described above — dock pad, two-row toolbar,
-mini toolbar, slash menu that restyles only the caret's block (including a bare `<div>` line), code blocks with syntax colours, free-floating shapes with a live angle, arrows that can point at a shape, link, image or text line, pasted images that sit in the text (or float, from the image bar), four-way link paste with embeds in a webview (a YouTube/Vimeo link embeds its player), a Nebula note file (`.nebula.json`, sanitised on import; a raw vault note file also imports) that round-trips the note, deletable arrows, AI panel with tabs, a Chrome user agent, and Sign in in browser,
+mini toolbar, slash menu that restyles only the caret's block (including a bare `<div>` line), code blocks with syntax colours (Rust included), free-floating shapes with a live angle, arrows that can point at a shape, link, image or text line, pasted images that sit in the text (or float, from the image bar), four-way link paste with embeds in a webview (a YouTube/Vimeo link embeds its player), a Nebula note file (`.nebula.json`, sanitised on import; a raw vault note file also imports) that round-trips the note, deletable arrows, AI panel with tabs, a Chrome user agent, and Sign in in browser,
 the Main/Dark/Light/White theme picker, and one
 starter note - `Welcome to Nebula Guide`, the same page in every build, with a
 working sample for every code language.

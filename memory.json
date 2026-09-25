@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.8.6",
+  "version": "0.8.8",
   "lastUpdated": "2026-09-25",
-  "currentPhase": "v0.8.6 - from the owner's screen recording of the rebuilt article in Nebula Test: pasted images now go into the text flow (figure.note-image--inline after the caret line; ⇄ on the image bar floats it or puts it back; dropped images still float), because pixel-positioned images landed on the text and left gaps at any other window width; captions of in-text images stay in the flow (a same-specificity CSS rule had hung them over the next paragraph); arrows moved to their own toolbar menu with icons (their icon-less rows had read \"S…\"); video cards lose the preview-blocked hint. The local page-rebuild test now measures layout at three window sizes and counts blank-line runs, and rewrites two articles. The Welcome guide now gets every release's features and refreshes itself while unedited; its shapes stand on a stage above the text. Test exe and release on the owner's go-ahead.",
-  "next": "Owner tries 0.8.6.",
+  "currentPhase": "v0.8.8 - from the owner's test of 0.8.7 (0.8.7 was a test build only; its Rust and link-menu-keys notes ship here): floating images share the shapes' two layers (one stacking order; old .image-layer merged on open by migrate.mergeImageLayers, images after the shapes as they painted); the image bar has three placements (▾ behind, ▴ above, ≡ in the text, current lit) instead of ⇄; one selection on the canvas at a time (nebula-canvas-select); arrows follow a dragged image (rich-paste onGeometry); undo: the first key of a typing run commits the scripted change before it; the save indicator ends on Saved after an input that changed nothing; video cards fill the column up to 960px (YouTube served sddefault at 558px, maxresdefault at 958px), player first, black while loading. New e2e tests/e2e/canvas.mjs (22 checks, in smoke). Test exe first; release on the owner's go-ahead.",
+  "next": "Owner tries Nebula Test.exe 0.8.8; then npm run push.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -88,6 +88,18 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "version": "0.8.8",
+      "date": "2026-09-25",
+      "by": "Claude",
+      "what": "history.typed commits at the start of a run; editor.flush reports saved on no change; rich-paste ensureLayer -> shapes.ensureLayer, placementOf/three placement buttons (.on), nebula-canvas-select both ways, onGeometry -> arrows.reflow; shapes releaseEmptyCanvases counts images; migrate.mergeImageLayers (MARKUP_VERSION 0.8.8); print keeps floating images where they float; CSS video card (.link-block.link-embed--video). Guide 0.8.8 (signature c4a8a567). Tests: history +1 (+1 reordered to the app's beforeinput order), save-indicator (new, 2), rich-paste +3/-2, migrate +1, seed-guide list, canvas.mjs (new e2e, 22; 9 fail on 0.8.7)."
+    },
+    {
+      "version": "0.8.7",
+      "date": "2026-09-25",
+      "by": "Claude",
+      "what": "Rust: LANGS.rust, keywords incl. primitive types, a rust rule set (no capturing groups because combined() numbers one group per rule). Link menu keys in rich-paste (lightKind, ↓/←/→/↑/Enter, Esc restores pendingRange) with a visible .sel outline and a hint naming the keys. Guide 0.8.7 (New in 0.8.7, keys under Links, RUST_SRC sample; signature 2ef83bbb). Tests: highlight +4, rich-paste +3, rebuild-findings +2 (keys pick Mention by wrapping; the guide Rust sample is coloured in the app)."
+    },
     {
       "version": "0.8.6",
       "date": "2026-09-25",
