@@ -19,6 +19,7 @@ import { runReportedChecks } from './reported.mjs';
 import { runEdgeChecks } from './editing-edges.mjs';
 import { runRichPasteChecks } from './rich-paste.mjs';
 import { runIdeasChecks } from './ideas-note.mjs';
+import { runRebuildFindingChecks } from './rebuild-findings.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mainJs = path.join(root, 'dist-electron', 'main.js');
@@ -2320,6 +2321,7 @@ try {
   await runEdgeChecks(check);
   await runRichPasteChecks(check);
   await runIdeasChecks(check);
+  await runRebuildFindingChecks(check);
 } catch (err) {
   failure = err;
   check('smoke run completed', false, err.message);

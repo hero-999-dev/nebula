@@ -143,6 +143,7 @@ async function boot() {
   const shapes = initShapes(editorEl, { history, onGeometry: () => arrows?.reflow() });
   const arrows = initArrows(editorEl, { history });
   const toolbar = initToolbar(editorEl, {
+    onLink: () => richPaste?.open('url'),
     shapes,
     arrows,
     history,

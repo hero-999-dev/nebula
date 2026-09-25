@@ -3,7 +3,7 @@
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
 import { icon } from './icons.js';
-import { blockFromNode, convertBlock } from './blocks.js';
+import { blockFromNode, convertBlock, insertDivider } from './blocks.js';
 
 export const SLASH_ITEMS = [
   { id: 'text', ic: 'text', label: 'Text' },
@@ -126,7 +126,16 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
       case 'numbered':
         break;
       case 'todo': exec('insertHTML', '<div class="blk-todo"><br></div>'); break;
-      case 'divider': exec('insertHTML', '<hr class="blk-hr"><p><br></p>'); break;
+      case 'divider': {
+        // At the top level, as the toolbar's divider is; insertHTML nested it in the line.
+        const line = insertDivider(editorEl, window.getSelection());
+        const r = document.createRange();
+        r.setStart(line, 0);
+        r.collapse(true);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(r);
+        break;
+      }
       case 'code': insertCodeBlock(editorEl, 'javascript', history); break;
       // Through the controller, so it arrives selected like the toolbar's does.
     case 'shape': shapes ? shapes.addShape('rect') : addShape(editorEl, 'rect', history); break;
@@ -139,7 +148,7 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
     if (!s || !s.rangeCount || !s.isCollapsed) return hide();
     const node = s.anchorNode;
     if (!node || node.nodeType !== Node.TEXT_NODE || !editorEl.contains(node)) return hide();
-    if (node.parentElement?.closest('.code-src, .shape')) return hide();
+    if (node.parentElement?.closest('.code-src, .shape, .image-caption')) return hide();
     const hit = detectSlash(node.textContent.slice(0, s.anchorOffset));
     if (!hit) return hide();
     ctx = { node, start: hit.start, end: s.anchorOffset };

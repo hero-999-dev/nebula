@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { convertBlock, liftNestedDividers, blockFromNode } from '../src/js/blocks.js';
+import { convertBlock, liftNestedDividers, blockFromNode, exitQuoteOnEmptyLine } from '../src/js/blocks.js';
 
 const root = (html) => {
   const el = document.createElement('div');
@@ -79,5 +79,35 @@ describe('blockFromNode on lines Chromium makes', () => {
     const el = root('<div><p>inner</p></div><div class="shape-layer" contenteditable="false"><div class="shape"><div class="shape-text">s</div></div></div>');
     expect(blockFromNode(el.querySelector('p').firstChild, el).tagName).toBe('P');
     expect(blockFromNode(el.querySelector('.shape-text').firstChild, el)).toBeNull();
+  });
+});
+
+describe('exitQuoteOnEmptyLine', () => {
+  const caretIn = (node) => { const s = window.getSelection(); const r = document.createRange(); r.setStart(node, 0); r.collapse(true); s.removeAllRanges(); s.addRange(r); return s; };
+  const mount = (html) => { const el = root(html); document.body.replaceChildren(el); return el; };
+
+  it('turns the empty quote Enter made into a paragraph and puts the caret there', () => {
+    const el = mount('<blockquote>Said the keeper.</blockquote><blockquote><br></blockquote>');
+    expect(exitQuoteOnEmptyLine(el, caretIn(el.children[1]))).toBe(true);
+    expect([...el.children].map((c) => c.tagName)).toEqual(['BLOCKQUOTE', 'P']);
+    expect(window.getSelection().anchorNode).toBe(el.querySelector('p'));
+  });
+
+  it('moves an empty last line out of a quote', () => {
+    const el = mount('<blockquote><div>one</div><div><br></div></blockquote>');
+    expect(exitQuoteOnEmptyLine(el, caretIn(el.querySelectorAll('div')[1]))).toBe(true);
+    expect(el.innerHTML).toBe('<blockquote><div>one</div></blockquote><p><br></p>');
+  });
+
+  it('splits a quote at an empty middle line so the rest stays quoted', () => {
+    const el = mount('<blockquote><div>one</div><div><br></div><div>two</div></blockquote>');
+    expect(exitQuoteOnEmptyLine(el, caretIn(el.querySelectorAll('div')[1]))).toBe(true);
+    expect(el.innerHTML).toBe('<blockquote><div>one</div></blockquote><p><br></p><blockquote><div>two</div></blockquote>');
+  });
+
+  it('leaves a line with text alone, and anything outside a quote', () => {
+    const el = mount('<blockquote>text</blockquote><p><br></p>');
+    expect(exitQuoteOnEmptyLine(el, caretIn(el.querySelector('blockquote').firstChild))).toBe(false);
+    expect(exitQuoteOnEmptyLine(el, caretIn(el.querySelector('p')))).toBe(false);
   });
 });

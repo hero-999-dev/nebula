@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   wrapperAt, isEmptyWrapper, unwrap,
   caretAtWrapperStart, caretAtWrapperEnd,
-  enterOutOfWrapper, backspaceOutOfWrapper,
+  enterOutOfWrapper, backspaceOutOfWrapper, formatsAt, dropFormatsOnEmptyLine,
 } from '../src/js/inline-format.js';
 
 let root;
@@ -214,5 +214,35 @@ describe('Backspace', () => {
     sel.removeAllRanges();
     sel.addRange(range);
     expect(backspaceOutOfWrapper(root, sel)).toBe(false);
+  });
+});
+
+describe('bold and italic switched off stay off across Enter', () => {
+  const setup = (html) => { const el = document.createElement('div'); el.innerHTML = html; document.body.replaceChildren(el); return el; };
+  const caretIn = (node) => { const s = window.getSelection(); const r = document.createRange(); r.setStart(node, 0); r.collapse(true); s.removeAllRanges(); s.addRange(r); return s; };
+
+  it('reads the formats around the caret', () => {
+    const el = setup('<p><i>a <b>b</b></i></p>');
+    expect(formatsAt(el.querySelector('b').firstChild, el)).toEqual({ bold: true, italic: true });
+    expect(formatsAt(el.querySelector('p'), el)).toEqual({ bold: false, italic: false });
+  });
+
+  it('strips the italic Chromium copied onto the new empty line', () => {
+    const el = setup('<div><i>caption</i></div><div><i><br></i></div>');
+    expect(dropFormatsOnEmptyLine(el, caretIn(el.querySelectorAll('i')[1]), ['italic'])).toBe(true);
+    expect(el.innerHTML).toBe('<div><i>caption</i></div><div><br></div>');
+  });
+
+  it('keeps a format that was not switched off', () => {
+    const el = setup('<div><i style="font-weight: bold;"><br></i></div>');
+    dropFormatsOnEmptyLine(el, caretIn(el.querySelector('i')), ['bold']);
+    expect(el.querySelector('i')).not.toBeNull();
+    expect(el.querySelector('i').style.fontWeight).toBe('');
+  });
+
+  it('never touches a line that already has text', () => {
+    const el = setup('<div><i>words</i></div>');
+    expect(dropFormatsOnEmptyLine(el, caretIn(el.querySelector('i').firstChild), ['italic'])).toBe(false);
+    expect(el.innerHTML).toBe('<div><i>words</i></div>');
   });
 });

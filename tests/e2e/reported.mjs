@@ -33,7 +33,7 @@ export async function runReportedChecks(check) {
     await win.waitForFunction(() => !document.getElementById('ov-whats-new')?.hidden, null, { polling: 50, timeout: 5000 }).catch(() => {});
     await win.evaluate(() => document.querySelector('#whats-new-close')?.click());
     const open = async i => {
-      await win.locator('.note-row').filter({ hasText: `Report ${i}` }).click();
+      await win.evaluate((t) => [...document.querySelectorAll('.note-row')].find((r) => r.textContent.includes(t))?.click(), `Report ${i}`);
       await win.waitForFunction(title => document.querySelector('#title').value === title, `Report ${i}`, { polling: 50 });
     };
     await open(1);

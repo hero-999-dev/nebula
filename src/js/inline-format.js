@@ -154,3 +154,58 @@ export function backspaceOutOfWrapper(root, selection) {
   selection.addRange(next);
   return true;
 }
+
+/**
+ * Bold and italic that are switched OFF stay off across Enter.
+ *
+ * Chromium forgets a cleared typing style when it starts a new line and copies
+ * the formatting of the text before the caret instead: finish a line in
+ * italics, press Ctrl+I, press Enter, and the next line is italic again —
+ * then Ctrl+I there turns it *off*, so the words meant to be italic come out
+ * plain (found by the page-rebuild test). The caller notes which formats were
+ * off before Enter; this strips those wrappers from the new, still-empty line.
+ */
+export function formatsAt(node, root) {
+  const out = { bold: false, italic: false };
+  for (let el = node?.nodeType === 1 ? node : node?.parentElement; el && el !== root; el = el.parentElement) {
+    const weight = el.style?.fontWeight;
+    if (/^(B|STRONG)$/.test(el.tagName) || weight === 'bold' || Number(weight) >= 600) out.bold = true;
+    if (/^(I|EM)$/.test(el.tagName) || el.style?.fontStyle === 'italic') out.italic = true;
+  }
+  return out;
+}
+
+/** @param {('bold'|'italic')[]} kinds formats to remove from the caret's empty line */
+export function dropFormatsOnEmptyLine(root, selection, kinds) {
+  if (!kinds.length || !selection?.rangeCount || !selection.isCollapsed) return false;
+  let el = selection.anchorNode?.nodeType === 1 ? selection.anchorNode : selection.anchorNode?.parentElement;
+  let line = el;
+  while (line && line.parentElement && line.parentElement !== root && !/^(P|DIV|LI|H[1-6]|BLOCKQUOTE)$/.test(line.tagName)) line = line.parentElement;
+  if (!line || !root.contains(line) || line.textContent.replace(/\u200b/g, '').trim()) return false;
+  let changed = false;
+  for (el = selection.anchorNode?.nodeType === 1 ? selection.anchorNode : selection.anchorNode?.parentElement; el && el !== line;) {
+    const parent = el.parentElement;
+    const weight = el.style?.fontWeight;
+    const bold = /^(B|STRONG)$/.test(el.tagName) || weight === 'bold' || Number(weight) >= 600;
+    const italic = /^(I|EM)$/.test(el.tagName) || el.style?.fontStyle === 'italic';
+    if ((bold && kinds.includes('bold')) || (italic && kinds.includes('italic'))) {
+      // Keep the other format if this element carried both.
+      if (bold && italic && !(kinds.includes('bold') && kinds.includes('italic'))) {
+        if (kinds.includes('bold')) el.style.fontWeight = ''; else el.style.fontStyle = '';
+      } else {
+        unwrap(el);
+      }
+      changed = true;
+    }
+    el = parent;
+  }
+  if (changed) {
+    if (!line.firstChild) line.innerHTML = '<br>';
+    const r = root.ownerDocument.createRange();
+    r.setStart(line, 0);
+    r.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(r);
+  }
+  return changed;
+}

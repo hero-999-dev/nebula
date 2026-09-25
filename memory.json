@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.8.4",
-  "lastUpdated": "2026-09-24",
-  "currentPhase": "v0.8.4 - fixes found by testing the 0.8.3 test build: slash heading/list/quote commands work on bare <div> lines (what Enter makes after a heading) and on text typed straight into the editor; the rotation readout is removed on release and stripped from saved notes; a selected arrow is highlighted and deletable while the editor has focus; an imported .nebula.json is sanitised (0.8.3 ran onerror) and a raw vault note file imports as a note. Test exe only; not pushed. v0.8.3 is tagged on GitHub but its Release was set back to draft.",
-  "next": "Owner tries Nebula Test.exe (C: source tree). On approval: npm run push for 0.8.4, and delete or leave the draft v0.8.3 Release.",
+  "version": "0.8.5",
+  "lastUpdated": "2026-09-25",
+  "currentPhase": "v0.8.5 - a page-rebuild test (npm run rebuild): a real web article rewritten in the app with its own tools and scored per feature; npm run push runs it after smoke and stops on any metric that went down. Scored 65.2% on 0.8.4 and 100% on 0.8.5. Built to get there: links on words (paste a URL over selected words, a toolbar link button, Ctrl+click to open, empty address unlinks), image captions (a figcaption from the image bar, Enter returns to the text), YouTube/Vimeo embeds load the player with a Referer, Enter leaves an empty quote line, bold/italic switched off stay off across Enter, /divider goes to the top level.",
+  "next": "Owner tries the released 0.8.5. More pages can go in tests/rebuild/pages.json.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -88,6 +88,12 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "version": "0.8.5",
+      "date": "2026-09-25",
+      "by": "Claude",
+      "what": "New test method: page rebuild. tests/rebuild/plan.js reads an article into ordered blocks with bold/italic/link runs (title as H1, subtitle italic, article headings H2/H3); tests/rebuild/score.js scores the saved note per metric (text, order, headings, bold, italic, links, images, captions, embeds, quotes, dividers) plus layout, imageOrder and videoPlayers measured in the app; regressions() blocks a release when a metric goes down. tests/e2e/rebuild-page.mjs drives the real app (typing, Ctrl+B/I, slash menu, pasted and dragged images, pasted URLs as Embed), writes test-results/rebuild/<version>/<page>/ (gitignored). tests/e2e/rebuild-findings.mjs pins the three faults it found in smoke. Fixes: exitQuoteOnEmptyLine (blocks.js), formatsAt/dropFormatsOnEmptyLine (inline-format.js), embedSource + EMBED_REFERRER (rich-paste.js). Note-open clicks in e2e modules no longer use Playwright actionability waits. Not released. Then, to reach 100%: links on words (rich-paste linkWords/unlinkWords, toolbar and mini-toolbar link button, Ctrl+click opens via openExternal) and image captions (figcaption.image-caption from the image bar; caret returns to the prose on Enter/Escape; exported to HTML and Markdown); /divider moved to blocks.insertDivider shared with the toolbar (it nested in an empty div line). KNOWN_GAPS is empty."
+    },
     {
       "version": "0.8.4",
       "date": "2026-09-24",

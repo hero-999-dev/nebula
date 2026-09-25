@@ -236,7 +236,7 @@ export function initArrows(editorEl, { history } = {}) {
     // so the caret does not jump), so the key arrives from #editor. Excluding
     // #editor here made a selected arrow impossible to delete (0.8.3).
     if ((e.key === 'Delete' || e.key === 'Backspace') && selected?.isConnected
-      && !e.target.closest?.('.shape-text, .code-src, input, textarea, select')) {
+      && !e.target.closest?.('.shape-text, .code-src, .image-caption, input, textarea, select')) {
       e.preventDefault();
       e.stopImmediatePropagation();
       history?.push();

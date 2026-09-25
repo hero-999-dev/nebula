@@ -13,6 +13,17 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.8.5': {
+    headline: 'Link any words, caption images, and YouTube links play in the note.',
+    items: [
+      { title: 'Link words', text: 'Select words and paste a URL over them, or press the link button in the toolbar. Ctrl+click a link to open it. An empty address takes a link off.' },
+      { title: 'Image captions', text: 'Select an image and press Aa on its bar to write a caption under it. The caption moves with the image; Enter takes you back to your text.' },
+      { title: 'Videos, not whole pages', text: 'Embed a YouTube or Vimeo link and you get the player, sized for video. A start time in the link is kept. Videos embedded earlier switch to the player when the note opens.' },
+      { title: 'Leaving a quote', text: 'Press Enter on an empty line of a quote to carry on writing outside it, the way a list works.' },
+      { title: 'Bold and italic stay off', text: 'Turn italic or bold off at the end of a line and press Enter: the next line starts plain.' },
+      { title: 'Dividers stay on their own line', text: 'A divider added with the slash menu on an empty line no longer takes the next heading inside it.' },
+    ],
+  },
   '0.8.4': {
     headline: 'Slash commands work on every line you type, and arrows can be deleted.',
     items: [

@@ -9,8 +9,8 @@
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
 import { normalizeLists, exitListOnEmptyItem, liftListItemAtStart } from './lists.js';
-import { blockFromNode, convertBlock } from './blocks.js';
-import { enterOutOfWrapper, backspaceOutOfWrapper } from './inline-format.js';
+import { blockFromNode, convertBlock, exitQuoteOnEmptyLine, insertDivider as insertDividerAt } from './blocks.js';
+import { enterOutOfWrapper, backspaceOutOfWrapper, formatsAt, dropFormatsOnEmptyLine } from './inline-format.js';
 import { applyInlineFamily, clearInlineFamilyAtCaret, cleanTypingMarkers } from './inline-family.js';
 import { initEquation } from './equation.js';
 import { on } from './bus.js';
@@ -107,7 +107,7 @@ export function parseSize(raw) {
   return Math.min(400, Math.max(6, Math.round(n)));
 }
 
-export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTitle, onImport, onPaste } = {}) {
+export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTitle, onImport, onPaste, onLink } = {}) {
   const toolbar = document.getElementById('toolbar');
   const miniBar = document.getElementById('mini-bar');
   if (!toolbar || !editorEl) return null;
@@ -458,23 +458,8 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
    * instead, with an empty line under it to carry on in.
    */
   function insertDivider() {
-    const block = blockOf();
     history?.push();
-    const hr = document.createElement('hr');
-    hr.className = 'blk-hr';
-    const after = document.createElement('p');
-    after.innerHTML = '<br>';
-    if (block) {
-      block.after(hr);
-      hr.after(after);
-      // An empty block the divider was called from has nothing left to say.
-      if (!block.textContent.trim() && !block.querySelector('img, .blk-code, .inline-eq')) {
-        block.remove();
-      }
-    } else {
-      editorEl.append(hr, after);
-    }
-    placeCaretEnd(after);
+    placeCaretEnd(insertDividerAt(editorEl, window.getSelection()));
     dirty();
   }
 
@@ -680,6 +665,8 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     // a printed note look like a photograph of the window.
     print: () => { const api = window.nebula?.note; if (api?.print) void api.print(); else window.print(); },
     import: () => void importNote(),
+    // Selected words become a link; with nothing selected it inserts one.
+    link: () => onLink?.(),
     'export-md': () => void exportNote('md'),
     'export-html': () => void exportNote('html'),
     'export-pdf': () => void exportNote('pdf'),
@@ -1203,7 +1190,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     const mod = e.ctrlKey || e.metaKey;
     // Shape text owns normal editing keys. App undo/save shortcuts below still
     // apply, but paragraph/list/divider handlers must not escape this host.
-    if (e.target.closest('.shape-text') && !mod) return;
+    if (e.target.closest('.shape-text, .image-caption') && !mod) return;
 
     /**
      * The caret stays in the note.
@@ -1254,6 +1241,15 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
         return;
       }
     }
+    // Enter on an empty quote line leaves the quote (Chromium would start another).
+    if (!mod && e.key === 'Enter' && !e.shiftKey && blockOf()?.closest('blockquote')) {
+      history?.push();
+      if (exitQuoteOnEmptyLine(editorEl, window.getSelection())) {
+        e.preventDefault();
+        dirty();
+        return;
+      }
+    }
     // Enter on an EMPTY to-do ends the run, exactly as it does in a list.
     // Without it the only way out was to keep making empty to-dos.
     if (!mod && e.key === 'Enter' && !e.shiftKey) {
@@ -1268,6 +1264,15 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
         dirty();
         return;
       }
+    }
+
+    // Bold/italic switched off before Enter stay off on the new line; Chromium
+    // would copy them from the text before the caret. See inline-format.js.
+    if (!mod && e.key === 'Enter' && !e.shiftKey) {
+      const sel = window.getSelection();
+      const here = sel?.isCollapsed ? formatsAt(sel.anchorNode, editorEl) : {};
+      const off = ['bold', 'italic'].filter((k) => here[k] && !document.queryCommandState(k));
+      if (off.length) setTimeout(() => { if (dropFormatsOnEmptyLine(editorEl, window.getSelection(), off)) dirty(); }, 0);
     }
 
     if (!mod && e.key === 'Enter' && !e.shiftKey) {

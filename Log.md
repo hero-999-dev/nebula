@@ -5,6 +5,29 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+## [2026-09-25 02:06] v0.8.5 - by Claude
+
+Links on words, image captions, YouTube players, and a page-rebuild test that scores 100%.
+
+* (no commits since the last release)
+
+---
+
+## [2026-09-25 01:45] v0.8.5 - by Claude
+
+A new kind of test: rewrite a real web page in Nebula with Nebula's tools, score it, and hold every release to the last one's score.
+
+* `npm run rebuild` (tests/e2e/rebuild-page.mjs) writes a real web article into a new note the way a person would: title as Heading 1, subtitle in italics, section headings as Heading 2, text typed with Ctrl+B/I, quotes and dividers from the slash menu, each image pasted and dragged into place, each YouTube link pasted and chosen as Embed. It scores the saved file per feature and writes a report, the rebuilt note (`note.nebula.json`) and screens to `test-results/rebuild/<version>/` (gitignored: the article is not ours to publish). `npm run push` runs it after smoke and stops if any metric went down.
+* 0.8.4 scored 65.2%. What it found: Enter could not leave a quote, so the rest of the note became quotes; italic switched off at a line end came back after Enter; a YouTube embed loaded the whole watch page (reported by the owner at the same time). All three fixed; the player also needed a Referer, or YouTube shows error 153. The first 0.8.5 run scored 90%; the remaining gap was links on words and captions, which Nebula had no tool for.
+* Then the two gaps the report named were built: **links on words** (select words and paste a URL, or the toolbar link button; Ctrl+click opens; an empty address unlinks) and **image captions** (Aa on the image bar; the caption belongs to the image; Enter returns to the text — blurring alone had left the caret in the caption and every later key went nowhere). The rerun then found `/divider` nesting the rule inside an empty `<div>` line and the next heading with it; the slash menu now uses the toolbar's top-level divider. **Score: 100%.**
+* `tests/e2e/rebuild-findings.mjs` (in smoke) pins those faults offline. Note-open clicks in the e2e modules stopped using Playwright's rAF-based wait, which timed out under load.
+* Not pushed. Waiting for the owner to try `Nebula Test.exe`.
+
+---
+
+
+
+
 
 ## [2026-09-25 00:02] v0.8.4 - by Claude
 

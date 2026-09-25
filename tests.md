@@ -4,17 +4,36 @@ What is tested, what each test proves, and what is knowingly untested.
 
 | | |
 |---|---|
-| **Unit** | 392 passing — `npm test` (Vitest, jsdom) |
-| **Electron smoke** | 243 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
+| **Unit** | 433 passing — `npm test` (Vitest, jsdom) |
+| **Electron smoke** | 254 passing — `npm run build && npm run smoke` (playwright-core, real app, throwaway profiles) |
 | **Failing** | 0 |
 | **CI** | `.github/workflows/test.yml` on push/PR · smoke + packaging assertions in `release.yml` |
 
 Unit tests cover pure logic. The smoke test covers what jsdom structurally
 cannot see: the preload bridge, the main process, the filesystem, and boot.
 
+| **Page rebuild** | `npm run rebuild` — a real article rewritten in the app and scored; run by `npm run push` after smoke |
+
 ---
 
 ## Suites
+
+### Page rebuild — `npm run rebuild` (new in 0.8.5)
+
+A different kind of test: not "does this handler work" but "can Nebula write this page". `tests/rebuild/pages.json` lists the pages (one today: a long Substack issue). For each, `tests/e2e/rebuild-page.mjs` fetches the source (cached in `test-results/rebuild/cache/`; `--refresh` fetches again), reads it into a plan (`tests/rebuild/plan.js`), and writes it into a new note with the app's own tools — typing, Ctrl+B/I, the slash menu, a pasted and dragged image per figure, a pasted URL chosen as Embed per video. The saved file is scored by `tests/rebuild/score.js`; layout, image order and working video players are measured in the running app. Each metric is compared with the previous version's report and any drop fails `npm run push`. A feature Nebula has no tool for can be listed in `KNOWN_GAPS` (score.js) so it reads as a gap, not a failure; the list is empty since 0.8.5.
+
+| Version | Score | What moved |
+|---|---|---|
+| 0.8.4 | 65.2% | Enter could not leave a quote, so the rest of the note was quoted; italic came back after Enter; videos embedded the watch page |
+| 0.8.5 | 100% | All of the above fixed; links on words (44/44) and image captions (6/6) built; /divider no longer nests in an empty line |
+
+Reports, screens and the rebuilt note stay in `test-results/` (gitignored): they hold the article.
+
+### `tests/e2e/rebuild-findings.mjs` (in smoke, 11 checks)
+
+What the rebuild found and needed, offline and with keys and pointer only: Enter on an empty quote line leaves it; italic switched off before Enter stays off; a pasted YouTube link embeds the player URL with a start time, keeps the pasted link on the card, and sends a Referer; a URL pasted over selected words links them and typing after stays outside the link; Ctrl+click opens a link (shell.openExternal stubbed); the image bar adds a caption and Enter returns typing to the note; /divider on an empty line and the heading after it are top level.
+
+Unit additions: `tests/rebuild.test.js` (16: plan reading, H1/H2 mapping, run spacing, scoring incl. real captions and normalised link addresses, regressions), `tests/blocks.test.js` +4 (quote exit), `tests/rich-paste.test.js` +18 (`embedSource`, links on words and unlinking, captions: bar button, Enter back to the note, empty removed, Backspace never deletes the image, Markdown export), `tests/inline-format.test.js` +4 (formats off across Enter).
 
 ### `tests/e2e/ideas-note.mjs` (in smoke, 12 checks)
 

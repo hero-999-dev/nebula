@@ -589,6 +589,23 @@
   border-radius: 5px;
   pointer-events: none;
 }
+/* An image's caption sits under it and moves with it (0.8.5). */
+.note-image .image-caption {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: .88em;
+  font-style: italic;
+  line-height: 1.4;
+  text-align: center;
+  cursor: text;
+  user-select: text;
+  outline: none;
+}
+.note-image .image-caption:empty::before { content: attr(data-placeholder); opacity: .6; }
 .image-h { display: none; }
 .note-image.sel .image-h {
   display: block;
@@ -642,6 +659,8 @@
 .link-embed { display: grid; grid-template-columns: 1fr auto; }
 .link-frame { grid-column: 1 / -1; width: 100%; height: 300px; border: 0; background: white; }
 .image-dragging .link-frame { pointer-events: none; }
+/* A video player, not a page: its own shape, black while it loads. */
+.link-embed--video .link-frame { height: auto; aspect-ratio: 16 / 9; background: #000; }
 .link-embed-hint { grid-column: 1 / -1; padding: 8px 12px; color: var(--ink); }
 .link-card {
   display: flex;
@@ -1207,6 +1226,7 @@ body.resizing webview { pointer-events: none; }
   .shape-layer { position: absolute !important; }
   .image-layer { position: relative !important; inset: auto !important; }
   .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; margin: 8px 0; }
+  .note-image .image-caption { position: static; margin-top: 4px; }
   .image-h, .link-del { display: none !important; }
 }
 

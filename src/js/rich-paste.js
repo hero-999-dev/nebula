@@ -21,6 +21,45 @@ export function normalizeUrl(raw) {
   }
 }
 
+/** Sent as the Referer by video embeds. The project's public page: nothing private in it. */
+export const EMBED_REFERRER = 'https://hero-999-dev.github.io/nebula/';
+
+/** "90", "90s", "1m30s", "1h2m3s" -> seconds; anything else -> 0. */
+function seconds(t) {
+  const v = String(t ?? '').trim();
+  if (/^\d+$/.test(v)) return Number(v);
+  const m = v.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/);
+  return m ? (Number(m[1] || 0) * 3600) + (Number(m[2] || 0) * 60) + Number(m[3] || 0) : 0;
+}
+
+/**
+ * What an Embed actually loads for a link.
+ *
+ * A YouTube or Vimeo link points at the site's watch page — header, comments,
+ * recommendations. Embedding that put the whole page in the note instead of
+ * the video. These sites publish a player URL for exactly this; everything
+ * else loads as given. The card keeps showing the link that was pasted.
+ * @returns {{src: string, video: boolean}}
+ */
+export function embedSource(raw) {
+  let u;
+  try { u = new URL(String(raw ?? '')); } catch { return { src: String(raw ?? ''), video: false }; }
+  const host = u.hostname.replace(/^(?:www|m|music)\./, '');
+  let id = '';
+  if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0];
+  else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    if (u.pathname === '/watch') id = u.searchParams.get('v') || '';
+    else id = (u.pathname.match(/^\/(?:embed|shorts|live|v)\/([\w-]+)/) || [])[1] || '';
+  }
+  if (/^[\w-]{6,}$/.test(id)) {
+    const start = seconds(u.searchParams.get('t') || u.searchParams.get('start'));
+    return { src: `https://www.youtube-nocookie.com/embed/${id}${start ? `?start=${start}` : ''}`, video: true };
+  }
+  const vimeo = host === 'vimeo.com' && u.pathname.match(/^\/(\d+)/);
+  if (vimeo) return { src: `https://player.vimeo.com/video/${vimeo[1]}`, video: true };
+  return { src: u.href, video: false };
+}
+
 export function isImageMime(mime) {
   return /^image\/(?:png|jpe?g|gif|webp)$/i.test(String(mime ?? ''));
 }
@@ -192,7 +231,15 @@ function makeLinkBlock(url, kind) {
     // The user explicitly chose Embed. Do not defer navigation to an
     // intersection callback: Electron can suspend it for an occluded window.
     frame.loading = 'eager';
-    frame.src = url;
+    const source = embedSource(url);
+    if (source.video) {
+      card.classList.add('link-embed--video');
+      // YouTube refuses a player with no Referer ("Video player configuration
+      // error", 153); a page loaded straight into a webview sends none. Name the
+      // app's public site, as a web page embedding the player would.
+      frame.setAttribute('httpreferrer', EMBED_REFERRER);
+    }
+    frame.src = source.src;
     const hint = document.createElement('small');
     hint.className = 'link-embed-hint';
     hint.textContent = 'Preview blocked or blank? Open the link above. Some sites do not allow embedding.';
@@ -267,8 +314,13 @@ export function initRichPaste(editor, { history } = {}) {
   function open(kind = '', url = '') {
     preferredKind = kind;
     pendingRange = currentRange(editor);
-    linkInput.value = url || '';
-    linkHint.textContent = url ? 'Choose how this link should appear.' : 'Paste a URL, then choose a format.';
+    const onWords = wordsSelected(pendingRange);
+    const start = pendingRange?.startContainer;
+    const existing = (start?.nodeType === Node.ELEMENT_NODE ? start : start?.parentElement)?.closest?.('a[href]');
+    linkInput.value = url || (onWords && existing ? existing.getAttribute('href') : '');
+    linkHint.textContent = onWords
+      ? 'URL links the selected words. Leave it empty to remove a link.'
+      : url ? 'Choose how this link should appear.' : 'Paste a URL, then choose a format.';
     linkMenu.querySelectorAll('[data-link-kind]').forEach((button) => {
       button.classList.toggle('sel', button.dataset.linkKind === kind);
     });
@@ -321,15 +373,92 @@ export function initRichPaste(editor, { history } = {}) {
     }
   }
 
+  /** Selected words inside the note's prose, not in a code block, shape, card or caption. */
+  function wordsSelected(range) {
+    if (!range || range.collapsed || !range.toString().trim()) return false;
+    const host = range.commonAncestorContainer;
+    const el = host.nodeType === Node.ELEMENT_NODE ? host : host.parentElement;
+    return editor.contains(el) && !el.closest('.code-src, .shape, .link-block, .note-image');
+  }
+
+  /**
+   * Link the selected words to `url`, keeping the words and their formatting.
+   *
+   * Until 0.8.5 a link could only be inserted as its own URL text, so an
+   * article rewritten in Nebula lost every link it had (the page-rebuild test:
+   * 0 of 44). Chromium's createLink wraps each run of the selection, bold and
+   * italic included; the caret ends after the link so typing goes on outside it.
+   */
+  const LINE = 'p, div, li, h1, h2, h3, h4, h5, h6, blockquote, figcaption';
+  const lineOf = (node) => (node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement)?.closest(LINE);
+
+  function decorate(a, url) {
+    a.href = url;
+    a.classList.add('link-url');
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.title = `${url} — Ctrl+click to open`;
+    return a;
+  }
+
+  function linkWords(range, url) {
+    if (!restoreRange(editor, range)) return null;
+    history?.push();
+    let last = null;
+    const inLink = (range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+      ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement)?.closest('a[href]');
+    if (inLink && editor.contains(inLink)) {
+      // Words already in one link: change where it goes.
+      last = decorate(inLink, url);
+    } else if (lineOf(range.startContainer) === lineOf(range.endContainer)) {
+      // One line: wrap the selection. Bold and italic inside it come along.
+      const a = decorate(document.createElement('a'), url);
+      a.appendChild(range.extractContents());
+      a.querySelectorAll('a').forEach((inner) => inner.replaceWith(...inner.childNodes));
+      range.insertNode(a);
+      last = a;
+    } else {
+      // Across lines, Chromium's command splits the link per line correctly.
+      document.execCommand('createLink', false, url);
+      const sel = window.getSelection();
+      const within = sel.rangeCount ? sel.getRangeAt(0) : null;
+      for (const a of editor.querySelectorAll('a[href]')) {
+        if (a.getAttribute('href') !== url || a.closest('.link-block') || !within?.intersectsNode(a)) continue;
+        last = decorate(a, url);
+      }
+    }
+    if (last) placeCaretAfter(last);
+    dirty();
+    return last;
+  }
+
+  /** Take the link off the selected words, keeping the words. */
+  function unlinkWords(range) {
+    if (!restoreRange(editor, range)) return;
+    history?.push();
+    for (const a of [...editor.querySelectorAll('a[href]')]) {
+      if (a.closest('.link-block') || !range.intersectsNode(a)) continue;
+      a.replaceWith(...a.childNodes);
+    }
+    dirty();
+  }
+
   function applyLink(kind) {
     const url = normalizeUrl(linkInput.value);
+    const range = pendingRange;
+    // An empty address on linked words takes the link off them.
+    if (!linkInput.value.trim() && kind === 'url' && wordsSelected(range)) {
+      hideLinkMenu();
+      unlinkWords(range);
+      return;
+    }
     if (!url) {
       linkHint.textContent = 'Enter a valid http(s) URL first.';
       linkInput.focus();
       return;
     }
-    const range = pendingRange;
     hideLinkMenu();
+    if (kind === 'url' && wordsSelected(range)) { linkWords(range, url); return; }
     if (!restoreRange(editor, range)) return;
     history?.push();
     if (kind === 'url' || kind === 'mention') insertInlineLink(url, kind, range);
@@ -368,6 +497,7 @@ export function initRichPaste(editor, { history } = {}) {
     bar.hidden = true;
     bar.innerHTML = '<button type="button" data-image="back" title="Send behind text">▾</button>'
       + '<button type="button" data-image="front" title="Bring above text">▴</button>'
+      + '<button type="button" data-image="caption" title="Add or edit a caption">Aa</button>'
       + '<button type="button" data-image="del" title="Delete image">✕</button>';
     document.body.appendChild(bar);
     return bar;
@@ -405,7 +535,12 @@ export function initRichPaste(editor, { history } = {}) {
   function refreshImages() {
     for (const layer of editor.querySelectorAll('.image-layer')) layer.contentEditable = 'false';
     for (const card of editor.querySelectorAll('.link-block')) {
-      if (!card.querySelector('.link-del') || (card.dataset.kind === 'embed' && !card.querySelector('webview'))) {
+      // A video saved before 0.8.5 loads the watch page; point it at the player.
+      // Only videos: another embed's src follows its own navigation (a sign-in).
+      const video = card.dataset.kind === 'embed' && embedSource(card.dataset.url).video;
+      const onWatchPage = video && !/^https:\/\/(?:www\.youtube-nocookie\.com\/embed\/|player\.vimeo\.com\/video\/)/
+        .test(card.querySelector('webview')?.getAttribute('src') || '');
+      if (!card.querySelector('.link-del') || (card.dataset.kind === 'embed' && !card.querySelector('webview')) || onWatchPage) {
         const url = normalizeUrl(card.dataset.url);
         if (url) card.replaceWith(makeLinkBlock(url, card.dataset.kind === 'embed' ? 'embed' : 'bookmark'));
       }
@@ -420,6 +555,7 @@ export function initRichPaste(editor, { history } = {}) {
       }
       const img = image.querySelector('img');
       if (img) img.draggable = false;
+      captionOf(image); // a saved caption is editable again
     }
     if (selectedImage && !selectedImage.isConnected) selectImage(null);
   }
@@ -455,6 +591,7 @@ export function initRichPaste(editor, { history } = {}) {
   }
 
   editor.addEventListener('mousedown', (event) => {
+    if (event.target.closest('.image-caption')) { selectImage(null); return; }
     const handle = event.target.closest('.image-h');
     let image = event.target.closest('.note-image');
     if (!image && !event.target.closest('.shape, .link-block')) {
@@ -516,10 +653,79 @@ export function initRichPaste(editor, { history } = {}) {
   window.addEventListener('mouseup', finishDrag);
   window.addEventListener('blur', finishDrag);
 
+  /**
+   * An image's caption: a line of text under it that moves with it.
+   *
+   * Images float, so a caption typed as the next paragraph drifted away from
+   * the picture as soon as either moved. The caption is a <figcaption> inside
+   * the figure, editable on its own like a shape's text.
+   */
+  function captionOf(figure, create = false) {
+    let cap = figure.querySelector(':scope > figcaption.image-caption');
+    if (!cap && create) {
+      cap = document.createElement('figcaption');
+      cap.className = 'image-caption';
+      cap.dataset.placeholder = 'Caption';
+      figure.appendChild(cap);
+    }
+    if (cap) cap.setAttribute('contenteditable', 'true');
+    return cap;
+  }
+
+  function editCaption(figure) {
+    history?.push();
+    const cap = captionOf(figure, true);
+    selectImage(null);
+    cap.focus();
+    const r = document.createRange();
+    r.selectNodeContents(cap);
+    r.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+    return cap;
+  }
+
+  // Where the caret was in the note's prose, so leaving a caption goes back there.
+  let lastProse = null;
+  document.addEventListener('selectionchange', () => {
+    const range = currentRange(editor);
+    const host = range?.startContainer;
+    const el = host?.nodeType === Node.ELEMENT_NODE ? host : host?.parentElement;
+    if (range && el && !el.closest('.image-caption, .note-image, .shape, .code-src, .link-block')) lastProse = range;
+  });
+
+  /**
+   * Leaving a caption (Enter or Escape): an empty one is removed, and the caret
+   * goes back into the note — where it was, or the end. Blurring alone left the
+   * selection inside the caption, so the next keys went nowhere.
+   */
+  function finishCaption(cap) {
+    if (!cap?.isConnected) return;
+    if (!cap.textContent.replace(/​/g, '').trim()) cap.remove();
+    cap.blur();
+    if (!(lastProse && restoreRange(editor, lastProse))) {
+      editor.focus();
+      const end = document.createRange();
+      end.selectNodeContents(editor);
+      end.collapse(false);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(end);
+    }
+    dirty();
+  }
+
+  editor.addEventListener('focusout', (event) => {
+    const cap = event.target.closest?.('.image-caption');
+    if (cap && !cap.textContent.trim()) { cap.remove(); dirty(); }
+  });
+
   imageBar.addEventListener('mousedown', (event) => event.preventDefault());
   imageBar.addEventListener('click', (event) => {
     const act = event.target.closest('[data-image]')?.dataset.image;
     if (!selectedImage || !act) return;
+    if (act === 'caption') { editCaption(selectedImage); return; }
     if (act === 'del') {
       history?.push();
       selectedImage.remove();
@@ -546,9 +752,16 @@ export function initRichPaste(editor, { history } = {}) {
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !linkMenu.hidden) { hideLinkMenu(); return; }
+    const cap = event.target.closest?.('.image-caption');
+    if (cap && (event.key === 'Enter' || event.key === 'Escape')) {
+      event.preventDefault();
+      event.stopPropagation();
+      finishCaption(cap);
+      return;
+    }
     if (event.key === 'Escape') selectImage(null);
     if ((event.key === 'Delete' || event.key === 'Backspace') && selectedImage
-      && !event.target.closest('input, textarea, .code-src, .shape-text')) {
+      && !event.target.closest('input, textarea, .code-src, .shape-text, .image-caption')) {
       event.preventDefault();
       event.stopPropagation();
       history?.push();
@@ -557,6 +770,19 @@ export function initRichPaste(editor, { history } = {}) {
       dirty();
     }
   }, true);
+
+  // Links in a note open with Ctrl+click (Cmd+click on a Mac); a plain click
+  // puts the caret in the words, as it does everywhere else in the note.
+  editor.addEventListener('click', (event) => {
+    if (!(event.ctrlKey || event.metaKey)) return;
+    const a = event.target.closest?.('a[href]');
+    if (!a || !editor.contains(a)) return;
+    const url = normalizeUrl(a.getAttribute('href'));
+    if (!url) return;
+    event.preventDefault();
+    if (window.nebula?.openExternal) void window.nebula.openExternal(url);
+    else window.open(url, '_blank', 'noopener');
+  });
 
   editor.addEventListener('paste', (event) => {
     if (event.target.closest('.code-src, .shape-text, .link-block, .note-image')) return;
@@ -569,6 +795,13 @@ export function initRichPaste(editor, { history } = {}) {
       return;
     }
     const text = event.clipboardData?.getData('text/plain') || '';
+    // A URL pasted over selected words links them, as in any editor.
+    const selected = currentRange(editor);
+    if (normalizeUrl(text) && wordsSelected(selected)) {
+      event.preventDefault();
+      linkWords(selected, normalizeUrl(text));
+      return;
+    }
     if (normalizeUrl(text)) {
       event.preventDefault();
       open('', text);

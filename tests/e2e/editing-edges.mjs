@@ -29,7 +29,7 @@ export async function runEdgeChecks(check) {
     // drawn; under a loaded full smoke run that lands after an early close.
     await win.waitForFunction(() => !document.getElementById('ov-whats-new')?.hidden, null, { polling: 50, timeout: 5000 }).catch(() => {});
     await win.evaluate(() => document.querySelector('#whats-new-close')?.click());
-    const open = async i => { await win.locator('.note-row').filter({ hasText: `Edges ${i}` }).click(); };
+    const open = async i => { await win.evaluate((t) => [...document.querySelectorAll('.note-row')].find((r) => r.textContent.includes(t))?.click(), `Edges ${i}`); };
     const caret = () => win.evaluate(() => {
       const s = getSelection(), r = s.getRangeAt(0), rect = r.getBoundingClientRect();
       return { x: rect.x, y: rect.y, h: rect.height, offset: s.anchorOffset,
@@ -70,8 +70,10 @@ export async function runEdgeChecks(check) {
     await open(1);
     const hint = win.locator('#editor .code-hint').first();
     check('a code block with existing code has no editing hint', !await hint.isVisible());
-    const code = win.locator('#editor .code-src').first();
-    await code.click();
+    // A real pointer click, without locator.click's rAF-based stability wait,
+    // which times out when the window is not composited (clickAt in smoke.mjs).
+    const at = await win.evaluate(() => { const r = document.querySelector('#editor .code-src').getBoundingClientRect(); return { x: r.left + Math.min(40, r.width / 2), y: r.top + r.height / 2 }; });
+    await win.mouse.click(at.x, at.y);
     await win.keyboard.type('x');
     await win.waitForTimeout(350);
     check('typing keeps the code hint hidden', !await hint.isVisible());

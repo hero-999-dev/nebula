@@ -136,6 +136,11 @@ function blockMd(el) {
     return [`- [${el.classList.contains('done') ? 'x' : ' '}] ${inlineMd(el).trim()}`];
   }
   if (tag === 'hr') return ['---'];
+  // An image's caption follows it as an italic line.
+  if (tag === 'figcaption') {
+    const text = inlineMd(el).trim();
+    return text ? [`*${text}*`] : [];
+  }
   if (tag === 'ul' || tag === 'ol') return [listMd(el)];
   if (tag === 'blockquote') {
     return [childrenMd(el).join('\n\n').split('\n').map((line) => `> ${line}`).join('\n')];
@@ -208,6 +213,7 @@ export function toHtml(html, title = 'Note') {
   img { max-width: 100%; }
   .note-image { position: relative !important; left: auto !important; top: auto !important; max-width: 100%; }
   .note-image img { width: 100%; height: 100%; object-fit: contain; }
+  .note-image .image-caption { position: static; margin-top: 4px; font-style: italic; text-align: center; }
   .blk-todo { list-style: none; }
 </style>
 </head>
@@ -327,6 +333,7 @@ export function toPrintDocument({ title = 'Untitled', body = '', css = '', margi
   .shape-layer { position: absolute; }
   .image-layer { position: relative; }
   .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; }
+  .note-image .image-caption { position: static; margin-top: 4px; font-style: italic; text-align: center; }
 </style>
 </head>
 <body>

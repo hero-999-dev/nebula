@@ -19,6 +19,7 @@
  *   npm run push -- --notes "..." headline for the Log.md entry
  *   npm run push -- --dry-run     do everything except commit/tag/push
  *   npm run push -- --no-flash    skip the USB drive mirror
+ *   npm run push -- --no-rebuild  skip the page rebuild (tests/e2e/rebuild-page.mjs)
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -204,6 +205,20 @@ console.log('\n> npm run smoke');
     if (second === 1) fail('Smoke checks failed. Nothing was committed.');
     if (second !== 0) fail('Smoke could not complete twice. Nothing was committed.');
   }
+}
+
+// The page rebuild (tests/e2e/rebuild-page.mjs): real articles written again in
+// the app with its own tools, scored, and held to the previous release's level.
+// A metric that went DOWN stops the release. Being offline with no cached source,
+// or a run that could not finish, is reported and does not block: that says
+// nothing about the code. The report is filed under the version being released.
+if (!args.includes('--no-rebuild')) {
+  console.log('\n> npm run rebuild');
+  process.env.NEBULA_REBUILD_VERSION = version;
+  const code = runSoft('node', [path.join(ROOT, 'tests', 'e2e', 'rebuild-page.mjs')]);
+  if (code === 1) fail('The page rebuild scored lower than the previous version. Nothing was committed.\n  See test-results/rebuild/ for what went down.');
+  if (code === 3) console.warn('\n  ! page rebuild skipped: no source (offline, nothing cached).\n');
+  else if (code !== 0) console.warn(`\n  ! page rebuild could not finish (exit ${code}); not blocking the release.\n`);
 }
 
 // The docs site is NOT built here. It stamps the version from package.json, and

@@ -32,7 +32,8 @@ export async function runIdeasChecks(check) {
     await win.waitForFunction(() => !document.getElementById('ov-whats-new')?.hidden, null, { polling: 50, timeout: 5000 }).catch(() => {});
     await win.evaluate(() => document.querySelector('#whats-new-close')?.click());
     const open = async (title) => {
-      await win.locator('.note-row').filter({ hasText: title }).first().click();
+      // No rAF-based stability wait: it stalls when the window is not composited (press() in smoke.mjs).
+      await win.evaluate((t) => [...document.querySelectorAll('.note-row')].find((r) => r.textContent.includes(t))?.click(), title);
       await win.waitForFunction((t) => document.querySelector('#title').value === t, title, { polling: 50 });
     };
     const slash = async (query) => {

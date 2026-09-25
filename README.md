@@ -4,7 +4,7 @@ Calm notes with a real editor. An Electron desktop app for **Windows and macOS**
 that keeps every note as a plain JSON file in your own profile. Installed Windows
 builds offer in-app updates; macOS and portable builds offer a download link.
 
-**Version v0.8.4** ·
+**Version v0.8.5** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 
@@ -194,7 +194,8 @@ npm install
 npm run preflight   # START HERE — version, phase, what changed, what is stale
 npm run dev         # dev app on its OWN profile
 npm test            # 346 unit tests
-npm run build && npm run smoke   # 203 checks against the real Electron app
+npm run build && npm run smoke   # checks against the real Electron app
+npm run rebuild                  # rewrite a real article in the app, score it per feature
 npm run check:versions           # every surface agrees with package.json
 npm run pack:win    # release/Nebula-Setup-*.exe + Nebula-portable-*.exe
 npm run site        # rebuild site/index.html (docs + mind maps)

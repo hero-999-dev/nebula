@@ -13,3 +13,7 @@ Nebula-data/
 *.log
 .DS_Store
 Thumbs.db
+
+# Page rebuild reports (tests/e2e/rebuild-page.mjs). They hold the rebuilt
+# article and its images, which are not ours to publish.
+test-results/

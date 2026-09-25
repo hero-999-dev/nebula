@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { normalizeUrl, isImageMime, linkLabel, initRichPaste } from '../src/js/rich-paste.js';
+import { normalizeUrl, isImageMime, linkLabel, initRichPaste, embedSource, EMBED_REFERRER } from '../src/js/rich-paste.js';
 import { initHistory } from '../src/js/history.js';
 import { sanitize, fromMarkdown } from '../src/js/import.js';
 import { toHtml, toMarkdown } from '../src/js/export.js';
@@ -66,11 +66,54 @@ describe('rich paste editing regressions', () => {
     expect(editor.querySelector('.link-block')).toBeNull();
   });
 
-  it.each(['url', 'mention'])('%s replaces a selection inline without fetching', (kind) => {
+  it('url links the selected words, keeping them (0.8.5)', () => {
+    insert('url');
+    const anchor = editor.querySelector('a');
+    expect(anchor.href).toBe('https://example.com/docs');
+    expect(anchor.textContent).toBe('selected');
+    expect(anchor.classList.contains('link-url')).toBe(true);
+    expect(editor.textContent).toBe('before selected after');
+    expect(editor.querySelector('webview, iframe')).toBeNull();
+    history.undo();
+    expect(editor.querySelector('a')).toBeNull();
+    expect(editor.textContent).toBe('before selected after');
+  });
+
+  it('keeps bold inside linked words, and re-links a link instead of nesting one', () => {
+    editor.innerHTML = '<p>one <b>two</b> three</p>';
+    const p = editor.querySelector('p');
+    const r = document.createRange();
+    r.setStart(p.firstChild, 0);
+    r.setEnd(p.lastChild, 3);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(r);
+    insert('url');
+    expect(p.innerHTML).toBe('<a href="https://example.com/docs" class="link-url" target="_blank" rel="noopener noreferrer" title="https://example.com/docs — Ctrl+click to open">one <b>two</b> th</a>ree');
+    select(p.querySelector('a b').firstChild, 0, 3);
+    rich.open('url');
+    document.getElementById('link-url-input').value = 'https://example.org/';
+    document.querySelector('[data-link-kind="url"]').click();
+    expect(p.querySelectorAll('a')).toHaveLength(1);
+    expect(p.querySelector('a').getAttribute('href')).toBe('https://example.org/');
+  });
+
+  it('an empty address takes the link off the selected words', () => {
+    insert('url');
+    select(editor.querySelector('a').firstChild, 0, 8);
+    rich.open('url');
+    expect(document.getElementById('link-url-input').value).toBe('https://example.com/docs');
+    document.getElementById('link-url-input').value = '';
+    document.querySelector('[data-link-kind="url"]').click();
+    expect(editor.querySelector('a')).toBeNull();
+    expect(editor.textContent).toBe('before selected after');
+  });
+
+  it('mention replaces a selection inline without fetching', () => {
+    const kind = 'mention';
     insert(kind);
     const anchor = editor.querySelector('a');
     expect(anchor.href).toBe('https://example.com/docs');
-    expect(anchor.textContent).toBe(kind === 'url' ? anchor.href : '@example.com');
+    expect(anchor.textContent).toBe('@example.com');
     expect(editor.querySelectorAll('p')).toHaveLength(1);
     expect(editor.querySelector('webview, iframe')).toBeNull();
     history.undo();
@@ -147,5 +190,96 @@ describe('rich paste editing regressions', () => {
     expect(isImageMime('image/bmp')).toBe(false);
     expect(normalizeUrl('https://user:password@example.com')).toBe('');
     expect(normalizeUrl('https://example.com some prose')).toBe('');
+  });
+});
+
+describe('embedSource: a video link embeds its player, not the watch page', () => {
+  const player = 'https://www.youtube-nocookie.com/embed/FUfGcZ092b0';
+  it.each([
+    'https://www.youtube.com/watch?v=FUfGcZ092b0',
+    'https://youtube.com/watch?v=FUfGcZ092b0&list=PL1',
+    'https://m.youtube.com/watch?v=FUfGcZ092b0',
+    'https://youtu.be/FUfGcZ092b0',
+    'https://www.youtube.com/shorts/FUfGcZ092b0',
+    'https://www.youtube.com/live/FUfGcZ092b0',
+    'https://www.youtube-nocookie.com/embed/FUfGcZ092b0',
+  ])('%s', (url) => {
+    expect(embedSource(url)).toEqual({ src: player, video: true });
+  });
+
+  it('carries a start time', () => {
+    expect(embedSource('https://youtu.be/FUfGcZ092b0?t=90').src).toBe(`${player}?start=90`);
+    expect(embedSource('https://www.youtube.com/watch?v=FUfGcZ092b0&t=1m30s').src).toBe(`${player}?start=90`);
+  });
+
+  it('handles Vimeo and leaves every other page as it is', () => {
+    expect(embedSource('https://vimeo.com/76979871')).toEqual({ src: 'https://player.vimeo.com/video/76979871', video: true });
+    expect(embedSource('https://example.com/watch?v=abc')).toEqual({ src: 'https://example.com/watch?v=abc', video: false });
+    expect(embedSource('https://www.youtube.com/@channel')).toEqual({ src: 'https://www.youtube.com/@channel', video: false });
+  });
+
+  it('sends a public https referrer, which YouTube requires of a player', () => {
+    expect(new URL(EMBED_REFERRER).protocol).toBe('https:');
+  });
+});
+
+describe('image captions (0.8.5)', () => {
+  let editor, rich;
+  const IMG = '<div class="image-layer" contenteditable="false"><figure class="note-image" contenteditable="false" style="left:10px;top:10px;width:100px;height:50px"><img src="data:image/png;base64,iVBORw0KGgo="></figure></div><p>text line</p>';
+  beforeEach(() => {
+    document.body.innerHTML = `<div id="editor" contenteditable="true">${IMG}</div>`;
+    editor = document.getElementById('editor');
+    vi.stubGlobal('requestAnimationFrame', () => 0);
+    rich = initRichPaste(editor, {});
+    rich.refresh();
+    const t = editor.querySelector('p').firstChild;
+    const r = document.createRange(); r.setStart(t, 4); r.collapse(true);
+    window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
+    document.dispatchEvent(new Event('selectionchange'));
+    editor.querySelector('.note-image').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 20, clientY: 20 }));
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+  afterEach(() => { rich.reset(); vi.unstubAllGlobals(); });
+  const captionButton = () => document.querySelector('#image-bar [data-image="caption"]');
+  const key = (el, k) => el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+
+  it('adds an editable caption inside the figure from the image bar', () => {
+    expect(document.getElementById('image-bar').hidden).toBe(false);
+    captionButton().click();
+    const cap = editor.querySelector('.note-image figcaption.image-caption');
+    expect(cap).not.toBeNull();
+    expect(cap.getAttribute('contenteditable')).toBe('true');
+    expect(document.activeElement).toBe(cap);
+  });
+
+  it('Enter finishes the caption and puts the caret back in the note', () => {
+    captionButton().click();
+    const cap = editor.querySelector('figcaption');
+    cap.textContent = 'Source: a survey';
+    key(cap, 'Enter');
+    expect(cap.textContent).toBe('Source: a survey');
+    const sel = window.getSelection();
+    expect(editor.querySelector('p').contains(sel.anchorNode)).toBe(true);
+  });
+
+  it('an empty caption is removed when left', () => {
+    captionButton().click();
+    key(editor.querySelector('figcaption'), 'Escape');
+    expect(editor.querySelector('figcaption')).toBeNull();
+  });
+
+  it('Backspace in a caption edits the caption, never deletes the image', () => {
+    captionButton().click();
+    const cap = editor.querySelector('figcaption');
+    cap.textContent = 'x';
+    key(cap, 'Backspace');
+    expect(editor.querySelector('.note-image')).not.toBeNull();
+  });
+
+  it('a saved caption comes back editable, and Markdown export keeps it', () => {
+    editor.innerHTML = IMG.replace('</figure>', '<figcaption class="image-caption">Saved</figcaption></figure>');
+    rich.refresh();
+    expect(editor.querySelector('figcaption').getAttribute('contenteditable')).toBe('true');
+    expect(toMarkdown(editor.innerHTML)).toContain('*Saved*');
   });
 });

@@ -136,3 +136,89 @@ export function liftNestedDividers(root) {
   }
   return moved;
 }
+
+/**
+ * Enter on an empty line of a quote leaves the quote, as it leaves a list.
+ *
+ * Chromium answers Enter in a <blockquote> with another <blockquote>, so there
+ * was no way out: every line typed after a quote was quoted too (found by the
+ * page-rebuild test, 0.8.4). Handles both shapes Enter produces — an empty
+ * sibling <blockquote>, and an empty line inside one. A line in the middle of a
+ * quote splits it, so the text after it stays quoted.
+ * @returns {boolean} true when it moved the caret out
+ */
+export function exitQuoteOnEmptyLine(root, selection) {
+  if (!selection?.rangeCount || !selection.isCollapsed) return false;
+  const node = selection.anchorNode;
+  const el = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+  const quote = el?.closest('blockquote');
+  if (!quote || !root.contains(quote) || quote.parentElement !== root) return false;
+  let line = el === quote ? null : el;
+  while (line && line.parentElement !== quote) line = line.parentElement;
+  const empty = (n) => !n.textContent.replace(/​/g, '').trim() && !n.querySelector?.('img, hr, .inline-eq');
+  const doc = root.ownerDocument;
+  const out = doc.createElement('p');
+  out.innerHTML = '<br>';
+  if (!line || line === quote) {
+    if (!empty(quote)) return false;
+    quote.replaceWith(out);
+  } else {
+    if (line.nodeType !== Node.ELEMENT_NODE || !empty(line)) return false;
+    const rest = [];
+    for (let n = line.nextSibling; n; n = n.nextSibling) rest.push(n);
+    line.remove();
+    quote.after(out);
+    if (rest.some((n) => !empty(n.nodeType === 1 ? n : { textContent: n.textContent, querySelector: () => null }))) {
+      const tail = quote.cloneNode(false);
+      rest.forEach((n) => tail.appendChild(n));
+      out.after(tail);
+    } else {
+      rest.forEach((n) => n.remove());
+    }
+    if (empty(quote)) quote.remove();
+  }
+  const r = doc.createRange();
+  r.setStart(out, 0);
+  r.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(r);
+  return true;
+}
+
+/**
+ * A divider, always at the top level, with an empty paragraph under it.
+ *
+ * Goes after the caret's top-level block; an empty block the divider was
+ * called from is replaced, an empty list item is dropped. The toolbar did this
+ * already, but /divider still used insertHTML, which put the rule INSIDE the
+ * empty <div> line Enter makes — and the heading typed next went in with it
+ * (the page-rebuild test, 0.8.5).
+ * @returns {HTMLParagraphElement} the empty line under the divider
+ */
+export function insertDivider(root, selection) {
+  const doc = root.ownerDocument;
+  const node = selection?.rangeCount ? selection.getRangeAt(0).startContainer : null;
+  let el = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+  if (!el || !root.contains(el)) el = null;
+  const li = el?.closest('li');
+  if (li && root.contains(li) && !li.textContent.trim()) {
+    const list = li.parentElement;
+    el = list;
+    li.remove();
+    if (!list.querySelector('li')) { el = list.previousElementSibling || null; list.remove(); if (!el) el = null; }
+  }
+  let block = el === root ? null : el;
+  while (block && block.parentElement !== root) block = block.parentElement;
+  const hr = doc.createElement('hr');
+  hr.className = 'blk-hr';
+  const after = doc.createElement('p');
+  after.innerHTML = '<br>';
+  if (block && !block.matches('.shape-layer, .image-layer')) {
+    block.after(hr);
+    hr.after(after);
+    if (!block.textContent.trim() && !block.querySelector('img, .blk-code, .inline-eq, hr, .link-block')) block.remove();
+  } else {
+    root.append(hr, after);
+  }
+  return after;
+}
