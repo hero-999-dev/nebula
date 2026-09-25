@@ -17,3 +17,10 @@ Thumbs.db
 # Page rebuild reports (tests/e2e/rebuild-page.mjs). They hold the rebuilt
 # article and its images, which are not ours to publish.
 test-results/
+
+# The page-rebuild test is local-only: it names and rewrites a real article,
+# which is not ours to publish. Kept on this machine; npm run push runs it when
+# it is here and skips it in a clone that does not have it.
+tests/rebuild/
+tests/rebuild.test.js
+tests/e2e/rebuild-page.mjs

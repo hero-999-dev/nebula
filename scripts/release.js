@@ -212,10 +212,13 @@ console.log('\n> npm run smoke');
 // A metric that went DOWN stops the release. Being offline with no cached source,
 // or a run that could not finish, is reported and does not block: that says
 // nothing about the code. The report is filed under the version being released.
-if (!args.includes('--no-rebuild')) {
+const rebuildScript = path.join(ROOT, 'tests', 'e2e', 'rebuild-page.mjs');
+if (!fs.existsSync(rebuildScript)) {
+  console.log('\n  (page rebuild not here: it is local-only and not in the repository)');
+} else if (!args.includes('--no-rebuild')) {
   console.log('\n> npm run rebuild');
   process.env.NEBULA_REBUILD_VERSION = version;
-  const code = runSoft('node', [path.join(ROOT, 'tests', 'e2e', 'rebuild-page.mjs')]);
+  const code = runSoft('node', [rebuildScript]);
   if (code === 1) fail('The page rebuild scored lower than the previous version. Nothing was committed.\n  See test-results/rebuild/ for what went down.');
   if (code === 3) console.warn('\n  ! page rebuild skipped: no source (offline, nothing cached).\n');
   else if (code !== 0) console.warn(`\n  ! page rebuild could not finish (exit ${code}); not blocking the release.\n`);

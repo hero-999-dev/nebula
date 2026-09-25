@@ -12,15 +12,17 @@ What is tested, what each test proves, and what is knowingly untested.
 Unit tests cover pure logic. The smoke test covers what jsdom structurally
 cannot see: the preload bridge, the main process, the filesystem, and boot.
 
-| **Page rebuild** | `npm run rebuild` — a real article rewritten in the app and scored; run by `npm run push` after smoke |
+| **Page rebuild** | `npm run rebuild` — local only; a real article rewritten in the app and scored; run by `npm run push` after smoke when present |
 
 ---
 
 ## Suites
 
-### Page rebuild — `npm run rebuild` (new in 0.8.5)
+### Page rebuild — `npm run rebuild` (new in 0.8.5, local only)
 
-A different kind of test: not "does this handler work" but "can Nebula write this page". `tests/rebuild/pages.json` lists the pages (one today: a long Substack issue). For each, `tests/e2e/rebuild-page.mjs` fetches the source (cached in `test-results/rebuild/cache/`; `--refresh` fetches again), reads it into a plan (`tests/rebuild/plan.js`), and writes it into a new note with the app's own tools — typing, Ctrl+B/I, the slash menu, a pasted and dragged image per figure, a pasted URL chosen as Embed per video. The saved file is scored by `tests/rebuild/score.js`; layout, image order and working video players are measured in the running app. Each metric is compared with the previous version's report and any drop fails `npm run push`. A feature Nebula has no tool for can be listed in `KNOWN_GAPS` (score.js) so it reads as a gap, not a failure; the list is empty since 0.8.5.
+Its files (`tests/rebuild/`, `tests/rebuild.test.js`, `tests/e2e/rebuild-page.mjs`) are gitignored and live on the owner's machine: they name and rewrite a real article, which is not ours to publish. `npm run push` skips the step in a clone that does not have them.
+
+A different kind of test: not "does this handler work" but "can Nebula write this page". `tests/rebuild/pages.json` lists the pages (kept locally). For each, `tests/e2e/rebuild-page.mjs` fetches the source (cached in `test-results/rebuild/cache/`; `--refresh` fetches again), reads it into a plan (`tests/rebuild/plan.js`), and writes it into a new note with the app's own tools — typing, Ctrl+B/I, the slash menu, a pasted and dragged image per figure, a pasted URL chosen as Embed per video. The saved file is scored by `tests/rebuild/score.js`; layout, image order and working video players are measured in the running app. Each metric is compared with the previous version's report and any drop fails `npm run push`. A feature Nebula has no tool for can be listed in `KNOWN_GAPS` (score.js) so it reads as a gap, not a failure; the list is empty since 0.8.5.
 
 | Version | Score | What moved |
 |---|---|---|

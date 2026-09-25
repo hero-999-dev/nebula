@@ -104,7 +104,7 @@ everyone else. Nothing reads the DOM to find out what a note contains.
 | `npm run dev` | Dev app on `<repo>/.dev-profile` — cannot see the installed app's notes |
 | `npm test` | Unit tests |
 | `npm run build && npm run smoke` | Drives the real Electron app on throwaway profiles |
-| `npm run rebuild` | Rewrites a real article in the app and scores it; reports in `test-results/rebuild/` (gitignored) |
+| `npm run rebuild` | Local only (its files are gitignored): rewrites a real article in the app and scores it; reports in `test-results/rebuild/` |
 | `npm run pack:test` | **`Nebula Test.exe`** in the project root — double-click, own icon, own notes |
 | `npm run pack:win` | `release/Nebula-Setup-*.exe` + `Nebula-portable-*.exe` |
 | `npm run icons` | Regenerate `build/icon.png` from `build/source-mark.png` (Windows) |

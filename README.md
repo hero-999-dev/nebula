@@ -195,7 +195,7 @@ npm run preflight   # START HERE — version, phase, what changed, what is stale
 npm run dev         # dev app on its OWN profile
 npm test            # 346 unit tests
 npm run build && npm run smoke   # checks against the real Electron app
-npm run rebuild                  # rewrite a real article in the app, score it per feature
+npm run rebuild                  # local only: rewrite a real article in the app, score it per feature
 npm run check:versions           # every surface agrees with package.json
 npm run pack:win    # release/Nebula-Setup-*.exe + Nebula-portable-*.exe
 npm run site        # rebuild site/index.html (docs + mind maps)
