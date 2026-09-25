@@ -122,6 +122,27 @@ describe('NoteStore.ensureGuide', () => {
     expect(localStorage.getItem('nebula:guide-version')).toBe('9.9.9');
   });
 
+  it('brings a guide nobody wrote in up to date in place (0.8.6)', () => {
+    const store = new NoteStore({ allowSeed: false });
+    store.notes = [
+      { id: 'g', title: GUIDE.title, content: '<h1>Welcome to Nebula</h1><p>old</p>', createdAt: 1, updatedAt: 1 },
+      { id: 'a', title: 'My note', content: 'mine', createdAt: 1, updatedAt: 1 },
+    ];
+    store.save();
+    expect(store.ensureGuide(GUIDE, '2.0.0', { unedited: () => true })).toBe(false); // refreshed, not added: nothing to open
+    expect(store.notes).toHaveLength(2);
+    expect(store.notes.find((n) => n.id === 'g').content).toBe(GUIDE.content);
+    expect(store.notes.find((n) => n.id === 'a').content).toBe('mine');
+  });
+
+  it('never rewrites a guide the user has written in', () => {
+    const store = new NoteStore({ allowSeed: false });
+    store.notes = [{ id: 'g', title: GUIDE.title, content: '<p>my own words</p>', createdAt: 1, updatedAt: 1 }];
+    store.save();
+    store.ensureGuide(GUIDE, '2.0.0', { unedited: () => false });
+    expect(store.notes[0].content).toBe('<p>my own words</p>');
+  });
+
   it('refuses without a note or a version rather than writing junk', () => {
     const store = new NoteStore({ allowSeed: false });
     expect(store.ensureGuide(null, '1.0.0')).toBe(false);

@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "lastUpdated": "2026-09-25",
-  "currentPhase": "v0.8.5 - a page-rebuild test (npm run rebuild): a real web article rewritten in the app with its own tools and scored per feature; npm run push runs it after smoke and stops on any metric that went down. Scored 65.2% on 0.8.4 and 100% on 0.8.5. Built to get there: links on words (paste a URL over selected words, a toolbar link button, Ctrl+click to open, empty address unlinks), image captions (a figcaption from the image bar, Enter returns to the text), YouTube/Vimeo embeds load the player with a Referer, Enter leaves an empty quote line, bold/italic switched off stay off across Enter, /divider goes to the top level.",
-  "next": "Owner tries the released 0.8.5. More pages can go in tests/rebuild/pages.json.",
+  "currentPhase": "v0.8.6 - from the owner's screen recording of the rebuilt article in Nebula Test: pasted images now go into the text flow (figure.note-image--inline after the caret line; ⇄ on the image bar floats it or puts it back; dropped images still float), because pixel-positioned images landed on the text and left gaps at any other window width; captions of in-text images stay in the flow (a same-specificity CSS rule had hung them over the next paragraph); arrows moved to their own toolbar menu with icons (their icon-less rows had read \"S…\"); video cards lose the preview-blocked hint. The local page-rebuild test now measures layout at three window sizes and counts blank-line runs, and rewrites two articles. The Welcome guide now gets every release's features and refreshes itself while unedited; its shapes stand on a stage above the text. Test exe and release on the owner's go-ahead.",
+  "next": "Owner tries 0.8.6.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -88,6 +88,12 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "version": "0.8.6",
+      "date": "2026-09-25",
+      "by": "Claude",
+      "what": "In-text images: rich-paste makeImage(inline), placeInText (after the caret block, replacing an empty line, a <p> after), setImageFloating both ways, drag/resize guard for images whose parent is the editor; CSS .note-image--inline (flow, height auto, static caption with two-class specificity). Arrow menu #menu-arrows beside shapes with SVG rows. Video embeds without the hint. Local rebuild test: images pasted in text (no drag, no blank lines), layout/imageOrder at 1280/1920/960 wide, blankLines metric, a second article. tests: rich-paste +4, rebuild-findings +4 (arrow menu, image in text, no overlap at two widths). The article names stay out of the repo. Guide 0.8.6: features since 0.6.0 and a \"New in\" list, shapes on a .guide-stage band, guideSignature/GUIDE_SIGNATURES and ensureGuide({unedited}) so an untouched guide is refreshed in place; AGENTS.md checklist item for the guide."
+    },
     {
       "version": "0.8.5",
       "date": "2026-09-25",

@@ -165,16 +165,18 @@ function imageSize(src) {
   });
 }
 
-function makeImage(src, width, height, at) {
+function makeImage(src, width, height, at, inline = false) {
   const figure = document.createElement('figure');
-  figure.className = 'note-image';
+  figure.className = inline ? 'note-image note-image--inline' : 'note-image';
   figure.setAttribute('contenteditable', 'false');
   figure.dataset.blockType = 'image';
   figure.dataset.ratio = String(width / Math.max(1, height));
-  figure.style.left = `${Math.round(at?.left ?? 40)}px`;
-  figure.style.top = `${Math.round(at?.top ?? 40)}px`;
   figure.style.width = `${Math.round(width)}px`;
-  figure.style.height = `${Math.round(height)}px`;
+  if (!inline) {
+    figure.style.left = `${Math.round(at?.left ?? 40)}px`;
+    figure.style.top = `${Math.round(at?.top ?? 40)}px`;
+    figure.style.height = `${Math.round(height)}px`;
+  }
 
   const image = document.createElement('img');
   image.src = src;
@@ -240,10 +242,14 @@ function makeLinkBlock(url, kind) {
       frame.setAttribute('httpreferrer', EMBED_REFERRER);
     }
     frame.src = source.src;
-    const hint = document.createElement('small');
-    hint.className = 'link-embed-hint';
-    hint.textContent = 'Preview blocked or blank? Open the link above. Some sites do not allow embedding.';
-    card.append(frame, hint);
+    card.append(frame);
+    // A video player loads or says why itself; the hint is for pages that refuse a frame.
+    if (!source.video) {
+      const hint = document.createElement('small');
+      hint.className = 'link-embed-hint';
+      hint.textContent = 'Preview blocked or blank? Open the link above. Some sites do not allow embedding.';
+      card.append(hint);
+    }
   }
   return card;
 }
@@ -254,7 +260,6 @@ export function initRichPaste(editor, { history } = {}) {
   let selectedImage = null;
   let drag = null;
   const claimed = new WeakSet();
-  let imageCascade = 0;
   let generation = 0;
   let preferredKind = '';
 
@@ -498,6 +503,7 @@ export function initRichPaste(editor, { history } = {}) {
     bar.innerHTML = '<button type="button" data-image="back" title="Send behind text">▾</button>'
       + '<button type="button" data-image="front" title="Bring above text">▴</button>'
       + '<button type="button" data-image="caption" title="Add or edit a caption">Aa</button>'
+      + '<button type="button" data-image="flow" title="Float freely / keep in the text">⇄</button>'
       + '<button type="button" data-image="del" title="Delete image">✕</button>';
     document.body.appendChild(bar);
     return bar;
@@ -561,20 +567,93 @@ export function initRichPaste(editor, { history } = {}) {
   }
 
   function insertImageData(src, dimensions, at) {
-    imageCascade = (imageCascade + 1) % 8;
     const maxWidth = 460;
     const ratio = dimensions.width / Math.max(1, dimensions.height);
     let width = Math.min(maxWidth, Math.max(120, dimensions.width || maxWidth));
     let height = width / ratio;
     if (height > 420) { height = 420; width = height * ratio; }
-    const point = at || { left: 36 + imageCascade * 22, top: (editor.scrollTop || 0) + 36 + imageCascade * 18 };
-    const image = makeImage(src, width, height, point);
     history?.push();
-    ensureLayer(editor).appendChild(image);
+    let image;
+    if (at) {
+      // Dropped at a point: it floats there, over or behind the text.
+      image = makeImage(src, width, height, at);
+      ensureLayer(editor).appendChild(image);
+    } else {
+      // Pasted: it goes into the text, on the caret's line, and flows with it.
+      // Floating by pixel position is what scattered images over the text and
+      // left gaps as soon as the window was a different width (owner's video,
+      // 0.8.5). The image bar can still set it free.
+      image = makeImage(src, width, height, null, true);
+      placeInText(image, pendingRange || currentRange(editor));
+    }
     refreshImages();
     selectImage(image);
     dirty();
     return image;
+  }
+
+  /** The note-level block a range sits in, or null. */
+  function topBlockOf(range) {
+    let el = range?.startContainer;
+    el = el?.nodeType === Node.ELEMENT_NODE ? el : el?.parentElement;
+    if (!el || !editor.contains(el) || el === editor) {
+      const child = range && range.startContainer === editor ? editor.childNodes[range.startOffset - 1] : null;
+      return child?.nodeType === Node.ELEMENT_NODE && !child.matches('.shape-layer, .image-layer') ? child : null;
+    }
+    while (el.parentElement && el.parentElement !== editor) el = el.parentElement;
+    return el.matches('.shape-layer, .image-layer') ? null : el;
+  }
+
+  /** Put an image into the text after the caret's line (in place of it, if empty), with a line to go on typing. */
+  function placeInText(image, range) {
+    const block = topBlockOf(range);
+    const empty = block && !block.textContent.trim()
+      && !block.querySelector('img, hr, .link-block, .note-image, .blk-code, .inline-eq');
+    if (block && empty) block.replaceWith(image);
+    else if (block) block.after(image);
+    else editor.append(image);
+    let next = image.nextElementSibling;
+    if (!next || next.matches('.note-image, .link-block, hr, .blk-code')) {
+      next = document.createElement('p');
+      next.innerHTML = '<br>';
+      image.after(next);
+    }
+    placeCaretIn(next);
+  }
+
+  /** In the text -> floating, staying exactly where it is on screen; and back. */
+  function setImageFloating(image, floating) {
+    const inline = image.classList.contains('note-image--inline');
+    if (floating === !inline) return;
+    const rect = image.getBoundingClientRect();
+    if (floating) {
+      const layer = ensureLayer(editor);
+      const origin = layer.getBoundingClientRect();
+      const pictureHeight = image.querySelector('img')?.getBoundingClientRect().height || rect.height;
+      image.classList.remove('note-image--inline');
+      image.style.left = `${Math.round(rect.left - origin.left)}px`;
+      image.style.top = `${Math.round(rect.top - origin.top)}px`;
+      image.style.height = `${Math.round(pictureHeight)}px`;
+      layer.appendChild(image);
+    } else {
+      // Into the text after the last line that starts above the image's top edge.
+      let after = null;
+      for (const el of editor.children) {
+        if (el.matches('.shape-layer, .image-layer') || el === image) continue;
+        if (el.getBoundingClientRect().top <= rect.top) after = el;
+      }
+      image.classList.remove('behind');
+      image.classList.add('note-image--inline');
+      image.style.left = '';
+      image.style.top = '';
+      image.style.height = '';
+      if (after) after.after(image);
+      else {
+        // Before the first line of text, but after the overlay layers, which stay first.
+        const first = [...editor.children].find((el) => !el.matches('.shape-layer, .image-layer') && el !== image);
+        if (first) first.before(image); else editor.append(image);
+      }
+    }
   }
 
   async function insertImageBlob(blob, at) {
@@ -628,7 +707,9 @@ export function initRichPaste(editor, { history } = {}) {
     const dy = event.clientY - drag.startY;
     if (Math.abs(event.clientX - drag.downX) > 2 || Math.abs(event.clientY - drag.downY) > 2) drag.moved = true;
     if (!drag.moved) return;
-    drag.layer.style.minHeight = `${drag.extent}px`;
+    const inText = drag.image.classList.contains('note-image--inline');
+    if (inText && drag.kind === 'move') return; // it sits in the text; ⇄ on the bar sets it free
+    if (!inText) drag.layer.style.minHeight = `${drag.extent}px`;
     editor.classList.add('image-dragging');
     if (drag.kind === 'move') {
       drag.image.style.left = `${Math.max(0, drag.left + dx)}px`;
@@ -637,15 +718,17 @@ export function initRichPaste(editor, { history } = {}) {
       const delta = Math.abs(dx) >= Math.abs(dy * drag.ratio) ? dx : dy * drag.ratio;
       const width = Math.max(Math.min(100, 60 * drag.ratio), drag.width + delta);
       drag.image.style.width = `${Math.round(width)}px`;
-      drag.image.style.height = `${Math.round(width / drag.ratio)}px`;
+      if (!inText) drag.image.style.height = `${Math.round(width / drag.ratio)}px`;
     }
     positionImageBar();
   });
 
   function finishDrag() {
     if (!drag) return;
-    drag.layer.style.minHeight = '';
-    if (!drag.layer.getAttribute('style')) drag.layer.removeAttribute('style');
+    if (drag.layer !== editor) {
+      drag.layer.style.minHeight = '';
+      if (!drag.layer.getAttribute('style')) drag.layer.removeAttribute('style');
+    }
     editor.classList.remove('image-dragging');
     if (drag.moved) dirty();
     drag = null;
@@ -726,6 +809,17 @@ export function initRichPaste(editor, { history } = {}) {
     const act = event.target.closest('[data-image]')?.dataset.image;
     if (!selectedImage || !act) return;
     if (act === 'caption') { editCaption(selectedImage); return; }
+    if (act === 'flow') {
+      history?.push();
+      setImageFloating(selectedImage, selectedImage.classList.contains('note-image--inline'));
+      selectImage(selectedImage);
+      dirty();
+      return;
+    }
+    // Behind/above text only means something for a floating image: set it free first.
+    if ((act === 'back' || act === 'front') && selectedImage.classList.contains('note-image--inline')) {
+      setImageFloating(selectedImage, true);
+    }
     if (act === 'del') {
       history?.push();
       selectedImage.remove();

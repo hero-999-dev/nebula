@@ -13,6 +13,16 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.8.6': {
+    headline: 'Pasted images stay in your text, and arrows have their own menu.',
+    items: [
+      { title: 'Images in the text', text: 'A pasted image goes on the line you are on and moves with the text, at any window size. No more pictures over the words or gaps between paragraphs. Press ⇄ on the image bar to let one float freely again.' },
+      { title: 'Captions stay under the picture', text: 'A caption on an image in the text sits under it instead of over the next paragraph.' },
+      { title: 'An arrow menu', text: 'Straight, elbow and curved arrows have their own button beside the shapes, each with its picture and full name.' },
+      { title: 'Cleaner video cards', text: 'Embedded videos no longer show the "preview blocked" hint under a working player.' },
+      { title: 'The guide keeps up', text: 'Welcome to Nebula Guide now tells what each version adds, and updates itself while you have not written in it. Its shapes stand in a row above the text.' },
+    ],
+  },
   '0.8.5': {
     headline: 'Link any words, caption images, and YouTube links play in the note.',
     items: [

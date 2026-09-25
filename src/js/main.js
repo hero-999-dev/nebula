@@ -1,6 +1,6 @@
 import { initDiskStorage, flushDisk, getDiskStatus } from './disk-store.js';
 import { NoteStore, plainSnippet, relativeTime } from './notes.js';
-import { GUIDE_NOTE, GUIDE_VERSION, addGuide } from './seed-notes.js';
+import { GUIDE_NOTE, GUIDE_VERSION, addGuide, guideUnedited } from './seed-notes.js';
 import { migrateNote } from './migrate.js';
 import { initWhatsNew } from './whats-new.js';
 import { bindEditor } from './editor.js';
@@ -64,7 +64,7 @@ async function boot() {
   const store = new NoteStore({ allowSeed: firstRun });
   // When the guide is genuinely new to this vault, open it — otherwise the one
   // note the user was told to look at is the one they never see.
-  if (disk.ok && store.ensureGuide(GUIDE_NOTE, GUIDE_VERSION)) {
+  if (disk.ok && store.ensureGuide(GUIDE_NOTE, GUIDE_VERSION, { unedited: guideUnedited })) {
     store.setActive(store.notes[0].id);
   }
   const titleEl = $('title');

@@ -5,6 +5,32 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+## [2026-09-25 03:54] v0.8.6 - by Claude
+
+Pasted images sit in the text, an arrow menu, and a guide that keeps up.
+
+* Keep the page-rebuild test local
+* Rebuild test: keep the rebuilt page in Nebula Test's vault
+* Tests: build the login-URL fixture through the URL API
+
+---
+
+## [2026-09-25 04:30] v0.8.6 - by Claude
+
+From the owner's screen recording of the rebuilt article opened in Nebula Test at full screen.
+
+* Images were placed by pixel position, so at a window width other than the one they were placed at, the text rewrapped under them: pictures lay over paragraphs and the blank lines made to clear them became gaps. A pasted image now goes into the text on the caret's line and flows with it; ⇄ on the image bar floats it (or puts a floating one back). A dropped image still floats where it is dropped.
+* A caption on an in-text image hung over the next paragraph: the floating-caption rule had the same specificity and came later in the file. Two classes now.
+* Arrows were at the end of the shape list without icons, so their names fell into the icon column and read "S…", "E…", "C…". They have their own menu beside the shapes, with pictures.
+* A working video player no longer carries the "preview blocked" hint.
+* **The guide:** owner's rule from now on — every release adds its features (not fixes) to "Welcome to Nebula Guide". It gained "New in 0.8.6", sections for links/pictures/videos and for moving a note, arrows and rotation under Shapes, and four themes. Its demo shapes stand in a row on a stage above the H1 instead of over the opening paragraphs. An existing vault's guide was never refreshed before; `ensureGuide` now replaces a guide whose text still matches a shipped signature (`GUIDE_SIGNATURES`) and leaves one the user wrote in alone.
+* The local page-rebuild test missed the scattering because it measured only at the width it wrote at. It now measures at three widths and counts blank-line runs; it also rewrites a second article. `tests/e2e/rebuild-findings.mjs` pins the arrow menu and an in-text image at two widths.
+
+---
+
+
+
+
 ## [2026-09-25 02:06] v0.8.5 - by Claude
 
 Links on words, image captions, YouTube players, and a page-rebuild test that scores 100%.

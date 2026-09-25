@@ -166,6 +166,55 @@ describe('rich paste editing regressions', () => {
     expect(editor.innerHTML).toBe('<p>other note</p>');
   });
 
+  describe('a pasted image goes into the text (0.8.6)', () => {
+    const loads = () => vi.stubGlobal('Image', class { set src(value) { queueMicrotask(() => this.onload()); } naturalWidth = 640; naturalHeight = 320; });
+    const png = () => new Blob(['png'], { type: 'image/png' });
+
+    it('sits after the caret line, in the flow, with a line under it to go on typing', async () => {
+      loads();
+      const figure = await rich.insertImageBlob(png());
+      expect(figure.classList.contains('note-image--inline')).toBe(true);
+      expect(figure.parentElement).toBe(editor);
+      expect(figure.previousElementSibling.textContent).toBe('before selected after');
+      expect(figure.style.top).toBe('');
+      expect(figure.nextElementSibling.tagName).toBe('P');
+      expect(editor.querySelector('.image-layer')).toBeNull();
+      expect(window.getSelection().anchorNode).toBe(figure.nextElementSibling);
+    });
+
+    it('takes the place of an empty line', async () => {
+      loads();
+      editor.innerHTML = '<p>one</p><p><br></p><p>two</p>';
+      const blank = editor.querySelectorAll('p')[1];
+      const r = document.createRange(); r.setStart(blank, 0); r.collapse(true);
+      window.getSelection().removeAllRanges(); window.getSelection().addRange(r);
+      await rich.insertImageBlob(png());
+      expect([...editor.children].map((el) => el.tagName)).toEqual(['P', 'FIGURE', 'P']);
+    });
+
+    it('a dropped image still floats where it was dropped', async () => {
+      loads();
+      const figure = await rich.insertImageBlob(png(), { left: 50, top: 60 });
+      expect(figure.classList.contains('note-image--inline')).toBe(false);
+      expect(figure.parentElement.classList.contains('image-layer')).toBe(true);
+      expect(figure.style.top).toBe('60px');
+    });
+
+    it('⇄ on the image bar sets it free and puts it back in the text', async () => {
+      loads();
+      const figure = await rich.insertImageBlob(png());
+      const flow = document.querySelector('#image-bar [data-image="flow"]');
+      flow.click();
+      expect(figure.classList.contains('note-image--inline')).toBe(false);
+      expect(figure.parentElement.classList.contains('image-layer')).toBe(true);
+      expect(figure.style.left).not.toBe('');
+      flow.click();
+      expect(figure.classList.contains('note-image--inline')).toBe(true);
+      expect(figure.parentElement).toBe(editor);
+      expect(figure.style.left).toBe('');
+    });
+  });
+
   it('rejects corrupt images rather than saving a broken-image placeholder', async () => {
     vi.stubGlobal('Image', class { set src(value) { queueMicrotask(() => this.onerror()); } });
     expect(await rich.insertImageBlob(new Blob(['broken'], { type: 'image/png' }))).toBeNull();

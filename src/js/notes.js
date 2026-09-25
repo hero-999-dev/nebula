@@ -115,11 +115,22 @@ export class NoteStore {
    *
    * @param {{title: string, content: string}} note the guide
    * @param {string} version bumped whenever the guide's content changes
-   * @returns {boolean} whether a note was added
+   * @param {{unedited?: (html: string) => boolean}} [opts] recognises a guide
+   *   nobody has written in (seed-notes.js `guideUnedited`); that one is
+   *   brought up to date in place. Until 0.8.6 an existing guide was never
+   *   refreshed, so nothing added to it after a vault's first run was ever seen.
+   * @returns {boolean} whether a note was added (a refresh in place returns false)
    */
-  ensureGuide(note, version) {
+  ensureGuide(note, version, { unedited } = {}) {
     if (!note || !version) return false;
     if (localStorage.getItem(STORAGE_KEY_GUIDE) === version) return false;
+
+    const existing = this.notes.find((n) => n.title === note.title && !n.deletedAt);
+    if (existing && existing.content !== note.content && unedited?.(existing.content)) {
+      existing.content = note.content;
+      existing.updatedAt = Date.now();
+      this.save();
+    }
 
     // A fresh vault was just seeded with it; only stamp the version.
     const already = this.notes.some((n) => n.title === note.title);

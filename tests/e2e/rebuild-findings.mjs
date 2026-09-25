@@ -153,6 +153,52 @@ export async function runRebuildFindingChecks(check) {
       return { heading: h?.parentElement === ed, hr: hr?.tagName === 'HR' && hr.parentElement === ed };
     });
     check('/divider on an empty line goes to the top level, and the heading after it too', rule.heading && rule.hr, JSON.stringify(rule));
+
+    /* Arrows have their own menu beside the shapes, with icons and whole names (0.8.6). */
+    const menus = await win.evaluate(() => {
+      document.querySelector('[data-menu="menu-arrows"]').click();
+      const m = document.getElementById('menu-arrows');
+      const rows = [...m.querySelectorAll('[data-arrow-add]')];
+      const out = {
+        inShapes: !!document.querySelector('#menu-shapes [data-arrow-add]'),
+        rows: rows.length,
+        icons: rows.every((b) => b.querySelector('svg')),
+        truncated: rows.filter((b) => { const l = b.querySelector('.label'); return l.scrollWidth > l.clientWidth + 1; }).map((b) => b.textContent),
+      };
+      document.querySelector('[data-menu="menu-arrows"]').click();
+      return out;
+    });
+    check('arrows are in their own menu, not the shape list', !menus.inShapes && menus.rows === 3, JSON.stringify(menus));
+    check('every arrow row has an icon and its whole name', menus.icons && menus.truncated.length === 0, JSON.stringify(menus));
+
+    /* A pasted image sits in the text and stays clear of it at any window width (0.8.6). */
+    await win.evaluate(() => document.getElementById('editor').focus());
+    await win.keyboard.press('Control+End');
+    await win.keyboard.press('Enter');
+    await win.keyboard.type('Line above the picture', { delay: 5 });
+    await win.keyboard.press('Enter');
+    const before = await win.locator('#editor .note-image').count();
+    await app.evaluate(({ clipboard, nativeImage }, file) => clipboard.writeImage(nativeImage.createFromPath(file)), path.join(root, 'build', 'icon.png'));
+    await win.keyboard.press('Control+v');
+    await win.waitForFunction((n) => document.querySelectorAll('#editor .note-image').length > n, before, { polling: 50 });
+    await win.keyboard.type('Line below the picture', { delay: 5 });
+    const placed = await win.evaluate(() => {
+      const f = [...document.querySelectorAll('#editor .note-image--inline')].pop();
+      return { inText: f?.parentElement?.id === 'editor', prev: f?.previousElementSibling?.textContent, next: f?.nextElementSibling?.textContent };
+    });
+    check('a pasted image goes into the text on the caret line', placed.inText && placed.prev === 'Line above the picture' && placed.next === 'Line below the picture', JSON.stringify(placed));
+    const clear = [];
+    for (const [w, h] of [[1920, 1040], [900, 900]]) {
+      await app.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setSize(...size), [w, h]);
+      await win.waitForTimeout(500);
+      clear.push(await win.evaluate(() => {
+        const f = [...document.querySelectorAll('#editor .note-image--inline')].pop();
+        const r = f.getBoundingClientRect();
+        const lines = [...document.querySelectorAll('#editor > p, #editor > div:not(.image-layer):not(.shape-layer)')].filter((el) => el.textContent.trim());
+        return !lines.some((el) => { const t = el.getBoundingClientRect(); return r.top < t.bottom - 2 && t.top < r.bottom - 2 && r.left < t.right && t.left < r.right; });
+      }));
+    }
+    check('the image in the text never overlaps the text, wide or narrow', clear.every(Boolean), JSON.stringify(clear));
   } catch (err) {
     check('rebuild-finding checks ran to the end', false, err.message.split('\n')[0]);
   } finally {

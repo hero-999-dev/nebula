@@ -280,26 +280,69 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '0.6.0';
+export const GUIDE_VERSION = '0.8.6';
+
+/**
+ * The guide's words, without its markup, shapes, code or equations — so a
+ * guide the app has only restyled or re-rendered still matches, and one the
+ * user has typed in does not. FNV-1a, 8 hex digits.
+ * @param {string} html
+ */
+export function guideSignature(html) {
+  const doc = new DOMParser().parseFromString(`<body>${String(html ?? '')}</body>`, 'text/html');
+  doc.body.querySelectorAll('.blk-code, .shape-layer, .image-layer, .inline-eq, .guide-stage').forEach((el) => el.remove());
+  const text = doc.body.textContent.replace(/\s+/g, ' ').trim();
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16).padStart(8, '0');
+}
+
+/**
+ * The signature of every guide that has shipped. A guide in a vault that
+ * matches one of these was never written in, so `NoteStore.ensureGuide` may
+ * replace it with the current one; any other guide is the user's and is left
+ * alone. When the guide's text changes: bump GUIDE_VERSION and add its
+ * signature here (tests/seed-guide.test.js fails until you do).
+ */
+export const GUIDE_SIGNATURES = {
+  '0.6.0': 'c33a6b3a',
+  '0.8.6': '66f979f9',
+};
+
+/** Whether a vault's guide is one we shipped and nobody has typed in. */
+export const guideUnedited = (html) => Object.values(GUIDE_SIGNATURES).includes(guideSignature(html));
 
 export const GUIDE_NOTE = {
   title: 'Welcome to Nebula Guide',
   content:
     // Shapes live on layers at the top of the note; the behind-layer is a real
     // second layer, not a class, so it can be painted under the text.
+    //
+    // They sit in a row on a stage of their own — an empty band at the very top
+    // that no text flows through. Placed over the opening paragraphs (up to
+    // 0.8.5) they landed on the words at any window width but one, which looked
+    // like a mistake rather than a demonstration.
     '<div class="shape-layer shape-layer--behind" contenteditable="false" data-block-type="shape-layer">' +
-    // Placed near the top so they are visible the moment the note opens — a
-    // shape parked next to section 6 would be a thousand pixels below the fold.
-    '<div class="shape diamond behind" data-kind="diamond" style="left:520px;top:470px;width:170px;height:130px;background:#F0D2CE"><div class="shape-text" contenteditable="true">behind the text</div><span class="shape-h"></span></div>' +
+    '<div class="shape diamond behind" data-kind="diamond" style="left:392px;top:8px;width:150px;height:116px;background:#F0D2CE"><div class="shape-text" contenteditable="true">behind the text</div><span class="shape-h"></span></div>' +
     '</div>' +
     '<div class="shape-layer" contenteditable="false" data-block-type="shape-layer">' +
-    '<div class="shape rect" data-kind="rect" style="left:600px;top:150px;width:150px;height:90px;background:#D6E4D0"><div class="shape-text" contenteditable="true">drag me anywhere</div><span class="shape-h"></span></div>' +
-    '<div class="shape ellipse" data-kind="ellipse" style="left:640px;top:270px;width:150px;height:100px;background:#D3E0EA"><div class="shape-text" contenteditable="true">over the text</div><span class="shape-h"></span></div>' +
+    '<div class="shape rect" data-kind="rect" data-rot="-6" style="left:14px;top:22px;width:150px;height:86px;background:#D6E4D0;transform:rotate(-6deg)"><div class="shape-text" contenteditable="true">drag me anywhere</div><span class="shape-h"></span></div>' +
+    '<div class="shape ellipse" data-kind="ellipse" style="left:196px;top:16px;width:164px;height:98px;background:#D3E0EA"><div class="shape-text" contenteditable="true">double-click to write</div><span class="shape-h"></span></div>' +
     '</div>' +
+    '<div class="guide-stage" contenteditable="false" aria-hidden="true"></div>' +
 
     '<h1>Welcome to Nebula</h1>' +
     '<p>A calm place for notes. Everything auto-saves — there is no save button to forget, though <span class="inline-code">Ctrl+S</span> works if you want one.</p>' +
-    '<p>This is the whole guide in one page. Every section has something you can try on the spot; the text you are reading is an ordinary note, so edit it, break it, or delete it once you are done. Your own notes are never touched by an update.</p>' +
+    '<p>This is the whole guide in one page. Every section has something you can try on the spot; the text you are reading is an ordinary note, so edit it, break it, or delete it once you are done. Your own notes are never touched by an update — and this page updates itself only while you have not written in it.</p>' +
+
+    // Each release adds its features here (features, not fixes) and in the
+    // section they belong to. See GUIDE_SIGNATURES before changing any text.
+    '<h2>New in 0.8.6</h2>' +
+    '<ul>' +
+    '<li><strong>Images sit in your text.</strong> A pasted image goes on the line you are on and moves with the words at any window size; <em>⇄</em> on its bar lets it float freely — section 7.</li>' +
+    '<li><strong>An arrow menu</strong> beside the shapes: straight, elbow and curved — section 6.</li>' +
+    '<li>Recently: <strong>links on any words</strong>, <strong>image captions</strong>, <strong>videos that play in the note</strong> (0.8.5); <strong>arrows</strong>, a <strong>rotation readout</strong> and <strong>moving a note to another Nebula</strong> (0.8.3).</li>' +
+    '</ul>' +
 
     '<h2>1 · The window</h2>' +
     '<p>The six buttons on the header line move the <strong>editing bar</strong>, not the note:</p>' +
@@ -309,7 +352,7 @@ export const GUIDE_NOTE = {
     '<li><strong>AI</strong> opens the side panel: Claude, Gemini, ChatGPT, Mistral, DeepSeek, Copilot, Perplexity, and <strong>+</strong> adds any site. The tab strip scrolls sideways (Shift+wheel); drag the panel’s left edge to resize it.</li>' +
     '<li><strong>−</strong> hides the bar for a clean page</li>' +
     '</ul>' +
-    '<p>Three themes at the bottom of the sidebar: <strong>Main</strong>, <strong>Dark</strong>, <strong>Light</strong>. The layout and the theme both survive a restart.</p>' +
+    '<p>Four themes at the bottom of the sidebar: <strong>Main</strong>, <strong>Dark</strong>, <strong>Light</strong> and <strong>White</strong>. The layout and the theme both survive a restart.</p>' +
     '<p><strong>Try it:</strong> send the bar to the left rail, restart the app, and it is still there.</p>' +
 
     '<h2>2 · Writing</h2>' +
@@ -337,7 +380,7 @@ export const GUIDE_NOTE = {
     '<span class="h-yellow">yellow background</span> · <span class="h-green">green background</span> · <span class="h-purple">purple background</span></p>' +
     '<p><strong>Try it:</strong> the <strong>Font</strong> menu shows every face in its own typeface. With text selected it restyles the selection; with only a caret it restyles the whole line. The button always names the font under the caret. <strong>Size</strong> accepts any number you type, not just the listed ones — try 37.</p>' +
     '<p><strong>Try it:</strong> <em>A</em> applies the last text colour and <em>H</em> the last highlight; each <em>▾</em> opens the full list. Every row lines up and the list fits without scrolling.</p>' +
-    '<p><strong>Try it:</strong> switch between <strong>Main</strong>, <strong>Dark</strong> and <strong>Light</strong> with that paragraph in view. Every colour repaints for the theme and stays readable — a colour is stored as a name, not as a fixed value picked against one background.</p>' +
+    '<p><strong>Try it:</strong> switch between the four themes with that paragraph in view. Every colour repaints for the theme and stays readable — a colour is stored as a name, not as a fixed value picked against one background.</p>' +
 
     '<h2>4 · Lists, to-dos and indent</h2>' +
     '<h3>Bulleted</h3><ul><li>first</li><li>second</li><li>third</li></ul>' +
@@ -362,13 +405,26 @@ export const GUIDE_NOTE = {
     '<p><strong>Try it:</strong> each one sits in its own frame, like <span class="inline-code">inline code</span>, so you can see where it starts and ends. Click one — the editor reopens with its LaTeX. Close the note and come back: all four are still typeset. It works with no network.</p>' +
 
     '<h2>6 · Shapes</h2>' +
-    '<p>Shapes float over the whole note — the three at the top of this page are real ones. Drag them down here, resize from the corner handle, double-click to write inside. Text wrap is <strong>through</strong>: the words never reflow, the shape floats above or below them.</p>' +
+    '<p>Shapes float over the whole note — the three at the top of this page are real ones. Drag them down here, resize from the corner handle, double-click to write inside, and turn them with the round handle: the angle shows while you turn (the green one is tilted by −6°). Text wrap is <strong>through</strong>: the words never reflow, the shape floats above or below them.</p>' +
     '<p>Selecting a shape opens its little bar: six colours, <em>▾</em> to send it behind the text, <em>▴</em> to bring it above, <em>✕</em> to delete it.</p>' +
     '<p><strong>Try it:</strong> send the green rectangle behind the text and drag it over this paragraph — the words run <em>on top of</em> it, at full strength, not through a faded copy.</p>' +
     '<p><strong>Try it:</strong> press <em>✕</em>. The shape goes and the bar goes with it — same for Esc, for clicking anywhere off a shape, and for switching notes. The bar is never left floating with nothing selected.</p>' +
-    '<p>Add more from the toolbar ◇ button (<em>▾</em> for ellipse and diamond) or type <span class="inline-code">/shape</span>.</p>' +
+    '<p>Add more from the toolbar ◇ button (<em>▾</em> for every kind) or type <span class="inline-code">/shape</span>.</p>' +
+    '<h3>Arrows</h3>' +
+    '<p>The ↗ button beside the shapes adds a <strong>straight</strong> arrow; its <em>▾</em> has <strong>elbow</strong> and <strong>curved</strong> ones too. Drag an arrow’s end onto a shape, an image, a link card or a line of text and it holds on: move that thing and the arrow follows.</p>' +
+    '<p><strong>Try it:</strong> add an arrow, drop its point on the blue ellipse at the top, then drag the ellipse around. To remove an arrow, click it so it lights up and press Delete.</p>' +
 
-    '<h2>7 · Code blocks</h2>' +
+    '<h2>7 · Links, pictures and videos</h2>' +
+    '<p><strong>Paste a URL</strong> on its own and Nebula asks how to show it: as the <strong>URL</strong>, as a short <strong>mention</strong>, as a <strong>bookmark</strong> card, or as an <strong>embed</strong> that loads the page inside the note (with its own sign-in forms). If a site refuses, the link above it opens it in your browser.</p>' +
+    '<p><strong>Link any words:</strong> select them and paste a URL over them, or use the link button in the toolbar. <strong>Ctrl+click</strong> a link to open it; choosing the link button again with an empty address takes the link off.</p>' +
+    '<p><strong>Videos:</strong> embed a YouTube or Vimeo link and you get the player itself, sized for video — a start time in the link is kept.</p>' +
+    '<p><strong>Pictures:</strong> paste an image and it goes on the line you are on, part of the text, so it moves with the words at any window size. Click it for its bar: <em>Aa</em> writes a caption under it, <em>⇄</em> lets it float freely (then <em>▾</em>/<em>▴</em> put it behind or above the text), <em>✕</em> deletes it. The corner handle resizes it. An image dropped from a folder floats where you drop it.</p>' +
+    '<p><strong>Try it:</strong> copy any picture, click at the end of this line and paste. Give it a caption, then make the window narrow and wide — the picture stays between the same two lines.</p>' +
+
+    '<h2>8 · Moving a note to another Nebula</h2>' +
+    '<p>Export → <strong>Nebula note (.json)</strong> writes the whole note — text, shapes, arrows, images and embeds — into one file. Import that file in any other Nebula and the same note opens. A note file copied straight out of a vault folder imports too. Markdown and HTML exports are there for other apps; they cannot carry shapes.</p>' +
+
+    '<h2>9 · Code blocks</h2>' +
     '<p>Markdown-style: pick a language and the colours follow, the way GitHub, Discord or Notion do it. Click into the code to edit it; changing the language repaints the same text; <em>Copy</em> takes the raw source. Every language Nebula knows has a sample below.</p>' +
     '<h3>JavaScript</h3>' + code(JS_SRC, 'javascript') +
     '<h3>TypeScript</h3>' + code(TS_SRC, 'typescript') +
@@ -387,7 +443,7 @@ export const GUIDE_NOTE = {
     '<h3>Markdown</h3>' + code(MD_SRC, 'markdown') +
     '<p><strong>Try it:</strong> switch the first block to Python — the same text recolours. In every sample the comment, the strings, the numbers and the keywords are coloured differently; flat grey text would mean that language’s rules failed to load.</p>' +
 
-    '<h2>8 · Where your notes live</h2>' +
+    '<h2>10 · Where your notes live</h2>' +
     '<p>Click the version number at the bottom of the sidebar to see every folder this copy uses. Notes are one JSON file each, written atomically, with a dated snapshot of the whole vault kept alongside them.</p>' +
     '<p>An update replaces the application folder only. The vault is copied into Backups before anything installs, and <strong>nothing in it is ever deleted</strong>. The installed app, the portable copy, the test build and the dev build each keep their own separate notes.</p>',
 };

@@ -580,6 +580,23 @@
   user-select: none;
 }
 .note-image:active { cursor: grabbing; }
+/* An image in the text (pasted, 0.8.5): a block in the flow, as wide as it was
+   made and never wider than the page; its height follows the picture, and its
+   caption sits under it in the flow. */
+.note-image.note-image--inline {
+  position: relative;
+  left: auto;
+  top: auto;
+  height: auto !important;
+  max-width: 100%;
+  margin: 10px 0 14px;
+  cursor: default;
+}
+.note-image--inline:active { cursor: default; }
+.note-image--inline img { height: auto; }
+/* Two classes on the figure: the floating caption rule further down has the same
+   specificity and would otherwise win by source order and hang it over the text. */
+.note-image.note-image--inline .image-caption { position: static; margin-top: 6px; }
 .note-image.sel { outline: 2px solid var(--clay); outline-offset: 2px; }
 .note-image img {
   display: block;
@@ -1383,6 +1400,9 @@ body.resizing webview { pointer-events: none; }
    asked dozens of times" — they were there and invisible, and checking that the
    text existed rather than that it RENDERED is why it survived. */
 .tb-menu--shapes { min-width: 146px; }
+.tb-menu--arrows { min-width: 168px; }
+/* A toolbar button drawn inline (the arrow button has no icon-set entry). */
+.tb .tb-svg { display: grid; place-items: center; pointer-events: none; }
 .tb-menu--shapes button {
   display: grid;
   grid-template-columns: 18px minmax(0, auto);
@@ -1419,3 +1439,7 @@ body.resizing { cursor: col-resize; user-select: none; }
   border-color: var(--clay) !important;
   box-shadow: 0 0 0 2px var(--clay-soft);
 }
+
+/* The guide's shape stage: an empty band at the top of the guide where its demo
+   shapes stand, so no line of text ever runs under them at any window width. */
+.editor .guide-stage { height: 136px; user-select: none; }
