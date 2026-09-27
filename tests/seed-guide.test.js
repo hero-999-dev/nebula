@@ -43,7 +43,7 @@ describe('guide page', () => {
     const text = doc.body.textContent;
     expect(text).toContain(`New in ${GUIDE_VERSION}`);
     for (const feature of ['Four themes', 'Arrows', 'angle shows', 'Link any words', 'Ctrl+click', 'Videos', 'caption', 'behind the text', 'one canvas', 'Rust', 'Nebula note (.json)', 'Bookmark',
-      'Embed', 'Mention', 'Only view', 'F12', 'snaps', 'Ctrl+F', 'Ctrl+K', 'Archive', 'Restore', 'Pin to top', 'The / menu', 'Quotes and dividers', 'Import', 'PDF']) {
+      'Embed', 'Mention', 'Only view', 'F12', 'snaps', 'Ctrl+F', 'Ctrl+K', 'Archive', 'Restore', 'Pin to top', 'The / menu', 'Quotes and dividers', 'Import', 'PDF', 'Labels', 'Four image corners', 'Google sign-in']) {
       expect(text).toContain(feature);
     }
   });

@@ -13,6 +13,16 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.9.0': {
+    headline: 'Labels, four image corners, and Google sign-in in your browser.',
+    items: [
+      { title: 'Label your notes', text: 'Add labels beside the title or from a note’s ⋯ menu, find them by name, and search notes by #label. A Nebula note export keeps them.' },
+      { title: 'Resize from any corner', text: 'Drag any of a picture’s four corners; on a floating picture the opposite corner stays put.' },
+      { title: 'Google sign-in in your browser', text: 'When an AI tab sends you to Google, Nebula opens the service in your default browser instead. Carry on there; the browser’s sign-in does not come back into the panel.' },
+      { title: 'Shapes keep their words and arrows', text: 'Text stays inside diamonds and triangles, arrows meet the real outline and follow the shape as it grows, and after an undo you can keep typing in the shape.' },
+      { title: 'Clearer links and editing', text: 'Bookmarks show the page’s title when there is one, and an embed warns only after a real load failure. Backspace deletes selected text at once, and locked notes keep their pictures and shapes still.' },
+    ],
+  },
   '0.8.9': {
     headline: 'Lock a note to read it, arrows that snap on, and F12 for a picture of the window.',
     items: [

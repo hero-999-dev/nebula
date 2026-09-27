@@ -1,3 +1,11 @@
+## 2026-09-27 — upcoming 0.9.0 validation
+
+- 506 unit tests pass across 35 files. New coverage: shape-outline intersections, four-corner image geometry, labels and native export/import, bounded title fetch, preview load events, and Google browser routing.
+- tests/e2e/v090.mjs covers locked buried shapes, text fitting, selected Backspace, caption editing, shape undo typing, label menus, four real mouse drags, metadata IPC and a real HTTP Google redirect (OS launch recorded). Optional NEBULA_V090_NOTES copies local reports and checks their source bytes remain unchanged; never commit private fixtures.
+- tests/link-preview.test.js (8): an embed's title counts only after the page has loaded (a YouTube player first reports just "YouTube"), a title already in the note is never replaced for an embed or a bookmark, and a placeholder address is, also one an older version wrote in another format (scheme, www., trailing slash). Found by the long-note trials in both rebuilt articles, where the replaced title was an edit nobody made and broke undo/redo in the trials.
+- Focused Electron run: 22/22, including real metadata IPC, triangle arrow attachment after reload/growth, and stable editor scroll. Earlier full smoke: 349/350; the sidebar geometry failure was a CSS transition stuck at time zero in an occluded Windows window. Both collapse/expand checks now finish the real transition and assert the resulting width. Full Electron smoke passed: 354/354 checks.
+- Sidebar text extraction benchmark on a local image-heavy report: median 139.26 ms to 14.76 ms, 12 uncached runs, same text. This is a jsdom microbenchmark, not whole-app typing latency.
+
 # Tests
 
 What is tested, what each test proves, and what is knowingly untested.
@@ -1519,3 +1527,5 @@ an unparseable tag returns null rather than a wrong answer.
 - **Long editing sessions.** No fuzz or property testing over the editor's
   contenteditable handling.
 - **Update rollback.** There is no downgrade path; the backup is the answer.
+
+- Local report-copy verification: H3 changes only the reported paragraph; Backspace removes the slash beside its divider; the source note remains byte-identical. Private fixtures and the probe stay under test-results/.

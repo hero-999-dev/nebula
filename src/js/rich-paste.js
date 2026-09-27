@@ -1,10 +1,14 @@
 /**
  * Rich paste and floating images.
  *
- * Bookmark/URL/mention never fetch a page. Embed is explicitly chosen and
+ * Bookmarks request a bounded page title; URL and mention do not fetch.
+ * Embed is explicitly chosen and
  * renders in a sandbox without same-origin privileges; its link remains a
  * fallback for sites which refuse framing. Async paste is bound to a note.
  */
+
+import { bindLinkPreview } from './link-preview.js';
+import { resizeImageBox, ensureImageHandles } from './image-resize.js';
 
 const LINK_KINDS = ['embed', 'bookmark', 'url', 'mention'];
 
@@ -177,10 +181,8 @@ function makeImage(src, width, height, at, inline = false) {
   image.src = src;
   image.alt = 'Pasted image';
   image.draggable = false;
-  const handle = document.createElement('span');
-  handle.className = 'image-h';
-  handle.title = 'Resize image';
-  figure.append(image, handle);
+  figure.append(image);
+  ensureImageHandles(figure);
   return figure;
 }
 
@@ -242,7 +244,8 @@ function makeLinkBlock(url, kind) {
     if (!source.video) {
       const hint = document.createElement('small');
       hint.className = 'link-embed-hint';
-      hint.textContent = 'Preview blocked or blank? Open the link above. Some sites do not allow embedding.';
+      hint.hidden = true;
+      hint.textContent = 'This preview could not load. Open the link above in your browser.';
       card.append(hint);
     }
   }
@@ -259,6 +262,14 @@ export function initRichPaste(editor, { history, onGeometry } = {}) {
   let preferredKind = '';
 
   const dirty = () => editor.dispatchEvent(new Event('input', { bubbles: true }));
+  // A card's title, once it arrives, is saved with the note (unless locked).
+  const watchTitle = (card) => bindLinkPreview(card, {
+    placeholder: linkLabel(card.dataset.url),
+    onTitle: () => { if (editor.contains(card) && editor.dataset.readonly !== 'true') dirty(); },
+  });
+  editor.addEventListener('input', () => {
+    for (const card of editor.querySelectorAll('.link-block')) watchTitle(card);
+  });
 
   function ensureLinkMenu() {
     let menu = $('link-menu');
@@ -591,17 +602,17 @@ export function initRichPaste(editor, { history, onGeometry } = {}) {
         .test(card.querySelector('webview')?.getAttribute('src') || '');
       if (!card.querySelector('.link-del') || (card.dataset.kind === 'embed' && !card.querySelector('webview')) || onWatchPage) {
         const url = normalizeUrl(card.dataset.url);
-        if (url) card.replaceWith(makeLinkBlock(url, card.dataset.kind === 'embed' ? 'embed' : 'bookmark'));
+        if (url) {
+          const next = makeLinkBlock(url, card.dataset.kind === 'embed' ? 'embed' : 'bookmark');
+          if (card.dataset.anchor) next.dataset.anchor = card.dataset.anchor;
+          card.replaceWith(next);
+        }
       }
     }
+    for (const card of editor.querySelectorAll('.link-block')) watchTitle(card);
     for (const image of editor.querySelectorAll('.note-image')) {
       image.setAttribute('contenteditable', 'false');
-      if (!image.querySelector('.image-h')) {
-        const handle = document.createElement('span');
-        handle.className = 'image-h';
-        handle.title = 'Resize image';
-        image.appendChild(handle);
-      }
+      ensureImageHandles(image);
       const img = image.querySelector('img');
       if (img) img.draggable = false;
       captionOf(image); // a saved caption is editable again
@@ -713,6 +724,7 @@ export function initRichPaste(editor, { history, onGeometry } = {}) {
   }
 
   editor.addEventListener('mousedown', (event) => {
+    if (editor.dataset.readonly === 'true') return;
     if (event.target.closest('.image-caption')) { selectImage(null); return; }
     const handle = event.target.closest('.image-h');
     let image = event.target.closest('.note-image');
@@ -731,6 +743,7 @@ export function initRichPaste(editor, { history, onGeometry } = {}) {
       layer: image.parentElement,
       extent: editor.scrollHeight,
       kind: handle ? 'resize' : 'move',
+      corner: handle?.dataset.corner || 'se',
       moved: false,
       downX: event.clientX,
       downY: event.clientY,
@@ -758,10 +771,13 @@ export function initRichPaste(editor, { history, onGeometry } = {}) {
       drag.image.style.left = `${Math.max(0, drag.left + dx)}px`;
       drag.image.style.top = `${Math.max(0, drag.top + dy)}px`;
     } else {
-      const delta = Math.abs(dx) >= Math.abs(dy * drag.ratio) ? dx : dy * drag.ratio;
-      const width = Math.max(Math.min(100, 60 * drag.ratio), drag.width + delta);
-      drag.image.style.width = `${Math.round(width)}px`;
-      if (!inText) drag.image.style.height = `${Math.round(width / drag.ratio)}px`;
+      const box = resizeImageBox(drag, dx, dy, drag.corner, inText);
+      drag.image.style.width = Math.round(box.width) + 'px';
+      if (!inText) {
+        drag.image.style.height = Math.round(box.height) + 'px';
+        drag.image.style.left = Math.round(box.left) + 'px';
+        drag.image.style.top = Math.round(box.top) + 'px';
+      }
     }
     positionImageBar();
     onGeometry?.();

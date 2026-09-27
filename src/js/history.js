@@ -186,9 +186,16 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
   const unpack = (html) => html.replace(/nebula-picture:\d+/g, (token) => byToken.get(token) ?? token);
 
   const snapshotHtml = () => {
-    if (!editorEl.querySelector('.note-image.sel')) return pack(editorEl.innerHTML);
+    const transient = '.note-image.sel, .shape.sel, .shape.editing, .shape-angle, .note-arrow.is-selected, .arrow-target, hr.armed';
+    if (!editorEl.querySelector(transient)) return pack(editorEl.innerHTML);
     const copy = editorEl.cloneNode(true);
-    copy.querySelectorAll('.note-image.sel').forEach((el) => el.classList.remove('sel'));
+    copy.querySelectorAll('.note-image.sel, .shape.sel').forEach(el => el.classList.remove('sel'));
+    copy.querySelectorAll('.shape.editing').forEach(el => el.classList.remove('editing'));
+    copy.querySelectorAll('.shape-text').forEach(el => el.setAttribute('contenteditable', 'false'));
+    copy.querySelectorAll('.shape-angle').forEach(el => el.remove());
+    copy.querySelectorAll('.note-arrow.is-selected').forEach(el => el.classList.remove('is-selected'));
+    copy.querySelectorAll('.arrow-target').forEach(el => el.classList.remove('arrow-target'));
+    copy.querySelectorAll('hr.armed').forEach(el => el.classList.remove('armed'));
     return pack(copy.innerHTML);
   };
   let present = { html: snapshotHtml(), caret: null };
@@ -290,6 +297,17 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
     const inCode = codeCaret(selection);
     onRestore?.(html);
     if (inCode) putCodeCaret(inCode, selection);
+    else if (state.caret) {
+      const node = nodeAt(editorEl, state.caret.start);
+      const el = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+      const host = el?.closest('.shape-text, .image-caption');
+      if (host && hadFocus) {
+        host.setAttribute('contenteditable', 'true');
+        host.closest('.shape')?.classList.add('editing');
+        host.focus({ preventScroll: true });
+      }
+      writeCaret(editorEl, state.caret, selection);
+    }
     // Rehydrating controls must not look like a new edit and discard redo.
     present = { html: snapshotHtml(), caret: state.caret };
     restoring = false;

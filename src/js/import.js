@@ -219,7 +219,7 @@ export function sanitizeNote(html) {
  */
 export function noteFromFile(name, text) {
   const native = fromNebulaNote(text);
-  if (native) return { title: native.title, content: sanitizeNote(native.content) };
+  if (native) return { ...native, content: sanitizeNote(native.content) };
   const base = String(name ?? '').replace(/\.[^.]+$/, '').trim() || 'Imported note';
   if (/\.html?$/i.test(name ?? '')) {
     const doc = new DOMParser().parseFromString(String(text ?? ''), 'text/html');

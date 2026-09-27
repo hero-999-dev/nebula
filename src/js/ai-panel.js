@@ -6,15 +6,8 @@
 
 import { loadJson, saveJson, generateId } from './storage.js';
 
-export const AI_SERVICES = {
-  claude: { name: 'Claude', url: 'https://claude.ai', dot: '#d97706' },
-  gemini: { name: 'Gemini', url: 'https://gemini.google.com', dot: '#4285f4' },
-  chatgpt: { name: 'ChatGPT', url: 'https://chat.openai.com', dot: '#10a37f' },
-  mistral: { name: 'Mistral', url: 'https://chat.mistral.ai', dot: '#ff7000' },
-  deepseek: { name: 'DeepSeek', url: 'https://chat.deepseek.com', dot: '#5b50e5' },
-  copilot: { name: 'Copilot', url: 'https://copilot.microsoft.com', dot: '#0f6cbd' },
-  perplexity: { name: 'Perplexity', url: 'https://www.perplexity.ai', dot: '#20808d' },
-};
+import { AI_SERVICES } from './ai-services.js';
+export { AI_SERVICES };
 
 /**
  * A plain Chrome user agent for the embedded views.
@@ -50,6 +43,17 @@ export function initAiPanel({ askText } = {}) {
   let custom = loadJson(CUSTOM_KEY, []);
   let active = localStorage.getItem(ACTIVE_KEY) || 'claude';
 
+  const handoffs = new Map();
+  const handoffBox = document.createElement('p');
+  handoffBox.className = 'ai-handoff'; handoffBox.hidden = true; handoffBox.setAttribute('role', 'status');
+  body.before(handoffBox);
+  const renderHandoff = () => {
+    const state = handoffs.get(active); handoffBox.hidden = !state;
+    handoffBox.textContent = state?.ok
+      ? 'Continue signing in and chatting in your browser. That sign-in stays in the browser.'
+      : 'The browser could not be opened. Use Open in browser to try again.';
+  };
+  window.nebula?.ai?.onBrowserHandoff?.(result => { handoffs.set(result.id, result); renderHandoff(); });
   const all = () => ({ ...AI_SERVICES, ...Object.fromEntries(custom.map((c) => [c.id, c])) });
 
   const savedWidth = Number(localStorage.getItem(WIDTH_KEY));
@@ -78,7 +82,8 @@ export function initAiPanel({ askText } = {}) {
    */
   const isVisible = () => !panel.hidden;
 
-  function showError(message) {
+  function showError(id, message) {
+    if (active !== id) return;
     let box = body.querySelector('.ai-error');
     if (!box) {
       box = document.createElement('div');
@@ -93,6 +98,7 @@ export function initAiPanel({ askText } = {}) {
     const service = all()[id];
     if (!service) return;
     active = id;
+    renderHandoff();
     localStorage.setItem(ACTIVE_KEY, id);
     const browser = document.getElementById('ai-browser');
     if (browser) {
@@ -122,10 +128,12 @@ export function initAiPanel({ askText } = {}) {
         // is reading. None of these were listened for before.
         wv.addEventListener('did-fail-load', (ev) => {
           if (ev.errorCode === -3) return;   // an aborted navigation is normal
-          showError(ev.errorDescription || `load failed (${ev.errorCode})`);
+          if (ev.isMainFrame === false) return;
+          showError(id, ev.errorDescription || `load failed (${ev.errorCode})`);
         });
-        wv.addEventListener('crashed', () => showError('the page crashed'));
-        wv.addEventListener('render-process-gone', () => showError('the page stopped'));
+        wv.addEventListener('crashed', () => showError(id, 'the page crashed'));
+        wv.addEventListener('render-process-gone', () => showError(id, 'the page stopped'));
+        wv.addEventListener('did-finish-load', () => { if (active === id) body.querySelector('.ai-error')?.classList.remove('on'); });
         body.appendChild(wv);
         views.set(id, wv);
       }
@@ -232,8 +240,8 @@ export function initAiPanel({ askText } = {}) {
    * visible container rather than to a `display: none` one.
    */
   function open() {
-    try { show(active); } catch (err) { showError(err.message); }
+    try { show(active); } catch (err) { showError(active, err.message); }
   }
 
-  return { open, show: (id) => { try { show(id); } catch (err) { showError(err.message); } } };
+  return { open, show: (id) => { try { show(id); } catch (err) { showError(id, err.message); } } };
 }

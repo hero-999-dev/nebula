@@ -1,5 +1,7 @@
 import { cleanTypingMarkers } from './inline-family.js';
 
+import { normalizeLabels } from './labels.js';
+
 /**
  * A note, as Markdown or as a standalone HTML file.
  *
@@ -244,8 +246,8 @@ export const FORMATS = [
 ];
 
 /** The open note, as the JSON another Nebula can open without losing shapes or embeds. */
-export function toNebulaNote({ title = '', content = '' } = {}) {
-  return `${JSON.stringify({ nebula: 1, title, content }, null, 2)}\n`;
+export function toNebulaNote({ title = '', content = '', labels }  = {}) {
+  return `${JSON.stringify({ nebula: 1, title, content, ...(normalizeLabels(labels).length ? { labels: normalizeLabels(labels) } : {}) }, null, 2)}\n`;
 }
 
 /**
@@ -261,7 +263,7 @@ export function fromNebulaNote(text) {
   const vaultFile = typeof data.id === 'string' && typeof data.title === 'string';
   if (data.nebula !== 1 && !vaultFile) return null;
   const content = data.content.replace(/<script[\s\S]*?<\/script>/gi, '');
-  return { title: String(data.title ?? 'Imported note'), content };
+  return { title: String(data.title ?? 'Imported note'), content, ...(normalizeLabels(data.labels).length ? { labels: normalizeLabels(data.labels) } : {}) };
 }
 
 /**

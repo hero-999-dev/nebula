@@ -1,3 +1,4 @@
+import { normalizeLabels } from './labels.js';
 import { loadJson, saveJson, generateId } from './storage.js';
 import { emit } from './bus.js';
 import { SEED_NOTES } from './seed-notes.js';
@@ -25,6 +26,8 @@ const BLOCKS = 'p,div,h1,h2,h3,h4,h5,h6,li,ul,ol,blockquote,pre,br,hr,tr,td,th,s
 
 const textCache = new Map();
 const TEXT_CACHE_MAX = 64;
+const TEXT_CACHE_CHARS = 4_000_000;
+let textCacheChars = 0;
 
 export function noteText(html) {
   const src = String(html ?? '');
@@ -34,7 +37,7 @@ export function noteText(html) {
 
   let text;
   if (typeof DOMParser === 'function') {
-    const doc = new DOMParser().parseFromString(src, 'text/html');
+    const doc = new DOMParser().parseFromString(src.replace(/data:image\/[^\s"'<>]+/gi, 'data:,'), 'text/html');
     doc.body.querySelectorAll('.shape-layer, .image-layer').forEach((el) => el.remove());
     // textContent joins blocks with nothing at all, so a heading ran straight
     // into the paragraph under it ("Welcome to NebulaA calm place"). Inline
@@ -45,8 +48,11 @@ export function noteText(html) {
     text = src.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
-  if (textCache.size >= TEXT_CACHE_MAX) textCache.clear();
-  textCache.set(src, text);
+  while (textCache.size && (textCache.size >= TEXT_CACHE_MAX || textCacheChars + src.length > TEXT_CACHE_CHARS)) {
+    const oldest = textCache.keys().next().value;
+    textCacheChars -= oldest.length; textCache.delete(oldest);
+  }
+  if (src.length <= TEXT_CACHE_CHARS) { textCache.set(src, text); textCacheChars += src.length; }
   return text;
 }
 
@@ -235,7 +241,7 @@ export class NoteStore {
     const q = query.trim().toLowerCase();
     if (!q) return this.sorted();
     return this.sorted().filter((n) => {
-      const hay = `${n.title} ${noteText(n.content)}`.toLowerCase();
+      const hay = `${n.title} ${normalizeLabels(n.labels).map(label => "#" + label).join(" ")} ${noteText(n.content)}`.toLowerCase();
       return hay.includes(q);
     });
   }
@@ -264,6 +270,10 @@ export class NoteStore {
   toggleReadOnly(id) {
     const note = this.get(id);
     return note ? this.#mark(id, { readOnly: !note.readOnly }) : null;
+  }
+
+  setLabels(id, labels) {
+    return this.#mark(id, { labels: normalizeLabels(labels) });
   }
 
   togglePin(id) {

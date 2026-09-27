@@ -5,6 +5,27 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-27 03:58] v0.9.0 - by Claude
+
+Labels, four image corners, bookmark titles and Google sign-in in the browser; shape text, arrows, undo, Backspace and locked-note fixes from the two report notes.
+
+* (no commits since the last release)
+
+---
+
+## [2026-09-27 02:00] v0.9.0 - by Codex, finished by Claude
+
+Owner requested fixes from two local reports and browser sign-in handoff. Labels beside the title with a searchable row-menu picker and native export/import; four image resize corners; bookmark page titles and accurate embed errors; Google sign-in hands off to the default browser. Selection Backspace, locked canvas objects, shape undo, text fitting, rotation controls and shape-outline arrow attachment corrected. Large-note sidebar text extraction avoids parsing base64 payloads.
+
+506 unit tests and 22 focused Electron checks passed. The earlier broad smoke sidebar failure was traced to a CSS transition stuck at time zero in an occluded Windows test window; the layout test now completes the real transition before measuring both collapsed and expanded width. Full Electron smoke passed: 354/354 checks. Report copies were tested in temporary profiles; original files remained byte-identical. Google redirect routing is tested with a local HTTP redirect and a mocked OS browser call; successful provider authentication is not claimed. Browser cookies do not transfer back into embedded AI tabs.
+
+Finished by Claude after the Codex session hit its limit: the release run had stopped in the rebuild's long-note trials ("Application exited", followed by ^C) as that session was killed, not a crash in the app. The new modules (labels, link preview, link metadata, browser sign-in, shape anchor) were rewritten from compressed one-liners into the codebase's style with no change in behaviour. The guide's "New in 0.9.0" list now holds only 0.9.0 features (0.8.9 moved to "Recently"), and the release notes follow the file's own format.
+
+The first full release run then failed the long-note trials in both rebuilt articles, which is a real 0.9.0 bug: a YouTube embed's webview first reports just "YouTube" as its title, and the new title code wrote that over the title saved in the note and marked the note edited. That extra edit moved undo by a step and dropped redo. A card now takes a fetched title only while it still shows its address, a webview's title counts only once the page has finished loading, and a title already in the note is never replaced; an address an older version wrote in another format still counts as no title. Nothing was committed by the failed runs.
+
+---
+
 ## [2026-09-26 00:15] v0.8.9 - by Claude
 
 Only view, arrows that snap on, F12 window snapshot, diamond/triangle outlines, a fuller guide with dividers; long-note trials and the undo, Backspace, underline and block fixes they found.

@@ -3,6 +3,9 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { installBrowserAuth } from './ai-browser-auth.js';
+import { AI_SERVICES } from '../src/js/ai-services.js';
+import { fetchPageTitle } from './link-metadata.js';
 import { initUpdater } from './updater.js';
 import { resolveUserData, appChannel, canSelfUpdate } from './user-data.js';
 
@@ -640,6 +643,14 @@ async function takeSnapshot(win) {
 }
 
 app.on('web-contents-created', (_event, contents) => {
+  if (contents.getType() === 'webview') {
+    const id = Object.keys(AI_SERVICES).find(id => contents.session === session.fromPartition('persist:ai-' + id));
+    if (id) installBrowserAuth(contents, {
+      serviceUrl: AI_SERVICES[id].url,
+      openExternal: url => shell.openExternal(url),
+      notify: result => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('ai:browser-handoff', { id, ...result }); },
+    });
+  }
   contents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown' || input.key !== 'F12' || input.control || input.alt || input.shift || input.meta) return;
     event.preventDefault();
@@ -732,6 +743,10 @@ app.whenReady().then(async () => {
     return { ok: true, path: abs };
   });
 
+  ipcMain.handle('links:title', (event, url) => {
+    if (event.sender !== mainWindow?.webContents) return { ok: false };
+    return fetchPageTitle(url);
+  });
   ipcMain.handle('app:version', () => APP_VERSION);
 
   // The four places a user ever needs to find: the program, their notes, the

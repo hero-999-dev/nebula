@@ -17,7 +17,7 @@ const LABELS = {
   archive: () => 'Archive',
 };
 
-export function initNoteActions({ store, onChanged, openNote }) {
+export function initNoteActions({ store, onChanged, openNote, onLabels }) {
   const menu = document.getElementById('note-menu');
   const drawerBody = document.getElementById('drawer-body');
   const tabs = [...document.querySelectorAll('.drawer-tab')];
@@ -60,7 +60,9 @@ export function initNoteActions({ store, onChanged, openNote }) {
     const act = e.target.closest('[data-note-act]')?.dataset.noteAct;
     if (!act || !forId) return;
     const id = forId;
+    const button = [...document.querySelectorAll('.nr-more')].find(b => b.getAttribute('aria-expanded') === 'true');
     close();
+    if (act === 'labels') { onLabels?.(id, button); return; }
     if (act === 'pin') store.togglePin(id);
     else if (act === 'readonly') store.toggleReadOnly(id);
     else if (act === 'archive') store.archive(id);

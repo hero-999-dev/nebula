@@ -8,6 +8,7 @@
  *
  * Run AFTER a build:   npm run build && npm run smoke
  */
+import { runV090Checks } from './v090.mjs';
 import { _electron as electron } from 'playwright-core';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -301,18 +302,15 @@ try {
   {
     const wide = await win.evaluate(() => document.getElementById('side').getBoundingClientRect().width);
     await press(win, '#side-toggle');
-    // The WIDTH is animated, so the class lands long before the geometry does.
-    // A fixed wait here passed by luck and failed the moment boot got busier;
-    // wait for the width to stop moving instead.
-    // Stability alone is not enough: the ease curve crawls at both ends, so two
-    // consecutive frames round to the same pixel while the bar is still moving.
-    // Wait for it to reach the collapsed width as well.
-    await win.waitForFunction(() => {
-      const w = Math.round(document.getElementById('side').getBoundingClientRect().width);
-      const settled = window.__sideW === w;
-      window.__sideW = w;
-      return settled && w < 100;
-    }, null, { timeout: 10_000 }).catch(() => { /* fall through to the check */ });
+    // Assert the resulting layout, independent of compositor timing. On an
+    // occluded Windows test window Chromium can leave the transition running
+    // at currentTime=0 indefinitely, even when document.hidden is false.
+    // Finish the actual CSS transition; a wrong target width still fails.
+    await win.evaluate(() => {
+      const side = document.getElementById('side');
+      void side.offsetWidth;
+      side.getAnimations().forEach(animation => animation.finish());
+    });
     const narrow = await win.evaluate(() => ({
       width: document.getElementById('side').getBoundingClientRect().width,
       list: document.getElementById('note-list').getBoundingClientRect().width,
@@ -343,6 +341,11 @@ try {
       rail.notes && rail.newNote && rail.themes && rail.initial === 'W',
       JSON.stringify(rail));
     await press(win, '#side-toggle');
+    await win.evaluate(() => {
+      const side = document.getElementById('side');
+      void side.offsetWidth;
+      side.getAnimations().forEach(animation => animation.finish());
+    });
     await win.waitForFunction((target) => Math.abs(document.getElementById('side').getBoundingClientRect().width - target) < 1,
       wide, { polling: 50, timeout: 10_000 });
     check('and comes back',
@@ -2347,6 +2350,7 @@ try {
   await runViewSnapChecks(check);
   await runGuideChecks(check);
   await runDenseChecks(check);
+  await runV090Checks(check);
 } catch (err) {
   failure = err;
   check('smoke run completed', false, err.message);

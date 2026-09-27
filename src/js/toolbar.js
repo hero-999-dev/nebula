@@ -107,7 +107,7 @@ export function parseSize(raw) {
   return Math.min(400, Math.max(6, Math.round(n)));
 }
 
-export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTitle, onImport, onPaste, onLink } = {}) {
+export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTitle, noteLabels, onImport, onPaste, onLink } = {}) {
   const toolbar = document.getElementById('toolbar');
   const miniBar = document.getElementById('mini-bar');
   if (!toolbar || !editorEl) return null;
@@ -614,7 +614,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     const content = format === 'html'
       ? toHtml(editorEl.innerHTML, title)
       : format === 'nebula'
-        ? toNebulaNote({ title, content: editorEl.innerHTML })
+        ? toNebulaNote({ title, content: editorEl.innerHTML, labels: noteLabels?.() })
         : toMarkdown(editorEl.innerHTML, title);
     await api.export({ suggested: safeFileName(title, fmt?.ext || format), content, format });
   }
@@ -1075,7 +1075,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   editorEl.addEventListener('beforeinput', (e) => {
     // Editing a nested text host intersects its ancestor overlay too, but is
     // not a request to delete that overlay.
-    if (e.target.closest('.shape-text, .code-src')) return;
+    if (e.target.closest('.shape-text, .code-src, .image-caption')) return;
     if (!e.inputType?.startsWith('delete')) {
       editorEl.querySelectorAll('hr.blk-hr.armed').forEach((h) => h.classList.remove('armed'));
       return;
@@ -1136,6 +1136,9 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     // A divider takes two goes: the first shows which one, the second takes it.
     // One press removed it the moment the caret reached the line beneath, which
     // is the opposite of "I want to get CLOSE to the divider".
+    const caretSelection = window.getSelection();
+    // A deliberate text selection is not a request to arm the previous divider.
+    if (caretSelection?.rangeCount && !caretSelection.isCollapsed) return;
     const before = e.inputType === 'deleteContentBackward' ? mergeTarget() : null;
     const hrs = [...new Set([
       ...touching('hr.blk-hr'),

@@ -4,6 +4,8 @@
  * without a layout.
  */
 
+import { shapeAnchorPoint } from './shape-anchor.js';
+
 export const ARROW_KINDS = ['straight', 'elbow', 'curve'];
 
 export function arrowPath(kind, x1, y1, x2, y2) {
@@ -175,6 +177,13 @@ export function initArrows(editorEl, { history } = {}) {
       const r = el.getBoundingClientRect();
       if (!r.width && !r.height) continue;
       out.push({
+        geometry: el.matches('.shape') ? {
+          left: r.left + r.width / 2 - origin.left - el.offsetWidth / 2,
+          top: r.top + r.height / 2 - origin.top - el.offsetHeight / 2,
+          width: el.offsetWidth, height: el.offsetHeight,
+        } : null,
+        shapeKind: el.dataset.kind,
+        rotation: Number(el.dataset.rot) || 0,
         id: ensureAnchor(el),
         el,
         kind: el.matches('.shape, .link-block, .note-image') ? 'object' : 'text',
@@ -193,9 +202,15 @@ export function initArrows(editorEl, { history } = {}) {
     return out;
   }
 
+  const meetingPoint = (target, toward) => target.geometry
+    ? shapeAnchorPoint(target.geometry, toward, target.shapeKind, target.rotation)
+    : anchorPoint(target.box, toward);
+
   function reflow() {
+    const arrows = editorEl.querySelectorAll('.note-arrow');
+    if (!arrows.length) return;
     const found = boxes();
-    for (const arrow of editorEl.querySelectorAll('.note-arrow')) {
+    for (const arrow of arrows) {
       for (const end of ['from', 'to']) {
         const id = arrow.dataset[end];
         const hit = found.find((a) => a.id === id);
@@ -203,7 +218,7 @@ export function initArrows(editorEl, { history } = {}) {
         const other = end === 'from'
           ? { x: num(arrow, 'x2', 0), y: num(arrow, 'y2', 0) }
           : { x: num(arrow, 'x1', 0), y: num(arrow, 'y1', 0) };
-        const p = anchorPoint(hit.box, other);
+        const p = meetingPoint(hit, other);
         arrow.dataset[end === 'from' ? 'x1' : 'x2'] = String(Math.round(p.x));
         arrow.dataset[end === 'from' ? 'y1' : 'y2'] = String(Math.round(p.y));
       }
@@ -262,7 +277,7 @@ export function initArrows(editorEl, { history } = {}) {
       // Held: the end sits on the target's edge, facing the other end, while
       // still being dragged — so it is visible that it has taken hold.
       const other = from ? { x: num(drag.arrow, 'x2', 0), y: num(drag.arrow, 'y2', 0) } : { x: num(drag.arrow, 'x1', 0), y: num(drag.arrow, 'y1', 0) };
-      const at = hit ? anchorPoint(hit.box, other) : point;
+      const at = hit ? meetingPoint(hit, other) : point;
       drag.arrow.dataset[from ? 'x1' : 'x2'] = String(Math.round(at.x));
       drag.arrow.dataset[from ? 'y1' : 'y2'] = String(Math.round(at.y));
     }
@@ -284,6 +299,7 @@ export function initArrows(editorEl, { history } = {}) {
   });
 
   document.addEventListener('keydown', (e) => {
+    if (editorEl.dataset.readonly === 'true') return;
     if (e.key === 'Escape' && selected) { select(null); return; }
     // The editor keeps focus when an arrow is pressed (mousedown is cancelled
     // so the caret does not jump), so the key arrives from #editor. Excluding

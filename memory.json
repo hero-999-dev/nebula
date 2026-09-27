@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.8.9",
-  "lastUpdated": "2026-09-25",
-  "currentPhase": "v0.8.9 - Only view (a per-note lock: ⋯ menu checkbox and a 🔒 badge; the guide seeds and refreshes locked; enforced in the capture phase for beforeinput/keys/paste/cut/drop/drag handles, plus toolbar ACTIONS and history undo/redo), arrow magnet (arrows.magnetTarget: inside or within MAGNET=28px of an object, text only from inside, objects before text, inside several the one painted on top; live snap and .arrow-target outline), diamond/triangle outline their own edge when selected and the diamond’s handles at the corners, F12 window snapshot (main-process before-input-event on every web contents + a page fallback; PNG to Pictures\\Nebula or NEBULA_SNAPSHOT_DIR, clipboard, toast), and the guide rewritten to cover every function with Where your notes live as 9 and Code blocks as 10 (Markdown first). Test exe first; release on the owner’s go-ahead.",
-  "next": "Owner tries Nebula Test.exe 0.8.9; then npm run push.",
+  "version": "0.9.0",
+  "lastUpdated": "2026-09-27",
+  "currentPhase": "v0.9.0: Labels beside the title with a searchable row-menu picker and native export/import; four image resize corners; bookmark page titles and accurate embed errors; Google sign-in hands off to the default browser. Selection Backspace, locked canvas objects, shape undo, text fitting, rotation controls and shape-outline arrow attachment corrected. Large-note sidebar text extraction avoids parsing base64 payloads.",
+  "next": "Verify the published Windows/macOS artifacts and try provider sign-in in the default browser. Embedded and browser sessions remain separate; authenticated third-party embeds require manual account testing. Local continuation evidence: test-results/CODEX-DEVIR.md.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -88,6 +88,12 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "version": "0.9.0",
+      "date": "2026-09-27",
+      "by": "Codex",
+      "what": "Labels beside the title with a searchable row-menu picker and native export/import; four image resize corners; bookmark page titles and accurate embed errors; Google sign-in hands off to the default browser. Selection Backspace, locked canvas objects, shape undo, text fitting, rotation controls and shape-outline arrow attachment corrected. Large-note sidebar text extraction avoids parsing base64 payloads. Validation: 506 unit tests and 22 focused Electron checks pass. Full Electron smoke passed 354/354 checks. Sidebar geometry tests finish the CSS transition because occluded Windows test windows can leave animation time at zero."
+    },
     {
       "version": "0.8.9",
       "date": "2026-09-25",

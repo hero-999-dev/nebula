@@ -4,7 +4,7 @@ Calm notes with a real editor. An Electron desktop app for **Windows and macOS**
 that keeps every note as a plain JSON file in your own profile. Installed Windows
 builds offer in-app updates; macOS and portable builds offer a download link.
 
-**Version v0.8.9** ·
+**Version v0.9.0** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 
@@ -303,3 +303,7 @@ quietly if code moved and those files did not.
 
 Demo's graph, flashcards, palette, search and i18n plug in through these without
 restructuring.
+
+### Labels, images and browser sign-in
+
+Note labels appear beside the title and can be searched or assigned from the note menu. Native JSON export preserves labels. Images resize from all four corners. Bookmarks request page titles; failed embeds offer a browser fallback. Google sign-in in the built-in AI tabs opens the provider in the default browser, where the conversation continues. Browser sign-in does not authenticate the embedded tab.

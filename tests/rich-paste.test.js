@@ -172,7 +172,8 @@ describe('rich paste editing regressions', () => {
     expect(frame.getAttribute('webpreferences')).toContain('nodeIntegration=no');
     expect(editor.querySelector('iframe')).toBeNull();
     expect(editor.querySelector('a').href).toBe(frame.src);
-    expect(editor.querySelector('.link-embed-hint').textContent).toContain('do not allow');
+    expect(editor.querySelector('.link-embed-hint').hidden).toBe(true);
+    expect(editor.querySelector('.link-embed-hint').textContent).toContain('Open the link');
   });
 
   it('splits nested list content without putting a block inside a paragraph', () => {
@@ -300,7 +301,7 @@ describe('rich paste editing regressions', () => {
     expect(figure.style.position).toBe('');
     expect(figure.style.background).toBe('');
     expect(editor.querySelector('.image-layer').contentEditable).toBe('false');
-    expect(editor.querySelectorAll('.image-h')).toHaveLength(1);
+    expect(editor.querySelectorAll('.image-h')).toHaveLength(4);
   });
 
   it('round-trips Markdown images as images and rejects unsafe clipboard formats', () => {

@@ -22,6 +22,7 @@ import { initSideToggle } from './side-toggle.js';
 import { initFind } from './find.js';
 import { initHistory } from './history.js';
 import { initRichPaste } from './rich-paste.js';
+import { initLabels } from './labels.js';
 import { initNoteActions } from './note-actions.js';
 import { initAppMenu } from './app-menu.js';
 import { initPalette, initShortcuts, initBlocks } from './palette.js';
@@ -153,7 +154,7 @@ async function boot() {
     if (ro) { shapes?.reset(); richPaste?.reset(); }
   }
   readonlyChip?.addEventListener('click', () => { if (store.activeId) store.setReadOnly(store.activeId, false); });
-  on('note-changed', ({ id } = {}) => { if (id === store.activeId) { applyReadOnly(); renderList(); } });
+  on('note-changed', ({ id } = {}) => { if (id === store.activeId) applyReadOnly(); });
   const READING_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown', 'Escape', 'Shift', 'Control', 'Alt', 'Meta', 'F12']);
   const stop = (e) => { e.preventDefault(); e.stopImmediatePropagation(); };
   editorEl.addEventListener('beforeinput', (e) => { if (isReadOnly()) stop(e); }, true);
@@ -198,6 +199,7 @@ async function boot() {
       shapes?.reset();
       richPaste?.reset();
       richPaste?.refresh();
+      arrows?.reflow();
       editor.flush();
       renderList();
     },
@@ -214,12 +216,13 @@ async function boot() {
     onPaste: () => richPaste?.paste(),
     onSave: () => { void saveCurrent().catch(showSaveError); },
     noteTitle: () => store.active()?.title ?? '',
+    noteLabels: () => store.active()?.labels ?? [],
     // An imported file becomes a new note, never an edit to the open one.
-    onImport: ({ title, content }) => {
+    onImport: ({ title, content, labels }) => {
       flushTitle();
       editor.flush();
       const note = store.createNote(title || 'Imported note');
-      store.updateActive({ content });
+      store.updateActive({ content, ...(labels?.length ? { labels } : {}) });
       renderList();
       openNote(note.id);
     },
@@ -303,6 +306,7 @@ async function boot() {
     shapes?.reset();
     richPaste?.reset();
     richPaste?.refresh();
+    arrows?.reflow();
     history?.reset(); // this note's history is not the next note's
     find?.close();    // its ranges point into the note that just closed
     setSaveState('');
@@ -355,7 +359,9 @@ async function boot() {
   // Which OS, so the title strip can leave room for macOS's traffic lights.
   document.documentElement.dataset.platform = window.nebula?.platform ?? 'web';
 
+  const labels = initLabels(store);
   const noteActions = initNoteActions({
+    onLabels: (id, button) => labels?.open(id, button),
     store,
     onChanged: () => { renderList(); openNote(store.activeId); },
     openNote: (id) => openNote(id),

@@ -384,3 +384,9 @@ Double-click files in the repo root: `Nebula Test.exe` (test build),
 | [docs/RELEASE.md](docs/RELEASE.md) | Publishing, and the macOS signing limit |
 | [docs/UPDATING.md](docs/UPDATING.md) | What a user sees; restoring a backup |
 | `site/index.html` | All of the above in one page, with mind maps |
+
+## Current browser and canvas work
+
+Google redirects in built-in AI webviews are handed to the default browser at the provider root URL. Authentication continues there; cookies are not transferred to Electron. `electron/ai-browser-auth.js` handles redirects and popups, and `src/js/ai-services.js` owns provider URLs. Bookmark title requests are bounded and credential-free in `electron/link-metadata.js`; `src/js/link-preview.js` binds cards after import/history restore. Labels persist as a normalized note array and in native JSON exports. Shape anchors use unrotated geometry plus rotation through `shape-anchor.js`.
+
+Local-only progress and private report references: `test-results/CODEX-DEVIR.md`. Keep owner note text/images out of this public repository. Latest validation checkpoint is in tests.md; do not treat an in-progress entry as a release.

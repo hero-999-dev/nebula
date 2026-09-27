@@ -34,6 +34,7 @@
         <button type="button" data-note-act="pin"></button>
         <button type="button" data-note-act="archive"></button>
         <button type="button" data-note-act="readonly" role="menuitemcheckbox" aria-checked="false"><span class="nm-check" aria-hidden="true"></span>Only view</button>
+        <button type="button" data-note-act="labels">Labels…</button>
         <button type="button" data-note-act="trash">Move to trash</button>
       </div>
 
@@ -69,6 +70,7 @@
       <header class="page-head">
         <input id="title" class="title-input" placeholder="Untitled" autocomplete="off" spellcheck="true" />
         <button type="button" class="readonly-chip" id="readonly-chip" hidden title="This note is view-only. Click to allow editing.">🔒 Only view</button>
+        <div id="note-labels" class="note-labels" aria-label="Note labels"></div>
         <span class="savestate" id="savestate"></span>
         <div class="pad" id="pad" role="group" aria-label="Move the editing bar">
           <button type="button" data-pad="top"    title="Editing bar: top"><span data-icon="up"></span></button>
@@ -217,7 +219,7 @@
       <div class="ai-resize" id="ai-resize" title="Drag to resize"></div>
       <div class="ai-head">
         <div class="ai-tabs" id="ai-tabs" role="tablist"></div>
-        <button type="button" class="btn ghost" id="ai-browser" title="If sign-in says this app is not secure, open this chat in the system browser">Sign in in browser</button>
+        <button type="button" class="btn ghost" id="ai-browser" title="Open this chat in your browser; browser sign-in stays in the browser">Open in browser</button>
         <button type="button" class="btn ghost ai-x" id="ai-close" title="Close"><span data-icon="close"></span></button>
       </div>
       <div class="ai-body" id="ai-body"></div>

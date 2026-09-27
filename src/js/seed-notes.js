@@ -303,7 +303,7 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '0.8.9';
+export const GUIDE_VERSION = '0.9.0';
 
 /**
  * The guide's words, without its markup, shapes, code or equations — so a
@@ -333,6 +333,7 @@ export const GUIDE_SIGNATURES = {
   '0.8.7': '2ef83bbb',
   '0.8.8': 'c4a8a567',
   '0.8.9': 'b32ad974',
+  '0.9.0': '5b765db9',
 };
 
 /** Whether a vault's guide is one we shipped and nobody has typed in. */
@@ -368,12 +369,13 @@ export const GUIDE_NOTE = {
     // section they belong to. See GUIDE_SIGNATURES before changing any text.
     // A divider closes each section before the next heading (owner, 0.8.9).
     '<hr class="blk-hr">' +
-    '<h2>New in 0.8.9</h2>' +
+    '<h2>New in 0.9.0</h2>' +
     '<ul>' +
-    '<li><strong>Only view.</strong> Lock any note from its ⋯ menu so it can be read and copied but not changed; this guide starts locked — section 1.</li>' +
-    '<li><strong>Arrows snap on.</strong> Bring an arrow’s end near a shape, a picture or a link card and it takes hold, the way mind-map apps do — section 6.</li>' +
-    '<li><strong>F12 takes a picture of the window</strong>, saves it and copies it — section 1.</li>' +
-    '<li>Recently: <strong>pictures and shapes on one canvas</strong>, <strong>three places for a picture</strong>, <strong>sharper videos</strong>, <strong>Rust</strong> and <strong>the link menu by keyboard</strong> (0.8.8); <strong>images that sit in your text</strong> and an <strong>arrow menu</strong> (0.8.6); <strong>links on any words</strong>, <strong>image captions</strong> (0.8.5).</li>' +
+    '<li><strong>Labels.</strong> Add labels beside the title or from a note’s ⋯ menu, find them by name, and search notes by #label — section 1.</li>' +
+    '<li><strong>Four image corners.</strong> Resize a picture from any corner; a floating one keeps the opposite corner in place — section 7.</li>' +
+    '<li><strong>Bookmarks show the page’s title</strong>, and an embed warns only when it really failed to load — section 7.</li>' +
+    '<li><strong>Google sign-in in your browser.</strong> When an AI tab sends you to Google, the service opens in your default browser — section 1.</li>' +
+    '<li>Recently: <strong>Only view</strong>, <strong>arrows that snap on</strong> and <strong>F12 for a picture of the window</strong> (0.8.9); <strong>pictures and shapes on one canvas</strong>, <strong>three places for a picture</strong>, <strong>sharper videos</strong>, <strong>Rust</strong> and <strong>the link menu by keyboard</strong> (0.8.8); <strong>images that sit in your text</strong> and an <strong>arrow menu</strong> (0.8.6).</li>' +
     '</ul>' +
 
     '<hr class="blk-hr">' +
@@ -382,12 +384,17 @@ export const GUIDE_NOTE = {
     '<ul>' +
     '<li><strong>↑</strong> bar on top (default) — press the active side again to come back to it</li>' +
     '<li><strong>↓</strong> bar under the note · <strong>←</strong> and <strong>→</strong> turn it into a vertical rail</li>' +
-    '<li><strong>AI</strong> opens the side panel: Claude, Gemini, ChatGPT, Mistral, DeepSeek, Copilot, Perplexity, and <strong>+</strong> adds any site. The tab strip scrolls sideways (Shift+wheel); drag the panel’s left edge to resize it. If a site will not let you sign in inside the app, <em>Sign in in browser</em> opens it in your browser.</li>' +
+    '<li><strong>AI</strong> opens the side panel: Claude, Gemini, ChatGPT, Mistral, DeepSeek, Copilot, Perplexity, and <strong>+</strong> adds any site. The tab strip scrolls sideways (Shift+wheel); drag the panel’s left edge to resize it. If a site will not let you sign in inside the app, <em>Open in browser</em> opens it in your browser. Google sign-in links in the built-in AI tabs do this automatically; continue signing in and chatting there. Browser sign-in stays in the browser.</li>' +
     '<li><strong>−</strong> hides the bar for a clean page</li>' +
     '</ul>' +
     '<p>Four themes at the bottom of the sidebar: <strong>Main</strong>, <strong>Dark</strong>, <strong>Light</strong> and <strong>White</strong>. The layout and the theme both survive a restart. <span class="inline-code">Ctrl +</span> and <span class="inline-code">Ctrl −</span> zoom, <span class="inline-code">Ctrl 0</span> goes back to actual size, <span class="inline-code">F11</span> is full screen, and the View menu hides the note list.</p>' +
     '<p><strong>F12</strong> takes a picture of the window: it is saved as a PNG in <em>Pictures\Nebula</em> and copied, ready to paste anywhere. A note at the bottom says where it went.</p>' +
     '<p><strong>Try it:</strong> send the bar to the left rail, restart the app, and it is still there.</p>' +
+    '<hr class="blk-hr">' +
+    '<h3>Labels</h3>' +
+    '<p>Press <strong>+</strong> beside the title or choose <strong>⋯ → Labels</strong> for any note. Search existing labels, tick them to add or remove, or type a new name and press Enter. Labels stay with the note after a restart and in a Nebula note export.</p>' +
+    '<p><strong>Try it:</strong> add <em>work</em>, then type <em>#work</em> in the sidebar filter to find matching notes.</p>' +
+    '<hr class="blk-hr">' +
     '<h3>Your notes</h3>' +
     '<ul>' +
     '<li><strong>New note</strong> under the list, or <span class="inline-code">Ctrl+N</span>. The box at the top of the list filters by title and text.</li>' +
@@ -479,23 +486,23 @@ export const GUIDE_NOTE = {
     '<p><strong>Paste a web address</strong> on its own (or type <span class="inline-code">/embed</span>, <span class="inline-code">/bookmark</span>, <span class="inline-code">/url</span> or <span class="inline-code">/mention</span>) and Nebula asks how to show it:</p>' +
     '<ul>' +
     '<li><strong>Embed</strong> — the page itself, live inside the note, with its own scrolling and sign-in forms. A YouTube or Vimeo link embeds its player. If a site refuses to be shown this way, the card’s link opens it in your browser.</li>' +
-    '<li><strong>Bookmark</strong> — a card with the site’s address, a tidy way to keep a link without loading the page.</li>' +
+    '<li><strong>Bookmark</strong> — a card with the site’s title and address. Nebula requests just the page title; if it is unavailable, the address stays as its title.</li>' +
     '<li><strong>URL</strong> — the address as a link in the line of text.</li>' +
     '<li><strong>Mention</strong> — a short @site tag in the line, for when the address itself is noise.</li>' +
     '</ul>' +
-    '<p>The ✕ on a card removes it. Nothing is fetched until you choose Embed.</p>' +
+    '<p>The ✕ on a card removes it. Bookmark requests page metadata without browser cookies. Embed loads the page; its fallback link stays available, and a failed-load message appears only if the preview reports a loading failure.</p>' +
 
     '<p>No mouse needed: in that menu press <strong>↓</strong> to reach the choices, <strong>←</strong> and <strong>→</strong> to move between them, and <strong>Enter</strong> to use the lit one. <strong>↑</strong> goes back to the address, <strong>Esc</strong> closes the menu and returns you to your text.</p>' +
     '<p><strong>Try it:</strong> copy any web address, paste it on an empty line, then ↓ → → Enter.</p>' +
     '<p><strong>Link any words:</strong> select them and paste a URL over them, or use the link button in the toolbar. <strong>Ctrl+click</strong> a link to open it; choosing the link button again with an empty address takes the link off.</p>' +
     '<p><strong>Videos:</strong> embed a YouTube or Vimeo link and you get the player itself, as wide as the text (up to a comfortable size) so the picture is sharp, black while it loads like on any site — a start time in the link is kept.</p>' +
-    '<p><strong>Pictures:</strong> paste an image and it goes on the line you are on, part of the text, so it moves with the words at any window size. Click it for its bar, where three buttons say where it lives and the current one is lit: <em>▾</em> behind the text, <em>▴</em> above the text (floating, on top), <em>≡</em> in the text. <em>Aa</em> writes a caption under it, <em>✕</em> deletes it, and the corner handle resizes it. An image dropped from a folder floats where you drop it.</p>' +
+    '<p><strong>Pictures:</strong> paste an image and it goes on the line you are on, part of the text, so it moves with the words at any window size. Click it for its bar, where three buttons say where it lives and the current one is lit: <em>▾</em> behind the text, <em>▴</em> above the text (floating, on top), <em>≡</em> in the text. <em>Aa</em> writes a caption under it, <em>✕</em> deletes it, and any of its four corner handles resizes it proportionally. On floating pictures, the opposite corner stays in place. An image dropped from a folder floats where you drop it.</p>' +
     '<p><strong>Try it:</strong> copy any picture, click at the end of this line and paste. Give it a caption, then make the window narrow and wide — the picture stays between the same two lines.</p>' +
 
     '<hr class="blk-hr">' +
     '<h2>8 · Import, export, print and moving a note</h2>' +
     '<p>The export button (and the File menu) writes the open note as <strong>Markdown</strong>, <strong>HTML</strong>, <strong>PDF</strong> (A4, laid out the way it looks) or a <strong>Nebula note (.json)</strong>. <span class="inline-code">Ctrl+P</span> prints. <strong>Import</strong> opens a Markdown, HTML, text or Nebula note file as a new note; anything that could run is stripped out first.</p>' +
-    '<p>To move a note to another Nebula intact, export it as a <strong>Nebula note</strong> — text, shapes, arrows, pictures and embeds in one file — and import that file there. A note file copied straight out of a vault folder imports too. Markdown and HTML are for other apps; they cannot carry shapes.</p>' +
+    '<p>To move a note to another Nebula intact, export it as a <strong>Nebula note</strong> — text, labels, shapes, arrows, pictures and embeds in one file — and import that file there. A note file copied straight out of a vault folder imports too. Markdown and HTML are for other apps; they cannot carry shapes.</p>' +
 
     '<hr class="blk-hr">' +
     '<h2>9 · Where your notes live</h2>' +

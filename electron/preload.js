@@ -2,6 +2,14 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('nebula', {
   platform: process.platform,
+  ai: {
+    onBrowserHandoff: (handler) => {
+      const listener = (_event, result) => handler(result);
+      ipcRenderer.on('ai:browser-handoff', listener);
+      return () => ipcRenderer.off('ai:browser-handoff', listener);
+    },
+  },
+  links: { title: (url) => ipcRenderer.invoke('links:title', url) },
   version: () => ipcRenderer.invoke('app:version'),
   paths: () => ipcRenderer.invoke('app:paths'),
   // Reveal takes a key ('exeDir' | 'userData' | 'storage' | 'backups'), not a

@@ -106,6 +106,7 @@ export function addShape(editorEl, kind, history) {
 
 export function initShapes(editorEl, { history, onGeometry } = {}) {
   if (!editorEl) return null;
+  const isLocked = () => editorEl.dataset.readonly === 'true';
   let drag = null;
   let selected = null;
 
@@ -210,6 +211,7 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
   }
 
   editorEl.addEventListener('mousedown', (e) => {
+    if (isLocked()) return;
     const handle = e.target.closest('.shape-h');
     const rotator = e.target.closest('.shape-rot');
     let shape = e.target.closest('.shape');
@@ -267,6 +269,7 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
 
   window.addEventListener('mousemove', (e) => {
     if (!drag) return;
+    if (isLocked()) { drag = null; return; }
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
     if (Math.abs(e.clientX - drag.downX) > 2 || Math.abs(e.clientY - drag.downY) > 2) drag.moved = true;
@@ -280,7 +283,7 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
       drag.el.dataset.rot = String(deg);
       drag.el.style.transform = deg ? `rotate(${deg}deg)` : '';
       showAngle(drag.el, deg);
-      positionBar();
+      document.getElementById('shape-bar')?.setAttribute('hidden', '');
       onGeometry?.();
       return;
     }
@@ -325,16 +328,18 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
 
   window.addEventListener('mouseup', (e) => {
     if (!drag) return;
-    const { el, moved, wasSelected } = drag;
+    const { el, moved, wasSelected, kind } = drag;
     drag = null;
     hideAngle(el);
+    if (selected) { document.getElementById('shape-bar')?.removeAttribute('hidden'); positionBar(); }
+    if (isLocked()) return;
     if (moved) { onGeometry?.(); dirty(); return; }
 
     // A press that never moved is a click. On a shape that was ALREADY
     // selected it means "let me at what is here": the shape's own text if the
     // pointer is over it, otherwise the paragraph underneath — which is the
     // only way to reach text that a behind-shape is covering.
-    if (!wasSelected) return;
+    if (!wasSelected || kind !== 'move') return;
     if (e.target.closest('.shape-text')) { startEditing(el); return; }
     if (el.classList.contains('behind')) {
       select(null);
@@ -364,30 +369,34 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
   function minSize(shape) {
     const text = shape?.querySelector('.shape-text');
     if (!text) return { w: 48, h: 34 };
-    const slack = shape.classList.contains('rect') || shape.classList.contains('square')
-      || shape.classList.contains('ellipse') || shape.classList.contains('circle') ? 14 : 40;
-    return { w: 48, h: Math.max(34, text.scrollHeight + slack) };
+    // The text rectangle must fit inside the silhouette, including its corners.
+    const kind = shape.dataset.kind;
+    const factor = kind === 'diamond' || kind === 'triangle' ? 2
+      : kind === 'ellipse' || kind === 'circle' ? Math.SQRT2 : 1;
+    return { w: 48, h: Math.max(34, Math.ceil((text.scrollHeight + 12) * factor)) };
   }
 
   function fitToText(shape) {
     const text = shape?.querySelector('.shape-text');
     if (!text) return;
-    // The text sizes itself; what runs out is the SHAPE. A diamond or a
-    // triangle only shows its middle, so the same words need more room in one.
-    const slack = shape.classList.contains('rect') || shape.classList.contains('ellipse') ? 14 : 40;
-    const side = EQUILATERAL.has(shape.dataset.kind);
-    let guard = 0;
-    while (text.offsetHeight + slack > shape.clientHeight && guard < 60) {
-      shape.style.height = `${shape.offsetHeight + 8}px`;
-      // A square that grew taller than it is wide is not a square any more.
-      if (side) shape.style.width = shape.style.height;
-      guard += 1;
-    }
+    const floor = minSize(shape);
+    if (EQUILATERAL.has(shape.dataset.kind)) {
+      const side = Math.max(shape.offsetWidth, shape.offsetHeight, floor.h);
+      if (side > shape.offsetHeight || side > shape.offsetWidth) {
+        shape.style.width = shape.style.height = side + 'px';
+      }
+    } else if (floor.h > shape.offsetHeight) shape.style.height = floor.h + 'px';
   }
 
   editorEl.addEventListener('input', (e) => {
     const text = e.target.closest?.('.shape-text');
-    if (text) fitToText(text.closest('.shape'));
+    if (text && !isLocked()) {
+      const scrollTop = editorEl.scrollTop;
+      fitToText(text.closest('.shape'));
+      onGeometry?.();
+      editorEl.scrollTop = scrollTop;
+      if (selected) positionBar();
+    }
   });
 
   editorEl.addEventListener('scroll', () => { if (selected) positionBar(); });
@@ -400,7 +409,7 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
    *   double-click on a word takes the word
    */
   function startEditing(shape, selectAll = false) {
-    if (!shape) return;
+    if (!shape || isLocked()) return;
     shape.classList.add('editing'); // now the text takes clicks, and drags stop
     const text = shape.querySelector('.shape-text');
     if (!text) return;
@@ -408,7 +417,7 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
     // walk the caret straight into a shape from the paragraph beside it.
     text.setAttribute('contenteditable', 'true');
     if (!text.textContent.trim() && !text.querySelector('br')) text.innerHTML = '<br>';
-    text.focus();
+    text.focus({ preventScroll: true });
     const place = () => {
       const r = document.createRange();
       r.selectNodeContents(text);
@@ -441,6 +450,7 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
   }
 
   editorEl.addEventListener('dblclick', (e) => {
+    if (isLocked() || e.target.closest('.shape-h, .shape-rot')) return;
     const shape = e.target.closest('.shape') ?? behindShapeAt(e.clientX, e.clientY);
     if (!shape) return;
     select(shape);
@@ -480,7 +490,7 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
       '<button type="button" data-shape="del" title="Delete shape">✕</button>';
     bar.addEventListener('mousedown', (e) => e.preventDefault());
     bar.addEventListener('click', (e) => {
-      if (!selected) return;
+      if (!selected || isLocked()) return;
       const color = e.target.closest('.dot')?.dataset.color;
       if (color) {
         history?.push();
@@ -511,6 +521,7 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
   }
 
   document.addEventListener('keydown', (e) => {
+    if (isLocked()) return;
     if (e.key === 'Escape' && selected) { select(null); return; }
     if ((e.key === 'Delete' || e.key === 'Backspace') && selected &&
         !document.activeElement?.classList?.contains('shape-text')) {
@@ -524,10 +535,10 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
   });
 
   return {
-    addShape: (kind) => select(addShape(editorEl, kind, history)),
+    addShape: (kind) => { if (!isLocked()) select(addShape(editorEl, kind, history)); },
     select,
     /** Called when a note is opened: the previous note's shapes are gone. */
-    reset: () => { select(null); stopEditing(null); },
+    reset: () => { if (drag) hideAngle(drag.el); drag = null; select(null); stopEditing(null); },
 
     /**
      * Grow one shape to fit the text already in it.

@@ -120,7 +120,9 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.8.9)
+## Current implementation state (v0.9.0)
+
+**Labels, canvas and browser sign-in:** Labels beside the title with a searchable row-menu picker and native export/import; four image resize corners; bookmark page titles and accurate embed errors; Google sign-in hands off to the default browser. Selection Backspace, locked canvas objects, shape undo, text fitting, rotation controls and shape-outline arrow attachment corrected. Large-note sidebar text extraction avoids parsing base64 payloads. Browser handoff opens the provider in the system browser; there is no third-party OAuth callback or cookie transfer into Nebula.
 
 **Working:** the whole editor described above — dock pad, two-row toolbar,
 mini toolbar, slash menu that restyles only the caret's block (including a bare `<div>` line), code blocks with syntax colours (Rust included), a per-note Only view lock, arrows that snap onto shapes and pictures, F12 window snapshots, free-floating shapes with a live angle, arrows that can point at a shape, link, image or text line, pasted images that sit in the text (or float, from the image bar), four-way link paste with embeds in a webview (a YouTube/Vimeo link embeds its player), a Nebula note file (`.nebula.json`, sanitised on import; a raw vault note file also imports) that round-trips the note, deletable arrows, AI panel with tabs, a Chrome user agent, and Sign in in browser,
@@ -181,7 +183,7 @@ Source text has a clear inset from the code panel edge.
   updates remain manual; signing alone would not change the Windows-only updater
   gate. CI checks universal slices and artifacts, not a hands-on Mac upgrade.
 
-**Quality:** 370 unit tests, 231 Electron smoke checks against the real app
+**Quality:** 506 unit tests and 22 focused Electron checks pass. Full Electron smoke passed 354/354 checks; sidebar geometry tests explicitly finish the CSS transition because Windows can pause animation in occluded test windows. Earlier baseline checks against the real app
 (including "an unreadable vault seeds nothing", the divider-gap sequence and
 code-hint input, verified by breaking the guards on purpose and watching the
 suite go red).
