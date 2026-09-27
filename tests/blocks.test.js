@@ -165,3 +165,117 @@ describe('tidyAfterDelete puts back a span Chromium dropped (0.8.9)', () => {
     expect(sel.getRangeAt(0).startOffset).toBe(4);
   });
 });
+
+describe('Enter then Backspace in a line set in a font (the owner\'s notes, 0.9.1)', () => {
+  const FONT = 'data-font-family="Noto Serif, serif" style="font-size: 14px; font-family: &quot;Noto Serif&quot;, serif;"';
+  const STYLE = 'style="font-size: 14px; font-family: &quot;Noto Serif&quot;, serif;"';
+  /** Before: the item and, under it, the line Enter split off. After: Chromium's join. */
+  const joined = (upper, lower, lowerBefore = FONT, lowerAfter = STYLE) => {
+    document.body.innerHTML = `<div id="ed"><ul><li><span ${FONT}>${upper}</span></li></ul><p><span ${lowerBefore}>${lower}</span></p></div>`;
+    const root = document.getElementById('ed');
+    const before = beforeDelete(root);
+    root.querySelector('p').remove();
+    root.querySelector('li').insertAdjacentHTML('beforeend', `<span ${lowerAfter}>${lower}</span>`);
+    const t = root.querySelector('li span').firstChild;
+    const r = document.createRange(); r.setStart(t, t.length); r.collapse(true);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    return { root, sel, before };
+  };
+
+  it('makes the two halves one span again, with the font name, and the space a plain space', () => {
+    const { root, sel, before } = joined('the harbour&nbsp;', 'boat waits');
+    expect(tidyAfterDelete(root, sel, before)).toBe(true);
+    const spans = root.querySelectorAll('li span');
+    expect(spans).toHaveLength(1);
+    expect(spans[0].getAttribute('data-font-family')).toBe('Noto Serif, serif');
+    expect(spans[0].textContent).toBe('the harbour boat waits');
+    // The caret is where the lines met, so the next Backspace takes the space and nothing else.
+    const r = sel.getRangeAt(0);
+    expect(r.startContainer.data.slice(0, r.startOffset)).toBe('the harbour ');
+  });
+
+  it('keeps two spans that format differently apart', () => {
+    const big = 'style="font-size: 20px;"';
+    const { root, sel, before } = joined('the harbour&nbsp;', 'boat', big, big);
+    tidyAfterDelete(root, sel, before);
+    expect(root.querySelectorAll('li span')).toHaveLength(2);
+    expect(root.querySelector('li').textContent).toBe('the harbour boat');
+  });
+
+  it('rejoins the two halves a deleted underlined word left, with the caret at the start of the right one', () => {
+    document.body.innerHTML = `<div id="ed"><ul><li><span ${FONT}>harbour </span><span ${FONT}>boat</span></li></ul></div>`;
+    const root = document.getElementById('ed');
+    const before = beforeDelete(root);
+    const t = root.querySelectorAll('li span')[1].firstChild;
+    const r = document.createRange(); r.setStart(t, 0); r.collapse(true);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    expect(tidyAfterDelete(root, sel, before)).toBe(true);
+    expect(root.querySelectorAll('li span')).toHaveLength(1);
+    expect(root.querySelector('li span').textContent).toBe('harbour boat');
+    const at = sel.getRangeAt(0);
+    expect(at.startContainer.data.slice(0, at.startOffset)).toBe('harbour ');
+  });
+});
+
+
+describe('a slash command on a line in a font (the owner\'s Ideas note, 0.9.1)', () => {
+  it('leaves the new heading somewhere to type: the <br> inside the font it kept', () => {
+    // After "/h3" is taken out, the line is an empty span: no text, no <br>.
+    const el = root('<p>above</p><p><span style="font-size: 14px;"></span></p><p>under</p>');
+    const heading = convertBlock(el.querySelectorAll('p')[1], 'h3');
+    expect(heading.outerHTML).toBe('<h3><span style="font-size: 14px;"><br></span></h3>');
+    expect(el.querySelectorAll('p')).toHaveLength(2);
+  });
+
+  it('does the same for a list made from such a line, and leaves a line with words alone', () => {
+    const el = root('<p><span style="font-size: 14px;"></span></p><p><span style="font-size: 14px;">words</span></p>');
+    expect(convertBlock(el.querySelector('p'), 'bullet').innerHTML).toBe('<span style="font-size: 14px;"><br></span>');
+    expect(convertBlock(el.querySelector('p'), 'h2').innerHTML).toBe('<span style="font-size: 14px;">words</span>');
+  });
+});
+
+describe('Backspace joins the whole block, not its first line (0.9.1)', () => {
+  const FONT = 'data-font-family="Noto Serif, serif" style="font-size: 14px;"';
+  it('a list item of three lines, split with Enter and joined again, is one item of three lines', () => {
+    // Before: the lower part was lifted out of the list by the first Backspace.
+    document.body.innerHTML = `<div id="ed"><ul><li><span ${FONT}>the result is written into the&nbsp;</span></li></ul>`
+      + `<p><span ${FONT}>second book by the door</span><br><span ${FONT}>line two</span><br><span ${FONT}>line three</span></p></div>`;
+    const root = document.getElementById('ed');
+    const p = root.querySelector('p');
+    let r = document.createRange(); r.setStart(p.querySelector('span').firstChild, 0); r.collapse(true);
+    let sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    const before = beforeDelete(root);
+    expect(before.startBlock).toBe(p);
+    // What Chromium does with the second Backspace: the first line only, and without its span.
+    const li = root.querySelector('li');
+    li.append(document.createTextNode('second book by the door'));
+    p.firstChild.remove(); p.firstChild.remove();           // its first line and the <br> after it
+    const left = li.querySelector('span').firstChild;
+    r = document.createRange(); r.setStart(left, left.length); r.collapse(true);
+    sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+
+    expect(tidyAfterDelete(root, sel, before)).toBe(true);
+    expect(root.querySelector('p')).toBeNull();
+    expect(root.querySelectorAll('li')).toHaveLength(1);
+    const item = root.querySelector('li');
+    expect(item.querySelectorAll('br')).toHaveLength(2);
+    expect([...item.querySelectorAll('span')].map((s) => s.textContent)).toEqual(['the result is written into the second book by the door', 'line two', 'line three']);
+    const at = sel.getRangeAt(0);
+    expect(at.startContainer.data.slice(0, at.startOffset)).toBe('');
+    expect(at.startContainer.data).toBe('second book by the door');
+  });
+
+  it('leaves a block alone that Chromium joined whole', () => {
+    document.body.innerHTML = '<div id="ed"><p>one</p><p>two</p></div>';
+    const root = document.getElementById('ed');
+    const second = root.querySelectorAll('p')[1];
+    let r = document.createRange(); r.setStart(second.firstChild, 0); r.collapse(true);
+    let sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    const before = beforeDelete(root);
+    root.querySelector('p').firstChild.appendData('two'); second.remove();
+    r = document.createRange(); r.setStart(root.querySelector('p').firstChild, 3); r.collapse(true);
+    sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    tidyAfterDelete(root, sel, before);
+    expect(root.innerHTML).toBe('<p>onetwo</p>');
+  });
+});

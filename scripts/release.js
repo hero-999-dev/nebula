@@ -20,6 +20,7 @@
  *   npm run push -- --dry-run     do everything except commit/tag/push
  *   npm run push -- --no-flash    skip the USB drive mirror
  *   npm run push -- --no-rebuild  skip the page rebuild (tests/e2e/rebuild-page.mjs)
+ *   npm run push -- --no-old-notes skip the trials on this machine's own notes
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -222,6 +223,20 @@ if (!fs.existsSync(rebuildScript)) {
   if (code === 1) fail('The page rebuild scored lower than the previous version, or a long-note trial failed in a rebuilt article. Nothing was committed.\n  See the output above and test-results/rebuild/.');
   if (code === 3) console.warn('\n  ! page rebuild skipped: no source (offline, nothing cached).\n');
   else if (code !== 0) console.warn(`\n  ! page rebuild could not finish (exit ${code}); not blocking the release.\n`);
+}
+
+// The long-note trials on COPIES of this machine's own notes (the installed
+// app's vault and Nebula Test's). The owner's rule, 2026-09-27: a bug fixed in
+// the app must not live on in the notes it already touched — and notes this
+// version writes cannot show that, only notes an older version wrote can. A
+// failed trial stops the release; no vault on the machine, or a run that could
+// not finish, is reported and does not block. Nothing is written back.
+if (!args.includes('--no-old-notes')) {
+  console.log('\n> npm run old-notes');
+  const code = runSoft('node', [path.join(ROOT, 'tests', 'e2e', 'old-notes.mjs')]);
+  if (code === 1) fail('A long-note trial failed in one of this machine\'s own notes (copies). Nothing was committed.\n  See the output above: the old-notes check names the vault and the note file.');
+  if (code === 3) console.log('  (no notes in this machine\'s vaults: nothing to try)');
+  else if (code !== 0) console.warn(`\n  ! the old-notes trials could not finish (exit ${code}); not blocking the release.\n`);
 }
 
 // The docs site is NOT built here. It stamps the version from package.json, and

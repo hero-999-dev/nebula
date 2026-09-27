@@ -37,7 +37,7 @@ describe('preview metadata and load status', () => {
 
   it('uses the page title as text and binds old cards once', () => {
     const c = card();
-    const changed = vi.fn();
+    const changed = vi.fn((write) => write());
     bindLinkPreview(c, { onTitle: changed });
     bindLinkPreview(c, { onTitle: changed });
     const frame = c.querySelector('webview');
@@ -50,7 +50,7 @@ describe('preview metadata and load status', () => {
 
   it('ignores a title reported while the page is still loading', () => {
     const c = card('embed', 'https://www.youtube.com/watch?v=x', 'www.youtube.com/watch?v=x');
-    const changed = vi.fn();
+    const changed = vi.fn((write) => write());
     bindLinkPreview(c, { onTitle: changed, placeholder: 'www.youtube.com/watch?v=x' });
     const frame = c.querySelector('webview');
     event(frame, 'page-title-updated', { title: 'YouTube' });
@@ -59,6 +59,22 @@ describe('preview metadata and load status', () => {
     event(frame, 'did-finish-load');
     expect(c.querySelector('strong').textContent).toBe('A video - YouTube');
     expect(changed).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not name a card after an error page ("Service unavailable")', () => {
+    const c = card('embed', 'https://example.com/down', 'example.com/down');
+    bindLinkPreview(c, { placeholder: 'example.com/down' });
+    const frame = c.querySelector('webview');
+    event(frame, 'did-navigate', { httpResponseCode: 503 });
+    event(frame, 'page-title-updated', { title: 'Service unavailable' });
+    event(frame, 'did-finish-load');
+    expect(c.querySelector('strong').textContent).toBe('example.com/down');
+    // The same card on a later, successful load does get its title.
+    event(frame, 'did-start-loading');
+    event(frame, 'did-navigate', { httpResponseCode: 200 });
+    event(frame, 'page-title-updated', { title: 'Firewall risks' });
+    event(frame, 'did-finish-load');
+    expect(c.querySelector('strong').textContent).toBe('Firewall risks');
   });
 
   it('never replaces a title the note already has, so opening a note is not an edit', () => {
@@ -86,6 +102,17 @@ describe('preview metadata and load status', () => {
     bindLinkPreview(c, { placeholder: 'www.example.com/plan' });
     await new Promise((r) => setTimeout(r, 0));
     expect(c.querySelector('strong').textContent).toBe('Timetable');
+  });
+
+  it('hands the title to onTitle to write, so the editor decides how it goes in', async () => {
+    window.nebula = { links: { title: vi.fn().mockResolvedValue({ ok: true, title: 'Arrived' }) } };
+    const c = card('bookmark', 'https://example.com/a', 'example.com/a');
+    let pending = null;
+    bindLinkPreview(c, { placeholder: 'example.com/a', onTitle: (write) => { pending = write; } });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(c.querySelector('strong').textContent).toBe('example.com/a');
+    pending();
+    expect(c.querySelector('strong').textContent).toBe('Arrived');
   });
 
   it('keeps a bookmark title the note already has', async () => {

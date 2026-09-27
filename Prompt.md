@@ -120,7 +120,7 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.9.0)
+## Current implementation state (v0.9.1)
 
 **Labels, canvas and browser sign-in:** Labels beside the title with a searchable row-menu picker and native export/import; four image resize corners; bookmark page titles and accurate embed errors; Google sign-in hands off to the default browser. Selection Backspace, locked canvas objects, shape undo, text fitting, rotation controls and shape-outline arrow attachment corrected. Large-note sidebar text extraction avoids parsing base64 payloads. Browser handoff opens the provider in the system browser; there is no third-party OAuth callback or cookie transfer into Nebula.
 
@@ -168,7 +168,21 @@ before arming the divider, and places the caret at the surviving text line.
 the block has source, including immediately after the first typed character.
 Source text has a clear inset from the code panel edge.
 
-**Rich paste:** Bookmark/URL/Mention do not fetch remote content; Embed is an
+**Deleted is deleted (0.9.1):** a note deleted from the Trash leaves the
+  vault and every backup (overwritten first; best effort on flash and SSD).
+  The notes deleted before 0.9.1 are taken out of the backups once, on its
+  first start; an empty or unreadable vault never triggers it.
+
+**Old notes (0.9.1):** a fix reaches the notes already written. The save,
+  undo steps, export and print go through one serializer that leaves out
+  on-screen state; opening a note repairs it and writes the repair back
+  without dating it; once per markup version every note in the vault is
+  repaired while idle, after a `pre-heal-<version>` backup, and a note whose
+  words would change is left alone. The long-note trials also run on a
+  hand-written old note in smoke and, locally, on copies of the real vaults.
+
+**Rich paste:** a Bookmark requests only the page title, from the main
+  process (no cookies, at most 256 KB and 8 s); URL/Mention fetch nothing. Embed is an
   explicitly chosen sandboxed iframe (`allow-scripts`, no same-origin or top
   navigation permission, no referrer) with a permanent external-link fallback.
   Third-party framing restrictions still apply. The four slash commands open

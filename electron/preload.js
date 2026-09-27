@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('nebula', {
     remove: (rel) => ipcRenderer.invoke('storage:delete', rel),
     reveal: (rel) => ipcRenderer.invoke('storage:reveal', rel),
     root: () => ipcRenderer.invoke('storage:root'),
+    // A labelled copy of the vault, taken before every note is repaired (heal.js).
+    backup: (label) => ipcRenderer.invoke('storage:backup', label),
   },
   lifecycle: {
     onSave: (fn) => {

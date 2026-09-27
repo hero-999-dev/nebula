@@ -1,7 +1,8 @@
 import { initDiskStorage, flushDisk, getDiskStatus } from './disk-store.js';
 import { NoteStore, plainSnippet, relativeTime } from './notes.js';
 import { GUIDE_NOTE, GUIDE_VERSION, addGuide, guideUnedited } from './seed-notes.js';
-import { migrateNote } from './migrate.js';
+import { migrateNote, MARKUP_VERSION } from './migrate.js';
+import { healVault } from './heal.js';
 import { initWhatsNew } from './whats-new.js';
 import { bindEditor } from './editor.js';
 import { initTheme } from './theme.js';
@@ -233,7 +234,17 @@ async function boot() {
     const separate = e.inputType !== 'insertText';
     history?.typed({ separate });
   });
-  richPaste = initRichPaste(editorEl, { history, onGeometry: () => arrows?.reflow() });
+  richPaste = initRichPaste(editorEl, {
+    history,
+    onGeometry: () => arrows?.reflow(),
+    // A page title that arrived is a repair: stored without dating the note,
+    // unless there is unsaved typing, whose save carries it anyway.
+    onHeal: () => {
+      if (editor.pending || !store.activeId) return;
+      const healed = editor.adopt();
+      if (healed) store.heal(store.activeId, healed, MARKUP_VERSION);
+    },
+  });
   initSlashMenu(editorEl, { history, shapes, links: richPaste });
   initCodeBlocks(editorEl, { history });
   const find = initFind(editorEl);
@@ -307,6 +318,11 @@ async function boot() {
     richPaste?.reset();
     richPaste?.refresh();
     arrows?.reflow();
+    // What the note became on the way in IS the note now: written back at once
+    // as a repair, not an edit, so a fix reaches this note even if nobody types
+    // in it, and its date and place in the list stay (0.9.1).
+    const healed = editor.adopt();
+    if (healed && note) store.heal(note.id, healed, MARKUP_VERSION);
     history?.reset(); // this note's history is not the next note's
     find?.close();    // its ranges point into the note that just closed
     setSaveState('');
@@ -448,6 +464,24 @@ async function boot() {
   on('note-changed', () => renderList());
 
   openNote(store.activeId);
+
+  // Every other note, brought up to this version while the app is idle, after
+  // the vault has been put aside (heal.js) — so a bug fixed here does not live
+  // on in the notes nobody has opened since. Only for a vault that was read,
+  // and only in the app, where there is a backup to make first.
+  if (disk.ok && window.nebula?.storage?.backup) {
+    const idle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(() => fn(), { timeout: 500 }) : setTimeout(fn, 0));
+    setTimeout(() => {
+      healVault(store, {
+        backup: (label) => window.nebula.storage.backup(label),
+        idle,
+        skip: (note) => note.id === store.activeId,
+      }).then((result) => {
+        if (result.healed || result.refused.length || result.aborted) console.info('[nebula] notes brought up to', MARKUP_VERSION, result);
+        if (result.healed) renderList();
+      }).catch((err) => console.warn('[nebula] note repair stopped:', err?.message ?? err));
+    }, 1500);
+  }
 
   // Native close/quit/update waits for both debounce buffers AND the disk
   // acknowledgements. The old window could disappear inside the 400ms delay.

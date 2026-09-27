@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { arrowPath, nearestAnchor, anchorPoint, magnetTarget, MAGNET } from '../src/js/arrows.js';
+import { arrowPath, nearestAnchor, anchorPoint, magnetTarget, MAGNET, pruneAnchors, dropCopiedAnchor } from '../src/js/arrows.js';
 import { formatAngle } from '../src/js/shapes.js';
 
 describe('arrowPath', () => {
@@ -79,5 +79,29 @@ describe('magnetTarget: an arrow end snaps on when it comes near (0.8.9)', () =>
     const right = { id: 'r', kind: 'object', box: { left: 300, top: 100, width: 100, height: 100 } };
     expect(magnetTarget({ x: 285, y: 150 }, [shape, right])?.id).toBe('r');
     expect(magnetTarget({ x: 270, y: 150 }, [shape, right])?.id).toBe('s');
+  });
+});
+
+describe('anchors that name nothing (the owner\'s Ideas note, 0.9.1)', () => {
+  const root = (html) => { const el = document.createElement('div'); el.innerHTML = html; return el; };
+
+  it('keeps an anchor an arrow uses, drops the rest and the copies Enter made', () => {
+    const el = root('<svg class="note-arrow" data-from="a-1" data-to="a-2"></svg>'
+      + '<p data-anchor="a-1">first</p><p data-anchor="a-1">split off it</p><p data-anchor="a-2">target</p><p data-anchor="a-9">stamped by a drag</p>');
+    expect(pruneAnchors(el)).toBe(2);
+    expect([...el.querySelectorAll('p')].map((p) => p.dataset.anchor ?? '-')).toEqual(['a-1', '-', 'a-2', '-']);
+    expect(pruneAnchors(el)).toBe(0);
+  });
+
+  it('after Enter, the line the caret moved to lets go of the copied anchor', () => {
+    document.body.innerHTML = '<div id="ed"><p data-anchor="a-1">upper</p><p data-anchor="a-1">lower</p></div>';
+    const ed = document.getElementById('ed');
+    const lower = ed.querySelectorAll('p')[1];
+    const r = document.createRange(); r.setStart(lower.firstChild, 0); r.collapse(true);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    expect(dropCopiedAnchor(ed, sel)).toBe(true);
+    expect(lower.hasAttribute('data-anchor')).toBe(false);
+    expect(ed.querySelector('p').dataset.anchor).toBe('a-1');
+    expect(dropCopiedAnchor(ed, sel)).toBe(false);
   });
 });

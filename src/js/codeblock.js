@@ -89,24 +89,36 @@ export function paintAllCode(root) {
   });
 }
 
-export function insertCodeBlock(editorEl, lang = 'javascript', history = null) {
+export function insertCodeBlock(editorEl, lang = 'javascript', history = null, { instead = null } = {}) {
   editorEl.focus();
   history?.push();
 
-  // The inserted block is found by a marker of its own, not by
-  // `.blk-code:not([data-ready])`.
-  //
-  // That selector returned the first unpainted block in DOCUMENT order, and the
-  // guide's seeded blocks carry no `data-ready` — so inserting a code block
-  // anywhere in that note stamped, repainted and focused the note's FIRST code
-  // block instead. The caret jumped to the top, the editor scrolled with it,
-  // and the block that was actually inserted was left unpainted.
-  const mark = `cb${Math.random().toString(36).slice(2, 9)}`;
-  document.execCommand('insertHTML', false, codeBlockHtml('', lang).replace('class="blk-code"', `class="blk-code ${mark}"`));
+  let block = null;
+  if (instead?.parentNode) {
+    // In place of the empty line it was asked for on. insertHTML lets Chromium
+    // choose where, and on an empty line over a picture it chose the next
+    // place it could type in: past the picture, inside the list below it (the
+    // owner's Ideas note, 0.9.1).
+    const holder = document.createElement('div');
+    holder.innerHTML = codeBlockHtml('', lang);
+    block = holder.firstElementChild;
+    instead.replaceWith(block);
+  } else {
+    // The inserted block is found by a marker of its own, not by
+    // `.blk-code:not([data-ready])`.
+    //
+    // That selector returned the first unpainted block in DOCUMENT order, and the
+    // guide's seeded blocks carry no `data-ready` — so inserting a code block
+    // anywhere in that note stamped, repainted and focused the note's FIRST code
+    // block instead. The caret jumped to the top, the editor scrolled with it,
+    // and the block that was actually inserted was left unpainted.
+    const mark = `cb${Math.random().toString(36).slice(2, 9)}`;
+    document.execCommand('insertHTML', false, codeBlockHtml('', lang).replace('class="blk-code"', `class="blk-code ${mark}"`));
+    block = editorEl.querySelector(`.${mark}`);
+    block?.classList.remove(mark);
+  }
 
-  const block = editorEl.querySelector(`.${mark}`);
   if (block) {
-    block.classList.remove(mark);
     block.dataset.ready = '1';
     paintCode(block);
     block.querySelector('.code-src')?.focus();

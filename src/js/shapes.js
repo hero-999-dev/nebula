@@ -43,6 +43,23 @@ export function outlineSvg(kind) {
 }
 
 /**
+ * A layer with nothing on it at all goes: the first shape in a note made one,
+ * and deleting that shape left an empty layer in the note for good (long-note
+ * trials, 0.8.9). The next shape makes a new one. Used after a delete and, for
+ * the notes that already carry one, by migrate.js on open (0.9.1).
+ * @returns {number} layers removed
+ */
+export function releaseEmptyLayers(root) {
+  let removed = 0;
+  for (const layer of root.querySelectorAll('.shape-layer')) {
+    if (layer.querySelector('.shape, .note-image')) continue;
+    if (!layer.children.length) { layer.remove(); removed += 1; }
+    else layer.style.removeProperty('min-height');
+  }
+  return removed;
+}
+
+/**
  * Two overlays, created lazily as the note's first children: one painted under
  * the text and one over it. "Send behind text" moves a shape between them —
  * with a single layer it could only ever be faded, never actually behind.
@@ -147,14 +164,7 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
   editorEl.addEventListener('nebula-canvas-select', (e) => { if (e.detail !== 'shape' && selected) select(null); });
 
   function releaseEmptyCanvases() {
-    for (const layer of editorEl.querySelectorAll('.shape-layer')) {
-      if (layer.querySelector('.shape, .note-image')) continue;
-      // A layer with nothing on it at all goes: the first shape in a note made
-      // one, and deleting that shape left an empty layer in the note for good
-      // (long-note trials, 0.8.9). The next shape makes a new one.
-      if (!layer.children.length) layer.remove();
-      else layer.style.removeProperty('min-height');
-    }
+    releaseEmptyLayers(editorEl);
   }
 
   function positionBar() {

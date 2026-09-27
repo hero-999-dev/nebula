@@ -31,8 +31,11 @@ const WORKSPACE = 'Cursor X Antigravity';
 
 // Nebula-data is a Chromium profile: cookies for the embedded AI panels, local storage, caches. The drive's rules
 // ban session cookies and local addresses, and a 2026-09-21 audit found eight cookie databases there that this
-// script had copied on every push. test-build is a regenerable 400 MB test build.
-const EXCLUDE_DIRS = ['node_modules', 'dist', 'dist-electron', 'release', '.dev-profile', '.git', 'Nebula-data', 'test-build'];
+// script had copied on every push. test-build is a regenerable 400 MB test build. test-results holds the
+// local page rebuild (a rebuilt article, its images, its cached source) and screenshots of real notes: the
+// owner kept it off the drive on 2026-09-25 in the workspace's flash-sync.ps1, and this second path copied
+// it anyway on every release until 0.9.1.
+const EXCLUDE_DIRS = ['node_modules', 'dist', 'dist-electron', 'release', '.dev-profile', '.git', 'Nebula-data', 'test-build', 'test-results'];
 
 if (process.platform !== 'win32') {
   console.log('sync-flash currently supports Windows only.');

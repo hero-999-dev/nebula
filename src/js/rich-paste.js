@@ -252,7 +252,7 @@ function makeLinkBlock(url, kind) {
   return card;
 }
 
-export function initRichPaste(editor, { history, onGeometry } = {}) {
+export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
   if (!editor) return null;
   let pendingRange = null;
   let selectedImage = null;
@@ -262,10 +262,16 @@ export function initRichPaste(editor, { history, onGeometry } = {}) {
   let preferredKind = '';
 
   const dirty = () => editor.dispatchEvent(new Event('input', { bubbles: true }));
-  // A card's title, once it arrives, is saved with the note (unless locked).
+  // A card's page title is something that ARRIVED, not an edit: it goes into
+  // the current state without an undo step (so redo survives), and is stored
+  // as a repair rather than as a change of the note's date (0.9.1).
   const watchTitle = (card) => bindLinkPreview(card, {
     placeholder: linkLabel(card.dataset.url),
-    onTitle: () => { if (editor.contains(card) && editor.dataset.readonly !== 'true') dirty(); },
+    onTitle: (write) => {
+      if (!editor.contains(card)) return;
+      if (history?.absorb) history.absorb(write); else write();
+      onHeal?.();
+    },
   });
   editor.addEventListener('input', () => {
     for (const card of editor.querySelectorAll('.link-block')) watchTitle(card);

@@ -303,7 +303,7 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '0.9.0';
+export const GUIDE_VERSION = '0.9.1';
 
 /**
  * The guide's words, without its markup, shapes, code or equations — so a
@@ -334,6 +334,7 @@ export const GUIDE_SIGNATURES = {
   '0.8.8': 'c4a8a567',
   '0.8.9': 'b32ad974',
   '0.9.0': '5b765db9',
+  '0.9.1': '1823b8d5',
 };
 
 /** Whether a vault's guide is one we shipped and nobody has typed in. */
@@ -369,13 +370,12 @@ export const GUIDE_NOTE = {
     // section they belong to. See GUIDE_SIGNATURES before changing any text.
     // A divider closes each section before the next heading (owner, 0.8.9).
     '<hr class="blk-hr">' +
-    '<h2>New in 0.9.0</h2>' +
+    '<h2>New in 0.9.1</h2>' +
     '<ul>' +
-    '<li><strong>Labels.</strong> Add labels beside the title or from a note’s ⋯ menu, find them by name, and search notes by #label — section 1.</li>' +
-    '<li><strong>Four image corners.</strong> Resize a picture from any corner; a floating one keeps the opposite corner in place — section 7.</li>' +
-    '<li><strong>Bookmarks show the page’s title</strong>, and an embed warns only when it really failed to load — section 7.</li>' +
-    '<li><strong>Google sign-in in your browser.</strong> When an AI tab sends you to Google, the service opens in your default browser — section 1.</li>' +
-    '<li>Recently: <strong>Only view</strong>, <strong>arrows that snap on</strong> and <strong>F12 for a picture of the window</strong> (0.8.9); <strong>pictures and shapes on one canvas</strong>, <strong>three places for a picture</strong>, <strong>sharper videos</strong>, <strong>Rust</strong> and <strong>the link menu by keyboard</strong> (0.8.8); <strong>images that sit in your text</strong> and an <strong>arrow menu</strong> (0.8.6).</li>' +
+    '<li><strong>Your older notes are repaired too.</strong> A fix to how notes are written now reaches every note you already have, on every computer Nebula runs on, not only the notes you start afterwards — after a copy of the whole vault is put aside — section 9.</li>' +
+    '<li><strong>Deleted is deleted.</strong> A note you delete from the Trash is removed from every backup as well, so it cannot be brought back from anywhere — section 9.</li>' +
+    '<li><strong>Looking is not editing.</strong> Opening a note no longer moves it to the top of the list as “just now”, and a page title arriving for a link is not an undo step — section 9.</li>' +
+    '<li>Recently: <strong>labels</strong>, <strong>four image corners</strong>, <strong>bookmark titles</strong> and <strong>Google sign-in in your browser</strong> (0.9.0); <strong>Only view</strong>, <strong>arrows that snap on</strong> and <strong>F12 for a picture of the window</strong> (0.8.9); <strong>pictures and shapes on one canvas</strong>, <strong>three places for a picture</strong>, <strong>sharper videos</strong>, <strong>Rust</strong> and <strong>the link menu by keyboard</strong> (0.8.8).</li>' +
     '</ul>' +
 
     '<hr class="blk-hr">' +
@@ -388,7 +388,7 @@ export const GUIDE_NOTE = {
     '<li><strong>−</strong> hides the bar for a clean page</li>' +
     '</ul>' +
     '<p>Four themes at the bottom of the sidebar: <strong>Main</strong>, <strong>Dark</strong>, <strong>Light</strong> and <strong>White</strong>. The layout and the theme both survive a restart. <span class="inline-code">Ctrl +</span> and <span class="inline-code">Ctrl −</span> zoom, <span class="inline-code">Ctrl 0</span> goes back to actual size, <span class="inline-code">F11</span> is full screen, and the View menu hides the note list.</p>' +
-    '<p><strong>F12</strong> takes a picture of the window: it is saved as a PNG in <em>Pictures\Nebula</em> and copied, ready to paste anywhere. A note at the bottom says where it went.</p>' +
+    '<p><strong>F12</strong> takes a picture of the window: it is saved as a PNG in <em>Pictures\\Nebula</em> and copied, ready to paste anywhere. A note at the bottom says where it went.</p>' +
     '<p><strong>Try it:</strong> send the bar to the left rail, restart the app, and it is still there.</p>' +
     '<hr class="blk-hr">' +
     '<h3>Labels</h3>' +
@@ -508,7 +508,10 @@ export const GUIDE_NOTE = {
     '<h2>9 · Where your notes live</h2>' +
     '<p>Click the version number at the bottom of the sidebar to see every folder this copy uses. Notes are one JSON file each, written atomically, with a dated snapshot of the whole vault kept alongside them.</p>' +
     '<p>An update replaces the application folder only. The vault is copied into Backups before anything installs, and <strong>nothing in it is ever deleted</strong>. The installed app, the portable copy, the test build and the dev build each keep their own separate notes.</p>' +
-    '<p><strong>File → Open notes folder</strong> shows that folder in Explorer. Pictures taken with F12 go to <em>Pictures\Nebula</em>, outside the vault.</p>' +
+    '<p><strong>File → Open notes folder</strong> shows that folder in Explorer. Pictures taken with F12 go to <em>Pictures\\Nebula</em>, outside the vault.</p>' +
+    '<p><strong>Deleted is deleted.</strong> A note in the Trash can still be restored. Once you delete it there, it leaves the vault and every backup with it — the daily copies, the ones taken before updates and before repairs — so it cannot be brought back from anywhere. Notes deleted before 0.9.1 are taken out of the backups the first time 0.9.1 starts.</p>' +
+    '<p><strong>Older notes are brought up to date.</strong> When a version changes how notes are written, the first start after the update repairs every note you have, a few at a time while the app is idle, after copying the whole vault to <em>Backups\\pre-heal-</em> and the version number. Only how a note is built is repaired: its words, pictures, links, shapes, code and equations stay exactly as they were, and a note that could not be repaired without changing one of them is left as it is. Its date and its place in the list do not change, and opening a note is never counted as editing it.</p>' +
+    '<p><strong>Try it:</strong> after the next update, open the Backups folder from the version number: beside the dated copies there is one called <em>pre-heal-</em> with the version it was taken for.</p>' +
 
     '<hr class="blk-hr">' +
     '<h2>10 · Code blocks</h2>' +

@@ -43,3 +43,36 @@ describe('save indicator', () => {
     vi.useRealTimers();
   });
 });
+
+describe('what the save writes (0.9.1)', () => {
+  it('never saves on-screen state: a selected picture is written unselected', () => {
+    vi.useFakeTimers();
+    document.body.innerHTML = '<div id="ed" contenteditable="true"></div>';
+    const el = document.getElementById('ed');
+    const note = { id: 'n', content: '<p>one</p>' };
+    const store = { get: () => note, updateNote: vi.fn() };
+    const editor = bindEditor(el, store, () => {});
+    editor.load(note);
+    el.innerHTML = '<p>one</p><figure class="note-image sel"><img src="data:,"></figure>';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    vi.advanceTimersByTime(1000);
+    expect(store.updateNote).toHaveBeenCalledWith('n', { content: '<p>one</p><figure class="note-image"><img src="data:,"></figure>' });
+    vi.useRealTimers();
+  });
+});
+
+describe('opening a note is not editing it (0.9.1)', () => {
+  it('adopt() makes the repaired note the baseline, and hands back what changed', () => {
+    document.body.innerHTML = '<div id="ed" contenteditable="true"></div>';
+    const el = document.getElementById('ed');
+    const note = { id: 'n', content: '<p>old</p>' };
+    const store = { get: () => note, updateNote: vi.fn() };
+    const editor = bindEditor(el, store, () => {});
+    editor.load(note);
+    el.innerHTML = '<p>old</p><p><br></p>';            // what migrate.js made of it
+    expect(editor.adopt()).toBe('<p>old</p><p><br></p>');
+    expect(editor.adopt()).toBeNull();                  // nothing new the second time
+    editor.flush();                                      // switching to another note
+    expect(store.updateNote).not.toHaveBeenCalled();    // looking is not an edit
+  });
+});

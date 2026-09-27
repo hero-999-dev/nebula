@@ -13,6 +13,15 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.9.1': {
+    headline: 'Your older notes get the fixes too.',
+    items: [
+      { title: 'Old notes repaired', text: 'A fix to how notes are written now reaches the notes you already have, on every computer, not only new ones. The vault is copied to Backups first, and only how a note is built changes, never its words.' },
+      { title: 'Deleted is deleted', text: 'A note you delete from the Trash is removed from every backup too, so it cannot be brought back from anywhere. Notes deleted earlier are taken out of the backups the first time this version starts.' },
+      { title: 'Looking is not editing', text: 'Opening a note no longer moves it to the top as “just now”, and a page title arriving for a link is not an undo step, so redo keeps working.' },
+      { title: 'Found in real notes', text: 'Backspace joins a whole line with several rows, a heading made with / on a line in a font keeps what you type, Enter then Backspace there no longer eats a space, /todo and /code land on the line they were typed on, and an embed is never named after an error page.' },
+    ],
+  },
   '0.9.0': {
     headline: 'Labels, four image corners, and Google sign-in in your browser.',
     items: [

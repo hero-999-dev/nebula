@@ -76,7 +76,14 @@ src/js/
   export.js          a note as Markdown or one standalone HTML file
   import.js          a .md/.html file back into a note, sanitised
   rich-paste.js      safe link Paste as choices and floating pasted images
-  history.js         the editor's own undo/redo; every scripted edit pushes
+  history.js         the editor's own undo/redo; every scripted edit pushes;
+                     absorb() folds in a change nobody made (a page title)
+  note-markup.js     the note vs the screen: ONE list of on-screen state; the
+                     save, every undo step, export and print serialise through it
+  migrate.js         brings an opened note up to this version (on every open)
+  backup-purge.js    (electron/) a note deleted from the Trash leaves every backup
+  heal.js            the same, for every note in the vault, once per version,
+                     after a pre-heal backup, guarded so no word can change
   app-menu.js        File/Edit/View/Window/Help; also the palette's source
   palette.js         Ctrl+K, and the keyboard-shortcut sheet
   note-actions.js    the per-note menu and the archive/trash drawers
@@ -105,6 +112,7 @@ everyone else. Nothing reads the DOM to find out what a note contains.
 | `npm test` | Unit tests |
 | `npm run build && npm run smoke` | Drives the real Electron app on throwaway profiles |
 | `npm run rebuild` | Local only (its files are gitignored): rewrites a real article in the app and scores it; reports in `test-results/rebuild/` |
+| `npm run old-notes` | The long-note trials on COPIES of this machine's own vaults (installed app + Nebula Test); nothing is written back, files are hash-checked |
 | `npm run pack:test` | **`Nebula Test.exe`** in the project root — double-click, own icon, own notes |
 | `npm run pack:win` | `release/Nebula-Setup-*.exe` + `Nebula-portable-*.exe` |
 | `npm run icons` | Regenerate `build/icon.png` from `build/source-mark.png` (Windows) |
@@ -190,10 +198,15 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    antialiasing — it reads as a colour nobody set. `-webkit-font-smoothing:
    antialiased` on the body is the fix; do not go looking for the colour.
 17. **Anything written into a note's markup is frozen in old notes** — and the
-   place to fix that is `src/js/migrate.js`, which runs on every note open.
-   Never add another one-off top-up at a call site: a shape saved overflowing
-   was never re-measured, an empty shape never got its `<br>`, and only the code
-   block's ✕ had a top-up at all.
+   place to fix that is `src/js/migrate.js`, which runs on every note open and,
+   since 0.9.1, over the whole vault once per `MARKUP_VERSION` (`heal.js`, after
+   a `pre-heal-<version>` backup). Never add another one-off top-up at a call
+   site: a shape saved overflowing was never re-measured, an empty shape never
+   got its `<br>`, and only the code block's ✕ had a top-up at all. Controls
+   drawn into a note (a shape's outline and grips) are REBUILT to this
+   version's form, never topped up "if missing" — a wrong one stayed wrong.
+   Every fix whose bug could have written something into a note adds an
+   exhibit to the residue museum, `tests/heal.test.js` (owner, 2026-09-27).
 18. **An inline span must never be allowed to wrap a block.** `text-decoration`
    does not propagate into a block child, so `<span class="u-single"><p>..</p>`
    underlines nothing — and the span becomes the editor's direct child, which
@@ -284,6 +297,34 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    code block's ✕ is created with the block, so blocks written before it existed
    never got one — `paintAllCode` tops the header up on every load. Any new
    in-note control needs the same treatment.
+48. **The save writes `serializeNote(editor)`, never `innerHTML`.** Until
+   0.9.1 whatever was on screen at an autosave was frozen into the note (the
+   owner's Ideas note held a picture "selected" for good). A new class that
+   only means "on screen now" goes into `note-markup.js`'s list, or it will be
+   saved into notes and exported to other computers.
+49. **Opening a note is not editing it.** `editor.adopt()` makes the repaired
+   note the baseline and `store.heal()` writes it without touching `updatedAt`.
+   A change nobody made (a link's page title arriving) goes through
+   `history.absorb()`, not an input event: an input event after an undo is a
+   new edit and throws the redo steps away.
+50. **The trials must also run on notes an older version wrote.** Notes this
+   version writes cannot hold old residue, which is why the trials missed what
+   the owner kept hitting. `tests/e2e/old-note.mjs` (in smoke) holds those
+   structures by hand; `npm run old-notes` runs the trials on copies of the
+   real vaults on this machine.
+51. **Enter copies every attribute of a line onto the line it splits off** —
+   its `data-anchor` too, so one arrow anchor ended up on nine paragraphs.
+   Anything identifying (an anchor, an id) must be dropped from the new line
+   (`dropCopiedAnchor`), and an empty line needs a `<br>` to hold a caret
+   even when it is an empty span (`ensureLineBox`): at the "end" of an empty
+   block the caret moves on to the next line, and so does the typing.
+52. **Deleted is deleted.** A note deleted from the Trash leaves every backup
+   too (`electron/backup-purge.js`, on `storage:delete`), and 0.9.1 took the
+   notes deleted before it out of the backups once (`meta.json`
+   `deletedNotesPurged`). Anything new that copies notes — a backup kind, a
+   test profile, an export cache, a sync — must drop a note when it is
+   deleted, or it reopens the hole the owner called a security hole. Test
+   profiles are swept by `tests/e2e/profiles.mjs`.
 16. **A `clip-path` cuts the border off too.** A clipped shape cannot have a
    `border`; draw it as two layers (outline behind, fill inset) and remember
    that CSS cannot read an element's inline `background`.

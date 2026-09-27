@@ -11,8 +11,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   migrateNote, migrateShapes, migrateCodeBlocks, unwrapBlockSwallowingSpans,
-  migrateBlankLines, MARKUP_VERSION,
+  migrateBlankLines, rebuildShapeChrome, MARKUP_VERSION,
 } from '../src/js/migrate.js';
+import { outlineSvg, makeShape } from '../src/js/shapes.js';
 
 const root = (html) => {
   const el = document.createElement('div');
@@ -248,11 +249,13 @@ describe('migrateNote', () => {
       + '<pre class="code-body"><code class="code-src"></code></pre></div>'
       + '<span class="u-single"><p>swallowed</p></span>');
     // The shape's own empty text is a blank line too, so `blanks` counts it.
-    expect(migrateNote(el)).toEqual({ shapes: 1, code: 1, wrappers: 1, blanks: 0 });
+    // Its text was saved editable (contenteditable="true"), which is on-screen
+    // state: `transient` counts it.
+    expect(migrateNote(el)).toEqual({ shapes: 1, code: 1, wrappers: 1, blanks: 0, transient: 1 });
   });
 
   it('survives being handed nothing', () => {
-    expect(migrateNote(null)).toEqual({ shapes: 0, code: 0, wrappers: 0, blanks: 0 });
+    expect(migrateNote(null)).toEqual({ shapes: 0, code: 0, wrappers: 0, blanks: 0, transient: 0 });
   });
 
   it('moves images from their old layers onto the shapes\' canvas, above the shapes there (0.8.8)', () => {
@@ -282,3 +285,73 @@ describe('migrateNote', () => {
     expect(MARKUP_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });
+
+describe('rebuildShapeChrome: a shape is drawn by this version (0.9.1)', () => {
+  const kinded = (kind, inner) => {
+    const el = document.createElement('div');
+    el.className = `shape ${kind}`;
+    el.dataset.kind = kind;
+    el.innerHTML = inner;
+    return el;
+  };
+
+  it('replaces an outline an older version drew wrongly', () => {
+    const s = kinded('diamond', '<svg class="shape-svg" viewBox="0 0 10 10"><polygon points="0,0 10,0 10,10 0,10"/></svg>'
+      + '<div class="shape-text" contenteditable="false">x</div><span class="shape-h" title="Resize"></span>');
+    expect(rebuildShapeChrome(s)).toBe(true);
+    const want = document.createElement('div');
+    want.innerHTML = outlineSvg('diamond');
+    expect(s.querySelectorAll('.shape-svg')).toHaveLength(1);
+    expect(s.querySelector('.shape-svg').outerHTML).toBe(want.firstElementChild.outerHTML);
+  });
+
+  it('gives an old shape both grips once, in the order makeShape writes them', () => {
+    const s = kinded('rect', '<div class="shape-text" contenteditable="false">x</div>'
+      + '<span class="shape-h"></span><span class="shape-h" title="Resize"></span>');
+    rebuildShapeChrome(s);
+    expect([...s.children].map((c) => c.className)).toEqual(['shape-text', 'shape-rot', 'shape-h']);
+    expect(s.querySelector('.shape-rot').getAttribute('title')).toBe('Rotate');
+  });
+
+  it('takes an outline off a kind that has none', () => {
+    const s = kinded('rect', '<svg class="shape-svg"></svg><div class="shape-text">x</div>');
+    rebuildShapeChrome(s);
+    expect(s.querySelector('.shape-svg')).toBeNull();
+  });
+
+  it('changes nothing on a shape this version made', () => {
+    for (const kind of ['rect', 'diamond', 'triangle', 'ellipse']) {
+      const s = makeShape(kind);
+      const before = s.innerHTML;
+      expect(rebuildShapeChrome(s)).toBe(false);
+      expect(s.innerHTML).toBe(before);
+    }
+  });
+});
+
+describe('migrateNote cleans on-screen state an older version saved (0.9.1)', () => {
+  it('a picture saved selected opens unselected, and a second open changes nothing', () => {
+    const el = root('<p>x</p><figure class="note-image sel" contenteditable="false"><img src="data:,"></figure><hr class="armed">');
+    expect(migrateNote(el).transient).toBe(2);
+    expect(el.querySelector('.sel, .armed')).toBeNull();
+    const after = el.innerHTML;
+    expect(migrateNote(el).transient).toBe(0);
+    expect(el.innerHTML).toBe(after);
+  });
+
+  it('is at the version that added these steps', () => {
+    expect(MARKUP_VERSION).toBe('0.9.1');
+  });
+});
+
+describe('an empty canvas an older version left behind (0.9.1)', () => {
+  it('goes on open; a layer with a shape or a picture on it stays', () => {
+    const el = root('<div class="shape-layer shape-layer--behind" contenteditable="false"></div>'
+      + '<div class="shape-layer" contenteditable="false"><figure class="note-image"><img src="data:,"></figure></div><p>x</p>');
+    migrateNote(el);
+    expect(el.querySelector('.shape-layer--behind')).toBeNull();
+    expect(el.querySelectorAll('.shape-layer')).toHaveLength(1);
+    expect(el.querySelector('.note-image')).not.toBeNull();
+  });
+});
+

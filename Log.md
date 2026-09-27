@@ -6,6 +6,38 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-27 20:52] v0.9.1 - by Claude
+
+Old notes heal too, and deleted is deleted: one serializer keeps on-screen state out of notes, opened notes are repaired without being dated, every note is repaired once per version after a backup, a note deleted from the Trash leaves every backup, and the editing bugs found in the owner's notes are fixed.
+
+* (no commits since the last release)
+
+---
+
+## [2026-09-27 04:46] v0.9.1 - by Claude
+
+The owner: a bug fixed in the app keeps living inside the notes it already touched, on every computer; continuing an old note keeps the bug, only a new note is clean — "this must be solved". The same request was written in the owner's own Ideas note.
+
+Measured first: the long-note trials on copies of the owner's notes with 0.9.0 failed in most places (installed Ideas 0/19, a second note 9/19), where the guide and the rebuilt articles passed everything — the trials had only ever run on notes the current version wrote. Causes found and fixed:
+
+- The save wrote the editor's markup as it stood, so on-screen state was frozen into notes (a picture "selected" for good in the Ideas note). One list of on-screen state now serves the save, every undo step, export and print (note-markup.js).
+- Repairs on open only added what was missing, so a control an older version drew wrongly stayed wrong. A shape's outline and grips are rebuilt to this version's form; saved on-screen state and empty canvases go on open.
+- Repairs on open lived on screen only and were saved later as an EDIT, so looking at an old note moved it to the top as "just now". The repaired note is now the baseline and is written back as a repair, date and order unchanged (editor.adopt, store.heal).
+- A note nobody opened kept the old markup for search, the sidebar, exports and other computers. On the first start of a version that changed the markup, every note is repaired while idle, after a pre-heal-<version> backup, only if its words, pictures, links, shapes, code and equations come out the same (heal.js).
+- A link's page title arriving was an input event, so after an undo it threw the redo steps away; it is absorbed into the current state now. An embed is not named after an error page any more ("Service unavailable" in the Ideas note).
+- Enter then Backspace in text set in a font left the line built differently (two spans, a no-break space), and the next Backspace ate a space; the halves are joined again. /todo and /code typed on a line of their own right above a picture landed inside the list below it; they take that line's place now.
+- "/h3" (or /h2, a list) on a new line in text set in a font made an empty heading and the words typed next went into the paragraph under it — the owner's "Heading 3 sometimes does nothing". The line was an empty span once the command was taken out, with no line box to hold a caret; a converted empty line now gets its <br> inside the font it kept.
+- Enter copied a line's arrow anchor onto the new line (one anchor on nine paragraphs in the Ideas note), and dragging an arrow stamped anchors on every block. The new line lets go of the copy, and on open an anchor no arrow uses goes.
+- Backspace at the start of a block joined only its first line (up to a <br>) to the line above and left the rest outside, a list item's other lines among them; the whole block is joined now, its words kept in their font.
+- The guide said "PicturesNebula" since 0.8.9.
+
+Deleted is deleted (owner: "a note I deleted must not be recoverable — that is a security hole"). A note deleted from the Trash now leaves every backup too, overwritten first (electron/backup-purge.js), and the first start of 0.9.1 takes the notes deleted earlier out of the backups once, refusing if the vault is empty or unreadable. Found and removed with the owner's approval: 28 deleted notes in Nebula Test's backups, an old vault copy on the flash with 22 notes deleted on this computer, the flash's test-results, Codex's work folder with exports of the two report notes, and 165 temp test profiles (two with copies of the owner's notes). Tests now clear what killed runs leave behind.
+
+New: a hand-written old note in smoke's long-note trials, and npm run old-notes, which runs the trials on copies of this machine's own vaults. AGENTS.md: a fix whose bug could have written into a note also repairs the notes already written and adds a museum exhibit. The flash mirror no longer copies test-results (the owner had excluded it on 2026-09-25; the release's own sync kept copying it).
+
+---
+
 ## [2026-09-27 03:58] v0.9.0 - by Claude
 
 Labels, four image corners, bookmark titles and Google sign-in in the browser; shape text, arrows, undo, Backspace and locked-note fixes from the two report notes.

@@ -77,6 +77,7 @@ export function convertBlock(block, kind) {
     const list = doc.createElement(tag);
     const li = doc.createElement('li');
     li.innerHTML = html;
+    ensureLineBox(li);
     keepInk(block, li);
     list.appendChild(li);
     placeInstead(block, list);
@@ -88,9 +89,33 @@ export function convertBlock(block, kind) {
   if (block.tagName === tag.toUpperCase()) return block;
   const next = doc.createElement(tag);
   next.innerHTML = html;
+  ensureLineBox(next);
   keepInk(block, next);
   placeInstead(block, next);
   return next;
+}
+
+/**
+ * An empty block has no line box, so there is nowhere to put a caret: a caret
+ * set at its end moves on to the next line, and what is typed goes there. A
+ * line whose only content was a slash command is exactly that once the command
+ * is taken out — and when the line was in a font it is an empty span, which
+ * `innerHTML || '<br>'` does not see. "/h3" made an empty heading and the
+ * words went into the paragraph under it; Backspace then joined paragraphs
+ * (the owner's Ideas note: "Heading 3 sometimes does nothing", 0.9.1).
+ *
+ * Gives the block the <br> a browser gives an empty line, inside the
+ * formatting the line kept, so what is typed there keeps the font.
+ * @returns {HTMLBRElement|null} the <br>, when the block had nothing to hold a caret
+ */
+export function ensureLineBox(block) {
+  if (!block || block.textContent.replace(/​/g, '')) return null;
+  if (block.querySelector('br, img, hr, .inline-eq, .link-block, .note-image')) return null;
+  let host = block;
+  while (host.lastElementChild?.matches('span, b, strong, i, em, u, s, font, a')) host = host.lastElementChild;
+  const br = block.ownerDocument.createElement('br');
+  host.appendChild(br);
+  return br;
 }
 
 /** A plain line's colour classes (c-red, h-blue…) travel with its text. */
@@ -263,15 +288,44 @@ export function tidyAfterDelete(root, selection, before = null) {
     changed = true;
   }
 
+  // Chromium joins only the first LINE of a block into the one above — up to
+  // its first <br> — and leaves the rest behind as a block of its own: a list
+  // item of three lines, split with Enter and joined again with Backspace, kept
+  // one line in the list and put two outside it (the long-note trials, 0.9.1).
+  // Joining a block means all of it, as in any word processor: the rest follows.
+  const lower = before?.startBlock;
+  if (range.collapsed && lower?.isConnected && lower !== block && !lower.contains(sc)
+    && lower.textContent.replace(/​/g, '').trim()) {
+    const below = block.nextElementSibling ?? (block.matches('li') ? block.parentElement?.nextElementSibling : null);
+    if (below === lower) {
+      if (lower.firstChild?.nodeName !== 'BR') block.appendChild(block.ownerDocument.createElement('br'));
+      while (lower.firstChild) block.appendChild(lower.firstChild);
+      lower.remove();
+      changed = true;
+    }
+  }
+
   // Enter inside a styled span splits it in two; Backspace then joins the
   // lines but drops the second half's span, so those words change style (in a
   // quote, a span that keeps words upright: the second half went italic). The
   // words right after the caret go back into the span they came out of.
   if (before?.blocks !== undefined && blockCount(root) < before.blocks && range.collapsed) {
-    const at = sc.nodeType === Node.TEXT_NODE && so === 0 ? sc : sc.nodeType === Node.ELEMENT_NODE ? sc.childNodes[so] : null;
-    const span = at?.previousSibling;
+    let at = sc.nodeType === Node.TEXT_NODE && so === 0 ? sc : sc.nodeType === Node.ELEMENT_NODE ? sc.childNodes[so] : null;
+    let span = at?.previousSibling;
+    // The caret can also be left at the END of the span's own words, with the
+    // words that lost their span right after it.
+    if (!at && sc.nodeType === Node.TEXT_NODE && so === sc.length && sc.parentElement?.lastChild === sc) {
+      span = sc.parentElement;
+      at = span.nextSibling;
+    }
     if (at?.nodeType === Node.TEXT_NODE && span?.matches?.('span[style]:not([class])') && before.has(span)) {
+      const end = span.lastChild;
       for (let t = at; t?.nodeType === Node.TEXT_NODE;) { const next = t.nextSibling; span.appendChild(t); t = next; }
+      // The space Enter turned into a no-break space to keep it visible at the
+      // end of the line is an ordinary space in the middle of one again.
+      if (end?.nodeType === Node.TEXT_NODE && end.data.endsWith(' ') && /^\S/.test(at.data)) {
+        end.replaceData(end.length - 1, 1, ' ');
+      }
       sc = at; so = 0; ec = at; eo = 0;
       changed = true;
     }
@@ -316,6 +370,20 @@ export function tidyAfterDelete(root, selection, before = null) {
     ({ startContainer: sc, startOffset: so, endContainer: ec, endOffset: eo } = live);
   }
 
+  // Joining two lines set in a font leaves the words that came up from the
+  // lower line in a span of their own — Chromium rebuilds it from the computed
+  // style, so it has the font's `style` but not the picker's `data-font-family`
+  // — and the space that ended the upper line stays the no-break space Enter
+  // turned it into. Deleting a word typed underlined inside such a line leaves
+  // the font's span cut in two the same way. Either way the line looked the
+  // same and was built differently, and the next Backspace ate a space that was
+  // there before (the owner's notes, 0.9.1). Where the caret stands between two
+  // spans that format alike, they become one span and one space again.
+  if (range.collapsed) {
+    const joined = rejoinSpans(sc, so);
+    if (joined) { sc = joined.node; so = joined.offset; ec = sc; eo = so; changed = true; }
+  }
+
   const list = block.closest('ul, ol');
   if (list && root.contains(list)) {
     for (const other of [list.nextElementSibling, list.previousElementSibling]) {
@@ -344,6 +412,9 @@ export function tidyAfterDelete(root, selection, before = null) {
 export function beforeDelete(root) {
   const known = new WeakSet(root.querySelectorAll('span[style]:not([class])'));
   known.blocks = blockCount(root);
+  // The block the caret stands at the very start of: a Backspace there joins
+  // it to the one above, and Chromium joins only its first line (tidyAfterDelete).
+  known.startBlock = blockStartAt(root);
   // By what they are too: joining lines, Chromium rebuilds a span it moves, so
   // the one after the delete is a new element with the same style and words.
   known.spans = new Set([...root.querySelectorAll('span[style]:not([class])')].map(spanKey));
@@ -365,8 +436,72 @@ export function beforeDelete(root) {
 }
 
 /** Lines in the note, to tell a delete that joined two of them. */
+/** The block a collapsed caret stands at the very start of, or null. */
+function blockStartAt(root) {
+  const doc = root.ownerDocument;
+  const sel = doc.getSelection?.();
+  if (!sel?.rangeCount || !sel.isCollapsed) return null;
+  const r = sel.getRangeAt(0);
+  const el = r.startContainer.nodeType === Node.ELEMENT_NODE ? r.startContainer : r.startContainer.parentElement;
+  const block = el?.closest('p, li, blockquote, h1, h2, h3, h4, h5, h6, .blk-todo, div');
+  if (!block || block === root || !root.contains(block)) return null;
+  const head = doc.createRange();
+  head.setStart(block, 0);
+  head.setEnd(r.startContainer, r.startOffset);
+  if (head.toString().replace(/​/g, '')) return null;
+  if (head.cloneContents().querySelector('br, img, hr')) return null;
+  return block;
+}
+
 function blockCount(root) {
   return root.querySelectorAll('p, li, blockquote, h1, h2, h3, h4, h5, h6, div').length;
+}
+
+/**
+ * At a caret that sits where two lines were just joined: the span the caret is
+ * at the end of and the span right after it, if they are the same formatting,
+ * become one; a no-break space right before the caret, with a word right after
+ * it, becomes a plain space again.
+ * @returns {{node: Text, offset: number}|null} the caret, if anything changed
+ */
+function rejoinSpans(node, offset) {
+  if (node?.nodeType !== Node.TEXT_NODE) return null;
+  // The caret at the start of the right-hand span is the same place as the end
+  // of the left-hand one: take it from there.
+  if (offset === 0 && node.parentElement?.firstChild === node) {
+    const prev = node.parentElement.previousSibling;
+    const last = prev?.nodeType === Node.ELEMENT_NODE ? prev.lastChild : null;
+    if (last?.nodeType === Node.TEXT_NODE && prev.tagName === 'SPAN') return rejoinSpans(last, last.length);
+    return null;
+  }
+  if (offset !== node.length) return null;
+  const left = node.parentElement;
+  if (left?.tagName !== 'SPAN' || left.lastChild !== node) return null;
+  const right = left.nextSibling;
+  if (right?.nodeType !== Node.ELEMENT_NODE || !sameFormat(left, right)) return null;
+  const font = right.getAttribute('data-font-family');
+  if (font && !left.hasAttribute('data-font-family')) left.setAttribute('data-font-family', font);
+  while (right.firstChild) left.appendChild(right.firstChild);
+  right.remove();
+  left.normalize();   // the caret's text node stays first, so its offset holds
+  const next = node.data.charAt(offset);
+  if (offset > 0 && node.data.charAt(offset - 1) === ' ' && next && !/\s/.test(next)) {
+    node.replaceData(offset - 1, 1, ' ');
+  }
+  return { node, offset };
+}
+
+/** Two spans that format their words the same way; the picker's font name follows its style. */
+function sameFormat(a, b) {
+  if (a.tagName !== 'SPAN' || b.tagName !== 'SPAN') return false;
+  if ((a.getAttribute('class') ?? '') !== (b.getAttribute('class') ?? '')) return false;
+  if (a.style.cssText !== b.style.cssText) return false;
+  const fa = a.getAttribute('data-font-family');
+  const fb = b.getAttribute('data-font-family');
+  if (fa && fb && fa !== fb) return false;
+  // Anything else on either (an id, a data-anchor) makes it a different span.
+  const extra = (el) => [...el.attributes].some((x) => !['class', 'style', 'data-font-family'].includes(x.name));
+  return !extra(a) && !extra(b);
 }
 
 function spanKey(span) {

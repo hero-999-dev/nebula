@@ -340,3 +340,40 @@ describe('typing is one step, not one per character', () => {
     vi.useRealTimers();
   });
 });
+
+describe('absorb: a change nobody made (0.9.1)', () => {
+  it('keeps the steps ahead: a page title arriving after an undo does not kill redo', () => {
+    mount('<p>one</p>');
+    const h = initHistory(editor);
+    h.push(); editor.innerHTML = '<p>one</p><p>two</p>';
+    h.push(); editor.innerHTML = '<p>one</p><p>two</p><p>three</p>';
+    h.commit();
+    expect(h.undo()).toBe(true);
+    const ahead = h.depth().future;
+    h.absorb(() => { editor.querySelector('p').setAttribute('title', 'arrived'); });
+    expect(h.depth().future).toBe(ahead);
+    expect(h.redo()).toBe(true);
+    expect(editor.textContent).toBe('onetwothree');
+  });
+
+  it("is not a step: undo goes back past the user's last edit, not to the title", () => {
+    mount('<p>one</p>');
+    const h = initHistory(editor);
+    h.push(); editor.innerHTML = '<p>one</p><p>two</p>';
+    h.commit();
+    const before = h.depth().past;
+    h.absorb(() => { editor.querySelector('p').setAttribute('title', 'arrived'); });
+    expect(h.depth().past).toBe(before);
+    expect(h.undo()).toBe(true);
+    expect(editor.textContent).toBe('one');
+  });
+
+  it('closes a pending edit as its own step first, so that edit stays undoable', () => {
+    mount('<p>one</p>');
+    const h = initHistory(editor);
+    h.push(); editor.innerHTML = '<p>moved</p>';      // a scripted edit, not yet committed
+    h.absorb(() => { editor.querySelector('p').setAttribute('title', 'arrived'); });
+    expect(h.undo()).toBe(true);
+    expect(editor.textContent).toBe('one');
+  });
+});

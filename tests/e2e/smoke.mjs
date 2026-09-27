@@ -25,9 +25,14 @@ import { runCanvasChecks } from './canvas.mjs';
 import { runViewSnapChecks } from './view-snap.mjs';
 import { runGuideChecks } from './guide.mjs';
 import { runDenseChecks } from './dense.mjs';
+import { OLD_NOTE } from './old-note.mjs';
+import { sweepStaleProfiles } from './profiles.mjs';
+import { runDeletedChecks } from './deleted.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mainJs = path.join(root, 'dist-electron', 'main.js');
+// Profiles that killed runs left in the temp folder go first (profiles.mjs).
+sweepStaleProfiles();
 if (!fs.existsSync(mainJs)) {
   console.error('x dist-electron/main.js not found - run "npm run build" first.');
   process.exit(1);
@@ -2349,8 +2354,10 @@ try {
   await runCanvasChecks(check);
   await runViewSnapChecks(check);
   await runGuideChecks(check);
-  await runDenseChecks(check);
+  // The guide, and a note as older versions and pasting left them (0.9.1).
+  await runDenseChecks(check, { docs: [OLD_NOTE] });
   await runV090Checks(check);
+  await runDeletedChecks(check);
 } catch (err) {
   failure = err;
   check('smoke run completed', false, err.message);

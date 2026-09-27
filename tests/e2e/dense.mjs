@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { sweepStaleProfiles } from './profiles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
@@ -37,6 +38,9 @@ function signatureSource() {
       if (n.matches('.code-paint, .katex')) return;
       // Code is coloured by spans that are redrawn after every restore: its text is what counts.
       if (n.matches('.code-src')) { out.push(`<code.code-src>${JSON.stringify(n.textContent)}</>`); return; }
+      // A link card's title is the page's, fetched when it answers — sometimes long after
+      // the note opened. It arrives without being an edit (0.9.1); it is not the trial's doing.
+      if (n.matches('.link-card__title')) { out.push('<strong.link-card__title></>'); return; }
       const cls = [...n.classList].filter((c) => !['sel', 'arrow-target', 'active', 'editing'].includes(c)).sort().join('.');
       out.push(`<${n.tagName.toLowerCase()}${cls ? `.${cls}` : ''}>`);
       n.childNodes.forEach(walk);
@@ -47,15 +51,30 @@ function signatureSource() {
     copy.childNodes.forEach(walk);
     return out.join('');
   };
-  window.__denseText = (rootEl) => rootEl.textContent.replace(/​/g, '').replace(/ /g, ' ');
+  // Without link cards' titles, for the same reason as above: a title arriving
+  // shortens or lengthens the note's text, and that is not a key taking text away.
+  window.__denseText = (rootEl) => { const c = rootEl.cloneNode(true); c.querySelectorAll('.link-card__title').forEach((t) => t.remove()); return c.textContent.replace(/\u200b/g, '').replace(/\u00a0/g, ' '); };
 }
 
 /** Places in the open note where the trials happen. */
 function findSites() {
   const ed = document.getElementById('editor');
   const top = [...ed.children];
-  const prose = (el) => el.matches('p') && el.textContent.trim().length > 60 && !el.querySelector('img, .link-block, .blk-code, .inline-eq');
-  const pick = (list) => list.sort((a, b) => b.textContent.length - a.textContent.length)[0];
+  // A place is only a place for the trials if it has a plain run of words to
+  // click into: a line that is all bold (the owner's Bug Finding note opens
+  // with one in capitals) has nowhere a format toggle would not switch off.
+  const FORMATTING = 'b, strong, i, em, u, s, strike, a, code, mark, sub, sup, [class*="u-"]';
+  const plainWords = (el) => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      let plain = !n.parentElement.closest('[contenteditable="false"]');
+      for (let p = n.parentElement; plain && p && p !== el; p = p.parentElement) if (p.matches(FORMATTING)) plain = false;
+      if (plain && / \S/.test(n.data)) return true;
+    }
+    return false;
+  };
+  const prose = (el) => el.matches('p') && el.textContent.trim().length > 60 && !el.querySelector('img, .link-block, .blk-code, .inline-eq') && plainWords(el);
+  const pick = (list) => list.filter(plainWords).sort((a, b) => b.textContent.length - a.textContent.length)[0];
   const mark = (el, name) => { if (el) el.dataset.denseSite = name; return el ? name : null; };
   document.querySelectorAll('[data-dense-site]').forEach((el) => delete el.dataset.denseSite);
   const sites = [
@@ -70,6 +89,7 @@ function findSites() {
 export async function runDenseChecks(check, { docs = [] } = {}) {
   const { GUIDE_NOTE } = await import(pathToFileURL(path.join(root, 'src/js/seed-notes.js')).href);
   const all = [{ name: 'guide', title: GUIDE_NOTE.title, content: GUIDE_NOTE.content }, ...docs];
+  sweepStaleProfiles();   // what killed runs left behind, which may hold copies of real notes
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'nebula-dense-'));
   const notesDir = path.join(profile, 'storage', 'notes');
   fs.mkdirSync(notesDir, { recursive: true });
@@ -108,6 +128,16 @@ export async function runDenseChecks(check, { docs = [] } = {}) {
         await win.evaluate((title) => [...document.querySelectorAll('.note-row')].find((r) => r.querySelector('.nr-title')?.textContent === title)?.click(), doc.title);
         await win.waitForFunction((title) => document.getElementById('title').value === title, doc.title, { polling: 50 });
         await win.waitForTimeout(400);
+        // Let the note settle: a link card's page title can arrive seconds after the
+        // note opens. It is not an edit (0.9.1), but it does change the note, and the
+        // trials compare against the note as it stood when they began.
+        let last = '';
+        for (let quiet = 0, t = 0; quiet < 3 && t < 50; t++) {
+          const now = await win.evaluate(() => document.getElementById('editor').innerHTML.length + ':' + document.getElementById('editor').textContent);
+          quiet = now === last ? quiet + 1 : 0;
+          last = now;
+          await win.waitForTimeout(300);
+        }
       };
       await open();
       const baseHtml = await win.evaluate(() => document.getElementById('editor').innerHTML);
@@ -137,12 +167,23 @@ export async function runDenseChecks(check, { docs = [] } = {}) {
         if (!el) return null;
         el.scrollIntoView({ block: 'center' });
         // 'middle' is plain text right in the line, not inside a bold or a link: a format
-        // toggled there would switch that format off, which is a different trial.
-        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentElement.closest('[contenteditable="false"]') || (where === 'middle' && n.parentElement !== el) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+        // toggled there would switch that format off, which is a different trial. A span
+        // that only sets a font, a size or a colour is plain text for this — pasted and
+        // older notes hold all their words in such spans, and the owner's notes could
+        // not be tried at all without it (0.9.1).
+        const FORMATTING = 'b, strong, i, em, u, s, strike, a, code, mark, sub, sup, [class*="u-"]';
+        const plainIn = (n) => {
+          for (let p = n.parentElement; p && p !== el; p = p.parentElement) if (p.matches(FORMATTING)) return false;
+          return true;
+        };
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentElement.closest('[contenteditable="false"]') || (where === 'middle' && !plainIn(n)) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
         const nodes = []; for (let n = walker.nextNode(); n; n = walker.nextNode()) if (n.data.trim()) nodes.push(n);
         if (!nodes.length) return null;
         let node; let offset;
-        if (where === 'end') { node = nodes.at(-1); offset = node.data.replace(/\s+$/, '').length; }
+        // The end is where a click at the end of the line lands: after the last thing
+        // that is drawn. Only collapsible white space is left out — a no-break space is
+        // drawn, and the owner's notes end paragraphs with one (0.9.1).
+        if (where === 'end') { node = nodes.at(-1); offset = node.data.replace(/[ \t\n\r]+$/, '').length; }
         else {
           // The start of a word near the middle of the longest plain run: letters on both sides.
           node = nodes.reduce((a, b) => (b.data.length > a.data.length ? b : a));

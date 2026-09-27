@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { installBrowserAuth } from './ai-browser-auth.js';
 import { AI_SERVICES } from '../src/js/ai-services.js';
 import { fetchPageTitle } from './link-metadata.js';
+import { purgeNoteFromBackups, purgeDeletedFromBackups } from './backup-purge.js';
 import { initUpdater } from './updater.js';
 import { resolveUserData, appChannel, canSelfUpdate } from './user-data.js';
 
@@ -90,6 +91,7 @@ if (process.platform === 'win32') {
 
 /** Notes live here as one JSON file per note. This directory is the vault. */
 const storageRoot = () => path.join(app.getPath('userData'), 'storage');
+const backupsRoot = () => path.join(app.getPath('userData'), 'backups');
 
 function resolveInStorage(rel) {
   const root = storageRoot();
@@ -111,7 +113,7 @@ function snapshotStorage({ label } = {}) {
   try {
     const src = storageRoot();
     if (!fsSync.existsSync(src)) return null;
-    const backupsDir = path.join(app.getPath('userData'), 'backups');
+    const backupsDir = backupsRoot();
     const name = label ?? new Date().toISOString().slice(0, 10);
     const dest = path.join(backupsDir, name);
     if (!fsSync.existsSync(dest)) {
@@ -148,11 +150,35 @@ function stampVaultMeta() {
       appVersion: APP_VERSION,
       firstOpened: meta.firstOpened ?? new Date().toISOString(),
       lastOpened: new Date().toISOString(),
+      // When the notes deleted before 0.9.1 were taken out of the backups.
+      ...(meta.deletedNotesPurged ? { deletedNotesPurged: meta.deletedNotesPurged } : {}),
     };
     fsSync.mkdirSync(storageRoot(), { recursive: true });
     fsSync.writeFileSync(file, JSON.stringify(next, null, 2), 'utf8');
   } catch (err) {
     console.warn('[nebula] vault meta write failed:', err.message);
+  }
+}
+
+/**
+ * Once per vault: the notes deleted before 0.9.1 come out of the backups
+ * (backup-purge.js). From then on a note leaves the backups as it leaves the
+ * vault, so this never has to run again. An empty or unreadable vault is not
+ * purged against — it is tried again on the next start.
+ */
+function purgeOldDeletions() {
+  const file = path.join(storageRoot(), 'meta.json');
+  let meta = {};
+  try { meta = JSON.parse(fsSync.readFileSync(file, 'utf8')); } catch { /* no stamp yet */ }
+  if (meta.deletedNotesPurged) return;
+  try {
+    const result = purgeDeletedFromBackups(path.join(storageRoot(), 'notes'), backupsRoot());
+    if (result.refused) return;
+    meta.deletedNotesPurged = new Date().toISOString();
+    fsSync.writeFileSync(file, JSON.stringify(meta, null, 2), 'utf8');
+    if (result.removed) console.info(`[nebula] ${result.removed} backup copies of deleted notes removed`);
+  } catch (err) {
+    console.warn('[nebula] purging deleted notes from backups failed:', err.message);
   }
 }
 
@@ -675,9 +701,19 @@ app.whenReady().then(async () => {
   });
 
   snapshotStorage();
+  purgeOldDeletions();
   stampVaultMeta();
 
   ipcMain.handle('storage:root', () => storageRoot());
+  // Before the renderer repairs every note in the vault (src/js/heal.js) — the
+  // one step that writes notes nobody opened — the vault is put aside under a
+  // label. A labelled copy is never overwritten, so asking twice keeps the first.
+  ipcMain.handle('storage:backup', (_e, label) => {
+    const safe = String(label ?? '').replace(/[^\w.-]/g, '').slice(0, 64);
+    if (!safe) return { ok: false };
+    const dest = snapshotStorage({ label: safe });
+    return dest ? { ok: true, path: dest } : { ok: false };
+  });
 
   ipcMain.handle('storage:read', async (_e, rel) => {
     try {
@@ -725,6 +761,10 @@ app.whenReady().then(async () => {
       const abs = resolveInStorage(rel);
       if (!rel || abs === storageRoot()) return { ok: false };
       await fs.rm(abs, { recursive: true, force: true });
+      // A note deleted from the vault (the Trash's Delete) leaves every backup
+      // with it: a deleted note must not be recoverable (owner, 2026-09-27).
+      const note = /^notes[\\/]([\w-]+)\.json$/.exec(String(rel));
+      if (note) purgeNoteFromBackups(backupsRoot(), note[1]);
       return { ok: true };
     } catch {
       return { ok: false };

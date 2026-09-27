@@ -19,6 +19,8 @@
  * closes the current step and starts a new one.
  */
 
+import { serializeNote } from './note-markup.js';
+
 /** Where a node sits, as child indexes from the root. Survives innerHTML. */
 export function pathOf(root, node) {
   if (!node || !root.contains(node)) return null;
@@ -185,19 +187,9 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
   });
   const unpack = (html) => html.replace(/nebula-picture:\d+/g, (token) => byToken.get(token) ?? token);
 
-  const snapshotHtml = () => {
-    const transient = '.note-image.sel, .shape.sel, .shape.editing, .shape-angle, .note-arrow.is-selected, .arrow-target, hr.armed';
-    if (!editorEl.querySelector(transient)) return pack(editorEl.innerHTML);
-    const copy = editorEl.cloneNode(true);
-    copy.querySelectorAll('.note-image.sel, .shape.sel').forEach(el => el.classList.remove('sel'));
-    copy.querySelectorAll('.shape.editing').forEach(el => el.classList.remove('editing'));
-    copy.querySelectorAll('.shape-text').forEach(el => el.setAttribute('contenteditable', 'false'));
-    copy.querySelectorAll('.shape-angle').forEach(el => el.remove());
-    copy.querySelectorAll('.note-arrow.is-selected').forEach(el => el.classList.remove('is-selected'));
-    copy.querySelectorAll('.arrow-target').forEach(el => el.classList.remove('arrow-target'));
-    copy.querySelectorAll('hr.armed').forEach(el => el.classList.remove('armed'));
-    return pack(copy.innerHTML);
-  };
+  // A step is the note as stored (note-markup.js), except that it keeps the
+  // pending-format caret so stepping back puts that back too.
+  const snapshotHtml = () => pack(serializeNote(editorEl, { keepTypingMarkers: true }));
   let present = { html: snapshotHtml(), caret: null };
   let typingTimer = null;
   let restoring = false;
@@ -329,6 +321,20 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
     return true;
   }
 
+  /**
+   * A change nobody made: a page title arriving for a link card. Whatever was
+   * pending becomes its own step first, then `change` runs and its result is
+   * folded into the current state: nothing to undo, and the steps ahead stay.
+   * Until 0.9.1 it arrived as an input event, and an input event right after
+   * an undo is a new edit, which threw the redo steps away.
+   */
+  function absorb(change) {
+    if (restoring) { change(); return; }
+    commit();
+    change();
+    present = { html: snapshotHtml(), caret: present.caret };
+  }
+
   /** A different note is open; its history is not this note's. */
   function reset() {
     clearTimeout(typingTimer);
@@ -343,6 +349,7 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
   return {
     push,
     typed,
+    absorb,
     undo,
     redo,
     reset,

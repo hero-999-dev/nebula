@@ -15,12 +15,14 @@
  */
 
 import { ensureHeadControls, paintCode } from './codeblock.js';
-import { outlineSvg, ensureLayer } from './shapes.js';
+import { outlineSvg, ensureLayer, releaseEmptyLayers } from './shapes.js';
 import { normalizeUnderlineInk } from './inline-family.js';
 import { liftNestedDividers } from './blocks.js';
+import { stripTransient } from './note-markup.js';
+import { pruneAnchors } from './arrows.js';
 
 /** Bumped whenever a step is added, so the log line means something. */
-export const MARKUP_VERSION = '0.8.8';
+export const MARKUP_VERSION = '0.9.1';
 
 /**
  * @param {Element} root the editor
@@ -30,14 +32,18 @@ export const MARKUP_VERSION = '0.8.8';
  * @returns {{shapes: number, code: number}} how many nodes were touched
  */
 export function migrateNote(root, { fitShape } = {}) {
-  if (!root) return { shapes: 0, code: 0, wrappers: 0, blanks: 0 };
+  if (!root) return { shapes: 0, code: 0, wrappers: 0, blanks: 0, transient: 0 };
   mergeImageLayers(root);
   const wrappers = unwrapBlockSwallowingSpans(root);
   liftNestedDividers(root);
-  // 0.8.3 saved the rotation readout ("285°") into the shape it labelled.
-  root.querySelectorAll('.shape-angle').forEach((label) => label.remove());
-  root.querySelectorAll('.note-arrow.is-selected').forEach((arrow) => arrow.classList.remove('is-selected'));
-  root.querySelectorAll('.arrow-target').forEach((el) => el.classList.remove('arrow-target'));
+  // Whatever was on screen when an older version saved: a selected picture or
+  // shape, a shape being typed in, an armed divider, a picked-up arrow and its
+  // target, the rotation readout 0.8.3 left in the shape it labelled.
+  const transient = stripTransient(root);
+  // An empty canvas an older version left behind after its last shape went.
+  releaseEmptyLayers(root);
+  // Anchors no arrow uses, and the copies Enter made of a line's anchor.
+  pruneAnchors(root);
   normalizeProse(root);
   normalizeUnderlineInk(root);
   return {
@@ -45,6 +51,7 @@ export function migrateNote(root, { fitShape } = {}) {
     code: migrateCodeBlocks(root),
     wrappers,
     blanks: migrateBlankLines(root),
+    transient,
   };
 }
 
@@ -180,34 +187,10 @@ export function migrateShapes(root, fitShape) {
       changed = true;
     }
 
-    // 0.7.2 — the clipped kinds are stroked as SVG now, so their line is one
-    // weight at any size instead of a box inset that grew with the shape.
-    const kind = shape.dataset.kind;
-    if (!shape.querySelector('.shape-svg')) {
-      const svg = outlineSvg(kind);
-      if (svg) {
-        const holder = shape.ownerDocument.createElement('div');
-        holder.innerHTML = svg;
-        shape.insertBefore(holder.firstElementChild, shape.firstChild);
-        changed = true;
-      }
-    }
-
-    // 0.6.9 — shapes can be turned, so every one needs the grip that turns it.
-    if (!shape.querySelector('.shape-rot')) {
-      const rot = shape.ownerDocument.createElement('span');
-      rot.className = 'shape-rot';
-      rot.setAttribute('title', 'Rotate');
-      shape.insertBefore(rot, shape.querySelector('.shape-h'));
-      changed = true;
-    }
-
-    // 0.6.1 — the resize grip gained a tooltip.
-    const grip = shape.querySelector('.shape-h');
-    if (grip && !grip.getAttribute('title')) {
-      grip.setAttribute('title', 'Resize');
-      changed = true;
-    }
+    // The outline (0.7.2) and the two grips (0.6.1, 0.6.9) are drawn by this
+    // version, not kept from the note: they used to be added only when missing,
+    // so an outline or grip an older version wrote wrongly stayed wrong forever.
+    if (rebuildShapeChrome(shape)) changed = true;
 
     // 0.6.2 — a shape grows to fit its text, but only while someone is TYPING
     // in it: nothing ever re-measured a shape that was already on disk. The
@@ -223,6 +206,37 @@ export function migrateShapes(root, fitShape) {
     if (changed) touched += 1;
   }
   return touched;
+}
+
+/**
+ * A shape's outline and grips, exactly as `makeShape` in this version writes
+ * them: one outline first (for the kinds that have one), then the turning grip,
+ * then the resize grip, last. Idempotent; returns whether anything changed.
+ */
+export function rebuildShapeChrome(shape) {
+  const doc = shape.ownerDocument;
+  const before = shape.innerHTML;
+
+  const want = outlineSvg(shape.dataset.kind);
+  const outlines = [...shape.querySelectorAll(':scope > .shape-svg')];
+  const holder = doc.createElement('div');
+  holder.innerHTML = want;
+  const fresh = holder.firstElementChild;
+  if (!fresh) {
+    outlines.forEach((svg) => svg.remove());
+  } else if (outlines.length !== 1 || outlines[0].outerHTML !== fresh.outerHTML || shape.firstElementChild !== outlines[0]) {
+    outlines.forEach((svg) => svg.remove());
+    shape.insertBefore(fresh, shape.firstChild);
+  }
+
+  for (const [cls, title] of [['shape-rot', 'Rotate'], ['shape-h', 'Resize']]) {
+    shape.querySelectorAll(`:scope > .${cls}`).forEach((grip) => grip.remove());
+    const grip = doc.createElement('span');
+    grip.className = cls;
+    grip.setAttribute('title', title);
+    shape.appendChild(grip);
+  }
+  return shape.innerHTML !== before;
 }
 
 /**

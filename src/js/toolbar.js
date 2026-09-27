@@ -15,6 +15,8 @@ import { applyInlineFamily, clearInlineFamilyAtCaret, cleanTypingMarkers } from 
 import { initEquation } from './equation.js';
 import { on } from './bus.js';
 import { toMarkdown, toHtml, toPrintDocument, toNebulaNote, safeFileName, FORMATS } from './export.js';
+import { serializeNote } from './note-markup.js';
+import { dropCopiedAnchor } from './arrows.js';
 import { noteFromFile } from './import.js';
 
 /**
@@ -394,6 +396,8 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   }, true);
   editorEl.addEventListener('input', (e) => {
     if (e.inputType?.startsWith('delete')) tidyAfterDelete(editorEl, window.getSelection(), beforeThisDelete);
+    // Enter copies the line's attributes onto the new line, its arrow anchor too.
+    if (e.inputType === 'insertParagraph') dropCopiedAnchor(editorEl, window.getSelection());
   });
   editorEl.addEventListener('input', () => cleanTypingMarkers(editorEl, { preserveActive: true }));
   document.addEventListener('selectionchange', () => cleanTypingMarkers(editorEl, { preserveActive: true }));
@@ -611,11 +615,14 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       return;
     }
     const fmt = FORMATS.find((f) => f.id === format);
+    // The note as stored, not as on screen: a selected picture or a shape being
+    // typed in must not travel to another computer inside the file.
+    const html = serializeNote(editorEl);
     const content = format === 'html'
-      ? toHtml(editorEl.innerHTML, title)
+      ? toHtml(html, title)
       : format === 'nebula'
-        ? toNebulaNote({ title, content: editorEl.innerHTML, labels: noteLabels?.() })
-        : toMarkdown(editorEl.innerHTML, title);
+        ? toNebulaNote({ title, content: html, labels: noteLabels?.() })
+        : toMarkdown(html, title);
     await api.export({ suggested: safeFileName(title, fmt?.ext || format), content, format });
   }
 
@@ -656,7 +663,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
 
   /** The note as a standalone white document, for the PDF writer. */
   function printDocument(title) {
-    return toPrintDocument({ title, body: editorEl.innerHTML, css: appStyles() });
+    return toPrintDocument({ title, body: serializeNote(editorEl), css: appStyles() });
   }
 
   async function importNote() {

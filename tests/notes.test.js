@@ -248,3 +248,20 @@ describe('Only view (0.8.9)', () => {
     expect(store.notes[0].readOnly).toBe(true);
   });
 });
+
+describe('NoteStore.heal (0.9.1)', () => {
+  beforeEach(() => { localStorage.clear(); });
+
+  it('stores a repaired note without dating it: a repair is not an edit', () => {
+    const store = new NoteStore({ allowSeed: false });
+    const note = store.createNote('Old');
+    store.updateNote(note.id, { content: '<p>x</p>' });
+    const stamp = store.get(note.id).updatedAt;
+    const order = store.sorted().map((n) => n.id);
+    store.heal(note.id, '<p>x</p><p><br></p>', '0.9.1');
+    expect(store.get(note.id).content).toBe('<p>x</p><p><br></p>');
+    expect(store.get(note.id).updatedAt).toBe(stamp);
+    expect(store.get(note.id).markupVersion).toBe('0.9.1');
+    expect(store.sorted().map((n) => n.id)).toEqual(order);
+  });
+});

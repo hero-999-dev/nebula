@@ -1,6 +1,6 @@
 {
   "name": "nebula",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Nebula — calm notes with a real editor: movable editing bar, line icons, markdown code blocks with syntax colors, free-floating shapes, AI panel with tabs.",
   "main": "dist-electron/main.js",
   "type": "module",
@@ -11,6 +11,7 @@
     "test": "vitest run",
     "smoke": "node tests/e2e/smoke.mjs",
     "rebuild": "node tests/e2e/rebuild-page.mjs",
+    "old-notes": "node tests/e2e/old-notes.mjs",
     "preflight": "node scripts/preflight.js",
     "check:versions": "node scripts/versions.js",
     "site": "node scripts/build-site.js",

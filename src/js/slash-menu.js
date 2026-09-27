@@ -3,7 +3,7 @@
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
 import { icon } from './icons.js';
-import { blockFromNode, convertBlock, insertDivider } from './blocks.js';
+import { blockFromNode, convertBlock, insertDivider, ensureLineBox } from './blocks.js';
 
 export const SLASH_ITEMS = [
   { id: 'text', ic: 'text', label: 'Text' },
@@ -107,9 +107,19 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
   const block = restyles ? blockFromNode(window.getSelection()?.anchorNode, editorEl) : null;
   const turned = block && convertBlock(block, id);
   if (turned) {
+    // An empty line (only the command was on it) gets a line box and the caret
+    // goes before its <br>: at the "end" of an empty block the caret moved on
+    // to the next line, and the words typed went there (blocks.ensureLineBox).
+    ensureLineBox(turned);
     const range = document.createRange();
-    range.selectNodeContents(turned);
-    range.collapse(false);
+    const lone = !turned.textContent.replace(/​/g, '') ? turned.querySelector('br') : null;
+    if (lone) {
+      range.setStartBefore(lone);
+      range.collapse(true);
+    } else {
+      range.selectNodeContents(turned);
+      range.collapse(false);
+    }
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
@@ -122,8 +132,20 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
     // trials, 0.8.9). It goes once the block is in.
     const line = blockFromNode(window.getSelection()?.anchorNode, editorEl);
     const blank = (el) => el?.isConnected && el !== editorEl && el.matches('p, div:not([class])')
-      && !el.textContent.replace(/​/g, '').trim() && !el.querySelector(':not(br)');
+      && !el.textContent.replace(/​/g, '').trim() && !el.querySelector(':not(br, span, b, strong, i, em, u, s, font)');
     const dropBlankLine = () => { if (blank(line)) line.remove(); };
+    // A command typed alone on a line of its own: the block takes that line's
+    // place. Left to insertHTML, an empty line right above a picture put the
+    // block past the picture, inside the list below it (the owner's Ideas
+    // note, 0.9.1). An empty line in a font is empty spans, so it counts too.
+    const own = blank(line) && line.parentElement === editorEl ? line : null;
+    const caretIn = (el) => {
+      const r = document.createRange();
+      r.setStart(el, 0);
+      r.collapse(true);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(r);
+    };
     switch (id) {
       case 'text':
       case 'h1':
@@ -133,7 +155,18 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
       case 'bullet':
       case 'numbered':
         break;
-      case 'todo': exec('insertHTML', '<div class="blk-todo"><br></div>'); dropBlankLine(); break;
+      case 'todo':
+        if (own) {
+          const todo = document.createElement('div');
+          todo.className = 'blk-todo';
+          todo.innerHTML = '<br>';
+          own.replaceWith(todo);
+          caretIn(todo);
+        } else {
+          exec('insertHTML', '<div class="blk-todo"><br></div>');
+          dropBlankLine();
+        }
+        break;
       case 'divider': {
         // At the top level, as the toolbar's divider is; insertHTML nested it in the line.
         const line = insertDivider(editorEl, window.getSelection());
@@ -144,7 +177,10 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
         window.getSelection().addRange(r);
         break;
       }
-      case 'code': insertCodeBlock(editorEl, 'javascript', history); dropBlankLine(); break;
+      case 'code':
+        insertCodeBlock(editorEl, 'javascript', history, { instead: own });
+        if (!own) dropBlankLine();
+        break;
       // Through the controller, so it arrives selected like the toolbar's does.
     case 'shape': shapes ? shapes.addShape('rect') : addShape(editorEl, 'rect', history); break;
     }

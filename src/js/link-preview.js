@@ -45,11 +45,13 @@ export function bindLinkPreview(card, { onTitle, placeholder } = {}) {
     // (scheme, www., a trailing slash) is still showing just the address.
     return bareAddress(now) === bareAddress(card.dataset.url);
   };
+  // `onTitle(write)` decides how the title goes in (the editor folds it into
+  // its history without making it an edit); without one it is simply written.
   const update = (raw) => {
     const text = String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, 500);
     if (!text || !card.isConnected || !title || title.textContent === text || !untitled()) return;
-    title.textContent = text;
-    onTitle?.();
+    const write = () => { title.textContent = text; };
+    if (onTitle) onTitle(write); else write();
   };
 
   const frame = card.querySelector('webview');
@@ -66,14 +68,19 @@ export function bindLinkPreview(card, { onTitle, placeholder } = {}) {
       hint.textContent = 'This preview could not load. Open the link above in your browser.';
     }
     // Titles reported while the page is still loading are interim; the one
-    // standing when it finishes is taken.
+    // standing when it finishes is taken — and only from a page that came back
+    // OK. An error page loads "successfully" as far as the webview is concerned,
+    // and a card in the owner's Ideas note was named "Service unavailable".
     let loaded = false;
     let latest = '';
+    let status = 0;
     frame.addEventListener('did-start-loading', () => {
       failed = false;
       loaded = false;
       if (hint) hint.hidden = true;
     });
+    frame.addEventListener('did-navigate', (e) => { status = Number(e.httpResponseCode) || 0; });
+    const pageOk = () => !failed && (status === 0 || (status >= 200 && status < 300));
     frame.addEventListener('did-fail-load', (e) => {
       if (e.errorCode === -3 || e.isMainFrame === false) return; // aborted, or a sub-frame
       failed = true;
@@ -82,11 +89,11 @@ export function bindLinkPreview(card, { onTitle, placeholder } = {}) {
     frame.addEventListener('did-finish-load', () => {
       loaded = true;
       if (hint && !failed) hint.hidden = true;
-      if (latest) update(latest);
+      if (latest && pageOk()) update(latest);
     });
     frame.addEventListener('page-title-updated', (e) => {
       latest = e.title;
-      if (loaded) update(latest);
+      if (loaded && pageOk()) update(latest);
     });
   } else if (card.dataset.kind === 'bookmark' && window.nebula?.links?.title) {
     const url = card.dataset.url;

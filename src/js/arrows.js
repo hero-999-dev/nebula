@@ -93,6 +93,47 @@ export function ensureAnchor(el) {
   return el.dataset.anchor;
 }
 
+/**
+ * Anchors that name nothing an arrow needs.
+ *
+ * Dragging an arrow stamps an anchor on every block it could attach to, and
+ * those stamps were saved; Enter then copied a line's anchor onto every line
+ * split off it. The owner's Ideas note had 37 anchored blocks and no arrow at
+ * all, and one anchor on nine paragraphs — an arrow looks its end up by anchor,
+ * so which paragraph it met was a matter of order (0.9.1). An anchor no arrow
+ * uses goes; of several copies, the first keeps it, which is the one an arrow
+ * already resolved to. On open (migrate.js), and after Enter (dropCopiedAnchor).
+ * @returns {number} anchors removed
+ */
+export function pruneAnchors(root) {
+  const used = new Set();
+  for (const arrow of root.querySelectorAll('.note-arrow')) {
+    if (arrow.dataset.from) used.add(arrow.dataset.from);
+    if (arrow.dataset.to) used.add(arrow.dataset.to);
+  }
+  const seen = new Set();
+  let removed = 0;
+  for (const el of root.querySelectorAll('[data-anchor]')) {
+    const id = el.dataset.anchor;
+    if (!used.has(id) || seen.has(id)) { delete el.dataset.anchor; removed += 1; }
+    else seen.add(id);
+  }
+  return removed;
+}
+
+/** After Enter: the line the caret moved to does not keep the anchor of the line it was split from. */
+export function dropCopiedAnchor(root, selection) {
+  const at = selection?.anchorNode;
+  const el = at?.nodeType === 1 ? at : at?.parentElement;
+  const block = el?.closest('[data-anchor]');
+  if (!block || !root.contains(block)) return false;
+  const id = block.dataset.anchor;
+  const twins = [...root.querySelectorAll('[data-anchor]')].filter((other) => other.dataset.anchor === id);
+  if (twins.length < 2) return false;
+  delete block.dataset.anchor;
+  return true;
+}
+
 function num(el, name, fallback) {
   const v = parseFloat(el.dataset[name]);
   return Number.isFinite(v) ? v : fallback;

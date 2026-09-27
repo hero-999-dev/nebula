@@ -37,6 +37,7 @@ Skipping preflight means the next agent — possibly you, next week — starts b
 | `npm run dev` | Hot-reload dev app **on its own profile** (`.dev-profile`) |
 | `npm test` | Unit tests — after every logic change |
 | `npm run build && npm run smoke` | Electron smoke — after anything touching `electron/`, the preload bridge, or boot |
+| `npm run old-notes` | The long-note trials on COPIES of the notes in this machine's vaults (installed app + Nebula Test). Run it after any editing fix: old notes hold structures new ones never do. `npm run push` runs it and stops on a failed trial (`--no-old-notes` skips it) |
 | `npm run rebuild` | Page rebuild (local only, not in the repo) — rewrites the pages in `tests/rebuild/pages.json` in the real app and scores them; `npm run push` runs it when present and fails on any metric that went down |
 | `npm run pack:test` | `Nebula Test.exe` in the project root — the build to actually click |
 | `npm run pack:win` | Local installer + portable exe |
@@ -58,6 +59,8 @@ Every session that changed code ends with **all** of these:
 - [ ] **`memory.json`** — version, `currentPhase`, `next`, `history[]`
 - [ ] **`Prompt.md`** — the "current state" section, if the product changed
 - [ ] **Guide note** (`src/js/seed-notes.js`) — every new *feature* (not a fix) goes into "Welcome to Nebula Guide": the "New in x.y.z" list and its own section with a "Try it", always ABOVE "Code blocks", which stays the last section (Markdown its first sample), with "Where your notes live" just before it. Every section ends with a divider before the next heading. The guide is regenerated into Nebula Test by every `pack:test` and checked by `tests/e2e/guide.mjs` in smoke. Bump `GUIDE_VERSION` and record the signature in `GUIDE_SIGNATURES` (the test says which). Demo shapes stay on the `.guide-stage` band. Owner's standing rule, 2026-09-25
+- [ ] **Old notes** — a fix whose bug could have written something into a note (a class, a control, a structure) also repairs the notes already written: a step in `src/js/migrate.js` (bump `MARKUP_VERSION`; `heal.js` then brings every vault up to it once) and an exhibit in the residue museum, `tests/heal.test.js`. Owner's standing rule, 2026-09-27: "a bug fixed in the app must not live on in the notes it already touched, on any computer"
+- [ ] **Deleted is deleted** — anything that keeps a copy of notes (backups, test profiles, caches, the flash) must drop a note when it is deleted. The owner, 2026-09-27: "a note I deleted must not be recoverable — that is a security hole". Never copy real notes anywhere a later delete cannot reach
 - [ ] **`README.md`** — if structure, scripts or workflow changed
 - [ ] **`HANDOVER.md`** — if a new trap or a new command appeared
 - [ ] `npm run push` — release the finished work; see **Releasing** below

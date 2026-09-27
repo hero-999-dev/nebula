@@ -272,6 +272,36 @@ export class NoteStore {
     return note ? this.#mark(id, { readOnly: !note.readOnly }) : null;
   }
 
+  /**
+   * Store a note as this version brought it up to date on the way in
+   * (migrate.js and the controllers' rehydration) — a repair, not an edit, so
+   * its date and its place in the list stay. `markupVersion` records which
+   * version last healed it.
+   */
+  heal(id, content, markupVersion) {
+    return this.#mark(id, { content, ...(markupVersion ? { markupVersion } : {}) });
+  }
+
+  /**
+   * Many repairs, one save (heal.js). Each is applied only if the note still
+   * holds exactly the markup it was computed from: a note someone typed in
+   * meanwhile keeps what they typed.
+   * @param {{id: string, from: string, content: string}[]} repairs
+   * @returns {number} notes written
+   */
+  healMany(repairs, markupVersion) {
+    let written = 0;
+    for (const { id, from, content } of repairs) {
+      const note = this.get(id);
+      if (!note || note.content !== from) continue;
+      note.content = content;
+      if (markupVersion) note.markupVersion = markupVersion;
+      written += 1;
+    }
+    if (written) this.save();
+    return written;
+  }
+
   setLabels(id, labels) {
     return this.#mark(id, { labels: normalizeLabels(labels) });
   }
