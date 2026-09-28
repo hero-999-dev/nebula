@@ -1,3 +1,12 @@
+## 2026-09-28 — 0.9.2
+
+- tests/ai-browser-auth.test.js (rewritten, 7): a Google redirect is never stopped; the tab is Firefox once a Google page has arrived and its own identity again after; no switch in the middle of a navigation (it restarted the navigation and looped); a Firefox request header once per session; "Continue with Google" popups are windows of the app, anything that is not a web page is refused; popups get the same treatment.
+- tests/e2e/v090.mjs: the redirect check now proves the opposite of 0.9.0 — the sign-in stays in the tab as Firefox and no browser is opened (22/22).
+- tests/paste-clean.test.js (new, 9): pasted HTML loses the page's font, size and colour and keeps bold, italic, underline, strike, lists, headings, quotes and web links; layout boxes become paragraphs; a copy from a note keeps Nebula's classes and loses Chromium's fixed ink, scrollbar colour and font; shapes keep their fill.
+- tests/lists.test.js: leaving a list with Enter on an empty item in a font keeps that font; an ordinary empty item still makes a plain line.
+- tests/e2e/view-snap.mjs: the ⋯ menu offers Edit mode on a locked note (no checkbox).
+- tests/e2e/dense.mjs: a place for the trials needs a plain run of words (the owner's Bug Finding note opens with a line all in bold).
+
 ## 2026-09-27 — 0.9.1: old notes heal too
 
 The owner's complaint: a bug fixed in the app kept living inside the notes it had already touched, on every computer, while a new note was clean. The first measurement ran the long-note trials (tests/e2e/dense.mjs) on COPIES of the owner's own notes with 0.9.0: the guide and "Bug search" passed every trial, the installed Ideas note 0 of 19, an older copy of it 0 of 19, a newer one 3 of 19, a second note 9 of 19. None of the notes the trials had ever run on (the guide, the rebuilt articles) could have shown this: this version wrote them.

@@ -13,6 +13,15 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.9.2': {
+    headline: 'Google sign-in in the app, a theme colour, and pasted words in your note\u2019s font.',
+    items: [
+      { title: 'Google sign-in in the app', text: 'Continue with Google in an AI tab opens a small sign-in window; when you are done it closes and the tab is signed in. The blank Gemini panel is gone.' },
+      { title: 'Theme color', text: 'The top of the text colour list gives words the theme\u2019s own ink again, pasted words in a fixed colour too.' },
+      { title: 'Pasted words fit in', text: 'Text copied from a web page or another note takes this note\u2019s font, size and colour; bold, italic, lists and links stay.' },
+      { title: 'Smaller things', text: 'The B, I and U buttons follow Ctrl+B and Ctrl+I at once, bullets sit in the middle of the line, leaving a list keeps your font, a picture\u2019s bar hides when the picture scrolls away, and the \u22ef menu reads Pin, Only view or Edit mode, Edit labels, Archive, Move to trash.' },
+    ],
+  },
   '0.9.1': {
     headline: 'Your older notes get the fixes too.',
     items: [

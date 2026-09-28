@@ -325,6 +325,14 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    test profile, an export cache, a sync — must drop a note when it is
    deleted, or it reopens the hole the owner called a security hole. Test
    profiles are swept by `tests/e2e/profiles.mjs`.
+53. **Never call `setUserAgent` on a webview in the middle of a navigation.**
+   It restarts the navigation; switching on a redirect restarted it at the
+   address that redirects, forever. Change a request's identity with
+   `webRequest.onBeforeSendHeaders`, and the page's only on `did-navigate`.
+54. **Chromium copies computed style into the clipboard,** even from Nebula
+   itself: `color`, `scrollbar-color` and the font land inline on every copied
+   element and freeze the source theme's ink. Pasted HTML goes through
+   `paste-clean.js`.
 16. **A `clip-path` cuts the border off too.** A clipped shape cannot have a
    `border`; draw it as two layers (outline behind, fill inset) and remember
    that CSS cannot read an element's inline `background`.

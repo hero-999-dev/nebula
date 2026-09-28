@@ -3,7 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { installBrowserAuth } from './ai-browser-auth.js';
+import { installAiSignIn } from './ai-browser-auth.js';
 import { AI_SERVICES } from '../src/js/ai-services.js';
 import { fetchPageTitle } from './link-metadata.js';
 import { purgeNoteFromBackups, purgeDeletedFromBackups } from './backup-purge.js';
@@ -671,11 +671,8 @@ async function takeSnapshot(win) {
 app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
     const id = Object.keys(AI_SERVICES).find(id => contents.session === session.fromPartition('persist:ai-' + id));
-    if (id) installBrowserAuth(contents, {
-      serviceUrl: AI_SERVICES[id].url,
-      openExternal: url => shell.openExternal(url),
-      notify: result => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('ai:browser-handoff', { id, ...result }); },
-    });
+    // Google sign-in stays in the app, in this service's own session (0.9.2).
+    if (id) installAiSignIn(contents, { popupOptions: { parent: mainWindow ?? undefined } });
   }
   contents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown' || input.key !== 'F12' || input.control || input.alt || input.shift || input.meta) return;

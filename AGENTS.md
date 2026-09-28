@@ -63,7 +63,7 @@ Every session that changed code ends with **all** of these:
 - [ ] **Deleted is deleted** — anything that keeps a copy of notes (backups, test profiles, caches, the flash) must drop a note when it is deleted. The owner, 2026-09-27: "a note I deleted must not be recoverable — that is a security hole". Never copy real notes anywhere a later delete cannot reach
 - [ ] **`README.md`** — if structure, scripts or workflow changed
 - [ ] **`HANDOVER.md`** — if a new trap or a new command appeared
-- [ ] `npm run push` — release the finished work; see **Releasing** below
+- [ ] `npm run pack:test` and stop — the owner tests `Nebula Test.exe` first. `npm run push` only after they say "push"; see **Releasing** below
 
 `npm run push` re-checks the tracking files and refuses to release quietly if
 code moved and `Log.md` / `tests.md` / `memory.json` did not.
@@ -72,9 +72,15 @@ code moved and `Log.md` / `tests.md` / `memory.json` did not.
 
 ## Releasing
 
-**Standing instruction from the owner (2026-09-07): release automatically.**
-Finish a piece of work, update the tracking files, then push — do not wait to be
-told, and do not ask which platforms to build. Both build, every time.
+**Standing instruction from the owner (2026-09-27): release ONLY when told "push".**
+This replaces the 2026-09-07 "release automatically" rule. In the owner's words
+(the first line of their Bug Finding note): when they ask for changes, make the
+changes, then STOP — no hours-long test runs. Run the unit tests for what you
+touched, build `Nebula Test.exe` (`npm run pack:test`), say what changed, and let
+the owner test it. Only when they say "okay, push" does everything run: all
+tests (`npm run push` runs smoke, the page rebuild and the old-notes trials),
+fixes for whatever they find, then the push to GitHub, the flash, nebula-web and
+every MD file. Both platforms build, every time — do not ask which.
 
 ```bash
 npm run push                 # patch;  -- minor | major | 0.5.2 | --notes "…"

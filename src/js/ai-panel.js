@@ -43,17 +43,6 @@ export function initAiPanel({ askText } = {}) {
   let custom = loadJson(CUSTOM_KEY, []);
   let active = localStorage.getItem(ACTIVE_KEY) || 'claude';
 
-  const handoffs = new Map();
-  const handoffBox = document.createElement('p');
-  handoffBox.className = 'ai-handoff'; handoffBox.hidden = true; handoffBox.setAttribute('role', 'status');
-  body.before(handoffBox);
-  const renderHandoff = () => {
-    const state = handoffs.get(active); handoffBox.hidden = !state;
-    handoffBox.textContent = state?.ok
-      ? 'Continue signing in and chatting in your browser. That sign-in stays in the browser.'
-      : 'The browser could not be opened. Use Open in browser to try again.';
-  };
-  window.nebula?.ai?.onBrowserHandoff?.(result => { handoffs.set(result.id, result); renderHandoff(); });
   const all = () => ({ ...AI_SERVICES, ...Object.fromEntries(custom.map((c) => [c.id, c])) });
 
   const savedWidth = Number(localStorage.getItem(WIDTH_KEY));
@@ -98,12 +87,7 @@ export function initAiPanel({ askText } = {}) {
     const service = all()[id];
     if (!service) return;
     active = id;
-    renderHandoff();
     localStorage.setItem(ACTIVE_KEY, id);
-    const browser = document.getElementById('ai-browser');
-    if (browser) {
-      browser.onclick = () => { void window.nebula?.openExternal?.(service.url); };
-    }
     renderTabs();
     // NOT `hidden`. A <webview> with display:none is detached from its guest and
     // reloads when it comes back, which logs you out of the site you had just

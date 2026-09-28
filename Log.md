@@ -7,6 +7,31 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-09-28 07:59] v0.9.2 - by Claude
+
+Google sign-in in the app, Theme color, pasted words in the note's font, B/I/U follow the shortcuts, centred bullets, leaving a list keeps the font, the picture bar follows its picture, a clearer note menu.
+
+* (no commits since the last release)
+
+---
+
+## [2026-09-28 06:59] v0.9.2 - by Claude
+
+From the owner's Bug Finding note and snapshots; the owner tested Nebula Test.exe and said push (new rule: changes, then the owner tests, then all tests and the push).
+
+- AI tabs: 0.9.0 sent Google sign-in to the system browser, which never brought the session back and left Gemini blank (it passes accounts.google.com just to check who is signed in). Sign-in now stays in the tab's own session: Google's pages get a Firefox request header and, once one has arrived, a Firefox identity; "Continue with Google" opens a small window of the app in the same session. Switching the identity during a navigation restarts it — on a redirect that looped; the smoke check caught it, and the switch happens only after a page arrives. The "Open in browser" button is gone.
+- B, I and U follow Ctrl+B and Ctrl+I with a bare caret before any word is typed (a pending mark, read from the typing state at the moment of the switch).
+- Bullets stand in the middle of the text line: the marker uses the item's own line box and is scaled, not given its own smaller font.
+- "Theme color (default)" heads the text colour list and also takes off fixed colours that pasted text carried (black on black in the Dark theme).
+- Pasted HTML takes the note's font, size and colour (paste-clean.js); from Nebula itself, the colour, scrollbar and font Chromium writes into every copied element go too.
+- Leaving a list or a run of to-dos with Enter keeps the font the lines were written in (lists.carryLine).
+- The picture's bar hides while the picture is scrolled out of the note; selecting a picture brings it into view first (the page rebuild caught a caption lost to a bar hidden under a just-pasted picture).
+- The ⋯ menu: Pin to top, Only view mode or Edit mode (no checkbox), Edit labels, Archive this note, Move to trash last.
+- AGENTS.md: release only when the owner says push.
+
+---
+
 ## [2026-09-27 20:52] v0.9.1 - by Claude
 
 Old notes heal too, and deleted is deleted: one serializer keeps on-screen state out of notes, opened notes are repaired without being dated, every note is repaired once per version after a backup, a note deleted from the Trash leaves every backup, and the editing bugs found in the owner's notes are fixed.

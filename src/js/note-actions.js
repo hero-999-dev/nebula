@@ -14,7 +14,9 @@ import { plainSnippet } from './notes.js';
 
 const LABELS = {
   pin: (note) => (note.pinned ? 'Unpin from top' : 'Pin to top'),
-  archive: () => 'Archive',
+  // Says what choosing it switches TO, like Pin/Unpin — no checkbox (owner, 0.9.2).
+  readonly: (note) => (note.readOnly ? 'Edit mode' : 'Only view mode'),
+  archive: () => 'Archive this note',
 };
 
 export function initNoteActions({ store, onChanged, openNote, onLabels }) {
@@ -45,7 +47,8 @@ export function initNoteActions({ store, onChanged, openNote, onLabels }) {
     forId = id;
     menu.querySelector('[data-note-act="pin"]').textContent = LABELS.pin(note);
     menu.querySelector('[data-note-act="archive"]').textContent = LABELS.archive(note);
-    menu.querySelector('[data-note-act="readonly"]')?.setAttribute('aria-checked', String(!!note.readOnly));
+    const mode = menu.querySelector('[data-note-act="readonly"]');
+    if (mode) mode.textContent = LABELS.readonly(note);
     menu.hidden = false;
     // Below the button, pulled back inside the window if there is no room.
     const r = button.getBoundingClientRect();

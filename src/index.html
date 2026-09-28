@@ -31,10 +31,11 @@
       <!-- Per-note menu: pin, archive, delete. One menu, moved to whichever
            row asked for it, rather than one per row. -->
       <div class="note-menu" id="note-menu" hidden>
+        <!-- The owner's order (0.9.2): pin, the view mode, labels, archive, trash last. -->
         <button type="button" data-note-act="pin"></button>
+        <button type="button" data-note-act="readonly"></button>
+        <button type="button" data-note-act="labels">Edit labels</button>
         <button type="button" data-note-act="archive"></button>
-        <button type="button" data-note-act="readonly" role="menuitemcheckbox" aria-checked="false"><span class="nm-check" aria-hidden="true"></span>Only view</button>
-        <button type="button" data-note-act="labels">Labels…</button>
         <button type="button" data-note-act="trash">Move to trash</button>
       </div>
 
@@ -219,7 +220,6 @@
       <div class="ai-resize" id="ai-resize" title="Drag to resize"></div>
       <div class="ai-head">
         <div class="ai-tabs" id="ai-tabs" role="tablist"></div>
-        <button type="button" class="btn ghost" id="ai-browser" title="Open this chat in your browser; browser sign-in stays in the browser">Open in browser</button>
         <button type="button" class="btn ghost ai-x" id="ai-close" title="Close"><span data-icon="close"></span></button>
       </div>
       <div class="ai-body" id="ai-body"></div>

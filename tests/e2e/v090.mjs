@@ -136,13 +136,13 @@ export async function runV090Checks(check) {
     check('bookmark title travels through the real metadata IPC and HTTP response',true);
     await win.evaluate(()=>document.querySelector('#metadata-probe').remove());
 
-    // A real HTTP redirect is caught before a Google page is loaded.
-    // OS browser launch is replaced with a recorder so tests open no real tabs.
+    // A real HTTP redirect to Google's sign-in stays in the tab (0.9.2): the tab
+    // takes a Firefox identity for it and no system browser is opened.
     await app.evaluate(({shell})=>{globalThis.browserHandoffs=[];shell.openExternal=async url=>{globalThis.browserHandoffs.push(url);};});
-    await win.evaluate(url=>{window.nebula.ai.onBrowserHandoff(result=>{window.authResult=result;});const w=document.createElement('webview');w.id='auth-probe';w.setAttribute('partition','persist:ai-gemini');w.style.cssText='position:fixed;left:0;top:0;width:200px;height:100px';w.src=url+'/redirect';document.body.append(w);},origin);
-    await win.waitForFunction(()=>window.authResult?.ok === true,null,{polling:50});
+    await win.evaluate(url=>{const w=document.createElement('webview');w.id='auth-probe';w.setAttribute('partition','persist:ai-gemini');w.style.cssText='position:fixed;left:0;top:0;width:200px;height:100px';w.src=url+'/redirect';document.body.append(w);},origin);
+    const firefox=await win.waitForFunction(()=>{try{return /Firefox\//.test(document.querySelector('#auth-probe').getUserAgent());}catch{return false;}},null,{polling:100,timeout:10000}).then(()=>true).catch(()=>false);
     const handoffs=await app.evaluate(()=>globalThis.browserHandoffs);
-    check('Electron sends a Google redirect to the system browser service URL exactly once',handoffs.length===1&&handoffs[0]==='https://gemini.google.com',JSON.stringify(handoffs));
+    check('a Google sign-in in an AI tab stays in the app, as Firefox, with no browser opened',firefox&&handoffs.length===0,JSON.stringify({firefox,handoffs}));
     await win.evaluate(()=>document.querySelector('#auth-probe').remove());
 
     for(let i=0;i<originals.length;i++) {

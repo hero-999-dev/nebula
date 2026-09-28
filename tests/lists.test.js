@@ -369,3 +369,26 @@ describe('normalizeLists: a list inside a paragraph', () => {
     expect(el.innerHTML).toBe(after);
   });
 });
+
+describe('leaving a list keeps its font (the owner’s Bug Finding note, 0.9.2)', () => {
+  it('Enter on an empty item in a font starts the line after the list in that font', () => {
+    document.body.innerHTML = '<div id="ed"><ul><li>one</li><li><span style="font-size: 14px;"><br></span></li></ul></div>';
+    const root = document.getElementById('ed');
+    const span = root.querySelectorAll('li')[1].querySelector('span');
+    const r = document.createRange(); r.setStart(span, 0); r.collapse(true);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    expect(exitListOnEmptyItem(root, sel)).toBe(true);
+    expect(root.innerHTML).toBe('<ul><li>one</li></ul><p><span style="font-size: 14px;"><br></span></p>');
+    expect(sel.getRangeAt(0).startContainer).toBe(root.querySelector('p span'));
+  });
+
+  it('an ordinary empty item still makes a plain line', () => {
+    document.body.innerHTML = '<div id="ed"><ul><li>one</li><li><br></li></ul></div>';
+    const root = document.getElementById('ed');
+    const li = root.querySelectorAll('li')[1];
+    const r = document.createRange(); r.setStart(li, 0); r.collapse(true);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    exitListOnEmptyItem(root, sel);
+    expect(root.innerHTML).toBe('<ul><li>one</li></ul><p><br></p>');
+  });
+});

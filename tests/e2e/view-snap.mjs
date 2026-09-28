@@ -78,11 +78,12 @@ export async function runViewSnapChecks(check) {
 
     /* ---------------- the ⋯ menu and the badge */
     await menuFor('Welcome to Nebula Guide');
-    const ticked = await win.evaluate(() => document.querySelector('[data-note-act="readonly"]').getAttribute('aria-checked'));
+    // No checkbox since 0.9.2: the item says what it switches to.
+    const ticked = await win.evaluate(() => document.querySelector('[data-note-act="readonly"]').textContent === 'Edit mode' ? 'true' : 'false');
     await win.evaluate(() => document.querySelector('[data-note-act="readonly"]').click());
     await win.waitForTimeout(200);
     const unlocked = await win.evaluate(() => ({ chip: !document.getElementById('readonly-chip').hidden, editable: document.getElementById('editor').isContentEditable }));
-    check('the ⋯ menu shows Only view ticked, and choosing it unlocks the note', ticked === 'true' && !unlocked.chip && unlocked.editable, JSON.stringify({ ticked, unlocked }));
+    check('the ⋯ menu offers Edit mode on a locked note, and choosing it unlocks the note', ticked === 'true' && !unlocked.chip && unlocked.editable, JSON.stringify({ ticked, unlocked }));
     await win.evaluate(() => { const ed = document.getElementById('editor'); ed.focus(); const t = ed.querySelector('p').lastChild; const r = document.createRange(); r.setStart(t, t.length); r.collapse(true); getSelection().removeAllRanges(); getSelection().addRange(r); });
     await win.keyboard.type(' QQQ', { delay: 10 });
     check('unlocked, typing works again', await win.evaluate(() => document.getElementById('editor').textContent.includes(' QQQ')));

@@ -9,6 +9,7 @@
 
 import { bindLinkPreview } from './link-preview.js';
 import { resizeImageBox, ensureImageHandles } from './image-resize.js';
+import { cleanPastedHtml, cleanNebulaHtml, fromNebula } from './paste-clean.js';
 
 const LINK_KINDS = ['embed', 'bookmark', 'url', 'mention'];
 
@@ -561,11 +562,19 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
   function positionImageBar() {
     if (!selectedImage?.isConnected) { selectImage(null); return; }
     const rect = selectedImage.getBoundingClientRect();
+    // While the picture is scrolled out of the note, its bar goes with it —
+    // pinned to the edge of the window it sat over the text being read (the
+    // owner's Bug Finding note, 0.9.2). The picture stays selected; the bar
+    // comes back when the picture does.
+    const view = editor.getBoundingClientRect();
+    const out = rect.bottom < view.top || rect.top > view.bottom;
+    imageBar.hidden = out;
+    if (out) return;
     const width = imageBar.offsetWidth || 130;
     const height = imageBar.offsetHeight || 32;
-    const top = rect.top - height - 8 >= 8 ? rect.top - height - 8 : rect.bottom + 8;
+    const top = rect.top - height - 8 >= view.top ? rect.top - height - 8 : rect.bottom + 8;
     imageBar.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))}px`;
-    imageBar.style.top = `${Math.max(8, Math.min(top, window.innerHeight - height - 8))}px`;
+    imageBar.style.top = `${Math.max(view.top + 4, Math.min(top, view.bottom - height - 4))}px`;
   }
 
   /** Which of the three placements an image has. */
@@ -585,6 +594,12 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
       for (const b of imageBar.querySelectorAll('[data-image="back"], [data-image="front"], [data-image="inline"]')) {
         b.classList.toggle('on', b.dataset.image === place);
       }
+      // A picture just selected is one the owner wants to see — one pasted at
+      // the end of a long note is still below the view — so it comes into view
+      // with its bar. Only scrolling away from it afterwards hides the bar.
+      const rect = selectedImage.getBoundingClientRect();
+      const view = editor.getBoundingClientRect();
+      if (rect.bottom < view.top || rect.top > view.bottom) selectedImage.scrollIntoView({ block: 'nearest' });
       positionImageBar();
     }
   }
@@ -988,7 +1003,21 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     if (normalizeUrl(text)) {
       event.preventDefault();
       open('', text);
+      return;
     }
+    // Words from another page arrive in that page's font, size and colour;
+    // they take the note's own now (paste-clean.js, 0.9.2).
+    // A copy from a note keeps Nebula's classes and blocks and loses only the
+    // colour, font and scrollbar Chromium wrote into it when it copied.
+    const html = event.clipboardData?.getData('text/html') || '';
+    if (!html) return;
+    const ours = fromNebula(html);
+    const clean = ours ? cleanNebulaHtml(html) : cleanPastedHtml(html);
+    if (!clean || (ours && !/style=|data-font-family/.test(html))) return;
+    event.preventDefault();
+    history?.push();
+    document.execCommand('insertHTML', false, clean);
+    dirty();
   });
 
   editor.addEventListener('dragover', (event) => {

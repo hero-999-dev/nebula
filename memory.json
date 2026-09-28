@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.9.1",
-  "lastUpdated": "2026-09-27",
-  "currentPhase": "v0.9.1 - old notes heal too, and deleted is deleted (a note deleted from the Trash leaves every backup; notes deleted earlier purged once) (owner, 2026-09-27: a bug fixed in the app must not live on in the notes it already touched, on any computer). One serializer (note-markup.js) for the save, undo steps, export and print, so on-screen state is never written into a note; migrate.js rebuilds a shape's outline and grips and drops saved on-screen state and empty canvases on open; an opened note is written back as a repair, not an edit (editor.adopt, store.heal; its date and place stay); heal.js repairs every note in the vault once per MARKUP_VERSION after a pre-heal backup, guarded so no word, picture, link, shape, code or equation changes; a link title arriving is absorbed (history.absorb), not an edit, and an embed is never named after an error page; Enter+Backspace in font text, /h2-/h3-lists on a line in a font (the words went to the next paragraph), /todo and /code above a picture, and anchors copied by Enter fixed. Trials now also run on a hand-written old note (smoke) and on copies of the real vaults (npm run old-notes).",
-  "next": "Owner tries Nebula Test.exe 0.9.1 on their own notes; watch the first start after the update (pre-heal backup, console line). Open: trials on the owner's real notes are the acceptance test (npm run old-notes) - keep it green; rest of the owner's Ideas list (AI sign-in providers) needs manual accounts.",
+  "version": "0.9.2",
+  "lastUpdated": "2026-09-28",
+  "currentPhase": "v0.9.2 - the owner’s Bug Finding list: Google sign-in stays in the app (Firefox identity for Google pages, popups in the tab session; the browser handoff that left Gemini blank is gone), B/I/U follow Ctrl+B/I, bullets centred on the line, Theme color, pasted words take the note’s font (paste-clean.js), leaving a list keeps the font, the picture bar hides off-screen, the ⋯ menu reordered. Released only after the owner tested and said push.",
+  "next": "The owner tests 0.9.2, especially Google sign-in with a real account in Gemini, ChatGPT and Mistral, and ArrowDown into an empty item (not reproduced). Workflow: change, give Nebula Test.exe, stop; all tests and the push only when the owner says push. Future (owner): an option to keep a pasted text’s own font.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -88,6 +88,12 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "version": "0.9.2",
+      "date": "2026-09-28",
+      "by": "Claude",
+      "what": "Bug Finding list: in-app Google sign-in (the 0.9.0 browser handoff left Gemini blank), B/I/U state, centred bullets, Theme color, paste in the note font, list exit keeps font, picture bar off-screen, menu order, Open in browser removed. A setUserAgent-on-redirect loop was caught by the smoke check before release."
+    },
     {
       "version": "0.9.1",
       "date": "2026-09-27",

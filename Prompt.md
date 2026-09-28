@@ -120,7 +120,7 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.9.1)
+## Current implementation state (v0.9.2)
 
 **Labels, canvas and browser sign-in:** Labels beside the title with a searchable row-menu picker and native export/import; four image resize corners; bookmark page titles and accurate embed errors; Google sign-in hands off to the default browser. Selection Backspace, locked canvas objects, shape undo, text fitting, rotation controls and shape-outline arrow attachment corrected. Large-note sidebar text extraction avoids parsing base64 payloads. Browser handoff opens the provider in the system browser; there is no third-party OAuth callback or cookie transfer into Nebula.
 
@@ -167,6 +167,13 @@ before arming the divider, and places the caret at the surviving text line.
 **Code blocks:** the Markdown-style edit hint is larger and is hidden whenever
 the block has source, including immediately after the first typed character.
 Source text has a clear inset from the code panel edge.
+
+**AI sign-in (0.9.2):** Google sign-in stays in the tab's own session — a
+  Firefox identity for Google's pages, "Continue with Google" popups as app
+  windows sharing that session. Nothing is handed to the system browser.
+
+**Pasting (0.9.2):** pasted HTML takes the note's font, size and colour and
+  keeps its structure and emphasis; "Theme color (default)" clears fixed ink.
 
 **Deleted is deleted (0.9.1):** a note deleted from the Trash leaves the
   vault and every backup (overwritten first; best effort on flash and SSD).

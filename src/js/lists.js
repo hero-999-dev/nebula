@@ -129,8 +129,12 @@ export function exitListOnEmptyItem(root, selection) {
   const after = [];
   for (let n = li.nextElementSibling; n; n = n.nextElementSibling) after.push(n);
 
-  const p = doc.createElement('p');
-  p.innerHTML = '<br>';
+  // The new line keeps the font the list was written in: the empty item's
+  // wrappers (the font picker's span, a bold) come along, as they do after an
+  // ordinary Enter. A bare <p> dropped them, and the next words came out in the
+  // default font — "going down I am back at Serif 17, I cannot go on with 14"
+  // (the owner's Bug Finding note, 0.9.2).
+  const p = carryLine(li, doc.createElement('p'));
   list.after(p);
 
   // Items below the one being left stay a list, under the new paragraph.
@@ -144,11 +148,26 @@ export function exitListOnEmptyItem(root, selection) {
   if (!list.querySelector('li')) list.remove();
 
   const caret = doc.createRange();
-  caret.setStart(p, 0);
+  caret.setStartBefore(p.querySelector('br'));
   caret.collapse(true);
   selection.removeAllRanges();
   selection.addRange(caret);
   return true;
+}
+
+/**
+ * Move an empty line's contents — its formatting wrappers and <br> — into a
+ * new block, so what is typed there next keeps that formatting. Ends with a
+ * <br> inside the innermost wrapper for the caret to stand before.
+ */
+export function carryLine(from, to) {
+  while (from.firstChild) to.appendChild(from.firstChild);
+  if (!to.querySelector('br')) {
+    let host = to;
+    while (host.lastElementChild && !host.lastElementChild.matches('br')) host = host.lastElementChild;
+    host.appendChild(to.ownerDocument.createElement('br'));
+  }
+  return to;
 }
 
 /**

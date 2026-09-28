@@ -328,13 +328,23 @@
 .editor ol > li { counter-increment: nebula-ol; }
 .editor ul > li::before { content: "\2022"; }
 .editor ol > li:not(.blk-todo)::before { content: counter(nebula-ol) "."; }
+/* The marker sits in the item's own first line box — same font size, same line
+   height — so it shares the text's baseline and stands at the middle of the
+   line. With its own smaller font size (0.86em) its line box was shorter than
+   the text's and it rode high: "in a bulleted list the text slides down", worst
+   when the words are in a smaller font than the item (the owner, 0.9.2). It is
+   made smaller by scaling, which does not move the line. */
 .editor li:not(.blk-todo)::before {
   position: absolute;
   left: -24px;
+  top: 0;
   width: 22px;
   text-align: left;
   font-family: var(--serif);
-  font-size: 0.86em;
+  font-size: 1em;
+  line-height: inherit;
+  transform: scale(0.86);
+  transform-origin: 0 50%;
   color: var(--ink-soft);
   pointer-events: none;
 }
@@ -1554,13 +1564,4 @@ body.resizing { cursor: col-resize; user-select: none; }
 }
 .label-options input {
   accent-color: var(--clay);
-}
-
-.ai-handoff {
-  margin: 0;
-  padding: 8px 12px;
-  color: var(--ink-soft);
-  background: var(--paper-raised);
-  font: 12px/1.5 var(--sans);
-  border-bottom: 1px solid var(--rule);
 }

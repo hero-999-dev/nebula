@@ -303,7 +303,7 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '0.9.1';
+export const GUIDE_VERSION = '0.9.2';
 
 /**
  * The guide's words, without its markup, shapes, code or equations — so a
@@ -335,6 +335,7 @@ export const GUIDE_SIGNATURES = {
   '0.8.9': 'b32ad974',
   '0.9.0': '5b765db9',
   '0.9.1': '1823b8d5',
+  '0.9.2': '7d56ce37',
 };
 
 /** Whether a vault's guide is one we shipped and nobody has typed in. */
@@ -342,7 +343,7 @@ export const guideUnedited = (html) => Object.values(GUIDE_SIGNATURES).includes(
 
 export const GUIDE_NOTE = {
   title: 'Welcome to Nebula Guide',
-  // Opens in Only view so a stray key cannot change it (0.8.9); ⋯ -> Only view unlocks it.
+  // Opens in Only view so a stray key cannot change it (0.8.9); ⋯ -> Edit mode unlocks it.
   readOnly: true,
   content:
     // Shapes live on layers at the top of the note; the behind-layer is a real
@@ -364,18 +365,19 @@ export const GUIDE_NOTE = {
     '<h1>Welcome to Nebula</h1>' +
     '<p>A calm place for notes. Everything auto-saves — there is no save button to forget, though <span class="inline-code">Ctrl+S</span> works if you want one.</p>' +
     '<p>This is the whole guide in one page. Every section has something you can try on the spot; the text you are reading is an ordinary note, so edit it, break it, or delete it once you are done. Your own notes are never touched by an update — and this page updates itself only while you have not written in it.</p>' +
-    '<p>This page opens in <strong>Only view</strong> (the 🔒 badge by its title), so nothing here changes by accident. To try things on it, click the badge or choose ⋯ → Only view in the note list — or try them in a new note.</p>' +
+    '<p>This page opens in <strong>Only view</strong> (the 🔒 badge by its title), so nothing here changes by accident. To try things on it, click the badge or choose ⋯ → Edit mode in the note list — or try them in a new note.</p>' +
 
     // Each release adds its features here (features, not fixes) and in the
     // section they belong to. See GUIDE_SIGNATURES before changing any text.
     // A divider closes each section before the next heading (owner, 0.8.9).
     '<hr class="blk-hr">' +
-    '<h2>New in 0.9.1</h2>' +
+    '<h2>New in 0.9.2</h2>' +
     '<ul>' +
-    '<li><strong>Your older notes are repaired too.</strong> A fix to how notes are written now reaches every note you already have, on every computer Nebula runs on, not only the notes you start afterwards — after a copy of the whole vault is put aside — section 9.</li>' +
-    '<li><strong>Deleted is deleted.</strong> A note you delete from the Trash is removed from every backup as well, so it cannot be brought back from anywhere — section 9.</li>' +
-    '<li><strong>Looking is not editing.</strong> Opening a note no longer moves it to the top of the list as “just now”, and a page title arriving for a link is not an undo step — section 9.</li>' +
-    '<li>Recently: <strong>labels</strong>, <strong>four image corners</strong>, <strong>bookmark titles</strong> and <strong>Google sign-in in your browser</strong> (0.9.0); <strong>Only view</strong>, <strong>arrows that snap on</strong> and <strong>F12 for a picture of the window</strong> (0.8.9); <strong>pictures and shapes on one canvas</strong>, <strong>three places for a picture</strong>, <strong>sharper videos</strong>, <strong>Rust</strong> and <strong>the link menu by keyboard</strong> (0.8.8).</li>' +
+    '<li><strong>Google sign-in in the app.</strong> <em>Continue with Google</em> in an AI tab opens a small sign-in window; when you are done it closes and the tab is signed in — section 1.</li>' +
+    '<li><strong>Theme color.</strong> The top of the text colour list gives words the theme’s own ink again, pasted words in a fixed colour too — section 3.</li>' +
+    '<li><strong>Pasted words take your note’s font.</strong> Text copied from a web page or another note arrives in this note’s font, size and colour; bold, italic, lists and links stay — section 7.</li>' +
+    '<li><strong>A clearer ⋯ menu.</strong> Pin to top, Only view mode or Edit mode, Edit labels, Archive this note, and Move to trash last — section 1.</li>' +
+    '<li>Recently: <strong>older notes repaired too</strong>, <strong>deleted is deleted</strong> and <strong>looking is not editing</strong> (0.9.1); <strong>labels</strong>, <strong>four image corners</strong> and <strong>bookmark titles</strong> (0.9.0); <strong>Only view</strong>, <strong>arrows that snap on</strong> and <strong>F12</strong> (0.8.9).</li>' +
     '</ul>' +
 
     '<hr class="blk-hr">' +
@@ -384,7 +386,7 @@ export const GUIDE_NOTE = {
     '<ul>' +
     '<li><strong>↑</strong> bar on top (default) — press the active side again to come back to it</li>' +
     '<li><strong>↓</strong> bar under the note · <strong>←</strong> and <strong>→</strong> turn it into a vertical rail</li>' +
-    '<li><strong>AI</strong> opens the side panel: Claude, Gemini, ChatGPT, Mistral, DeepSeek, Copilot, Perplexity, and <strong>+</strong> adds any site. The tab strip scrolls sideways (Shift+wheel); drag the panel’s left edge to resize it. If a site will not let you sign in inside the app, <em>Open in browser</em> opens it in your browser. Google sign-in links in the built-in AI tabs do this automatically; continue signing in and chatting there. Browser sign-in stays in the browser.</li>' +
+    '<li><strong>AI</strong> opens the side panel: Claude, Gemini, ChatGPT, Mistral, DeepSeek, Copilot, Perplexity, and <strong>+</strong> adds any site. The tab strip scrolls sideways (Shift+wheel); drag the panel’s left edge to resize it. Signing in with Google stays in the app: <em>Continue with Google</em> opens a small sign-in window that shares the tab’s session, and when you are done it closes and the tab is signed in.</li>' +
     '<li><strong>−</strong> hides the bar for a clean page</li>' +
     '</ul>' +
     '<p>Four themes at the bottom of the sidebar: <strong>Main</strong>, <strong>Dark</strong>, <strong>Light</strong> and <strong>White</strong>. The layout and the theme both survive a restart. <span class="inline-code">Ctrl +</span> and <span class="inline-code">Ctrl −</span> zoom, <span class="inline-code">Ctrl 0</span> goes back to actual size, <span class="inline-code">F11</span> is full screen, and the View menu hides the note list.</p>' +
@@ -392,7 +394,7 @@ export const GUIDE_NOTE = {
     '<p><strong>Try it:</strong> send the bar to the left rail, restart the app, and it is still there.</p>' +
     '<hr class="blk-hr">' +
     '<h3>Labels</h3>' +
-    '<p>Press <strong>+</strong> beside the title or choose <strong>⋯ → Labels</strong> for any note. Search existing labels, tick them to add or remove, or type a new name and press Enter. Labels stay with the note after a restart and in a Nebula note export.</p>' +
+    '<p>Press <strong>+</strong> beside the title or choose <strong>⋯ → Edit labels</strong> for any note. Search existing labels, tick them to add or remove, or type a new name and press Enter. Labels stay with the note after a restart and in a Nebula note export.</p>' +
     '<p><strong>Try it:</strong> add <em>work</em>, then type <em>#work</em> in the sidebar filter to find matching notes.</p>' +
     '<hr class="blk-hr">' +
     '<h3>Your notes</h3>' +
@@ -400,7 +402,7 @@ export const GUIDE_NOTE = {
     '<li><strong>New note</strong> under the list, or <span class="inline-code">Ctrl+N</span>. The box at the top of the list filters by title and text.</li>' +
     '<li>Everything saves itself as you go; the word by the title says <em>Saving…</em> and then <em>Saved</em>. <span class="inline-code">Ctrl+S</span> saves at once.</li>' +
     '<li>Each note’s <strong>⋯</strong> menu: <em>Pin to top</em>, <em>Archive</em> (out of the list, kept), <strong>Only view</strong>, and <em>Move to trash</em>. <strong>Archive</strong> and <strong>Trash</strong> under the list open their notes, with <em>Unarchive</em> or <em>Restore</em> to bring one back.</li>' +
-    '<li><strong>Only view</strong> locks a note: you can read it, scroll it, select and copy, open its links with Ctrl+click and play its videos, but no key, paste, drag or toolbar button changes it. The 🔒 badge by the title shows it, and clicking the badge unlocks it.</li>' +
+    '<li><strong>Only view</strong> locks a note: you can read it, scroll it, select and copy, open its links with Ctrl+click and play its videos, but no key, paste, drag or toolbar button changes it. The ⋯ menu switches it: <em>Only view mode</em> locks the note, <em>Edit mode</em> unlocks it; the 🔒 badge by the title shows it, and clicking the badge unlocks it too.</li>' +
     '<li><span class="inline-code">Ctrl+F</span> finds words in the open note and steps through every match. <span class="inline-code">Ctrl+K</span> opens the command palette: type part of any command’s name and press Enter. <span class="inline-code">Ctrl+Z</span> and <span class="inline-code">Ctrl+Y</span> undo and redo, one step at a time — a move, a paste or a run of typing each count as one.</li>' +
     '<li>Help → <em>Keyboard shortcuts</em> lists every key, and <em>What’s new</em> shows what the current version changed.</li>' +
     '</ul>' +
@@ -436,7 +438,7 @@ export const GUIDE_NOTE = {
     '<span class="c-red">red text</span> · <span class="c-blue">blue text</span> · <span class="c-green">green text</span> · ' +
     '<span class="h-yellow">yellow background</span> · <span class="h-green">green background</span> · <span class="h-purple">purple background</span></p>' +
     '<p><strong>Try it:</strong> the <strong>Font</strong> menu shows every face in its own typeface. With text selected it restyles the selection; with only a caret it restyles the whole line. The button always names the font under the caret. <strong>Size</strong> accepts any number you type, not just the listed ones — try 37.</p>' +
-    '<p><strong>Try it:</strong> <em>A</em> applies the last text colour and <em>H</em> the last highlight; each <em>▾</em> opens the full list. Every row lines up and the list fits without scrolling.</p>' +
+    '<p><strong>Try it:</strong> <em>A</em> applies the last text colour and <em>H</em> the last highlight; each <em>▾</em> opens the full list. <em>Theme color</em>, at the top, gives selected words back the theme’s own ink — also words pasted in a fixed colour that vanished in the Dark theme. Every row lines up and the list fits without scrolling.</p>' +
     '<p><strong>Try it:</strong> switch between the four themes with that paragraph in view. Every colour repaints for the theme and stays readable — a colour is stored as a name, not as a fixed value picked against one background.</p>' +
 
     '<hr class="blk-hr">' +
@@ -483,6 +485,7 @@ export const GUIDE_NOTE = {
 
     '<hr class="blk-hr">' +
     '<h2>7 · Links, pictures and videos</h2>' +
+    '<p><strong>Pasted words take this note’s font.</strong> Text copied from a web page, a document or another note arrives in the font, size and colour of the text around it; its paragraphs, headings, lists, links, bold and italic stay. <strong>Try it:</strong> copy a paragraph from any web page and paste it into a note — it looks like the rest of the note.</p>' +
     '<p><strong>Paste a web address</strong> on its own (or type <span class="inline-code">/embed</span>, <span class="inline-code">/bookmark</span>, <span class="inline-code">/url</span> or <span class="inline-code">/mention</span>) and Nebula asks how to show it:</p>' +
     '<ul>' +
     '<li><strong>Embed</strong> — the page itself, live inside the note, with its own scrolling and sign-in forms. A YouTube or Vimeo link embeds its player. If a site refuses to be shown this way, the card’s link opens it in your browser.</li>' +

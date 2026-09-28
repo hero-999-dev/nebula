@@ -8,7 +8,7 @@
 
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
-import { normalizeLists, exitListOnEmptyItem, liftListItemAtStart } from './lists.js';
+import { normalizeLists, exitListOnEmptyItem, liftListItemAtStart, carryLine } from './lists.js';
 import { blockFromNode, convertBlock, exitQuoteOnEmptyLine, insertDivider as insertDividerAt, tidyAfterDelete, beforeDelete } from './blocks.js';
 import { enterOutOfWrapper, backspaceOutOfWrapper, formatsAt, dropFormatsOnEmptyLine } from './inline-format.js';
 import { applyInlineFamily, clearInlineFamilyAtCaret, cleanTypingMarkers } from './inline-family.js';
@@ -31,7 +31,8 @@ import { noteFromFile } from './import.js';
  * `[label, class]`; the empty class is "clear it".
  */
 export const TEXT_COLORS = [
-  ['Black text', ''],
+  // The theme's own ink: it changes with Main, Dark, Light and White (0.9.2).
+  ['Theme color (default)', ''],
   ['Gray text', 'c-gray'],
   ['Brown text', 'c-brown'],
   ['Orange text', 'c-orange'],
@@ -441,8 +442,40 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   });
   const applyTextColor = (cls) => withSelection(() => {
     if (clearAtCaret(colorClasses(TEXT_COLORS))) return;
+    if (!cls) clearFixedInk();
     applyToBlockOrSelection(colorClasses(TEXT_COLORS), alreadyApplied(cls) ? '' : cls);
   });
+
+  /**
+   * "Theme color" also takes off the colours pasted text brought with it.
+   *
+   * Words copied from another page arrive as `style="color: rgb(0, 0, 0)"` or
+   * `<font color>`, not as one of our classes, so the default ink never
+   * reached them: in the Dark theme they stayed black on black (the owner's
+   * snapshot, 0.9.2). Every element the selection touches, and the wrappers
+   * around it inside its line, lets go of a fixed colour.
+   */
+  function clearFixedInk() {
+    const range = selectionInEditor();
+    if (!range || range.collapsed) return;
+    const touched = new Set();
+    const walker = document.createTreeWalker(range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+      ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement, NodeFilter.SHOW_TEXT);
+    for (let t = walker.currentNode; t; t = walker.nextNode()) {
+      if (t.nodeType !== Node.TEXT_NODE || !range.intersectsNode(t)) continue;
+      for (let el = t.parentElement; el && el !== editorEl; el = el.parentElement) {
+        touched.add(el);
+        if (el.matches('p, li, h1, h2, h3, h4, h5, h6, blockquote, .blk-todo')) break;
+      }
+    }
+    for (const el of touched) {
+      if (el.style?.color) {
+        el.style.removeProperty('color');
+        if (!el.getAttribute('style')) el.removeAttribute('style');
+      }
+      if (el.tagName === 'FONT') el.removeAttribute('color');
+    }
+  }
   const applyHilite = (cls) => withSelection(() => {
     if (clearAtCaret(colorClasses(HILITE_COLORS))) return;
     applyToBlockOrSelection(colorClasses(HILITE_COLORS), alreadyApplied(cls) ? '' : cls);
@@ -728,10 +761,10 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     'shape-rect': () => insertShape(lastShape),
     codeblock: () => insertCodeBlock(editorEl, 'javascript', history),
     divider: () => insertDivider(),
-    bold: () => cmd('bold'),
-    italic: () => cmd('italic'),
-    underline: () => applyUnderline('u-single'),
-    strike: () => cmd('strikeThrough'),
+    bold: () => { cmd('bold'); notePending('bold'); },
+    italic: () => { cmd('italic'); notePending('italic'); },
+    underline: () => { applyUnderline('u-single'); syncState(); },
+    strike: () => { cmd('strikeThrough'); notePending('strikeThrough', 'strike'); },
     code: () => wrapSelection('inline-code'),
     eq: () => equation?.open(),
     color: () => applyTextColor(lastColor),
@@ -1052,11 +1085,40 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       strike: 's,strike,del',
       underline: `${U_STYLES.map((c) => `.${c}`).join(',')},u`,
     };
+    // Switched with nothing selected, a mark changes only what is typed next:
+    // the note does not have it yet, so until the caret moves or the words are
+    // typed, the button shows what it was just switched to (notePending).
+    const pend = pending && range.collapsed && range.startContainer === pending.node && range.startOffset === pending.offset
+      ? pending.marks : null;
     toolbar.querySelectorAll('[data-act]').forEach((b) => {
       const mark = MARKS[b.dataset.act];
-      if (mark) b.classList.toggle('active', wearing(mark));
+      if (!mark) return;
+      b.classList.toggle('active', pend && b.dataset.act in pend ? pend[b.dataset.act] : wearing(mark));
     });
   }
+
+  /**
+   * Ctrl+B, Ctrl+I and the buttons with a bare caret. Chromium only changes
+   * its typing state, no selectionchange follows, and the caret's DOM still
+   * says the old thing — so the bar did not move until typing began ("Ctrl+B
+   * works but the bold button up there does not change", the owner's Bug
+   * Finding note, 0.9.2). The typing state is asked for right here, where it
+   * is exactly the thing that was switched, not read back at a boundary later
+   * (HANDOVER 40).
+   */
+  let pending = null;
+  function notePending(command, act = command) {
+    const sel = window.getSelection();
+    if (!sel?.rangeCount || !sel.isCollapsed || !editorEl.contains(sel.anchorNode)) { pending = null; syncState(); return; }
+    const r = sel.getRangeAt(0);
+    const same = pending && pending.node === r.startContainer && pending.offset === r.startOffset;
+    const marks = same ? pending.marks : {};
+    marks[act] = document.queryCommandState(command);
+    pending = { node: r.startContainer, offset: r.startOffset, marks };
+    syncState();
+  }
+  // Once the words are typed the note itself carries the mark.
+  editorEl.addEventListener('input', () => { pending = null; });
   document.addEventListener('selectionchange', () => {
     const range = selectionInEditor();
     if (!range) return;
@@ -1354,10 +1416,14 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       if (here?.classList.contains('blk-todo') && !here.textContent.trim()) {
         e.preventDefault();
         history?.push();
-        const out = document.createElement('p');
-        out.innerHTML = '<br>';
+        // The line after keeps the font the to-dos were written in (lists.js carryLine).
+        const out = carryLine(here, document.createElement('p'));
         here.replaceWith(out);
-        placeCaretEnd(out);
+        const at = document.createRange();
+        at.setStartBefore(out.querySelector('br'));
+        at.collapse(true);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(at);
         dirty();
         return;
       }
@@ -1389,6 +1455,10 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
 
     if (!mod) return;
     const k = e.key.toLowerCase();
+    // Chromium applies Ctrl+B and Ctrl+I itself; the bar follows right after.
+    if ((k === 'b' || k === 'i') && !e.shiftKey && !e.altKey) {
+      setTimeout(() => notePending(k === 'b' ? 'bold' : 'italic'), 0);
+    }
     if (k === 'z' && !e.shiftKey) { e.preventDefault(); ACTIONS.undo(); return; }
     if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); ACTIONS.redo(); return; }
     // Ctrl+U was never in this table, so it fell through to Chromium and
