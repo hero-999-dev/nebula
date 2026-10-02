@@ -66,7 +66,8 @@ export async function runV090Checks(check) {
     await open('diamond');await open('triangle');
     const triangleEdge=()=>win.evaluate(()=>{
       const a=document.querySelector('#editor .note-arrow'),shape=document.querySelector('#editor .shape'),layer=a.closest('.shape-layer').getBoundingClientRect(),r=shape.getBoundingClientRect();
-      const x=(Number(a.dataset.x2)+layer.left-r.left)/r.width,y=(Number(a.dataset.y2)+layer.top-r.top)/r.height;
+      const z=Number.parseFloat(document.getElementById('editor').style.zoom||'1');
+      const x=(Number(a.dataset.x2)*z+layer.left-r.left)/r.width,y=(Number(a.dataset.y2)*z+layer.top-r.top)/r.height;
       return {attached:a.dataset.to===shape.dataset.anchor,onEdge:Math.min(Math.abs(y-Math.abs(x-.5)*2),Math.abs(y-1))<.02,height:r.height,scroll:document.getElementById('editor').scrollTop,x,y};
     });
     const edgeBefore=await triangleEdge();

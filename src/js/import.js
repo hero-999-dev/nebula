@@ -15,7 +15,7 @@ import { fromNebulaNote } from './export.js';
 const FORBIDDEN = 'script, style, link, meta, iframe, webview, object, embed, form, input, button, svg, math';
 
 /** Kept, per element. Anything else is dropped. */
-const ALLOWED_ATTRS = new Set(['href', 'src', 'alt', 'title', 'target', 'rel', 'class', 'data-lang', 'data-code', 'data-tex', 'data-ind', 'data-block-type', 'data-url', 'data-kind', 'data-ratio', 'colspan', 'rowspan']);
+const ALLOWED_ATTRS = new Set(['href', 'src', 'alt', 'title', 'target', 'rel', 'class', 'data-lang', 'data-code', 'data-tex', 'data-ind', 'data-block-type', 'data-url', 'data-kind', 'data-ratio', 'data-open', 'data-note', 'data-tag', 'data-edge', 'colspan', 'rowspan']);
 
 /** Classes the editor gives meaning to. An imported file may not invent others. */
 const ALLOWED_CLASSES = new Set([
@@ -24,6 +24,7 @@ const ALLOWED_CLASSES = new Set([
   'c-gray', 'c-brown', 'c-orange', 'c-yellow', 'c-green', 'c-blue', 'c-purple', 'c-pink', 'c-red',
   'h-gray', 'h-brown', 'h-orange', 'h-yellow', 'h-green', 'h-blue', 'h-purple', 'h-pink', 'h-red',
   'image-layer', 'image-layer--behind', 'note-image', 'link-block', 'link-embed', 'link-bookmark', 'link-url', 'link-mention',
+  'blk-toggle', 'toggle-title', 'toggle-body', 'note-tag', 'note-mention', 'embed-h',
 ]);
 
 const esc = (s) => String(s ?? '')

@@ -148,7 +148,9 @@ export async function runViewSnapChecks(check) {
     for (let i = 1; i <= 12; i++) await win.mouse.move(to.x + (near.x - to.x) * i / 12, to.y + (near.y - to.y) * i / 12);
     const mid = await win.evaluate(() => {
       const a = document.querySelector('#editor .note-arrow'); const layer = a.closest('.shape-layer').getBoundingClientRect(); const bx = document.getElementById('sb').getBoundingClientRect();
-      return { lit: document.getElementById('sb').classList.contains('arrow-target'), x2: +a.dataset.x2 + layer.left, edge: bx.left };
+      // The arrow's ends are in the page's pixels; the rectangles on the screen (page zoom, 0.9.3).
+      const z = Number.parseFloat(document.getElementById('editor').style.zoom || '1');
+      return { lit: document.getElementById('sb').classList.contains('arrow-target'), x2: +a.dataset.x2 * z + layer.left, edge: bx.left };
     });
     await win.mouse.up();
     await win.waitForTimeout(150);
@@ -185,7 +187,7 @@ export async function runViewSnapChecks(check) {
     const files = fs.readdirSync(shots).filter((f) => /^Nebula \d{4}-\d\d-\d\d \d\d\.\d\d\.\d\d( \(\d+\))?\.png$/.test(f));
     const png = files.length ? fs.readFileSync(path.join(shots, files[0])) : null;
     const size = png ? { w: png.readUInt32BE(16), h: png.readUInt32BE(20) } : null;
-    const clip = await app.evaluate(({ clipboard }) => { const i = clipboard.readImage(); return i.isEmpty() ? null : i.getSize(); });
+    const clip = await app.evaluate(async ({ clipboard, nativeImage }) => { const i = await (async () => { const items = await clipboard.read(); const it = items.find((x) => x.types.includes('image/png')); return it ? nativeImage.createFromBuffer(Buffer.from(await (await it.getType('image/png')).arrayBuffer())) : nativeImage.createEmpty(); })(); return i.isEmpty() ? null : i.getSize(); });
     const view = await win.evaluate(() => ({ w: innerWidth, h: innerHeight, toast: document.getElementById('toast').textContent }));
     check('F12 saves a PNG of the whole window, named by date and time', files.length === 1 && size && Math.abs(size.w - view.w) <= 2 && Math.abs(size.h - view.h) <= 2, JSON.stringify({ files, size, view }));
     check('and copies it, and says where it went', !!clip && clip.width === size?.w && view.toast.includes(files[0] || '???'), JSON.stringify({ clip, toast: view.toast }));

@@ -24,7 +24,7 @@ export default defineConfig({
               // electron-updater is a real runtime dependency loaded from the
               // packaged node_modules. Bundling it silently produces a main
               // process that cannot check for updates.
-              external: ['electron-updater'],
+              external: ['electron-updater', 'word-extractor'],
             },
           },
         },

@@ -7,6 +7,7 @@
  * fallback for sites which refuse framing. Async paste is bound to a note.
  */
 
+import { editorZoom } from './page-zoom.js';
 import { bindLinkPreview } from './link-preview.js';
 import { resizeImageBox, ensureImageHandles } from './image-resize.js';
 import { cleanPastedHtml, cleanNebulaHtml, fromNebula } from './paste-clean.js';
@@ -140,10 +141,20 @@ function ensureLayer(editor, behind = false) {
 }
 
 function imagePoint(editor, clientX, clientY) {
+  // Pictures and shapes are placed on the paper (0.9.3): measured from the
+  // canvas, which is the paper's width and scrolls with the page.
+  const canvas = editor.querySelector(':scope > .shape-layer:not(.shape-layer--behind)');
+  if (canvas) {
+    const origin = canvas.getBoundingClientRect();
+    return {
+      left: Math.max(8, (clientX - origin.left) / editorZoom(editor)),
+      top: Math.max(8, (clientY - origin.top) / editorZoom(editor)),
+    };
+  }
   const rect = editor.getBoundingClientRect();
   return {
-    left: Math.max(8, clientX - rect.left + editor.scrollLeft),
-    top: Math.max(8, clientY - rect.top + editor.scrollTop),
+    left: Math.max(8, (clientX - rect.left) / editorZoom(editor) + editor.scrollLeft),
+    top: Math.max(8, (clientY - rect.top) / editorZoom(editor) + editor.scrollTop),
   };
 }
 
@@ -185,6 +196,22 @@ function makeImage(src, width, height, at, inline = false) {
   figure.append(image);
   ensureImageHandles(figure);
   return figure;
+}
+
+const EMBED_EDGES = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se'];
+
+/** An embed's eight resize handles, rebuilt to this version's set (the 0.9.3 first build drew one grip). */
+function ensureEmbedHandles(card) {
+  card.querySelectorAll(':scope > .embed-grip, :scope > .embed-h:not([data-edge])').forEach((g) => g.remove());
+  const have = new Set([...card.querySelectorAll(':scope > .embed-h')].map((h) => h.dataset.edge));
+  for (const edge of EMBED_EDGES) {
+    if (have.has(edge)) continue;
+    const h = document.createElement('span');
+    h.className = 'embed-h';
+    h.dataset.edge = edge;
+    h.title = 'Drag to resize the embed';
+    card.append(h);
+  }
 }
 
 function makeLinkBlock(url, kind) {
@@ -241,6 +268,7 @@ function makeLinkBlock(url, kind) {
     }
     frame.src = source.src;
     card.append(frame);
+    ensureEmbedHandles(card);
     // A video player loads or says why itself; the hint is for pages that refuse a frame.
     if (!source.video) {
       const hint = document.createElement('small');
@@ -552,12 +580,15 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
       + '<button type="button" data-image="inline" title="In the text (moves with the words)">≡</button>'
       + '<span class="image-bar__sep"></span>'
       + '<button type="button" data-image="caption" title="Add or edit a caption">Aa</button>'
+      + '<button type="button" data-image="crop" title="Crop the picture">✂</button>'
       + '<button type="button" data-image="del" title="Delete image">✕</button>';
     document.body.appendChild(bar);
     return bar;
   }
 
   const imageBar = ensureImageBar();
+  // ✂ on the bar (image-crop.js); the cropped picture comes back selected.
+  const crop = initImageCrop(editor, { history, onDone: (figure) => { selectImage(figure); onGeometry?.(); } });
 
   function positionImageBar() {
     if (!selectedImage?.isConnected) { selectImage(null); return; }
@@ -583,9 +614,45 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     return image.closest('.shape-layer--behind, .image-layer--behind') ? 'back' : 'front';
   }
 
+  /**
+   * A picture in the text let go (Esc, a click on its bar) while the caret
+   * stood beside it on the editor itself: that caret was hidden only while the
+   * picture was selected, and blinked between the divider and the picture the
+   * moment it was not — "the divider still has a caret of its own" (the owner,
+   * 0.9.3). It goes to the nearest line: the one after the picture, else the
+   * one before, else the next or last line of the note.
+   */
+  const TEXT_LINE = 'p, div:not([class]), h1, h2, h3, h4, h5, h6, blockquote, ul, ol';
+  function caretOffTheEditor(was) {
+    if (!was?.isConnected || was.parentNode !== editor) return;
+    const sel = window.getSelection();
+    if (!sel?.rangeCount || !sel.isCollapsed || sel.anchorNode !== editor) return;
+    const isLine = (n) => n?.nodeType === Node.ELEMENT_NODE && n.matches(TEXT_LINE);
+    let target = null;
+    let atEnd = false;
+    if (isLine(was.nextElementSibling)) target = was.nextElementSibling;
+    else if (isLine(was.previousElementSibling)) { target = was.previousElementSibling; atEnd = true; }
+    else {
+      for (let n = was.nextElementSibling; n && !target; n = n.nextElementSibling) if (isLine(n)) target = n;
+      for (let n = was.previousElementSibling; n && !target; n = n.previousElementSibling) if (isLine(n)) { target = n; atEnd = true; }
+    }
+    if (!target) return;
+    const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
+    let text = walker.nextNode();
+    if (atEnd) for (let t = text; t; t = walker.nextNode()) text = t;
+    const r = document.createRange();
+    if (text) r.setStart(text, atEnd ? text.nodeValue.length : 0);
+    else r.setStart(target, 0);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }
+
   function selectImage(image) {
+    const was = selectedImage;
     editor.querySelectorAll('.note-image.sel').forEach((node) => node.classList.remove('sel'));
     selectedImage = image || null;
+    if (was && !selectedImage) caretOffTheEditor(was);
     selectedImage?.classList.add('sel');
     imageBar.hidden = !selectedImage;
     if (selectedImage) {
@@ -631,6 +698,10 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
       }
     }
     for (const card of editor.querySelectorAll('.link-block')) watchTitle(card);
+    // An embed is resized from its four sides and corners (0.9.3); the handles
+    // are controls drawn into the note, so every embed gets them here, old ones
+    // too (trap 47).
+    for (const card of editor.querySelectorAll('.link-block.link-embed')) ensureEmbedHandles(card);
     for (const image of editor.querySelectorAll('.note-image')) {
       image.setAttribute('contenteditable', 'false');
       ensureImageHandles(image);
@@ -705,10 +776,11 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
       const layer = ensureLayer(editor);
       const origin = layer.getBoundingClientRect();
       const pictureHeight = image.querySelector('img')?.getBoundingClientRect().height || rect.height;
+      const z = editorZoom(editor);
       image.classList.remove('note-image--inline');
-      image.style.left = `${Math.round(rect.left - origin.left)}px`;
-      image.style.top = `${Math.round(rect.top - origin.top)}px`;
-      image.style.height = `${Math.round(pictureHeight)}px`;
+      image.style.left = `${Math.round((rect.left - origin.left) / z)}px`;
+      image.style.top = `${Math.round((rect.top - origin.top) / z)}px`;
+      image.style.height = `${Math.round(pictureHeight / z)}px`;
       layer.appendChild(image);
     } else {
       // Into the text after the last line that starts above the image's top edge.
@@ -780,8 +852,10 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
 
   window.addEventListener('mousemove', (event) => {
     if (!drag) return;
-    const dx = event.clientX - drag.startX;
-    const dy = event.clientY - drag.startY;
+    // On the page, not on the screen: the page may be zoomed (page-zoom.js).
+    const z = editorZoom(editor);
+    const dx = (event.clientX - drag.startX) / z;
+    const dy = (event.clientY - drag.startY) / z;
     if (Math.abs(event.clientX - drag.downX) > 2 || Math.abs(event.clientY - drag.downY) > 2) drag.moved = true;
     if (!drag.moved) return;
     const inText = drag.image.classList.contains('note-image--inline');
@@ -815,6 +889,133 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     drag = null;
   }
   editor.addEventListener('nebula-canvas-select', (e) => { if (e.detail !== 'image' && selectedImage) selectImage(null); });
+  /**
+   * A picture onto the clipboard as a picture (0.9.3). "I cannot copy pictures
+   * out of Nebula" (the owner's Ideas note): Ctrl+C with a picture selected
+   * copied nothing, since a selected picture is not a text selection. It goes
+   * as a PNG, which every program takes, through the main process.
+   */
+  async function copyImage(figure) {
+    const img = figure?.querySelector('img');
+    if (!img) return false;
+    const src = img.getAttribute('src') || '';
+    let dataUrl = src;
+    if (!/^data:image\/png[;,]/i.test(src)) {
+      try {
+        if (!img.complete) await img.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        dataUrl = canvas.toDataURL('image/png');
+      } catch { /* a picture that cannot be drawn is sent as it is */ }
+    }
+    let ok = false;
+    try {
+      if (window.nebula?.clipboard?.image) {
+        ok = await window.nebula.clipboard.image({ dataUrl, html: `<img src="${src.replace(/"/g, '&quot;')}" alt="">` });
+      } else if (navigator.clipboard?.write && typeof ClipboardItem === 'function') {
+        const blob = await (await fetch(dataUrl)).blob();
+        await navigator.clipboard.write([new ClipboardItem({ [blob.type || 'image/png']: blob })]);
+        ok = true;
+      }
+    } catch { ok = false; }
+    window.dispatchEvent(new CustomEvent('nebula-toast', { detail: ok ? 'Picture copied' : 'The picture could not be copied' }));
+    return ok;
+  }
+
+  function deleteImage(figure) {
+    if (!figure?.isConnected) return;
+    history?.push();
+    if (selectedImage === figure) selectImage(null);
+    figure.remove();
+    dirty();
+  }
+
+  // A double click on a picture opens its caption (0.9.3): "double-click the
+  // picture and the note under it should open, quickly" (the owner).
+  editor.addEventListener('dblclick', (event) => {
+    if (editor.dataset.readonly === 'true') return;
+    const figure = event.target.closest?.('.note-image');
+    if (!figure || event.target.closest('.image-caption')) return;
+    event.preventDefault();
+    editCaption(figure);
+  });
+
+  /**
+   * An embed resized by its corner, like a picture (0.9.3, the owner's Ideas
+   * note). Width and height are kept on the card (`width`, `--embed-h`); a
+   * video keeps its shape, so only its width changes.
+   */
+  let embedDrag = null;
+  editor.addEventListener('mousedown', (event) => {
+    const grip = event.target.closest?.('.embed-h');
+    if (!grip || event.button !== 0 || editor.dataset.readonly === 'true') return;
+    const card = grip.closest('.link-block');
+    event.preventDefault();
+    event.stopPropagation();
+    history?.push();
+    const frame = card.querySelector('.link-frame');
+    embedDrag = {
+      card,
+      x: event.clientX,
+      y: event.clientY,
+      width: card.getBoundingClientRect().width / editorZoom(editor),
+      height: (frame?.getBoundingClientRect().height || 300 * editorZoom(editor)) / editorZoom(editor),
+      video: card.classList.contains('link-embed--video'),
+      max: editor.clientWidth - 24,
+      edge: grip.dataset.edge,
+    };
+    document.body.classList.add('resizing');
+  }, true);
+  window.addEventListener('mousemove', (event) => {
+    if (!embedDrag) return;
+    const d = embedDrag;
+    const z = editorZoom(editor);
+    const dx = (event.clientX - d.x) / z;
+    const dy = (event.clientY - d.y) / z;
+    // A side moves the way it is pulled: outward grows the embed, inward shrinks it.
+    if (/[ew]/.test(d.edge)) {
+      const w = d.width + (d.edge.includes('w') ? -dx : dx);
+      d.card.style.width = `${Math.round(Math.min(d.max, Math.max(260, w)))}px`;
+    }
+    if (/[ns]/.test(d.edge) && !d.video) {
+      const h = d.height + (d.edge.includes('n') ? -dy : dy);
+      d.card.style.setProperty('--embed-h', `${Math.round(Math.min(1400, Math.max(120, h)))}px`);
+    }
+    onGeometry?.();
+  });
+  window.addEventListener('mouseup', () => {
+    if (!embedDrag) return;
+    embedDrag = null;
+    document.body.classList.remove('resizing');
+    dirty();
+  });
+
+  // A picture in the text stays selected only while the caret stands beside
+  // it, on the editor itself. ↑ from it put the caret in the heading while the
+  // picture stayed outlined — and the caret, hidden while a picture is
+  // selected, could not be seen there (0.9.3).
+  // Only a caret the arrow keys moved counts: a paste or a click selects a
+  // picture while the caret stays in its line, and that is as it should be.
+  let arrowedFrom = null;
+  editor.addEventListener('keydown', (e) => {
+    arrowedFrom = selectedImage && !e.altKey && /^(Arrow(Up|Down|Left|Right)|Home|End|Page(Up|Down))$/.test(e.key) ? selectedImage : null;
+  }, true);
+  document.addEventListener('selectionchange', () => {
+    const was = arrowedFrom;
+    arrowedFrom = null;
+    if (!was || was !== selectedImage || was.closest('.shape-layer, .image-layer')) return;
+    const s = window.getSelection();
+    const n = s?.rangeCount ? s.anchorNode : null;
+    if (!n || n === editor || !editor.contains(n) || was.contains(n)) return;
+    selectImage(null);
+  });
+
+  // Reached from the keyboard: Backspace or Delete against a picture in the text (toolbar.js).
+  editor.addEventListener('nebula-select-image', (e) => {
+    if (e.detail?.isConnected && editor.contains(e.detail)) selectImage(e.detail);
+  });
   window.addEventListener('mouseup', finishDrag);
   window.addEventListener('blur', finishDrag);
 
@@ -891,6 +1092,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     const act = event.target.closest('[data-image]')?.dataset.image;
     if (!selectedImage || !act) return;
     if (act === 'caption') { editCaption(selectedImage); return; }
+    if (act === 'crop') { const figure = selectedImage; selectImage(null); crop.start(figure); return; }
     if (act === 'inline') {
       history?.push();
       setImageFloating(selectedImage, false);
@@ -944,6 +1146,52 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
       return;
     }
     if (event.key === 'Escape') selectImage(null);
+    // A picture that is no longer in the note (an undo put the markup back)
+    // is not selected any more: it swallowed the next Delete and Backspace.
+    if (selectedImage && !selectedImage.isConnected) selectImage(null);
+    // A picture in the text, selected (0.9.3): Enter opens a line under it,
+    // Shift+Enter one over it, and Alt+↑ / Alt+↓ move it past the line above
+    // or below — a picture has no caret of its own to type around it with.
+    const inTextPicture = selectedImage?.classList.contains('note-image--inline') && editor.dataset.readonly !== 'true'
+      && !event.target.closest?.('input, textarea, .code-src, .shape-text, .image-caption');
+    if (inTextPicture && event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      history?.push();
+      const figure = selectedImage;
+      const line = document.createElement('p');
+      line.innerHTML = '<br>';
+      if (event.shiftKey) figure.before(line); else figure.after(line);
+      selectImage(null);
+      placeCaretIn(line);
+      dirty();
+      return;
+    }
+    if (inTextPicture && event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+      event.preventDefault();
+      event.stopPropagation();
+      const figure = selectedImage;
+      const skip = (el) => el && el.matches('.shape-layer, .image-layer');
+      let other = event.key === 'ArrowUp' ? figure.previousElementSibling : figure.nextElementSibling;
+      if (skip(other)) other = null;
+      if (!other) return;
+      history?.push();
+      if (event.key === 'ArrowUp') other.before(figure); else other.after(figure);
+      selectImage(figure);
+      onGeometry?.();
+      dirty();
+      return;
+    }
+    // Ctrl+C and Ctrl+X with a picture selected copy the picture itself (0.9.3).
+    const key = event.key.toLowerCase();
+    if ((event.ctrlKey || event.metaKey) && (key === 'c' || key === 'x') && !event.shiftKey && !event.altKey
+      && selectedImage && !event.target.closest?.('input, textarea, .code-src, .shape-text, .image-caption')) {
+      event.preventDefault();
+      event.stopPropagation();
+      const figure = selectedImage;
+      void copyImage(figure).then((ok) => { if (ok && key === 'x' && editor.dataset.readonly !== 'true') deleteImage(figure); });
+      return;
+    }
     if ((event.key === 'Delete' || event.key === 'Backspace') && selectedImage
       && !event.target.closest('input, textarea, .code-src, .shape-text, .image-caption')) {
       event.preventDefault();
@@ -1075,8 +1323,13 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     open,
     paste,
     refresh: refreshImages,
-    reset: () => { generation += 1; drag = null; editor.classList.remove('image-dragging'); selectImage(null); hideLinkMenu(); },
+    reset: () => { generation += 1; drag = null; editor.classList.remove('image-dragging'); selectImage(null); hideLinkMenu(); crop.cancel(); embedDrag = null; },
     insertImageBlob,
+    copyImage,
+    deleteImage,
+    editCaption,
+    selectImage,
   };
 }import { ensureLayer as ensureCanvas } from './shapes.js';
+import { initImageCrop } from './image-crop.js';
 

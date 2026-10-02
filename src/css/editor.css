@@ -29,6 +29,64 @@
 .pad button.on { background: var(--clay); border-color: var(--clay); color: #fff; }
 :root:not([data-theme="light"]):not([data-theme="white"]) .pad button.on { color: var(--paper-sunken); }
 
+/* ---------- the page width beside Saved (0.9.3, page-mode.js) ----------
+   The pad's boxes, four to a row: NW A3 A4 A5 over NN B3 B4 B5. */
+.pad.page-modes { grid-template-columns: repeat(4, 26px); margin-left: 6px; }
+.pad.page-modes button { font: inherit; font-size: 10.5px; font-weight: 600; letter-spacing: .02em; }
+
+/* A page that is not Nebula Wide: the line is as long as the mode's column
+   (a paper's printed line, or Nebula Narrow), centred, and the paper's own
+   edges — the column plus its 12.7 mm print margins — are drawn faintly, so
+   the sheet can be seen. The caret wraps where the line will wrap on paper. */
+#editor[data-paper] {
+  /* The scroll bar's room comes out of the editor's width too, or the line
+     came out 10px short of the paper's (--sb is measured by page-mode.js). */
+  scrollbar-gutter: stable;
+  /* Never less than the paper's margin: the whole sheet, edges and all, is
+     always on the page (the owner held an A4 to the screen) — and nothing
+     more, or a B4 at 100 % that fits scrolled sideways for a gutter (0.9.3). */
+  --page-side: max(var(--page-margin, 48px), calc((100% - var(--sb, 0px) - var(--page-col, 100%)) / 2));
+  --paper-edge: calc(var(--page-side) - var(--page-margin, 48px));
+  padding-left: var(--page-side);
+  padding-right: var(--page-side);
+  /* The line is always the paper's: when the page (at its zoom) is wider than
+     the window, the frame scrolls sideways instead of the column shrinking
+     (the owner: "A3 or B3 at real size on a laptop should scroll left and right"). */
+  min-width: calc(var(--page-col) + 2 * var(--page-margin, 48px) + var(--sb, 0px));
+  background-image:
+    linear-gradient(to right,
+      var(--page-out) 0, var(--page-out) var(--paper-edge),
+      var(--rule) var(--paper-edge), var(--rule) calc(var(--paper-edge) + 1px),
+      transparent calc(var(--paper-edge) + 1px), transparent calc(100% - var(--paper-edge) - 1px),
+      var(--rule) calc(100% - var(--paper-edge) - 1px), var(--rule) calc(100% - var(--paper-edge)),
+      var(--page-out) calc(100% - var(--paper-edge)), var(--page-out) 100%),
+    /* Where the export starts a new page: a very thin line every page height,
+       from the top of the writing (the editor's 16px top padding). */
+    repeating-linear-gradient(to bottom,
+      transparent 0, transparent calc(var(--page-break, 100000px) - 1px),
+      var(--page-break-line) calc(var(--page-break, 100000px) - 1px), var(--page-break-line) var(--page-break, 100000px));
+  /* The PDF prints the title above the writing on page one, so the first
+     line is a title's room early (--page-title, page-mode.js). */
+  background-position: 0 0, 0 calc(16px - var(--page-title, 0px));
+  background-attachment: local, local;
+}
+#editor { --page-break-line: color-mix(in srgb, var(--ink-faint) 38%, transparent); }
+.page-mode-hint {
+  position: fixed;
+  z-index: 90;
+  max-width: 300px;
+  padding: 6px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  color: var(--ink);
+  font-size: 12px;
+  box-shadow: 0 8px 22px var(--shadow);
+  pointer-events: none;
+}
+#editor { --page-out: color-mix(in srgb, var(--paper-sunken) 55%, transparent); }
+
+
 /* ---------- the editing shell: bar can sit on any side ---------- */
 .edit-shell {
   flex: 1;
@@ -103,6 +161,15 @@
 .tb:hover { background: var(--paper-sunken); border-color: var(--rule); }
 .tb:active, .tb.active { background: var(--clay-soft); border-color: var(--clay-soft); }
 .tb-sep { width: 1px; height: 18px; background: var(--rule); margin: 0 4px; }
+/* Page zoom (0.9.3): − ratio +, one group. */
+.tb-zoom { display: inline-flex; align-items: center; gap: 2px; }
+/* Auto order page (0.9.3): pressed while the note does it by itself; on
+   Nebula Wide clearly not to be pressed (the owner). */
+.tb.tb-order.on { background: var(--clay-soft); color: var(--clay); box-shadow: inset 0 0 0 1px var(--clay); }
+.tb.tb-order:disabled { opacity: .28; cursor: default; pointer-events: none; }
+.tb-zoom .tb { font-size: 16px; line-height: 1; }
+.tb-zoom .tb-zoom-select { width: auto; min-width: 68px; max-width: 170px; text-align: center; }
+.edit-shell.bar-left .tb-zoom, .edit-shell.bar-right .tb-zoom { flex-direction: column; }
 /* Every dropdown mark in the bar is the same triangle at the same size: the
    ▾ glyph ones (underline, colours, shapes, font) and the CSS-drawn ones on
    the <select>s. They were an 8px glyph next to a 4px drawing next to the
@@ -285,6 +352,7 @@
   flex: 1;
   min-height: 0;
   min-width: 0;
+  overflow-x: auto;
   display: flex;
   position: relative;
   background: var(--paper-raised);
@@ -314,7 +382,15 @@
   color: var(--ink-soft);
   font-style: italic;
 }
-.editor hr.blk-hr { border: none; border-top: 1.4px solid var(--rule); margin: 14px 0; }
+/* Preformatted text pasted from a page (a JSON error, a log) keeps its line
+   breaks and spaces but wraps at the page's edge: one long line of it made
+   the whole note scroll sideways (the owner, 0.9.3). A code block's source
+   already wraps the same way (.code-src). */
+.editor pre { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%; }
+.editor hr.blk-hr { border: none; border-top: 1.4px solid var(--rule); margin: 14px 0; position: relative; overflow: visible; cursor: pointer; }
+/* A divider is picked with a click (0.9.3); a 1.4px line is too thin to hit,
+   so the band around it takes the click too. */
+.editor hr.blk-hr::after { content: ""; position: absolute; left: 0; right: 0; top: -9px; height: 17px; }
 /* One marker column that both kinds START in.
    `::marker` is right-aligned against the text in `outside` position, so a "•"
    and a "1." shared their right edge and began at different x — which is what
@@ -327,6 +403,9 @@
 .editor li { padding-left: 2px; position: relative; }
 .editor ol > li { counter-increment: nebula-ol; }
 .editor ul > li::before { content: "\2022"; }
+/* An item Tab moved under another one (0.9.3) takes the next mark down. */
+.editor ul ul > li::before { content: "\25E6"; }
+.editor ul ul ul > li::before { content: "\25AA"; }
 .editor ol > li:not(.blk-todo)::before { content: counter(nebula-ol) "."; }
 /* The marker sits in the item's own first line box — same font size, same line
    height — so it shares the text's baseline and stands at the middle of the
@@ -351,6 +430,35 @@
 /* A to-do draws its own box in ::before, so it is left out of the rules above
    rather than having its marker cancelled afterwards. */
 
+/* The toggle list (0.9.3). The title is the first child, whatever it is; the
+   arrow is drawn in its left padding and a press there folds the body. */
+.editor .blk-toggle { margin: 2px 0; }
+.editor .blk-toggle > :first-child:not(.toggle-body) { position: relative; padding-left: 26px; }
+.editor .blk-toggle > :first-child:not(.toggle-body)::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: calc(0.8em - 5px);
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid var(--ink-soft);
+  transform-origin: 3px 5px;
+  transition: transform .12s ease;
+  cursor: pointer;
+}
+.editor .blk-toggle[data-open="true"] > :first-child:not(.toggle-body)::before { transform: rotate(90deg); }
+.editor .blk-toggle > :first-child:not(.toggle-body):has(> br:only-child)::after {
+  content: var(--t-toggle, "Toggle list");
+  position: absolute;
+  left: 26px;
+  top: 0;
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+.editor .blk-toggle > .toggle-body { padding-left: 26px; }
+.editor .blk-toggle:not([data-open="true"]) > .toggle-body { display: none; }
 .editor [data-ind="1"] { margin-left: 26px; }
 .editor [data-ind="2"] { margin-left: 52px; }
 .editor [data-ind="3"] { margin-left: 78px; }
@@ -560,6 +668,17 @@
   z-index: 3;
 }
 .shape-layer--behind { z-index: 1; }
+/* On a page, the canvas is the paper: a shape's or a picture's place is
+   measured from the sheet's left edge, so it stays on the paper whatever the
+   window's width (the owner: the guide's shapes sat beside the A4, 0.9.3).
+   100% here is the editor's padding box — its width less the scroll bar —
+   which the paper is centred in. */
+#editor[data-paper] > .shape-layer,
+#editor[data-paper] > .image-layer {
+  left: max(0px, calc((100% - var(--page-col, 100%) - 2 * var(--page-margin, 48px)) / 2));
+  right: auto;
+  width: calc(var(--page-col, 100%) + 2 * var(--page-margin, 48px));
+}
 
 /* Everything the user writes sits above the back layer and below the front one.
    z-index needs a position; relative moves nothing. */
@@ -608,6 +727,10 @@
    specificity and would otherwise win by source order and hang it over the text. */
 .note-image.note-image--inline .image-caption { position: static; margin-top: 6px; }
 .note-image.sel { outline: 2px solid var(--clay); outline-offset: 2px; }
+/* A picture in the text is the selection while it is outlined; the caret the
+   browser keeps beside it stands on no line, and blinked next to the divider
+   above it (the owner, 0.9.3). A picked divider draws none either. */
+#editor:has(> .note-image.sel) { caret-color: transparent; }
 .note-image img {
   display: block;
   width: 100%;
@@ -632,7 +755,9 @@
   user-select: text;
   outline: none;
 }
-.note-image .image-caption:empty::before { content: attr(data-placeholder); opacity: .6; }
+/* The word comes from the language in use (i18n.js sets --t-caption); the
+   attribute is in the note and stays as it was written. */
+.note-image .image-caption:empty::before { content: var(--t-caption, attr(data-placeholder)); opacity: .6; }
 .image-h { display: none; }
 .note-image.sel .image-h {
   display: block;
@@ -689,7 +814,62 @@
   overflow: hidden;
 }
 .link-embed { display: grid; grid-template-columns: 1fr auto; }
-.link-frame { grid-column: 1 / -1; width: 100%; height: 300px; border: 0; background: white; }
+.link-frame { grid-column: 1 / -1; width: 100%; height: var(--embed-h, 300px); border: 0; background: white; }
+/* An embed is resized from its four sides and corners (0.9.3): strips along
+   the edges, squares at the corners, shown when the pointer is over it. */
+.link-embed { position: relative; max-width: 100%; }
+.link-embed .embed-h { position: absolute; z-index: 3; background: transparent; }
+.link-embed .embed-h[data-edge="n"], .link-embed .embed-h[data-edge="s"] { left: 10px; right: 10px; height: 8px; cursor: ns-resize; }
+.link-embed .embed-h[data-edge="n"] { top: -2px; }
+.link-embed .embed-h[data-edge="s"] { bottom: -2px; }
+.link-embed .embed-h[data-edge="e"], .link-embed .embed-h[data-edge="w"] { top: 10px; bottom: 10px; width: 8px; cursor: ew-resize; }
+.link-embed .embed-h[data-edge="e"] { right: -2px; }
+.link-embed .embed-h[data-edge="w"] { left: -2px; }
+.link-embed .embed-h[data-edge="nw"], .link-embed .embed-h[data-edge="ne"],
+.link-embed .embed-h[data-edge="sw"], .link-embed .embed-h[data-edge="se"] { width: 12px; height: 12px; border-radius: 3px; }
+.link-embed .embed-h[data-edge="nw"] { left: -2px; top: -2px; cursor: nwse-resize; }
+.link-embed .embed-h[data-edge="ne"] { right: -2px; top: -2px; cursor: nesw-resize; }
+.link-embed .embed-h[data-edge="sw"] { left: -2px; bottom: -2px; cursor: nesw-resize; }
+.link-embed .embed-h[data-edge="se"] { right: -2px; bottom: -2px; cursor: nwse-resize; }
+.link-embed:hover { outline: 1px dashed var(--clay); outline-offset: 1px; }
+.link-embed:hover .embed-h { background: var(--clay-soft); }
+.link-embed:hover .embed-h[data-edge="nw"], .link-embed:hover .embed-h[data-edge="ne"],
+.link-embed:hover .embed-h[data-edge="sw"], .link-embed:hover .embed-h[data-edge="se"] { background: var(--clay); }
+/* The crop frame over a picture: page chrome, never part of the note. */
+.crop-frame { position: fixed; z-index: 95; pointer-events: auto; }
+.crop-area {
+  position: absolute;
+  outline: 2px dashed #fff;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(0, 0, 0, .6);
+  cursor: move;
+}
+.crop-clip { position: absolute; inset: 0; clip-path: inset(-7px); }
+.crop-h { position: absolute; width: 12px; height: 12px; background: #fff; border: 1px solid #333; border-radius: 2px; }
+.crop-h[data-edge="nw"] { left: -6px; top: -6px; cursor: nwse-resize; }
+.crop-h[data-edge="ne"] { right: -6px; top: -6px; cursor: nesw-resize; }
+.crop-h[data-edge="sw"] { left: -6px; bottom: -6px; cursor: nesw-resize; }
+.crop-h[data-edge="se"] { right: -6px; bottom: -6px; cursor: nwse-resize; }
+.crop-h[data-edge="n"] { left: calc(50% - 6px); top: -6px; cursor: ns-resize; }
+.crop-h[data-edge="s"] { left: calc(50% - 6px); bottom: -6px; cursor: ns-resize; }
+.crop-h[data-edge="w"] { top: calc(50% - 6px); left: -6px; cursor: ew-resize; }
+.crop-h[data-edge="e"] { top: calc(50% - 6px); right: -6px; cursor: ew-resize; }
+.crop-bar {
+  position: absolute;
+  left: 0;
+  bottom: -40px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper-raised);
+  color: var(--ink-soft);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.crop-bar button { font: inherit; font-size: 13px; padding: 2px 8px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); color: var(--ink); cursor: pointer; }
+.crop-bar .crop-ok { border-color: var(--clay); color: var(--clay); font-weight: 700; }
 .image-dragging .link-frame { pointer-events: none; }
 /* A video player, not a page: its own shape, black while it loads. */
 .link-embed--video .link-frame { height: auto; aspect-ratio: 16 / 9; background: #000; }
@@ -1045,6 +1225,29 @@
 }
 .float-menu button:hover, .float-menu button.sel { background: var(--paper-sunken); }
 .float-menu .fm-ic { display: grid; place-items: center; width: 22px; color: var(--clay); }
+/* The right-click menu (0.9.3): a spelling suggestion is set bold, as in Word. */
+.ctx-menu { min-width: 190px; z-index: 90; }
+/* @ and # in a note (0.9.3). */
+.mention-menu { min-width: 220px; }
+.mention-menu .mention-none { padding: 7px 10px; color: var(--ink-faint); font-size: 13px; }
+.editor a.note-mention {
+  color: var(--clay);
+  background: var(--clay-soft);
+  border-radius: 5px;
+  padding: 0 4px;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.editor a.note-mention:hover { text-decoration: underline; }
+.editor a.note-mention.is-missing { color: var(--ink-faint); background: transparent; text-decoration: line-through; }
+.editor .note-tag {
+  color: var(--clay);
+  font-weight: 600;
+  cursor: pointer;
+}
+.ctx-menu button:disabled { color: var(--ink-faint); cursor: default; background: transparent; }
+.ctx-menu .ctx-rule { height: 1px; margin: 4px 6px; background: var(--rule); }
 
 /* ---------- AI panel (Demo-style tabs, side-scrolling) ---------- */
 .ai-panel {
@@ -1108,7 +1311,28 @@ body.resizing webview { pointer-events: none; }
 .ai-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); flex-shrink: 0; }
 .ai-tab__x { margin-left: 2px; opacity: 0.6; font-size: 13px; }
 .ai-tab__x:hover { opacity: 1; }
-.ai-add { padding: 5px 9px; }
+.ai-add { padding: 5px 9px; flex-shrink: 0; }
+/* Reload and + are the same round button, side by side (the owner, 0.9.3). */
+.ai-head .ai-reload,
+.ai-head .ai-add {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper-raised);
+  color: var(--ink-soft);
+  font-size: 15px;
+  line-height: 1;
+}
+.ai-head .ai-reload:hover,
+.ai-head .ai-add:hover { border-color: var(--clay); color: var(--ink); }
+.ai-head .ai-reload .ic { width: 14px; height: 14px; }
+.ai-site-menu { min-width: 190px; }
+.ai-site-menu .ai-site-menu__delete { color: var(--c-red, #c0392b); }
 .ai-x { padding: 4px 6px; flex-shrink: 0; }
 .ai-x .ic { width: 14px; height: 14px; }
 
@@ -1168,6 +1392,57 @@ body.resizing webview { pointer-events: none; }
 #dlg-input:focus { border-color: var(--clay); }
 .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 
+/* The PDF export's preview (0.9.3): the app's own dialog, the pages in it. */
+#ov-pdf { padding-top: 5vh; }
+.modal.modal-pdf {
+  width: min(920px, 94vw);
+  height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+.pdf-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.pdf-head .dlg-title { margin: 0; }
+.pdf-orient { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--paper-sunken); }
+.pdf-orient[hidden] { display: none; }
+.pdf-orient button {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 12px;
+  padding: 5px 11px;
+  border: 0; background: transparent; color: var(--ink-soft); cursor: pointer;
+}
+.pdf-orient button + button { border-left: 1px solid var(--rule); }
+.pdf-orient button:hover { color: var(--ink); background: var(--paper-raised); }
+.pdf-orient button.on { background: var(--clay); color: var(--paper-sunken); font-weight: 600; }
+:root[data-theme="light"] .pdf-orient button.on, :root[data-theme="white"] .pdf-orient button.on { color: #fff; }
+.pdf-sheet { display: inline-block; border: 1.4px solid currentColor; border-radius: 1.5px; }
+.pdf-sheet--across { width: 15px; height: 10px; }
+.pdf-sheet--upright { width: 10px; height: 14px; }
+.pdf-paper { margin-left: auto; font-size: 12px; color: var(--ink-faint); }
+/* Videos with or without, in the export menu (0.9.3). */
+.tb-menu__seg { display: flex; align-items: center; gap: 0; margin: 2px 6px 6px; border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; }
+.tb-menu__seg .seg-label { padding: 3px 8px; font-size: 11px; color: var(--ink-faint); border-right: 1px solid var(--rule); }
+.tb-menu__seg button { flex: 1; font: inherit; font-size: 11.5px; padding: 3px 8px; border: 0; background: transparent; color: var(--ink-soft); cursor: pointer; }
+.tb-menu__seg button + button { border-left: 1px solid var(--rule); }
+.tb-menu__seg button.on { background: var(--clay); color: var(--paper-sunken); font-weight: 600; }
+:root[data-theme="light"] .tb-menu__seg button.on, :root[data-theme="white"] .tb-menu__seg button.on { color: #fff; }
+.pdf-frame {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  overflow: hidden;
+  background: var(--paper-sunken);
+}
+.pdf-frame .pdf-view { position: absolute; inset: 0; width: 100%; height: 100%; }
+.pdf-status {
+  position: absolute; inset: 0; margin: 0;
+  display: grid; place-items: center;
+  font-size: 13px; color: var(--ink-faint);
+  pointer-events: none;
+}
+.pdf-status[hidden] { display: none; }
+
 /* ---------- print: only the note, on paper ----------
    The old block hid the sidebar and the toolbar but not the title strip, the
    menus, the find bar, the update card or any of the overlays — and it never
@@ -1177,6 +1452,9 @@ body.resizing webview { pointer-events: none; }
 @page { size: A4; margin: 18mm 16mm; }
 
 @media print {
+  /* On paper the paper is the page: no column, no drawn edges. */
+  #editor[data-paper] { padding-left: 0 !important; padding-right: 0 !important; background-image: none !important; }
+
   .titlebar, #app-menu, .side, .pad, .toolbar, .ai-panel, .demo-banner,
   .mini-bar, .float-menu, .savestate, .shape-bar, .image-bar, .code-head, .find-bar,
   .update-card, .overlay, .note-menu, .eq-pop { display: none !important; }

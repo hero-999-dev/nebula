@@ -1,11 +1,14 @@
-import { app, BrowserWindow, Menu, dialog, shell, ipcMain, session, clipboard } from 'electron';
+import { app, BrowserWindow, Menu, dialog, shell, ipcMain, session, clipboard, screen } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { installAiSignIn } from './ai-browser-auth.js';
-import { AI_SERVICES } from '../src/js/ai-services.js';
-import { fetchPageTitle } from './link-metadata.js';
+import { randomUUID } from 'node:crypto';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { installAiSignIn, signInWindowOpener } from './ai-browser-auth.js';
+import { AI_SERVICES, isGoogleService } from '../src/js/ai-services.js';
+import { realScaleFor } from '../src/js/page-zoom.js';
+import { fetchPageTitle, fetchVideoPoster } from './link-metadata.js';
+import { installContextMenu, registerEditingHandlers, writeImageToClipboard } from './context-menu.js';
 import { purgeNoteFromBackups, purgeDeletedFromBackups } from './backup-purge.js';
 import { initUpdater } from './updater.js';
 import { resolveUserData, appChannel, canSelfUpdate } from './user-data.js';
@@ -66,6 +69,9 @@ const CHANNEL = appChannel({
   metaChannel: META.nebulaChannel,
   portableDir: process.env.PORTABLE_EXECUTABLE_DIR,
 });
+/** The Blink feature behind passkeys; switched off in every page the app shows (see below). */
+export const NO_WEBAUTH = 'WebAuth';
+
 const APP_TITLE = META.productName ?? 'Nebula';
 
 // Windows groups taskbar buttons by AppUserModelID and takes the button's icon
@@ -91,6 +97,38 @@ if (process.platform === 'win32') {
 
 /** Notes live here as one JSON file per note. This directory is the vault. */
 const storageRoot = () => path.join(app.getPath('userData'), 'storage');
+
+/**
+ * The folder the last export or import went to. Electron 43 opens every file
+ * dialog in Downloads unless told otherwise, and the OS no longer remembers
+ * the last folder for it; the app does, for as long as it runs (0.9.3).
+ */
+let lastFolder = null;
+
+/**
+ * The sheet a print goes on (0.9.3): the note's paper (page-mode.js), in
+ * microns as Electron wants a size it has no name for; A4 for Nebula's own.
+ */
+const PAPER_MM = { nw: [297, 210], 'nw-portrait': [210, 297], nn: [210, 297], a3: [297, 420], a4: [210, 297], a5: [148, 210], b3: [353, 500], b4: [250, 353], b5: [176, 250] };
+function printPageSize(page) {
+  const mm = PAPER_MM[String(page || '')];
+  return mm ? { width: mm[0] * 1000, height: mm[1] * 1000 } : 'A4';
+}
+const PDF_OPTIONS = {
+  // The note's own frame and code-block fills are part of how it reads.
+  printBackground: true,
+  pageSize: 'A4',
+  // The page box comes from the document's own `@page`, exactly. Without
+  // this Chromium rounds it — the sheet came out 795x1124 while the page box
+  // was 794x1123 offset by a pixel, leaving a 0.75pt strip of the document's
+  // background along the top edge of every page.
+  preferCSSPageSize: true,
+};
+/** Where the export preview keeps its PDF while it is open: this app's own (Nebula Test and Nebula never share it). */
+const pdfPreviewDir = () => path.join(app.getPath('userData'), 'pdf-preview');
+/** The preview's own session: a PDF shown, nothing navigated, nothing opened. */
+const PDF_PREVIEW_PARTITION = 'nebula-pdf-preview';
+const inLastFolder = (name) => (lastFolder ? path.join(lastFolder, path.basename(name)) : name);
 const backupsRoot = () => path.join(app.getPath('userData'), 'backups');
 
 function resolveInStorage(rel) {
@@ -248,6 +286,8 @@ function requestRendererSave(win) {
 }
 
 app.on('before-quit', () => { quitRequested = true; });
+// The export preview's PDFs hold notes: none outlives the app (0.9.3).
+app.on('will-quit', () => { try { fsSync.rmSync(pdfPreviewDir(), { recursive: true, force: true }); } catch { /* in use */ } });
 
 /** The test build carries its own mark so the two are told apart at a glance. */
 function windowIconPath() {
@@ -294,14 +334,38 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true, // AI panel embeds a real chat webview
+      disableBlinkFeatures: NO_WEBAUTH,
     },
+  });
+  // Every AI tab and embed is a <webview>: passkeys off in each (see NO_WEBAUTH).
+  win.webContents.on('will-attach-webview', (_e, webPreferences) => {
+    webPreferences.disableBlinkFeatures = [webPreferences.disableBlinkFeatures, NO_WEBAUTH].filter(Boolean).join(',');
   });
 
   const restored = savedBounds();
   if (restored) win.setBounds(restored);
-  if (readPrefs().maximized) win.maximize();
+  // A window that was maximized opens maximized — but maximize() on a hidden
+  // window shows it at once on Windows, before the page has painted, and the
+  // page first laid itself out at the saved (half-screen) size: the app opened
+  // "as if the screen were split in two" (the owner, 0.9.3, Electron 44). The
+  // page is laid out at the screen's size from the start, and the window is
+  // maximized only as it is shown; leaving maximized goes back to the saved size.
+  const startMaximized = !!readPrefs().maximized;
+  if (startMaximized) {
+    try { win.setBounds(screen.getDisplayMatching(restored ?? win.getBounds()).workArea); } catch { /* no display info */ }
+  }
 
-  win.once('ready-to-show', () => win.show());
+  // Actual size needs the monitor's physical width, which Windows takes a moment
+  // to tell: asked now, so it is ready by the time a note opens.
+  void realScale(win);
+
+  win.once('ready-to-show', () => {
+    if (startMaximized) {
+      win.maximize();
+      if (restored) win.once('unmaximize', () => { if (!win.isDestroyed()) win.setBounds(restored); });
+    }
+    win.show();
+  });
 
   // Zoom is restored once the page exists, or it is applied to nothing.
   win.webContents.on('did-finish-load', () => {
@@ -372,6 +436,7 @@ function createWindow() {
   });
 
   mainWindow = win;
+  installContextMenu(win);
   const contentsId = win.webContents.id;
   win.webContents.on('did-start-loading', () => {
     // Reload registers a fresh listener once its store has booted.
@@ -487,20 +552,28 @@ function registerShellHandlers() {
    */
   ipcMain.handle('note:export', async (e, { suggested, content, format }) => {
     const win = from(e);
-    if (!win || typeof content !== 'string') return { ok: false };
-    const filters = format === 'html'
-      ? [{ name: 'HTML', extensions: ['html'] }]
-      : format === 'nebula'
-        ? [{ name: 'Nebula note', extensions: ['json'] }]
-        : [{ name: 'Markdown', extensions: ['md'] }];
+    // Text, or the bytes of a Word / OpenDocument file (0.9.3, office.js).
+    const binary = content instanceof Uint8Array;
+    if (!win || (typeof content !== 'string' && !binary)) return { ok: false };
+    const FILTERS = {
+      html: [{ name: 'HTML', extensions: ['html'] }],
+      nebula: [{ name: 'Nebula note', extensions: ['json'] }],
+      docx: [{ name: 'Word document', extensions: ['docx'] }],
+      odt: [{ name: 'OpenDocument text', extensions: ['odt'] }],
+      doc: [{ name: 'Word 97–2003 document', extensions: ['doc'] }],
+      rtf: [{ name: 'Rich Text', extensions: ['rtf'] }],
+      enex: [{ name: 'Evernote export', extensions: ['enex'] }],
+    };
+    const filters = FILTERS[format] ?? [{ name: 'Markdown', extensions: ['md'] }];
     const { canceled, filePath } = await dialog.showSaveDialog(win, {
       title: 'Export note',
-      defaultPath: String(suggested ?? 'Untitled'),
+      defaultPath: inLastFolder(String(suggested ?? 'Untitled')),
       filters,
     });
     if (canceled || !filePath) return { ok: false, canceled: true };
+    lastFolder = path.dirname(filePath);
     try {
-      await fs.writeFile(filePath, content, 'utf8');
+      await fs.writeFile(filePath, binary ? Buffer.from(content) : content, binary ? undefined : 'utf8');
       return { ok: true, path: filePath };
     } catch (err) {
       return { ok: false, error: err.message };
@@ -558,26 +631,66 @@ function registerShellHandlers() {
     }
   }
 
+  /**
+   * The PDF export's preview (0.9.3, the owner: "a preview of which page and
+   * which style the export will be, in a panel that suits the app"). The PDF
+   * is made once and shown from a file of its own; Export saves that same PDF.
+   * The file holds the note, so it goes when the preview closes, and anything a
+   * crash left behind goes at the next start (deleted notes stay deleted).
+   */
+  const previews = new Map();          // token -> { file, data }
+  async function dropPreview(token) {
+    const p = previews.get(token);
+    previews.delete(token);
+    if (p) await fs.rm(p.file, { force: true }).catch(() => {});
+  }
+  ipcMain.handle('note:pdf-preview', async (e, { document: html } = {}) => {
+    if (!from(e) || typeof html !== 'string' || !html) return { ok: false };
+    try {
+      const data = await withPrintWindow(html, (w) => w.webContents.printToPDF(PDF_OPTIONS));
+      await fs.mkdir(pdfPreviewDir(), { recursive: true });
+      const token = randomUUID();
+      const file = path.join(pdfPreviewDir(), `${token}.pdf`);
+      await fs.writeFile(file, data);
+      previews.set(token, { file, data });
+      return { ok: true, token, url: pathToFileURL(file).href, bytes: data.length };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+  ipcMain.handle('note:pdf-save', async (e, { token, suggested } = {}) => {
+    const win = from(e);
+    const p = previews.get(token);
+    if (!win || !p) return { ok: false };
+    const { canceled, filePath } = await dialog.showSaveDialog(win, {
+      title: 'Export as PDF',
+      defaultPath: inLastFolder(String(suggested ?? 'Untitled.pdf')),
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    lastFolder = path.dirname(filePath);
+    try {
+      await fs.writeFile(filePath, p.data);
+      await dropPreview(token);
+      return { ok: true, path: filePath, bytes: p.data.length, via: 'preview' };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+  ipcMain.handle('note:pdf-discard', (_e, token) => dropPreview(token));
+
   ipcMain.handle('note:pdf', async (e, { suggested, document: html } = {}) => {
     const win = from(e);
     if (!win) return { ok: false };
     const { canceled, filePath } = await dialog.showSaveDialog(win, {
       title: 'Export as PDF',
-      defaultPath: String(suggested ?? 'Untitled.pdf'),
+      defaultPath: inLastFolder(String(suggested ?? 'Untitled.pdf')),
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
     });
     if (canceled || !filePath) return { ok: false, canceled: true };
+    lastFolder = path.dirname(filePath);
 
-    const options = {
-      // The note's own frame and code-block fills are part of how it reads.
-      printBackground: true,
-      pageSize: 'A4',
-      // The page box comes from the document's own `@page`, exactly. Without
-      // this Chromium rounds it — the sheet came out 795x1124 while the page box
-      // was 794x1123 offset by a pixel, leaving a 0.75pt strip of the document's
-      // background along the top edge of every page.
-      preferCSSPageSize: true,
-    };
+    const options = PDF_OPTIONS;
     try {
       // A whole document, printed in a window of its own. Falling back to the
       // live window keeps the export working if the renderer is too old to send
@@ -604,12 +717,12 @@ function registerShellHandlers() {
    * through webContents.print keeps Chromium's own layout and text output all
    * the way to the driver, with the print stylesheet applied.
    */
-  ipcMain.handle('note:print', async (e) => {
+  ipcMain.handle('note:print', async (e, { page } = {}) => {
     const win = from(e);
     if (!win) return { ok: false };
     return new Promise((resolve) => {
       win.webContents.print(
-        { silent: false, printBackground: true, pageSize: 'A4' },
+        { silent: false, printBackground: true, pageSize: printPageSize(page) },
         (ok, reason) => resolve({ ok, reason: reason ?? null }),
       );
     });
@@ -619,19 +732,37 @@ function registerShellHandlers() {
     const win = from(e);
     if (!win) return { ok: false };
     const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+      ...(lastFolder ? { defaultPath: lastFolder } : {}),
       title: 'Import a note',
       properties: ['openFile'],
       filters: [
-        { name: 'Notes', extensions: ['md', 'markdown', 'html', 'htm', 'txt', 'json'] },
+        { name: 'Notes', extensions: ['md', 'markdown', 'html', 'htm', 'txt', 'json', 'docx', 'odt', 'doc', 'rtf', 'enex'] },
         { name: 'All files', extensions: ['*'] },
       ],
     });
+    if (!canceled && filePaths?.[0]) lastFolder = path.dirname(filePaths[0]);
     if (canceled || !filePaths?.length) return { ok: false, canceled: true };
     try {
       const file = filePaths[0];
+      const name = path.basename(file);
+      // Word and OpenDocument (0.9.3): the bytes go to the renderer, which reads
+      // them (office.js) and sanitises the result like any HTML file. The old
+      // binary .doc is read to its text here (word-extractor), as paragraphs.
+      if (/\.(docx|odt|doc|rtf)$/i.test(name)) {
+        const bytes = await fs.readFile(file);
+        if (bytes.length > 64 * 1024 * 1024) return { ok: false, error: 'too large' };
+        if (/\.doc$/i.test(name) && bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0) {
+          const { default: WordExtractor } = await import('word-extractor');
+          const doc = await new WordExtractor().extract(bytes);
+          const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          const html = String(doc.getBody() ?? '').split(/\r?\n/).map((line) => `<p>${esc(line) || '<br>'}</p>`).join('');
+          return { ok: true, name: name.replace(/\.doc$/i, '.html'), text: html };
+        }
+        return { ok: true, name, bytes: new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength) };
+      }
       const text = await fs.readFile(file, 'utf8');
       // The renderer parses and sanitises it; the main process only reads bytes.
-      return { ok: true, name: path.basename(file), text };
+      return { ok: true, name, text };
     } catch (err) {
       return { ok: false, error: err.message };
     }
@@ -653,7 +784,7 @@ async function takeSnapshot(win) {
   if (!win || win.isDestroyed()) return { ok: false };
   try {
     const image = await win.webContents.capturePage();
-    clipboard.writeImage(image);
+    await writeImageToClipboard(image);
     // NEBULA_SNAPSHOT_DIR lets the tests keep their pictures out of the user's folder.
     const dir = process.env.NEBULA_SNAPSHOT_DIR || path.join(app.getPath('pictures'), 'Nebula');
     await fs.mkdir(dir, { recursive: true });
@@ -668,11 +799,135 @@ async function takeSnapshot(win) {
   }
 }
 
+/**
+ * No "allow public and private networks" prompt (0.9.3).
+ *
+ * The owner met Windows Firewall's question for nebula.exe and asked that the
+ * app never need it. Nebula opens no server of its own; what asks is
+ * Chromium's WebRTC in the AI tabs and embeds, which waits for other peers'
+ * UDP packets on every network card (and announces itself over mDNS). With
+ * this, WebRTC goes only through a relay the site provides, so nothing on the
+ * machine waits for a connection from outside and Windows has nothing to ask.
+ * A site's voice or video still works where the site offers a relay.
+ */
+app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
+app.commandLine.appendSwitch('force-webrtc-ip-handling-policy', 'disable_non_proxied_udp');
+
+/**
+ * No passkeys anywhere in the app (0.9.3). Google's sign-in (Gemini, and the
+ * "Continue with Google" of ChatGPT and Mistral) asks for a passkey the moment
+ * it opens, and Chromium in Electron answers with the Windows "Choose a
+ * passkey" window before an address is typed. The page script in
+ * ai-browser-auth.js did not reach every page in time (the owner met the
+ * window again in Gemini); with WebAuth switched off in Blink the API is not
+ * there at all, in every page, frame and popup, from the first load. Nebula
+ * itself never uses it.
+ */
+app.commandLine.appendSwitch('disable-blink-features', 'WebAuth');
+// Electron 36 and later lower-case what goes through app.commandLine, and a
+// Blink feature name is case-sensitive: "webauth" switches nothing off. The
+// same feature goes into every window's and webview's own preferences
+// (disableBlinkFeatures), which is where Electron 44 honours it (0.9.3).
+
+/**
+ * Which way of signing in to Google worked for each site (0.9.3,
+ * SIGN_IN_METHODS in ai-services.js): the sign-in window starts with it next
+ * time. A small file in this copy's own folder — site addresses and a method
+ * name, nothing from any note.
+ */
+const signInMemoryFile = () => path.join(app.getPath('userData'), 'sign-in-methods.json');
+let signInMemoryCache = null;
+const signInMemory = {
+  get(site) {
+    if (!signInMemoryCache) {
+      try { signInMemoryCache = JSON.parse(fsSync.readFileSync(signInMemoryFile(), 'utf8')) || {}; } catch { signInMemoryCache = {}; }
+    }
+    return signInMemoryCache[site];
+  },
+  set(site, method) {
+    if (!site || !method) return;
+    this.get(site);
+    if (signInMemoryCache[site] === method) return;
+    signInMemoryCache[site] = method;
+    try { fsSync.writeFileSync(signInMemoryFile(), JSON.stringify(signInMemoryCache, null, 2)); } catch { /* remembered for this run only */ }
+  },
+};
+/**
+ * What the sign-in windows did, step by step (0.9.3), so a sign-in that fails
+ * on the owner's machine can be read afterwards: sign-in-log.txt in this
+ * copy's folder, the last 400 lines. Addresses are redacted by redactUrl —
+ * host and path only, never a code, token or e-mail.
+ */
+const signInLogFile = () => path.join(app.getPath('userData'), 'sign-in-log.txt');
+function signInLog(event, data = {}) {
+  const line = `${new Date().toISOString()} ${event} ${JSON.stringify(data)}\n`;
+  try {
+    fsSync.appendFileSync(signInLogFile(), line);
+    const all = fsSync.readFileSync(signInLogFile(), 'utf8').split('\n');
+    if (all.length > 480) fsSync.writeFileSync(signInLogFile(), all.slice(-400).join('\n'));
+  } catch { /* the log is a help, never a reason to fail */ }
+}
+
+/**
+ * Actual size (0.9.3): how much a CSS millimetre must be zoomed to be a real
+ * one on this screen. Windows reports the monitor's physical width (WMI): in
+ * millimetres from the monitor's own modes where it lists them, else in whole
+ * centimetres (31 for a 309 mm screen: 0.3 % off); the screen's width in device-independent pixels over that
+ * width, against CSS's 96 per inch, is the factor — Windows' own scaling falls
+ * out of it. One monitor, or the one whose proportions match the window's
+ * display; anything else (macOS, an unreadable or implausible answer) is 1.
+ */
+// One question, shared: the window asks as it is created and the page asks
+// while Windows is still answering. A cached 1 set before the answer came back
+// gave the page 1, and 100 % was CSS's size, not the paper's (0.9.3).
+let realScaleAsked = null;
+function realScale(win) {
+  realScaleAsked ??= measureRealScale(win);
+  return realScaleAsked;
+}
+async function measureRealScale(win) {
+  let realScaleCache = 1;
+  if (process.platform !== 'win32') return realScaleCache;
+  try {
+    const { execFile } = await import('node:child_process');
+    const out = await new Promise((resolve) => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+      '$mm = @{}; Get-CimInstance -Namespace root/wmi -ClassName WmiMonitorListedSupportedSourceModes -ErrorAction SilentlyContinue | ForEach-Object { $s = $_.MonitorSourceModes | Where-Object HorizontalImageSize | Select-Object -First 1; if ($s) { $mm[$_.InstanceName] = "$($s.HorizontalImageSize / 10) $($s.VerticalImageSize / 10)" } }; '
+      + 'Get-CimInstance -Namespace root/wmi -ClassName WmiMonitorBasicDisplayParams | Where-Object Active | ForEach-Object { if ($mm[$_.InstanceName]) { $mm[$_.InstanceName] } else { "$($_.MaxHorizontalImageSize) $($_.MaxVerticalImageSize)" } }'],
+    { timeout: 15000, windowsHide: true }, (err, stdout) => resolve(err ? '' : String(stdout))));
+    const monitors = out.split(/\r?\n/).map((l) => l.trim().split(/\s+/).map(Number)).filter((p) => p.length === 2).map(([w, h]) => ({ w, h }));
+    const display = screen.getDisplayMatching(win?.getBounds?.() ?? screen.getPrimaryDisplay().bounds);
+    realScaleCache = realScaleFor(display.size.width, display.size.height, monitors);
+  } catch { realScaleCache = 1; }
+  return realScaleCache;
+}
+
+/** The app's language, for the page a sign-in window shows when Google refused every way. */
+const appLanguage = () => mainWindow?.webContents?.executeJavaScript("localStorage.getItem('nebula:lang') || 'en'").catch(() => 'en') ?? 'en';
+
 app.on('web-contents-created', (_event, contents) => {
+  try { contents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp'); } catch { /* a contents that cannot take it */ }
+  if (contents.getType() === 'webview' && contents.session === session.fromPartition(PDF_PREVIEW_PARTITION)) {
+    // The export preview shows its PDF and nothing else: a link in the note is
+    // not followed inside the preview, and nothing opens a window from it.
+    contents.on('will-navigate', (ev) => ev.preventDefault());
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  }
   if (contents.getType() === 'webview') {
     const id = Object.keys(AI_SERVICES).find(id => contents.session === session.fromPartition('persist:ai-' + id));
     // Google sign-in stays in the app, in this service's own session (0.9.2).
-    if (id) installAiSignIn(contents, { popupOptions: { parent: mainWindow ?? undefined } });
+    if (id) {
+      const popupOptions = { parent: mainWindow ?? undefined };
+      // Gemini is Google's own: the whole tab is Firefox, not only the sign-in.
+      const firefoxAlways = isGoogleService(AI_SERVICES[id]?.url);
+      const openSignIn = signInWindowOpener(BrowserWindow, popupOptions, {
+        memory: signInMemory,
+        chromium: app.userAgentFallback,     // the engine as it is, without Electron's name
+        platform: process.platform,
+        language: appLanguage,
+        log: signInLog,
+      });
+      installAiSignIn(contents, { popupOptions, openSignIn, firefoxAlways, log: signInLog });
+    }
   }
   contents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown' || input.key !== 'F12' || input.control || input.alt || input.shift || input.meta) return;
@@ -689,6 +944,7 @@ app.whenReady().then(async () => {
   // The app draws its own menus beside the logo, so the native bar goes.
   Menu.setApplicationMenu(null);
   registerShellHandlers();
+  registerEditingHandlers(ipcMain, () => mainWindow);
   // Webviews load arbitrary sites — allow only what chat UIs legitimately need.
   const ALLOWED_PERMISSIONS = new Set([
     'media', 'notifications', 'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'openExternal',
@@ -697,10 +953,12 @@ app.whenReady().then(async () => {
     cb(ALLOWED_PERMISSIONS.has(permission));
   });
 
+  try { fsSync.rmSync(pdfPreviewDir(), { recursive: true, force: true }); } catch { /* another copy has one open */ }
   snapshotStorage();
   purgeOldDeletions();
   stampVaultMeta();
 
+  ipcMain.handle('display:real-scale', (e) => realScale(BrowserWindow.fromWebContents(e.sender)));
   ipcMain.handle('storage:root', () => storageRoot());
   // Before the renderer repairs every note in the vault (src/js/heal.js) — the
   // one step that writes notes nobody opened — the vault is put aside under a
@@ -783,6 +1041,11 @@ app.whenReady().then(async () => {
   ipcMain.handle('links:title', (event, url) => {
     if (event.sender !== mainWindow?.webContents) return { ok: false };
     return fetchPageTitle(url);
+  });
+  // A video's still and title, for an export "with video" (0.9.3).
+  ipcMain.handle('links:video-poster', (event, url) => {
+    if (event.sender !== mainWindow?.webContents) return { ok: false };
+    return fetchVideoPoster(url);
   });
   ipcMain.handle('app:version', () => APP_VERSION);
 

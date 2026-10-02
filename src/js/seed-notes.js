@@ -303,7 +303,7 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '0.9.2';
+export const GUIDE_VERSION = '0.9.3';
 
 /**
  * The guide's words, without its markup, shapes, code or equations — so a
@@ -336,6 +336,26 @@ export const GUIDE_SIGNATURES = {
   '0.9.0': '5b765db9',
   '0.9.1': '1823b8d5',
   '0.9.2': '7d56ce37',
+  '0.9.3 first test build': 'ba8043ce',
+  '0.9.3 second test build': 'e7656553',
+  '0.9.3 third test build': '61d84c6e',
+  '0.9.3 fourth test build': 'f12275a0',
+  '0.9.3 fifth test build': 'bf9c031e',
+  '0.9.3 sixth test build': '396b684c',
+  '0.9.3 seventh test build': '05ad1f4c',
+  '0.9.3 eighth test build': '0dd064de',
+  '0.9.3 ninth test build': '24419b13',
+  '0.9.3 tenth test build': '55944dc2',
+  '0.9.3 eleventh test build': '5e0f35dd',
+  '0.9.3 twelfth test build': '30e1beb9',
+  '0.9.3 thirteenth test build': '61bc5960',
+  '0.9.3 fourteenth test build': '80ec76b9',
+  '0.9.3 fifteenth test build': 'aeb2bdbc',
+  '0.9.3 sixteenth test build': '838f87ba',
+  '0.9.3 seventeenth test build': 'e0a03dd1',
+  '0.9.3 eighteenth test build': 'e2798686',
+  '0.9.3 nineteenth test build': '0288c643',
+  '0.9.3': '6a23d307',
 };
 
 /** Whether a vault's guide is one we shipped and nobody has typed in. */
@@ -371,13 +391,22 @@ export const GUIDE_NOTE = {
     // section they belong to. See GUIDE_SIGNATURES before changing any text.
     // A divider closes each section before the next heading (owner, 0.8.9).
     '<hr class="blk-hr">' +
-    '<h2>New in 0.9.2</h2>' +
+    '<h2>New in 0.9.3</h2>' +
     '<ul>' +
-    '<li><strong>Google sign-in in the app.</strong> <em>Continue with Google</em> in an AI tab opens a small sign-in window; when you are done it closes and the tab is signed in — section 1.</li>' +
-    '<li><strong>Theme color.</strong> The top of the text colour list gives words the theme’s own ink again, pasted words in a fixed colour too — section 3.</li>' +
-    '<li><strong>Pasted words take your note’s font.</strong> Text copied from a web page or another note arrives in this note’s font, size and colour; bold, italic, lists and links stay — section 7.</li>' +
-    '<li><strong>A clearer ⋯ menu.</strong> Pin to top, Only view mode or Edit mode, Edit labels, Archive this note, and Move to trash last — section 1.</li>' +
-    '<li>Recently: <strong>older notes repaired too</strong>, <strong>deleted is deleted</strong> and <strong>looking is not editing</strong> (0.9.1); <strong>labels</strong>, <strong>four image corners</strong> and <strong>bookmark titles</strong> (0.9.0); <strong>Only view</strong>, <strong>arrows that snap on</strong> and <strong>F12</strong> (0.8.9).</li>' +
+    '<li><strong>Page zoom.</strong> Beside the alignment buttons: − and + and the ratio, 50 % to 200 % of the real size, or fit to page, for the open note — section 1.</li>' +
+    '<li><strong>Page widths.</strong> Beside <em>Saved</em>: Nebula Wide (NW, as wide as the window), Nebula Narrow (NN, A4 close to its edges), and the A3, A4, A5, B3, B4 and B5 papers — the line breaks where it will on paper, and a thin line shows each page — section 1.</li>' +
+    '<li><strong>Auto order page.</strong> The button right of the page zoom moves a shape or picture that a page line falls across to the next page; turned on in a note’s ⋯ menu, it does so by itself — section 1.</li>' +
+    '<li><strong>Word, OpenDocument and a Mac\u2019s own.</strong> Export and import .docx, .odt, .doc, Rich Text (.rtf, for TextEdit, Pages and Notes) and Evernote (.enex, for Apple Notes, Bear and Joplin), each with a preview of its pages; videos go out with their picture or as bookmarks — section 8.</li>' +
+    '<li><strong>A preview before a PDF.</strong> Export as PDF shows the pages first, as they will be saved; a Nebula Wide note chooses A4 landscape or portrait there — section 8.</li>' +
+    '<li><strong>Your AI tabs, your way.</strong> Right-click a tab to rename it, change its address or delete it; ↻ reloads the tab; MathGPT is in the panel — section 1.</li>' +
+    '<li><strong>Folders, and notes in the order you choose.</strong> <em>New folder</em> beside New note; drag notes into a folder or above and below each other, the pinned ones among themselves, and folders too — section 1.</li>' +
+    '<li><strong>Four languages.</strong> English, Deutsch, Polski and Türkçe, beside the version number at the bottom of the sidebar — section 1.</li>' +
+    '<li><strong>Spelling suggestions.</strong> Right-click a word with a red underline for its corrections, or add it to the dictionary — section 2.</li>' +
+    '<li><strong>Toggle lists.</strong> A line with an arrow that folds away what is under it — section 4.</li>' +
+    '<li><strong>@ and # in a note.</strong> <em>@</em> mentions another note, <em>#word</em> writes a label into the text; <em>Filter by label</em> under the filter box shows one label’s notes — section 1.</li>' +
+    '<li><strong>A font for each note.</strong> The font and size you picked last in a note are what its new lines are written in — section 3.</li>' +
+    '<li><strong>Pictures, embeds and dividers.</strong> Crop a picture with ✂, double-click it for its caption, copy it with Ctrl+C or a right-click; resize an embed by its corner; click a divider to pick it — sections 4 and 7.</li>' +
+    '<li>Recently: <strong>Google sign-in in the app</strong>, <strong>Theme color</strong> and <strong>pasted words in your note’s font</strong> (0.9.2); <strong>older notes repaired too</strong> and <strong>deleted is deleted</strong> (0.9.1); <strong>labels</strong> and <strong>four image corners</strong> (0.9.0).</li>' +
     '</ul>' +
 
     '<hr class="blk-hr">' +
@@ -386,9 +415,10 @@ export const GUIDE_NOTE = {
     '<ul>' +
     '<li><strong>↑</strong> bar on top (default) — press the active side again to come back to it</li>' +
     '<li><strong>↓</strong> bar under the note · <strong>←</strong> and <strong>→</strong> turn it into a vertical rail</li>' +
-    '<li><strong>AI</strong> opens the side panel: Claude, Gemini, ChatGPT, Mistral, DeepSeek, Copilot, Perplexity, and <strong>+</strong> adds any site. The tab strip scrolls sideways (Shift+wheel); drag the panel’s left edge to resize it. Signing in with Google stays in the app: <em>Continue with Google</em> opens a small sign-in window that shares the tab’s session, and when you are done it closes and the tab is signed in.</li>' +
+    '<li><strong>AI</strong> opens the side panel: Claude, Gemini, ChatGPT, Mistral, MathGPT and Copilot; <strong>↻</strong> loads the open tab again and <strong>+</strong>, at the right end, adds any site. Right-click a tab to change its name (<em>Change header</em>) or its address (<em>Change website</em>), or to delete it; <em>Restore removed sites</em> brings deleted ones back. The tab strip scrolls sideways (Shift+wheel); drag the panel’s left edge to resize it. Signing in with Google stays in the app: in every tab, Google’s sign-in opens in a small window that shares the tab’s session, and when you are done it closes and the tab is signed in. No Windows “Choose a passkey” window gets in the way of typing your address.</li>' +
     '<li><strong>−</strong> hides the bar for a clean page</li>' +
     '</ul>' +
+    '<p><strong>Languages.</strong> Right beside the version number at the bottom of the sidebar stand the four languages — <strong>English</strong>, <strong>Deutsch</strong>, <strong>Polski</strong>, <strong>Türkçe</strong> — each in its own language, the one in use lit. Pick one and every menu, button and hint follows at once; with the note list folded they stand one under another as EN, DE, PL, TR. Your notes are never translated. The spelling check, its red underlines and its suggestions, follow the language you pick.</p>' +
     '<p>Four themes at the bottom of the sidebar: <strong>Main</strong>, <strong>Dark</strong>, <strong>Light</strong> and <strong>White</strong>. The layout and the theme both survive a restart. <span class="inline-code">Ctrl +</span> and <span class="inline-code">Ctrl −</span> zoom, <span class="inline-code">Ctrl 0</span> goes back to actual size, <span class="inline-code">F11</span> is full screen, and the View menu hides the note list.</p>' +
     '<p><strong>F12</strong> takes a picture of the window: it is saved as a PNG in <em>Pictures\\Nebula</em> and copied, ready to paste anywhere. A note at the bottom says where it went.</p>' +
     '<p><strong>Try it:</strong> send the bar to the left rail, restart the app, and it is still there.</p>' +
@@ -396,6 +426,10 @@ export const GUIDE_NOTE = {
     '<h3>Labels</h3>' +
     '<p>Press <strong>+</strong> beside the title or choose <strong>⋯ → Edit labels</strong> for any note. Search existing labels, tick them to add or remove, or type a new name and press Enter. Labels stay with the note after a restart and in a Nebula note export.</p>' +
     '<p><strong>Try it:</strong> add <em>work</em>, then type <em>#work</em> in the sidebar filter to find matching notes.</p>' +
+    '<p><strong>#word in a note</strong> writes a label into the text: type <em>#</em>, a word and a space (or Enter), and the word becomes a label chip in the line. It is a label of the text, not one of the note’s own labels by its title; taking a label off the title leaves the text as it is. “C#” and “#1” stay ordinary words.</p>' +
+    '<p><strong>Filter by label.</strong> The button right under the filter box opens a search box and every label in use, of the titles and of the texts, in one set. Click a label and the list shows the notes that have it either way; the button then names it, and its × shows every note again. The ⋯ beside a label offers <em>Delete label</em>: it says how many notes have it, and then takes it off every note — from the title and from the text.</p>' +
+    '<p><strong>@ mentions a note.</strong> Type <em>@</em> and the start of another note’s name: a list of matching notes opens; Enter (or a click) puts a mention in the line, and a click on the mention opens that note. It keeps up with the note’s name if you rename it.</p>' +
+    '<p><strong>Try it:</strong> in a note of your own, type <em>see @Wel</em> and press Enter, then click the mention.</p>' +
     '<hr class="blk-hr">' +
     '<h3>Your notes</h3>' +
     '<ul>' +
@@ -407,6 +441,19 @@ export const GUIDE_NOTE = {
     '<li>Help → <em>Keyboard shortcuts</em> lists every key, and <em>What’s new</em> shows what the current version changed.</li>' +
     '</ul>' +
     '<p><strong>Try it:</strong> lock a note of your own with ⋯ → Only view, try to type in it, then click the 🔒 badge to unlock it.</p>' +
+    '<hr class="blk-hr">' +
+    '<h3>Page width</h3>' +
+    '<p>The eight boxes beside <em>Saved</em> set the open note\u2019s page; press one and it says what it is. <strong>NW</strong>, Nebula Wide, is the page as it always was: as wide as the window, no paper drawn; its PDF is A4, landscape or portrait, chosen in the export’s preview. <strong>NN</strong>, Nebula Narrow, is A4 written close to its edges (6.35 mm margins). <strong>A3</strong>, <strong>A4</strong>, <strong>A5</strong>, <strong>B3</strong>, <strong>B4</strong> and <strong>B5</strong> are the paper sizes. In every mode but NW the line is as long as it is on that paper when printed, so the caret goes to the next line where the paper will; the paper\u2019s edges are drawn faintly on either side, and a very thin line across the page shows where the export starts a new page. Printing and PDF export use that paper. Each note keeps its own page; choosing one is not an edit.</p>' +
+    '<p><strong>Try it:</strong> in a note of your own, press A5, then A3, and watch where the lines break; NW takes it back to the whole width.</p>' +
+    '<p><strong>Auto order page.</strong> On every page but NW, the button right of the page zoom (a sheet with two lines) looks for shapes and pictures that a page line falls across — the PDF would cut them or push them over — and moves each to just under the line, so the screen and the PDF break in the same place. The first line comes a little early: the PDF prints the note’s title above the writing on page one. In a note’s ⋯ menu, <em>Auto order page: not active</em> turns it on for that note, and the note does it by itself — when it opens, when its paper changes, when you let go of something and when typing settles; the button stays pressed and <em>Auto order mode is on</em> shows by the title (click it to turn it off). On NW the button is faded: there are no pages to order.</p>' +
+    '<p><strong>Try it:</strong> in a note of your own on A4, drag a shape onto the thin page line and press the button; it lands just under the line.</p>' +
+    '<p><strong>Page zoom.</strong> Beside the alignment buttons, after a thin line: <strong>−</strong>, the ratio, <strong>+</strong>. It brings the page closer or takes it further away — words, pictures, shapes and the page width together — from 50 % to 200 %. On the papers it is a share of the paper’s real size: at <strong>100 %</strong> a centimetre on the paper is a centimetre on your screen, whichever paper it is. On NW and NN, 100 % is the size Nebula has always shown. <strong>Fit</strong>, first in the list, makes the whole sheet as wide as the window and keeps it so when the window is made narrower or wider; beside it, what that is now as a share of the real size — Fit (62%). A note in Only view can still be zoomed. NW, NN, A4, A5 and B5 open at 100 %, A3, B4 and B3 fitted (NW has no sheet to fit); a page wider than the window scrolls sideways, its edges and lines kept. Each note keeps its own; Ctrl + and Ctrl − still zoom the whole window.</p>' +
+    '<p><strong>Try it:</strong> set a note to A4 and 150 %, then drag a shape — it follows the pointer exactly.</p>' +
+    '<hr class="blk-hr">' +
+    '<h3>Folders and the order of your notes</h3>' +
+    '<p><strong>New folder</strong> — the folder button beside <em>New note</em> — asks for a name and puts the folder in the list, open. A click on a folder shows or hides the notes in it; double-click it, or choose its <strong>⋯ → Rename folder</strong>, to rename it. <strong>Delete folder</strong> never deletes a note: the notes in it go back to the list.</p>' +
+    '<p><strong>Drag a note</strong> onto the middle of a folder to put it in, or between two notes or folders to put it there — a line shows where it will land. Dragging never pins or unpins a note: pinned notes stay at the top and can be put in any order among themselves, and a note in a folder can be pinned too (⋯ → Pin to top), staying at the top of that folder. <strong>Folders are dragged the same way</strong>: a new folder comes in at the top, and a note you change afterwards rises above it, as notes do, until you put the folder where you want it. <strong>⋯ → Move to folder</strong> moves a note without dragging. A note you never dragged still moves to the top when you change it; one you placed stays where you put it.</p>' +
+    '<p><strong>Try it:</strong> make a folder called <em>Work</em>, drag a note onto it, then drag another note above the first one in the list.</p>' +
 
     '<hr class="blk-hr">' +
     '<h2>2 · Writing</h2>' +
@@ -418,8 +465,11 @@ export const GUIDE_NOTE = {
     '<p>Some <span class="inline-code">inline code</span> to practise on.</p>' +
     '<p><strong>Try it:</strong> put the caret at the <em>end</em> of that code run and press Enter — the next line starts as plain text. Put it at the <em>start</em> and press Backspace — the code formatting comes off and the words stay. You are never stuck inside a format.</p>' +
 
+    '<h3>Spelling</h3>' +
+    '<p>A word the spelling check does not know gets a red wavy underline. <strong>Right-click it</strong> for its corrections — click one and the word is replaced, and one Ctrl+Z takes it back — or <em>Add to dictionary</em> so it is never marked again. A right-click on a picture offers <em>Copy image</em>, its caption and <em>Delete image</em>; over selected words it opens the formatting bar.</p>' +
+    '<p><strong>Try it:</strong> type <em>sentense</em> in a note and right-click it.</p>' +
     '<h3>The / menu</h3>' +
-    '<p>Type <span class="inline-code">/</span> at the start of a line (or after a space) and a menu of blocks opens; keep typing to narrow it, ↑ ↓ to choose, Enter to use. It turns the line you are on into <strong>Text</strong>, <strong>Heading 1–3</strong>, a <strong>bulleted</strong> or <strong>numbered</strong> list or a <strong>quote</strong>, and it inserts a <strong>to-do</strong>, a <strong>code block</strong>, a <strong>divider</strong>, a <strong>shape</strong>, or a link as an <strong>embed</strong>, a <strong>bookmark</strong>, a <strong>URL</strong> or a <strong>mention</strong>.</p>' +
+    '<p>Type <span class="inline-code">/</span> at the start of a line (or after a space) and a menu of blocks opens; keep typing to narrow it, ↑ ↓ to choose, Enter to use. It turns the line you are on into <strong>Text</strong>, <strong>Heading 1–3</strong>, a <strong>bulleted</strong> or <strong>numbered</strong> list, a <strong>toggle list</strong> or a <strong>quote</strong>, and it inserts a <strong>to-do</strong>, a <strong>code block</strong>, a <strong>divider</strong>, a <strong>shape</strong>, or a link as an <strong>embed</strong>, a <strong>bookmark</strong>, a <strong>URL</strong> or a <strong>mention</strong>.</p>' +
     '<p><strong>Try it:</strong> in a new note type <span class="inline-code">/h2</span> and Enter, then a title — only that line becomes a heading.</p>' +
 
     '<hr class="blk-hr">' +
@@ -437,7 +487,9 @@ export const GUIDE_NOTE = {
     '<p><span style="font-size:22px">22px</span> · <span style="font-size:11px">11px</span> · ' +
     '<span class="c-red">red text</span> · <span class="c-blue">blue text</span> · <span class="c-green">green text</span> · ' +
     '<span class="h-yellow">yellow background</span> · <span class="h-green">green background</span> · <span class="h-purple">purple background</span></p>' +
-    '<p><strong>Try it:</strong> the <strong>Font</strong> menu shows every face in its own typeface. With text selected it restyles the selection; with only a caret it restyles the whole line. The button always names the font under the caret. <strong>Size</strong> accepts any number you type, not just the listed ones — try 37.</p>' +
+    '<p><strong>Try it:</strong> the <strong>Font</strong> menu shows every face in its own typeface. With text selected it restyles the selection. The button always names the font under the caret. <strong>Size</strong> accepts any number you type, not just the listed ones — try 37.</p>' +
+    '<p><strong>A font for each note.</strong> The font and the size you picked last in a note become that note’s writing font: a new line is written in them, and the bar shows them there. What you already wrote keeps the font it was written in; <em>Serif (default)</em> and 17 go back to the app’s own.</p>' +
+    '<p><strong>Try it:</strong> in a note of your own, pick Consolas with nothing selected, press Enter and type — the new line is in Consolas; the lines above did not change.</p>' +
     '<p><strong>Try it:</strong> <em>A</em> applies the last text colour and <em>H</em> the last highlight; each <em>▾</em> opens the full list. <em>Theme color</em>, at the top, gives selected words back the theme’s own ink — also words pasted in a fixed colour that vanished in the Dark theme. Every row lines up and the list fits without scrolling.</p>' +
     '<p><strong>Try it:</strong> switch between the four themes with that paragraph in view. Every colour repaints for the theme and stays readable — a colour is stored as a name, not as a fixed value picked against one background.</p>' +
 
@@ -454,11 +506,15 @@ export const GUIDE_NOTE = {
     '<p><strong>Try it:</strong> end a list from the <em>middle</em> — the items below stay a list of the same kind, in order, under the new paragraph.</p>' +
     '<p><strong>Try it:</strong> the to-do button toggles. Press it on “click the box to tick me” and the line becomes an ordinary paragraph; press it again and the box comes back.</p>' +
     '<p><strong>Try it:</strong> build a bulleted list and start a numbered one on the line right under it. Two separate lists, side by side — the numbered one must not end up nested inside the last bullet.</p>' +
-    '<p>Tab and Shift+Tab indent any block up to six levels. The outline dropdown (paragraph, H1–H3, quote) sits before the list buttons, LibreOffice-style, and <span class="inline-code">/</span> anywhere opens the block menu.</p>' +
+    '<p>Tab and Shift+Tab indent any block up to six levels. In a list, <strong>Tab moves the item</strong> under the one above it, and Shift+Tab brings it back — the rest of the list and the lines around it stay where they are. The outline dropdown (paragraph, H1–H3, quote) sits before the list buttons, LibreOffice-style, and <span class="inline-code">/</span> anywhere opens the block menu.</p>' +
+    '<p><strong>Try it:</strong> put the caret in “second” and press Tab — it goes under “first”; Shift+Tab brings it back.</p>' +
+    '<h3>Toggle lists</h3>' +
+    '<div class="blk-toggle" data-open="true"><p class="toggle-title">Click the arrow to fold this away</p><div class="toggle-body"><p>Whatever is written under a toggle folds away with it: lines, lists, pictures, even another toggle.</p></div></div>' +
+    '<p>The ▸ button beside the to-do (or <span class="inline-code">/toggle</span>) turns the line you are on into a toggle. Enter in its title goes into the part that folds, Enter on an empty last line there leaves it, and Backspace at the start of the title turns it back into plain lines, nothing lost. Whether it is open or folded is kept with the note.</p>' +
 
     '<h3>Quotes and dividers</h3>' +
     '<blockquote>A quote stands apart from the text around it.</blockquote>' +
-    '<p>A quote comes from the outline dropdown or <span class="inline-code">/quote</span>. Enter on an empty line of a quote leaves it, the way a list does. A <strong>divider</strong> — the ― button or <span class="inline-code">/divider</span> — is a line of its own; Backspace next to it first marks it, and a second Backspace removes it, so one stray key cannot.</p>' +
+    '<p>A quote comes from the outline dropdown or <span class="inline-code">/quote</span>. Enter on an empty line of a quote leaves it, the way a list does. A <strong>divider</strong> — the ― button or <span class="inline-code">/divider</span> — is a line of its own; Backspace next to it first marks it, and a second Backspace removes it, so one stray key cannot. A click on a divider picks it: Backspace or Delete then removes it, and any other key carries on in the line under it.</p>' +
 
     '<hr class="blk-hr">' +
     '<h2>5 · Equations</h2>' +
@@ -493,18 +549,21 @@ export const GUIDE_NOTE = {
     '<li><strong>URL</strong> — the address as a link in the line of text.</li>' +
     '<li><strong>Mention</strong> — a short @site tag in the line, for when the address itself is noise.</li>' +
     '</ul>' +
-    '<p>The ✕ on a card removes it. Bookmark requests page metadata without browser cookies. Embed loads the page; its fallback link stays available, and a failed-load message appears only if the preview reports a loading failure.</p>' +
+    '<p>An embed is resized from any of its four sides or corners — they light up when the pointer is over it — wider or narrower, taller or shorter; a video keeps its shape. The ✕ on a card removes it. Bookmark requests page metadata without browser cookies. Embed loads the page; its fallback link stays available, and a failed-load message appears only if the preview reports a loading failure.</p>' +
 
     '<p>No mouse needed: in that menu press <strong>↓</strong> to reach the choices, <strong>←</strong> and <strong>→</strong> to move between them, and <strong>Enter</strong> to use the lit one. <strong>↑</strong> goes back to the address, <strong>Esc</strong> closes the menu and returns you to your text.</p>' +
     '<p><strong>Try it:</strong> copy any web address, paste it on an empty line, then ↓ → → Enter.</p>' +
     '<p><strong>Link any words:</strong> select them and paste a URL over them, or use the link button in the toolbar. <strong>Ctrl+click</strong> a link to open it; choosing the link button again with an empty address takes the link off.</p>' +
     '<p><strong>Videos:</strong> embed a YouTube or Vimeo link and you get the player itself, as wide as the text (up to a comfortable size) so the picture is sharp, black while it loads like on any site — a start time in the link is kept.</p>' +
-    '<p><strong>Pictures:</strong> paste an image and it goes on the line you are on, part of the text, so it moves with the words at any window size. Click it for its bar, where three buttons say where it lives and the current one is lit: <em>▾</em> behind the text, <em>▴</em> above the text (floating, on top), <em>≡</em> in the text. <em>Aa</em> writes a caption under it, <em>✕</em> deletes it, and any of its four corner handles resizes it proportionally. On floating pictures, the opposite corner stays in place. An image dropped from a folder floats where you drop it.</p>' +
+    '<p><strong>Pictures:</strong> paste an image and it goes on the line you are on, part of the text, so it moves with the words at any window size. Click it for its bar, where three buttons say where it lives and the current one is lit: <em>▾</em> behind the text, <em>▴</em> above the text (floating, on top), <em>≡</em> in the text. <em>Aa</em> writes a caption under it — so does a <strong>double-click</strong> on the picture — <em>✂</em> crops it (drag the frame’s edges or corners, Enter crops, Esc leaves it whole, one Ctrl+Z brings the whole picture back), <em>✕</em> deletes it, and any of its four corner handles resizes it proportionally. <strong>Ctrl+C</strong> with a picture selected (or <em>Copy image</em> on a right-click) copies the picture itself, ready for any program. In the text, Backspace at the start of the line under a picture, or Delete at the end of the line above, first selects the picture and only a second press deletes it; an empty line beside a picture simply goes. With a picture in the text selected, Enter opens a line under it and Alt+↑ / Alt+↓ move it up or down a line. On floating pictures, the opposite corner stays in place. An image dropped from a folder floats where you drop it.</p>' +
     '<p><strong>Try it:</strong> copy any picture, click at the end of this line and paste. Give it a caption, then make the window narrow and wide — the picture stays between the same two lines.</p>' +
 
     '<hr class="blk-hr">' +
     '<h2>8 · Import, export, print and moving a note</h2>' +
-    '<p>The export button (and the File menu) writes the open note as <strong>Markdown</strong>, <strong>HTML</strong>, <strong>PDF</strong> (A4, laid out the way it looks) or a <strong>Nebula note (.json)</strong>. <span class="inline-code">Ctrl+P</span> prints. <strong>Import</strong> opens a Markdown, HTML, text or Nebula note file as a new note; anything that could run is stripped out first.</p>' +
+    '<p>The export button (and the File menu) writes the open note as <strong>Markdown</strong>, <strong>HTML</strong>, <strong>Word</strong> (.docx, and .doc for older Word), <strong>OpenDocument</strong> (.odt, for LibreOffice), <strong>Rich Text</strong> (.rtf: TextEdit, Pages and Apple Notes open it), <strong>Evernote</strong> (.enex: Apple Notes, Evernote, Bear, Joplin and UpNote import it), <strong>PDF</strong> (on the note’s paper — A4 for NW and NN — laid out the way it looks; a preview shows the pages first, and a Nebula Wide note picks landscape or portrait in it) or a <strong>Nebula note (.json)</strong>. <span class="inline-code">Ctrl+P</span> prints. <strong>Import</strong> opens a Markdown, HTML, text, Word (.docx, .doc), OpenDocument (.odt) or Nebula note file as a new note; a Word, OpenDocument, Rich Text or Evernote file keeps its headings, lists, bold and italic, links and pictures (an .enex with several notes brings each in), and is set on the note\u2019s paper when it goes out (shapes stay behind — a word processor has no canvas); anything that could run is stripped out first.</p>' +
+    '<p><strong>Videos in an export.</strong> A video in the note goes out the way it shows: its picture with the play button, as wide as in the note, linked to the video — in Word it even plays, and an HTML file keeps the player. At the top of the export menu, and in the preview, <em>Videos: With / Without</em> chooses; without, it goes as a bookmark card — its title over its address, linked — like a bookmark in the note. Bookmarks, and embedded pages that no paper can show, go out as those cards too. PDF, Word, OpenDocument and Rich Text show their pages first, on the note\u2019s paper; Export writes the file.</p>' +
+    '<p><strong>Try it:</strong> export a note of your own as Word (.docx), then import that file: it comes back as a new note with its headings, lists and pictures.</p>' +
+    '<p><strong>Try it:</strong> in a note of your own on NW, choose export → PDF; turn the preview between Landscape and Portrait and watch the pages change, then Cancel — nothing is saved until Export.</p>' +
     '<p>To move a note to another Nebula intact, export it as a <strong>Nebula note</strong> — text, labels, shapes, arrows, pictures and embeds in one file — and import that file there. A note file copied straight out of a vault folder imports too. Markdown and HTML are for other apps; they cannot carry shapes.</p>' +
 
     '<hr class="blk-hr">' +

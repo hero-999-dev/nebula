@@ -32,12 +32,16 @@ const DROP = '.shape-layer, .code-head, .image-h, .image-del, .link-del, .link-e
 const ESCAPE_MD = /([\\`*_[\]])/g;
 
 /** A DOM to read from. DOMParser documents are inert — nothing loads or runs. */
-function parse(html) {
+function parse(html, drop = DROP) {
   const doc = new DOMParser().parseFromString(String(html ?? ''), 'text/html');
   cleanTypingMarkers(doc.body);
-  doc.body.querySelectorAll(DROP).forEach((el) => el.remove());
+  doc.body.querySelectorAll(drop).forEach((el) => el.remove());
   return doc;
 }
+/** The note, parsed and cleaned for a writer that cannot place shapes (office.js). */
+export function parseNote(html) { return parse(html); }
+/** The PDF keeps the canvas: Markdown and HTML cannot place a shape, a page can (0.9.3). */
+const DROP_PRINT = DROP.replace('.shape-layer, ', '');
 
 const clean = (s) => String(s ?? '').replace(/​/g, '').replace(/[ \t]+/g, ' ');
 
@@ -194,6 +198,19 @@ export function toHtml(html, title = 'Note') {
   });
   doc.body.querySelectorAll('[contenteditable]').forEach((el) => el.removeAttribute('contenteditable'));
   doc.body.querySelectorAll('iframe, webview').forEach((el) => el.remove());
+  // A video "with" (export-video.js): a web page can hold the real player, as the note does.
+  doc.body.querySelectorAll('figure.note-video[data-video]').forEach((fig) => {
+    const src = fig.dataset.video;
+    if (!/^https:\/\/(www\.youtube-nocookie\.com\/embed\/|player\.vimeo\.com\/video\/)/.test(src)) return;
+    const ratio = Number(fig.dataset.ratio) || 16 / 9;
+    const frame = doc.createElement('iframe');
+    frame.src = src;
+    frame.width = '100%';
+    frame.setAttribute('style', `aspect-ratio: ${ratio}; border: 0; display: block;`);
+    frame.setAttribute('allowfullscreen', '');
+    frame.setAttribute('allow', 'encrypted-media; picture-in-picture; fullscreen');
+    fig.querySelector('a:has(img)')?.replaceWith(frame);
+  });
 
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return `<!doctype html>
@@ -217,6 +234,12 @@ export function toHtml(html, title = 'Note') {
   .note-image img { width: 100%; height: 100%; object-fit: contain; }
   .note-image .image-caption { position: static; margin-top: 4px; font-style: italic; text-align: center; }
   .blk-todo { list-style: none; }
+  /* Bookmarks as the note draws them (0.9.3). */
+  .link-card { display: block; margin: .8em 0; padding: .6rem .85rem; border: 1px solid #ddd; border-radius: 8px;
+               background: #f7f7f5; color: inherit; text-decoration: none; }
+  .link-card__kind { display: block; font-size: .68em; letter-spacing: .05em; text-transform: uppercase; color: #888; }
+  .link-card__title { display: block; }
+  .link-card__url { display: block; font-size: .8em; color: #777; overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -242,6 +265,14 @@ export const FORMATS = [
   { id: 'md', label: 'Markdown (.md)', ext: 'md' },
   { id: 'html', label: 'HTML (.html)', ext: 'html' },
   { id: 'pdf', label: 'PDF (.pdf)', ext: 'pdf' },
+  // Word and OpenDocument (0.9.3, office.js); the .doc is Rich Text, which Word opens as one.
+  { id: 'docx', label: 'Word (.docx)', ext: 'docx' },
+  { id: 'odt', label: 'OpenDocument (.odt)', ext: 'odt' },
+  { id: 'doc', label: 'Word 97–2003 (.doc)', ext: 'doc' },
+  // A Mac's own (0.9.3): Rich Text for TextEdit, Pages and Notes; Evernote's export,
+  // which Apple Notes, Bear, Joplin and UpNote import.
+  { id: 'rtf', label: 'Rich Text (.rtf)', ext: 'rtf' },
+  { id: 'enex', label: 'Evernote / Apple Notes (.enex)', ext: 'enex' },
   { id: 'nebula', label: 'Nebula note (.nebula.json)', ext: 'nebula.json' },
 ];
 
@@ -280,10 +311,16 @@ export function fromNebulaNote(text) {
  * builds one — the note, the app's own styles, and nothing else — for a hidden
  * window to print.
  *
- * @param {{title?: string, body?: string, css?: string, margin?: string}} opts
+ * Shapes and arrows come along on their canvas (they were dropped with the
+ * Markdown's controls until 0.9.3, and every PDF came out without them — the
+ * owner's export preview showed it). The canvas's corner sits where the
+ * writing starts: Chromium cuts whatever reaches into a page's margin, and a
+ * shape placed by the paper's edge on screen would lose its left side.
+ *
+ * @param {{title?: string, body?: string, css?: string, margin?: string, size?: string}} opts
  */
-export function toPrintDocument({ title = 'Untitled', body = '', css = '', margin = '12.7mm' } = {}) {
-  const doc = parse(body);
+export function toPrintDocument({ title = 'Untitled', body = '', css = '', margin = '12.7mm', size = 'A4' } = {}) {
+  const doc = parse(body, DROP_PRINT);
   // Nothing executable travels into the print window. It has JavaScript turned
   // off as well; this is the belt to that pair of braces.
   doc.body.querySelectorAll('script, iframe, webview, object, embed, link, meta').forEach((el) => el.remove());
@@ -310,7 +347,7 @@ export function toPrintDocument({ title = 'Untitled', body = '', css = '', margi
      because it has to cover a dark sheet. This document is white to begin with,
      so the margin can be a real page margin - which is the only kind that
      repeats on every page. */
-  @page { size: A4; margin: ${margin}; }
+  @page { size: ${/^(A4|\d+mm \d+mm)$/.test(size) ? size : 'A4'}; margin: ${/^\d+(\.\d+)?mm$/.test(margin) ? margin : '12.7mm'}; }
   html, body { background: #fff; margin: 0; padding: 0; }
   body { color: #111; }
   /* The colours in a note are the note. Chromium drops backgrounds when
@@ -332,7 +369,12 @@ export function toPrintDocument({ title = 'Untitled', body = '', css = '', margi
     border: 0;
     background: none;
   }
-  .shape-layer { position: absolute; }
+  /* flow-root: the first block's top margin stays inside, as on screen, so
+     the pages break where the screen's page lines are (page-order.js). */
+  .editor { position: relative; display: flow-root; }
+  .shape-layer { position: absolute; inset: auto; left: 0; top: -16px; right: auto; bottom: auto; width: 0; height: 0; overflow: visible; }
+  .shape-layer .shape { break-inside: avoid; }
+  .shape-layer .sel, .shape-layer .is-selected { outline: none !important; box-shadow: none !important; }
   .image-layer { position: relative; }
   /* In the text, or in an old image layer: flowed. On the canvas: where it floats, like a shape. */
   .note-image--inline, .image-layer .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; }

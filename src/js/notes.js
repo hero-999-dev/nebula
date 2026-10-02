@@ -56,8 +56,17 @@ export function noteText(html) {
   return text;
 }
 
+/** How much of a note's markup the sidebar line reads, pictures taken out. */
+const SNIPPET_SOURCE = 40_000;
+
 export function plainSnippet(html, max = 80) {
-  const text = noteText(html);
+  // The first words, not a parse of the whole note: every save redraws the
+  // list, and the note being typed in is new markup each time — a 900 KB note
+  // with pictures was parsed whole on every autosave. Cut after the pictures
+  // are taken out, so a picture cannot use up the part that is read.
+  let src = String(html ?? '');
+  if (src.length > SNIPPET_SOURCE) src = src.replace(/data:image\/[^\s"'<>]+/gi, 'data:,').slice(0, SNIPPET_SOURCE);
+  const text = noteText(src);
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
 
@@ -68,6 +77,16 @@ export function relativeTime(ts) {
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`;
   if (diff < 604_800_000) return `${Math.floor(diff / 86_400_000)}d`;
   return new Date(ts).toLocaleDateString();
+}
+
+/**
+ * Where a note stands in the list (0.9.3). A note nobody has dragged stands
+ * by when it was last changed, newest first, as it always has; a dragged one
+ * keeps the place it was put in (`order`). Both are on one scale — `order` is
+ * made from its neighbours' keys — so the two kinds sort together.
+ */
+export function sortKey(note) {
+  return typeof note?.order === 'number' && Number.isFinite(note.order) ? note.order : (note?.updatedAt ?? 0);
 }
 
 export class NoteStore {
@@ -191,7 +210,7 @@ export class NoteStore {
     this.notes.unshift(note);
     this.activeId = note.id;
     localStorage.setItem(STORAGE_KEY_ACTIVE, note.id);
-    this.save();
+    this.save([note.id]);
     emit('note-changed', { id: note.id });
     return note;
   }
@@ -204,7 +223,7 @@ export class NoteStore {
     const note = this.get(id);
     if (!note) return;
     Object.assign(note, partial, { updatedAt: Date.now() });
-    this.save();
+    this.save([note.id]);
     emit('note-changed', { id: note.id });
   }
 
@@ -223,12 +242,72 @@ export class NoteStore {
       .sort((a, b) => b.deletedAt - a.deletedAt);
   }
 
-  /** Pinned first, then most recently touched. */
+  /** Pinned first, then by place: dragged notes where they were put, the rest most recently touched. */
   sorted() {
     return this.live().sort((a, b) => {
       if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
-      return b.updatedAt - a.updatedAt;
+      return sortKey(b) - sortKey(a);
     });
+  }
+
+  /**
+   * A note dragged to a place in the list (0.9.3): into a folder or out of
+   * one, and to a place (`order`, worked out by note-list.js from the
+   * neighbours it was dropped between). Dragging never pins or unpins a note
+   * (the owner, 0.9.3: "moving a note must not pin it"). Not an edit: the date stays.
+   * @param {string} id
+   * @param {{folder?: string|null, order?: number}} where
+   */
+  setPlace(id, { folder = null, order } = {}) {
+    const note = this.get(id);
+    if (!note) return null;
+    const patch = {};
+    if (typeof order === 'number' && Number.isFinite(order)) patch.order = order;
+    if (folder) patch.folder = folder; else delete note.folder;
+    return this.#mark(id, patch);
+  }
+
+  /** Places for several notes at once (a group numbered afresh), one save. */
+  setOrders(entries) {
+    const changed = [];
+    for (const [id, order] of entries) {
+      const note = this.get(id);
+      if (!note || !Number.isFinite(order)) continue;
+      note.order = order;
+      changed.push(id);
+    }
+    if (changed.length) {
+      this.save(changed);
+      emit('note-changed', { id: changed[0] });
+    }
+    return changed;
+  }
+
+  /** Into a folder, or out of every folder with null. Its place is kept. */
+  setFolder(id, folder) {
+    const note = this.get(id);
+    if (!note) return null;
+    if (!folder) {
+      if (!note.folder) return note;
+      delete note.folder;
+      this.save([id]);
+      emit('note-changed', { id });
+      return note;
+    }
+    return note.folder === folder ? note : this.#mark(id, { folder });
+  }
+
+  /** A folder was deleted: its notes, archived and trashed ones too, are in the list again. */
+  releaseFolder(folder) {
+    const changed = [];
+    for (const note of this.notes) {
+      if (note.folder === folder) { delete note.folder; changed.push(note.id); }
+    }
+    if (changed.length) {
+      this.save(changed);
+      for (const id of changed) emit('note-changed', { id });
+    }
+    return changed;
   }
 
   /**
@@ -253,7 +332,7 @@ export class NoteStore {
     Object.assign(note, patch);
     // `updatedAt` is deliberately NOT touched: archiving a note is not editing
     // it, and bumping it would reorder the list for no reason.
-    this.save();
+    this.save([id]);
     emit('note-changed', { id });
     return note;
   }
@@ -290,20 +369,111 @@ export class NoteStore {
    * @returns {number} notes written
    */
   healMany(repairs, markupVersion) {
-    let written = 0;
+    const written = [];
     for (const { id, from, content } of repairs) {
       const note = this.get(id);
       if (!note || note.content !== from) continue;
       note.content = content;
       if (markupVersion) note.markupVersion = markupVersion;
-      written += 1;
+      written.push(id);
     }
-    if (written) this.save();
-    return written;
+    if (written.length) this.save(written);
+    return written.length;
+  }
+
+  /**
+   * The note's writing font (0.9.3): the family and size picked last in it,
+   * which a new line is written in. `null` for either goes back to the app's
+   * own. A setting, not an edit — the note keeps its date.
+   * @param {{family?: string|null, size?: number|null}} patch
+   */
+  setFont(id, patch) {
+    const note = this.get(id);
+    if (!note) return null;
+    const font = { ...(note.font || {}) };
+    for (const key of ['family', 'size']) {
+      if (!(key in (patch || {}))) continue;
+      if (patch[key] === null || patch[key] === undefined || patch[key] === '') delete font[key];
+      else font[key] = key === 'size' ? Math.max(6, Math.min(400, Math.round(Number(patch[key])))) : String(patch[key]).slice(0, 200);
+    }
+    const same = JSON.stringify(font) === JSON.stringify(note.font || {});
+    if (same) return note;
+    return this.#mark(id, Object.keys(font).length ? { font } : { font: undefined });
+  }
+
+  /** Auto order page for this note (0.9.3, page-order.js): a setting, not an edit. */
+  toggleAutoOrder(id) {
+    const note = this.get(id);
+    return note ? this.#mark(id, { autoOrder: !note.autoOrder }) : null;
+  }
+
+  /**
+   * The note's page (0.9.3, page-mode.js): Nebula Wide, Nebula Narrow or a
+   * paper size. A setting, like the font — the note keeps its date and place.
+   */
+  setPage(id, page) {
+    const note = this.get(id);
+    if (!note) return null;
+    const value = page && page !== 'nw' ? String(page).slice(0, 8) : undefined;
+    if ((note.page || undefined) === value) return note;
+    if (value === undefined) {
+      delete note.page;
+      this.save([id]);
+      emit('note-changed', { id });
+      return note;
+    }
+    return this.#mark(id, { page: value });
+  }
+
+  /** The note's page zoom in percent (0.9.3, page-zoom.js); a setting, 100 stores nothing. */
+  setZoom(id, percent) {
+    const note = this.get(id);
+    if (!note) return null;
+    // A percentage of the real size or 'fit'; null (or nothing) is "the page's own default".
+    const value = percent === 'fit' ? 'fit' : (Number.isFinite(percent) ? Math.round(percent) : undefined);
+    if ((note.zoom ?? undefined) === value) return note;
+    if (value === undefined) {
+      delete note.zoom;
+      this.save([id]);
+      emit('note-changed', { id });
+      return note;
+    }
+    return this.#mark(id, { zoom: value });
   }
 
   setLabels(id, labels) {
     return this.#mark(id, { labels: normalizeLabels(labels) });
+  }
+
+  /**
+   * A label gone from every note (0.9.3, "⋯ -> Delete label" in the label
+   * search): off each note's title, and — through `stripText`, which takes the
+   * #chips out of a note's markup — out of each note's text. One save.
+   * @param {string} label
+   * @param {(html: string) => string|null} stripText the new markup, or null when nothing changed
+   * @returns {string[]} the notes that changed
+   */
+  deleteLabel(label, stripText) {
+    const want = String(label || '').replace(/^#+/, '').toLocaleLowerCase();
+    if (!want) return [];
+    const changed = [];
+    for (const note of this.notes) {
+      let touched = false;
+      const labels = normalizeLabels(note.labels);
+      const kept = labels.filter((l) => l.toLocaleLowerCase() !== want);
+      if (kept.length !== labels.length) {
+        if (kept.length) note.labels = kept; else delete note.labels;
+        touched = true;
+      }
+      const html = typeof note.content === 'string' && note.content.includes('note-tag') ? stripText?.(note.content) : null;
+      if (html !== null && html !== undefined && html !== note.content) { note.content = html; touched = true; }
+      if (touched) changed.push(note.id);
+    }
+    if (changed.length) {
+      this.save(changed);
+      for (const id of changed) emit('note-changed', { id, labelDeleted: want });
+    }
+    return changed;
   }
 
   togglePin(id) {
@@ -342,12 +512,17 @@ export class NoteStore {
     if (this.activeId === id) this.activeId = this.sorted()[0]?.id ?? null;
     if (this.activeId) localStorage.setItem(STORAGE_KEY_ACTIVE, this.activeId);
     else localStorage.removeItem(STORAGE_KEY_ACTIVE);
-    this.save();
+    this.save([]);
     emit('note-changed', { id, deleted: true });
     return true;
   }
 
-  save() {
-    saveJson(STORAGE_KEY_NOTES, this.notes);
+  /**
+   * @param {string[]} [changed] the notes this save is for. Without it every
+   *   note is written again, which in a vault holding long articles cost a
+   *   visible pause on each autosave.
+   */
+  save(changed) {
+    saveJson(STORAGE_KEY_NOTES, this.notes, { changed });
   }
 }

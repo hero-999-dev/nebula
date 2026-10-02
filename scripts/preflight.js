@@ -13,6 +13,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { ROOT } from './paths.js';
 import { checkVersions } from './versions.js';
+import { checkBrowsers, printBrowsers } from './check-browsers.js';
 
 const c = {
   reset: '\x1b[0m', bold: '\x1b[1m', dim: '\x1b[2m',
@@ -108,6 +109,15 @@ head('Versions');
     console.log(`  ${r.ok ? `${c.dim}ok${c.reset}   ` : `${c.red}DRIFT${c.reset}`} ${r.file.padEnd(18)} ${r.found ?? '(not found)'}`);
   }
   if (!ok) console.log(`\n  ${c.yellow}npm run push restamps these; do not edit a version by hand.${c.reset}`);
+}
+
+/* ------------------------- is the app still a browser Google lets sign in */
+
+head('Browsers');
+{
+  const browsers = await checkBrowsers();
+  printBrowsers(browsers);
+  if (!browsers.ok) console.log(`\n  ${c.yellow}npm run push stops on this: Google refuses an old browser ("Try using a different browser").${c.reset}`);
 }
 
 /* ------------------------------------------------------------------- say it */

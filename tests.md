@@ -1,3 +1,193 @@
+## 2026-10-04 — 0.9.3, twenty-eighth round
+
+- tests/export-video.test.js (12): without = a bookmark card; offline = the bookmark; a bookmark in .docx/.odt/.rtf/.enex/.html as its boxed card.
+- By hand: Word opens the bookmark box and both links in .docx, .odt and .rtf.
+
+## 2026-10-02 — 0.9.3, twenty-seventh round
+
+- tests/export-video.test.js (11): with/without remembered; with = the still, linked, card-wide, the player's address kept; without = the link; offline = the link; Word plays it (webVideoPr), ODT and RTF link it; HTML keeps the player; videoOf and fetchVideoPoster (the grey stand-in skipped); .enex out and back with MD5 pictures and to-dos; .rtf; the documents' preview page.
+- tests/e2e/v093.mjs (138): .docx/.odt/.doc/.rtf through the preview (title, paper, the PDF shown) and .enex; each imported back; the menu's video choice; with = player in HTML and the playable still in Word; without = the link only; the preview offers the choice only when the note has a video.
+- By hand: Word opens the files (the video as Word's online video); real YouTube and Vimeo stills.
+- Unit 690/690, full smoke 519/519.
+
+## 2026-10-02 — 0.9.3, twenty-sixth round
+
+- tests/office.test.js (7): the note as blocks (shapes left out); picture sizes from PNG bytes; .docx on A4, landscape for NW, and back through mammoth; .odt with mimetype first and back; .doc as Rich Text and back; .doc kinds told apart.
+- tests/e2e/v093.mjs (133): the order button faded on NW, pressed and the chip shown while on, the chip turns it off; export as .docx, .odt, .doc and import each back with its bold, list and picture.
+- By hand: LibreOffice and Word open the three files.
+- Unit 679/679, full smoke 514/514.
+
+## 2026-10-02 — 0.9.3, twenty-fifth round
+
+- tests/page-order.test.js (4): the line a box straddles; placed under it, a too-tall one left; nothing on NW; autoOrder a setting.
+- tests/e2e/v093.mjs (129): the button off on NW; the first line leaves the title's room; pressed, a shape across the line goes under it; turned on in the ⋯ menu, it happens on letting go.
+- Unit 672/672, full smoke 510/510. By hand: A4/NN/A5 screen lines against the PDF's page starts (pypdf) — exact for pages 2-3, a line off later on NN/A5.
+
+## 2026-10-02 — 0.9.3, twenty-fourth round
+
+- tests/page-mode.test.js: NW fluid (no data-paper), NW/NN at the screen's size, NW's sheet turned by the orientation, the preview's paper line, the remembered orientation.
+- tests/page-zoom.test.js: 100 % is 1 on NW/NN. tests/export.test.js: the PDF document keeps shapes; HTML does not.
+- tests/e2e/v093.mjs (125): NW as it always was; NN at 100 %; the preview on NN (paper line, the PDF in a plugin webview, file removed on Cancel); NW landscape/portrait re-rendered, remembered, printed that way.
+- smoke: the PDF export goes through the preview's Export. Unit 668/668, full smoke 506/506.
+
+## 2026-10-02 — 0.9.3, twenty-third round
+
+- tests/e2e/v093.mjs (119): "Fit (n%)" first in the box and its number matching the zoom; B4 at 100 % scrolls only when the sheet itself is wider; in Only view the zoom stays bright and pressable while the rest is dimmed.
+- Unit 666/666, full smoke 500/500.
+
+## 2026-10-01 — 0.9.3, twenty-second round
+
+- tests/editor.test.js: parseSize goes down to 5. smoke: the size menu starts at 5.
+- Unit 666/666, full smoke 497/497 (the first run after the 10px run was stopped had 5 timing failures, v093 alone then passed 116/116 twice).
+
+## 2026-10-01 — 0.9.3, twenty-first round
+
+- tests/e2e/v093.mjs (116): 100 % equals the main process's real scale (the startup race gave 1); the canvas is the A4 sheet, from its left edge.
+- smoke: shape outline weights measured unzoomed.
+- Unit 666/666, full smoke 497/497.
+
+## 2026-10-01 — 0.9.3, twentieth round
+
+- tests/page-zoom.test.js: 100 % is real size (1.644), 50 % half of it, 'actual' reads as 100, the window's zoom taken out; fit to page (fitFor) and stepping past it; setZoom 'fit'.
+- tests/page-mode.test.js: NW, A3, B4, B3 open fitted; sheetPx.
+- tests/e2e/v093.mjs (114): lines measured over the page's zoom; NW opens fitted with no sideways scroll; fit follows a narrower window; A5 at 100 % with "Fit to page" first; real size keeps the paper's edges; embed resize over the zoom.
+- rich-paste, view-snap, v090 checks zoom-aware; smoke compares outline weights at 100 %.
+- Unit 666/666, full smoke 495/495 (guide included).
+
+## 2026-10-01 — 0.9.3, nineteenth round
+
+- tests/page-mode.test.js: NN 746 px line, 1075 px pages, opens at actual size; NN's margin in the export document, an injected margin refused.
+- tests/e2e/v093.mjs (111): actual size shown as a bare percentage with the tooltip; B3 at 200 % keeps its 1238 px line and the frame scrolls sideways; NN's 746 px line.
+- Unit 665/665, guide 8/8, full smoke 492/492.
+
+## 2026-10-01 — 0.9.3, eighteenth round
+
+- tests/page-mode.test.js: NW 1027 px on A4 landscape, NN on A4 portrait; page heights (NW 698, A4 and NN 1027, A5 698); which papers open at real size; NW's title; the editor gets --page-col and --page-break.
+- tests/page-zoom.test.js (5): realScaleFor — the owner's 31 cm 1920 px screen 1.639, scaling cancelling out, the monitor shaped like the screen, implausible answers 1; actual size as a zoom of its own, − / + past it; setZoom 'actual' and null.
+- tests/e2e/v093.mjs (109): NW's line and page height, its meaning on a press; A5 opens at actual size with the percentage in the box; choosing the page's default zoom stores none; A4 at 100 % exactly 698 px (scroll bar accounted).
+- Unit 665/665, guide 8/8, full smoke 490/490 (the PDF margin check now expects NW's A4 landscape: 1027x698 writing area).
+
+## 2026-10-01 — 0.9.3, seventeenth round
+
+- tests/page-zoom.test.js (new, 3): the steps (50–200 %, nearest, − and + at the ends); the editor's zoom and editorZoom read from inside it; setZoom keeps the date, 100 % stores nothing.
+- tests/e2e/v093.mjs (106): at 150 % a dragged shape moves exactly as far as the pointer; the zoom on the page and in the box; − steps down; 100 % leaves no zoom.
+- Probe (local): shape move, picture move and picture corner at 150 % measured 1.5× before the fix, 1:1 after; caret clicks right either way.
+- Unit 663/663, guide 8/8, full smoke 487/487.
+
+## 2026-10-01 — 0.9.3, sixteenth round
+
+- tests/page-mode.test.js (new, 5): the eight boxes in order; each paper's printed line in px (A4 698, A5 463, A3 1027, B4 849, B5 569, B3 1238), NN 760, NW none; the print sheet per mode, A4 for Nebula's own, and an injected size refused; the column and print sheet applied to the editor; setPage keeps the date, NW stores nothing.
+- tests/e2e/v093.mjs (102): A5 and A4 lines measured in the real app; the page kept on the note without dating it; the print sheet follows; NW gives the whole width back.
+- Probe (local): the opening traced from inside main — hidden and screen-wide until shown, first layout at 1920.
+- Unit 660/660, guide 8/8, full smoke 483/483.
+
+## 2026-10-01 — 0.9.3, fifteenth round
+
+- tests/editor.test.js: the shipped line-up is Claude, Gemini, ChatGPT, Mistral, MathGPT, Copilot. tests/e2e/v093.mjs (98): MathGPT after Mistral, no Perplexity, no DeepSeek. Guide signature recorded (seventh test build kept).
+- Unit 655/655 in one run. v093 98/98.
+
+## 2026-10-01 — 0.9.3, fourteenth round
+
+- tests/ai-browser-auth.test.js (22): the order — a service's tab starts as Chromium, Gemini as Firefox, a remembered way first; the refusal sequence Chromium → Firefox → ESR → explanation page; each refusal moves the site on in memory; openSignIn carries firefoxFirst.
+- Unit: 655 pass (41 files with two workers, heal.test.js alone after an out-of-memory crash of the machine, not of a test). v093 e2e 98/98.
+
+## 2026-09-30 — 0.9.3, thirteenth round
+
+- tests/check-browsers.test.js (5): a newer Electron stops the release with the upgrade commands and the tests; compareVersions.
+- tests/ai-browser-auth.test.js (21): redactUrl keeps host, path and parameter names, never a value.
+- Bug check after Electron 44.5.1: unit 654/654, full smoke 479/479 (see Log.md for the one timed-out relaunch and its reruns).
+
+## 2026-09-30 — 0.9.3, twelfth round (Electron 44)
+
+- Full smoke on Electron 44.5.0: 479/479. Fixed on the way: Help → Blocks expects 16 (the toggle list), the save-dialog stub keeps the file name only (the app now hands the last folder too).
+- tests/e2e/v093.mjs 98/98 on 44: Backspace on the empty line under a divider brings the picture up and picks the divider, the next Backspace takes the divider and keeps the picture; passkeys refused in an AI tab (WebAuth off per webview), a picture copied is on the clipboard (read back as a ClipboardItem), a click in the AI page closes the tab menu (window blur).
+- e2e clipboard helpers moved to ClipboardItem: dense.mjs, rebuild-findings.mjs, rebuild-page.mjs, v093.mjs, view-snap.mjs.
+- Unit 652/652. `npm run check:browsers`: Firefox 157, ESR 140, Chromium 152 vs 154 — all ok.
+
+## 2026-09-30 — 0.9.3, eleventh round
+
+- tests/ai-browser-auth.test.js (20): refused → the next browser (today's Firefox, the ESR, Chromium as it is) from the start; all refused → the explanation page in the app's language, no more rounds; what worked is remembered per site and tried first.
+- tests/check-browsers.test.js (new, 4): today's Firefox (or the one before) passes; one behind stops with the line to change; an ESR that is no longer one stops; Electron's Chromium far behind is a warning.
+- Real app (probe): MathGPT's window opens on Google's address page as Firefox 157. `npm run check:browsers`: Firefox 157 ok, ESR 140 ok, Chromium 130 vs 154 warned.
+- Unit 652/652, v093 e2e 97/97. Not run (owner's rule): the full smoke, rebuild and old-notes.
+
+## 2026-09-30 — 0.9.3, tenth round
+
+- tests/editor.test.js: currentFirefox (157 on 30 September 2026, 158 four weeks on, never older) and the user agent built from it.
+- tests/e2e/v093.mjs (97): a real click in the AI page closes the tab menu.
+- Probe (local): the host document sees only `focus` (target WEBVIEW) when the page is clicked; reload and + render as the same round button.
+- Unit 647/647. Not run (owner's rule): the full smoke, rebuild and old-notes.
+
+## 2026-09-30 — 0.9.3, ninth round
+
+- tests/ai-browser-auth.test.js: no window spam — a window closed by hand is not reopened by the page until the tab gets input; an idle tab opens two a minute at most; input opens one at once.
+- Probe (local): a click in an AI tab reaches the tab's `input-event` (mouseDown); Mistral's Google window still opens on Google's address page.
+- Unit 646/646, v093 e2e 96/96. Not run (owner's rule): the full smoke, rebuild and old-notes.
+
+## 2026-09-29 — 0.9.3, eighth round
+
+- tests/ai-browser-auth.test.js (19): the hand-back redirect is stopped in the window and the tab alone takes the address; a page the window arrived at is not loaded again in the tab — the window finishes, closes after a quiet moment, and the tab reloads.
+- tests/v093.test.js: the page script acts on Google hosts only (accounts.google.co.uk, youtube yes; chat.deepseek.com, google.com.evil.test, notgoogle.com, copilot no).
+- tests/editor.test.js: mergeServices (renamed, re-addressed, hidden, + sites after) and siteUrl.
+- tests/e2e/v093.mjs (96): Esc on the picture under the divider leaves the caret on a line; a long <pre> line wraps; a tab's right-click menu, Change header, Delete website, Restore removed sites; the passkey probe now expects no stand-in in a service's tab.
+- rich-paste 20/20, editing-edges 8/8, reported 16/16, guide 8/8.
+- Not run (owner's rule): the full smoke, rebuild and old-notes.
+
+## 2026-09-29 — 0.9.3, seventh round
+
+- tests/folders.test.js (16): orderFor (between, top, bottom, alone, numbered afresh); setPlace keeps the date and the pin; a new note still comes in on top; ownRun — dragging never pins or unpins; setOrders one save; a folder stands among the notes by creation or its dragged place, order kept in folders.json.
+- tests/e2e/v093.mjs (89): ↓ and → from the heading go past the divider to the picture, never beside the divider; a note dropped among pinned ones is not pinned, a pinned one dropped among the others stays pinned; a folder dragged below a note; MathGPT after Mistral, no Perplexity; reload and + right of the strip.
+- rich-paste.mjs 20/20, editing-edges 8/8, reported 16/16, guide 8/8 after the picture/divider changes.
+- Probes (local): caret steps on a copy of the Ideas note (found the caret between heading and divider); Mistral's Google window in the real app reaches Google's address page; DeepSeek sign-in with and without the app's settings (Turnstile, no challenge shown).
+- Not run (owner's rule): the full smoke, rebuild and old-notes.
+
+## 2026-09-29 — 0.9.3, sixth round
+
+- tests/ai-browser-auth.test.js (+4, 17): one header listener per session covering all of Google, Firefox only for account pages or a Firefox-throughout contents; a sign-in window sharing the Mistral tab's session is Firefox to gstatic while the tab is not, and Gemini's session is Firefox even for a request with no tab; an OAuth "Sign in with Google" request is kept whole (also when carried in a refusal's continue); the window loads within the limit when the debugger never answers, straight to Google with no empty page first; the refusal is caught inside the page too.
+- tests/folders.test.js (new, 14): sortKey; a note dropped between two stands there and keeps its date, to the top and the bottom; a new note still comes in at the top; the pinned ones ordered among themselves, pinned by a drop among them, unpinned out of them; numbered afresh when there is no room; into a folder and out; a deleted folder gives its notes back, archived ones too; folder names cleaned, folders.json read defensively; make/rename/remove, new ones open; open folders remembered; listGroups (pinned, folders, rest, a lost folder's notes in the list); group keys; dropGapBreaks.
+- tests/heal.test.js: museum exhibit "a loose <br> between a divider and a picture" (fails without the step — checked).
+- tests/migrate.test.js: migrateNote counts `gaps`.
+- tests/e2e/v093.mjs (82): the Ideas note's `<hr><br><figure>` opens with nothing between; deleting the picture under a divider selects the next one with the caret hidden; New folder, a note dragged onto a folder, a note dragged above another, a click closes and opens a folder, folders.json and note.folder on disk, Delete folder keeps the notes. Drags use notes on screen: Playwright's drag is cut short when it has to scroll the list on the way.
+- Probes (test-results/probe/, local only): the real Mistral sign-in in Electron with the app's ai-browser-auth.js (blank window reproduced; after the fix Google shows the Mistral sign-in and answers "Couldn't find this account" to a made-up address instead of refusing the browser); the script registration order (loading about:blank first makes the script miss the next page); the divider gap in the real app; folders end to end with screenshots in Main and White.
+- tests/e2e/guide.mjs: 8/8 with the new section.
+- Not run (owner's rule): the full smoke, rebuild and old-notes.
+
+## 2026-09-29 — 0.9.3, fifth round
+
+- tests/ai-browser-auth.test.js (+3, 14): the window starts afresh with only the destination; refused, it retries by itself at most twice; the tab landing on the refusal (not on the silent check) opens the window; freshSignInUrl never takes a non-https continue.
+
+## 2026-09-29 — 0.9.3, fourth round
+
+- tests/v093.test.js: taking a label off a title leaves the text; deleteLabel takes a label off every note's title and text and nothing else; the passkey script leaves a PublicKeyCredential that says no; where the page is told Firefox, userAgentData and window.chrome are hidden (and not in a Chrome page); Google gets no sec-ch-ua headers; chips come out of the repair as plain text.
+- tests/heal.test.js: the chip exhibit now also removes a chip's contenteditable.
+- tests/e2e/v093.mjs (73): ⋯ -> Delete label with its confirmation, from title and text; ArrowDown through lines of #chips keeps them; Backspace on the empty line under a divider selects the picture; the AI tab's passkey check now expects a present, empty API.
+
+## 2026-09-29 — 0.9.3, third round
+
+- tests/ai-browser-auth.test.js (+4): the silent check stays in the tab and nothing is stopped without a window to open; a sign-in the person started (a navigation, or a redirect from a service) goes to its own window, frames and other sites do not; which pages are Google's accounts steps; the window closes and sends the tab on when Google hands back, and a window closed by hand reloads the tab; what counts as an interactive sign-in.
+- tests/v093.test.js (+3): setLabels names the labels taken off; removeTagChips takes a label's chips and one space out; the one-set search matches either kind.
+- tests/e2e/v093.mjs (69): one label set in the search; taking a label off the title removes its #chip and undo brings it back; Delete on an empty line between a divider and a picture; Alt+Up and Enter on a selected picture; eight embed handles, the left side widens, a freshly pasted embed has them.
+
+## 2026-09-29 — 0.9.3, second round
+
+- tests/v093.test.js (+7): text labels read from the markup; the label catalogue keeps note and text labels apart and filters by either; nested tag chips taken apart without losing a word, then idempotent; a divider inside a toggle stays in its body; Backspace after a <br> at the start of an item keeps the item; crop maps the frame onto the picture's pixels; spelling in the chosen language only.
+- tests/heal.test.js: museum exhibit "a #tag chip was editable, so the tags below went inside it".
+- tests/rich-paste.test.js: the picture bar has ✂.
+- tests/e2e/v093.mjs (62 checks): the four languages always open right of the version and fitting; German spelling set; #word not added to the note's labels, the next line's tag not inside the one above; the label filter closed until pressed, two groups, each kind filters, the × clears; the owner's three editing bugs on the structures of the note; /todo, /code, /divider and the to-do button inside a toggle; an empty nested item comes back out on Enter inside a toggle; crop to half the width and undo; an embed resized by its corner.
+- Probed by hand on a COPY of the owner's Ideas note in a throwaway profile (test-results/probe-ideas.mjs, probe-caption.mjs, probe-toggle.mjs; local only).
+- Not run (owner's rule): the full smoke, rebuild and old-notes.
+
+## 2026-09-29 — 0.9.3 (owner's "Ideas & Bugs" note)
+
+- tests/v093.test.js (new, 24): Tab nests a list item and Shift+Tab lifts it, the first item stays, a paragraph is left to the block indent, a list in a toggle stays there; @ and #word detection (C#, #1, "# " left alone) and note matching; the four languages (all strings have three translations, patterns fill values, the note, title and note names are never translated, back to English restores); spelling languages; the passkey refusal script; the note's writing font kept without dating the note; hasExplicitFont; a save serialises and writes only the changed note and drops the stale localStorage copy, and the browser preview still writes localStorage; dropWrapperIndents; makeToggle from a line and from a list item.
+- tests/heal.test.js: museum exhibit "Tab indented the wrapper round a heading and its list".
+- tests/migrate.test.js: MARKUP_VERSION is 0.9.3.
+- tests/seed-guide.test.js: guide signature 0.9.3.
+- tests/e2e/v093.mjs (new, 44 checks, in smoke): language picker (German/Turkish interface, closed picker above the version, the note unchanged, menus drawn later translated, back to English); Tab/Shift+Tab in a list; a click picks a divider, Backspace removes it, one undo brings it back, never saved armed; Backspace/Delete next to a picture in the text select it first; double-click opens a caption; Ctrl+C puts the picture on the clipboard; the right-click menu for a misspelt word and for a picture; toggle list (toolbar, Enter in/out, arrow folds, a list inside stays); @ mention (list, Enter, click opens the note); #word label chip and the note's label; label chips filter the list; the writing font on a new line, other lines unchanged, one undo, kept with the note; an AI tab is not offered passkeys; WebRTC has no UDP host candidates; an autosave beside a 5 MB note takes no long task and does not rewrite the big note.
+- tests/e2e/dense.mjs: the long-note trials include /toggle on a new line (passed 2/2 on the guide).
+- Real spellcheck checked by hand in the built app: "sentense" -> right-click offers "sentence", it replaces the word, Ctrl+Z restores it.
+- Not run (owner's rule: no long runs before "push"): the full smoke, rebuild and old-notes.
+
 ## 2026-09-28 — 0.9.2
 
 - tests/ai-browser-auth.test.js (rewritten, 7): a Google redirect is never stopped; the tab is Firefox once a Google page has arrived and its own identity again after; no switch in the middle of a navigation (it restarted the navigation and looped); a Firefox request header once per session; "Continue with Google" popups are windows of the app, anything that is not a web page is refused; popups get the same treatment.

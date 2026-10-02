@@ -22,7 +22,7 @@ import { stripTransient } from './note-markup.js';
 import { pruneAnchors } from './arrows.js';
 
 /** Bumped whenever a step is added, so the log line means something. */
-export const MARKUP_VERSION = '0.9.1';
+export const MARKUP_VERSION = '0.9.3';
 
 /**
  * @param {Element} root the editor
@@ -32,7 +32,7 @@ export const MARKUP_VERSION = '0.9.1';
  * @returns {{shapes: number, code: number}} how many nodes were touched
  */
 export function migrateNote(root, { fitShape } = {}) {
-  if (!root) return { shapes: 0, code: 0, wrappers: 0, blanks: 0, transient: 0 };
+  if (!root) return { shapes: 0, code: 0, wrappers: 0, blanks: 0, transient: 0, gaps: 0 };
   mergeImageLayers(root);
   const wrappers = unwrapBlockSwallowingSpans(root);
   liftNestedDividers(root);
@@ -44,15 +44,116 @@ export function migrateNote(root, { fitShape } = {}) {
   releaseEmptyLayers(root);
   // Anchors no arrow uses, and the copies Enter made of a line's anchor.
   pruneAnchors(root);
+  // Before normalizeProse, which would make each of them an empty line.
+  const gaps = dropGapBreaks(root);
   normalizeProse(root);
   normalizeUnderlineInk(root);
+  dropWrapperIndents(root);
+  repairTagChips(root);
   return {
     shapes: migrateShapes(root, fitShape),
     code: migrateCodeBlocks(root),
     wrappers,
     blanks: migrateBlankLines(root),
     transient,
+    gaps,
   };
+}
+
+/**
+ * A loose <br> between two blocks that are not lines (0.9.3).
+ *
+ * The owner's Ideas note holds `<hr><br><figure>`: a <br> straight on the
+ * editor, between a divider and a picture. It is no line anyone wrote on —
+ * normalizeProse would make it an empty paragraph, and the caret stood on it
+ * under the divider ("there should be nothing between the divider and the
+ * picture"). Only a <br> with nothing but other loose <br>s and blank text
+ * between two such blocks goes. Idempotent.
+ */
+const NOT_A_LINE = 'hr, .note-image, .blk-code, .link-block';
+export function dropGapBreaks(root) {
+  let touched = 0;
+  const loose = (n) => n && ((n.nodeType === 3 && !n.nodeValue.trim()) || (n.nodeType === 1 && n.tagName === 'BR'));
+  for (const br of [...root.children].filter((c) => c.tagName === 'BR')) {
+    if (br.parentNode !== root) continue;
+    let before = br.previousSibling;
+    let after = br.nextSibling;
+    while (loose(before)) before = before.previousSibling;
+    while (loose(after)) after = after.nextSibling;
+    if (before?.nodeType !== 1 || after?.nodeType !== 1) continue;
+    if (!before.matches(NOT_A_LINE) || !after.matches(NOT_A_LINE)) continue;
+    br.remove();
+    touched += 1;
+  }
+  return touched;
+}
+
+/**
+ * An indent on a wrapper that holds several lines (0.9.3).
+ *
+ * Up to 0.9.2, Tab indented "the block the caret was in", which was the
+ * editor's direct child — and when a font or colour had put one wrapper round
+ * a heading and the list under it, Tab moved all of them: the owner's Ideas
+ * note holds `<div data-ind="1"><h3>Bugs</h3><ul>…</ul></div>` ("I pressed Tab
+ * to move the next item under, and everything moved"). Tab now moves one line
+ * or one list item, so an indent on a container of lines is only ever that
+ * bug. It goes; nothing else changes. Idempotent.
+ */
+const LINE_BLOCKS = 'p, div, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, pre, figure, hr';
+
+/**
+ * #word chips, one piece each (0.9.3).
+ *
+ * The first 0.9.3 build wrote a chip as an editable span, so Enter after it
+ * carried it to the next line and every tag typed below went inside the one
+ * above: the owner's Ideas note holds `#label6` inside `#label5` inside
+ * `#label4`, and a chip holding only the line's <br>. A chip that holds other
+ * chips is taken apart; one that holds more than its "#word" gives the rest
+ * back to the line; each ends up plain text, its data-tag its word. Nothing
+ * is lost. Idempotent.
+ */
+export function repairTagChips(root) {
+  let touched = 0;
+  const unwrap = (el) => { while (el.firstChild) el.before(el.firstChild); el.remove(); };
+  for (const chip of [...root.querySelectorAll('span.note-tag')].reverse()) {
+    if (chip.isConnected && chip.querySelector('span.note-tag')) { unwrap(chip); touched += 1; }
+  }
+  for (const chip of [...root.querySelectorAll('span.note-tag')]) {
+    const m = chip.textContent.match(/^#([^\s#]+)/u);
+    if (!m) { unwrap(chip); touched += 1; continue; }
+    const word = `#${m[1]}`;
+    if (chip.textContent !== word || chip.children.length) {
+      // Keep the chip's own word; everything after it follows the chip, in order.
+      const rest = document.createRange();
+      const walker = root.ownerDocument.createTreeWalker(chip, NodeFilter.SHOW_TEXT);
+      let seen = 0;
+      for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+        if (seen + t.nodeValue.length >= word.length) { rest.setStart(t, word.length - seen); break; }
+        seen += t.nodeValue.length;
+      }
+      rest.setEnd(chip, chip.childNodes.length);
+      const tail = rest.extractContents();
+      chip.after(tail);
+      chip.textContent = word;
+      touched += 1;
+    }
+    if (chip.dataset.tag !== m[1]) { chip.dataset.tag = m[1]; touched += 1; }
+    // Ordinary text again (the second 0.9.3 build made chips one piece, and
+    // the caret could not stand on a line of them).
+    if (chip.hasAttribute('contenteditable')) { chip.removeAttribute('contenteditable'); touched += 1; }
+  }
+  return touched;
+}
+export function dropWrapperIndents(root) {
+  let touched = 0;
+  for (const el of root.querySelectorAll('div[data-ind]')) {
+    if (el.matches('.blk-todo, .blk-code, .blk-toggle, .shape, .shape-layer, .image-layer, .link-block')) continue;
+    const lines = [...el.children].filter((c) => c.matches(LINE_BLOCKS));
+    if (lines.length < 2) continue;
+    el.removeAttribute('data-ind');
+    touched += 1;
+  }
+  return touched;
 }
 
 /**

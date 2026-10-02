@@ -57,21 +57,21 @@ function enqueue(id, json) {
   return entry.promise;
 }
 
-function mirrorNotes(serialized) {
-  if (!api) return Promise.resolve();
-  let notes;
-  try {
-    notes = JSON.parse(serialized);
-  } catch {
-    return Promise.resolve();
-  }
-  if (!Array.isArray(notes)) return Promise.resolve();
+/**
+ * @param {object[]} notes every note
+ * @param {string[]} [changed] the ids that changed. Without it every note is
+ *   serialised again to find out — a 6 MB article on every keystroke's save.
+ */
+function mirrorNotes(notes, changed) {
+  if (!api || !Array.isArray(notes)) return Promise.resolve();
 
+  const only = Array.isArray(changed) ? new Set(changed) : null;
   const ids = new Set();
   const jobs = [];
   for (const note of notes) {
     if (!note?.id) continue;
     ids.add(note.id);
+    if (only && !only.has(note.id) && (desired.has(note.id) || lastWritten.has(note.id))) continue;
     const json = JSON.stringify(note, null, 2);
     desired.set(note.id, json);
     jobs.push(enqueue(note.id, json));
@@ -85,9 +85,20 @@ function mirrorNotes(serialized) {
   return Promise.all(jobs).then(() => {});
 }
 
-function mirror(key, serialized) {
-  if (!api || key !== NOTES_KEY) return;
-  mirrorNotes(serialized).catch((err) => console.warn('[storage] mirror failed', err));
+let localCopyDropped = false;
+
+/** The save hook: notes go to disk, and localStorage stops carrying them. */
+function mirror(key, value, { changed } = {}) {
+  if (!api || key !== NOTES_KEY) return false;
+  mirrorNotes(value, changed).catch((err) => console.warn('[storage] mirror failed', err));
+  // The copy loaded at boot is stale from the first save on. Left there, a
+  // vault emptied on disk would find it on the next start and write every
+  // note in it back — the notes deleted since among them.
+  if (!localCopyDropped) {
+    localCopyDropped = true;
+    try { localStorage.removeItem(NOTES_KEY); } catch { /* nothing to drop */ }
+  }
+  return true;
 }
 
 /** Wait for every pending disk write (used before quitting / verifying). */
@@ -117,6 +128,7 @@ export async function flushDisk() {
  */
 export async function initDiskStorage() {
   generation += 1;
+  localCopyDropped = false;
   api = window.nebula?.storage ?? null;
   lastWritten.clear();
   desired.clear();
@@ -191,14 +203,39 @@ export async function initDiskStorage() {
   // No files on disk. If localStorage still holds notes this is an upgrade from
   // a build that had no disk mirror — push them out to files, do not reseed.
   const cached = localStorage.getItem(NOTES_KEY);
-  let cachedCount = 0;
+  let cachedNotes = [];
   if (cached) {
-    try { cachedCount = JSON.parse(cached)?.length ?? 0; } catch { cachedCount = 0; }
-    if (cachedCount) await mirrorNotes(cached);
+    try { cachedNotes = JSON.parse(cached) ?? []; } catch { cachedNotes = []; }
+    if (!Array.isArray(cachedNotes)) cachedNotes = [];
+    if (cachedNotes.length) await mirrorNotes(cachedNotes);
   }
+  const cachedCount = cachedNotes.length;
 
   setSaveHook(mirror);
   return { bridge: true, ok: true, empty: cachedCount === 0, error: null };
+}
+
+/**
+ * A file of the vault that is not a note (0.9.3: `folders.json`). Read and
+ * written only while the vault itself was read successfully — the same rule
+ * the notes follow — so an unreadable vault is never written to.
+ * @returns {Promise<string|null>} the text, or null when it is not there or cannot be read
+ */
+export async function readVaultFile(rel) {
+  if (!api) return null;
+  try {
+    const res = await api.read(rel);
+    return res?.ok ? res.data : null;
+  } catch { return null; }
+}
+
+/** @returns {Promise<boolean>} whether it was written */
+export async function writeVaultFile(rel, text) {
+  if (!api) return false;
+  try {
+    const res = await api.write(rel, text);
+    return !!res?.ok;
+  } catch { return false; }
 }
 
 export function hasDiskStorage() {

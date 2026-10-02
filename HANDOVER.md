@@ -42,10 +42,10 @@ GitHub Releases, and updates itself in place on Windows.
 
 | | |
 |---|---|
-| Stack | Electron 33 · Vite 6 · vanilla ES modules · Vitest · playwright-core |
+| Stack | Electron 44 (Chromium 152, Node 24) · Vite 6 · vanilla ES modules · Vitest · playwright-core |
 | Renderer | `src/` — no framework, no build magic beyond Vite |
 | Main | `electron/main.js` + `electron/preload.js` — the only place with disk access |
-| Storage | `<userData>/storage/notes/<id>.json`, mirrored from `localStorage` |
+| Storage | `<userData>/storage/notes/<id>.json`, mirrored from `localStorage`; `storage/folders.json` holds the list's folders |
 | Tests | `npm test` (370 unit) · `npm run smoke` (231 Electron checks against the real app) |
 
 It is a deliberate rewrite of `../Nebula Demo/` (v0.5.7, feature-complete but
@@ -72,6 +72,12 @@ src/js/
   editor.js          contenteditable + debounced autosave
   toolbar.js  dock.js  slash-menu.js  shapes.js  codeblock.js  highlight.js
   side-toggle.js     folds the note list away; remembers the choice
+  i18n.js            four languages; translates the interface as it is drawn
+  context-menu.js    the right-click menu (spelling, pictures); electron/context-menu.js feeds it
+  toggles.js         toggle lists · mentions.js @ note mentions and #word labels
+  label-filter.js    "Filter by label": note labels and labels in the text, apart
+  image-crop.js      ✂ crop frame over a picture (page chrome, never in the note)
+  dividers.js        a click picks a divider
   find.js            Ctrl+F; paints matches, never edits the note
   export.js          a note as Markdown or one standalone HTML file
   import.js          a .md/.html file back into a note, sanitised
@@ -87,6 +93,12 @@ src/js/
   app-menu.js        File/Edit/View/Window/Help; also the palette's source
   palette.js         Ctrl+K, and the keyboard-shortcut sheet
   note-actions.js    the per-note menu and the archive/trash drawers
+  folders.js         FolderStore (folders.json) and how the list groups notes
+  page-zoom.js       a note's page zoom (CSS zoom); editorZoom() for drags
+  page-mode.js       a note's page width (NW, NN, A3–A5, B3–B5): the printed
+                     line on screen, and the paper for print and PDF
+  note-list.js       the list with folders; dragging a note into a folder or
+                     between two (note.order, on updatedAt's scale)
   lists.js           repairs what execCommand's list commands leave behind
   inline-format.js   Enter/Backspace out of an inline wrapper
   inline-family.js   exact inline selection boundaries and clean typing markers
@@ -112,7 +124,8 @@ everyone else. Nothing reads the DOM to find out what a note contains.
 | `npm test` | Unit tests |
 | `npm run build && npm run smoke` | Drives the real Electron app on throwaway profiles |
 | `npm run rebuild` | Local only (its files are gitignored): rewrites a real article in the app and scores it; reports in `test-results/rebuild/` |
-| `npm run old-notes` | The long-note trials on COPIES of this machine's own vaults (installed app + Nebula Test); nothing is written back, files are hash-checked |
+| `npm run old-notes` | The long-note trials on COPIES of this machine's own vaults (Nebula Test only — never the installed app); nothing is written back, files are hash-checked |
+| `npm run check:browsers` | The Firefox/ESR the sign-in windows claim against Mozilla's list, Electron's Chromium against Chrome's; `npm run push` stops on a stale Firefox |
 | `npm run pack:test` | **`Nebula Test.exe`** in the project root — double-click, own icon, own notes |
 | `npm run pack:win` | `release/Nebula-Setup-*.exe` + `Nebula-portable-*.exe` |
 | `npm run icons` | Regenerate `build/icon.png` from `build/source-mark.png` (Windows) |
@@ -311,7 +324,7 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    version writes cannot hold old residue, which is why the trials missed what
    the owner kept hitting. `tests/e2e/old-note.mjs` (in smoke) holds those
    structures by hand; `npm run old-notes` runs the trials on copies of the
-   real vaults on this machine.
+   notes in Nebula Test's vault (never the installed app's, trap 55).
 51. **Enter copies every attribute of a line onto the line it splits off** —
    its `data-anchor` too, so one arrow anchor ended up on nine paragraphs.
    Anything identifying (an anchor, an id) must be dropped from the new line
@@ -333,6 +346,34 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    itself: `color`, `scrollbar-color` and the font land inline on every copied
    element and freeze the source theme's ink. Pasted HTML goes through
    `paste-clean.js`.
+55. **Never the installed app.** `C:\Program Files\Nebula` and its notes and backups (`%APPDATA%\nebula`)
+   are the owner's private notes: no agent, script or test opens, reads, copies,
+   screenshots or updates them (owner, 2026-09-28). 0.9.1's old-notes check read them;
+   it reads Nebula Test's vault only now. The owner updates the installed app from inside it.
+56. **A save used to write the whole vault.** `NoteStore.save()` stringified
+   every note, the mirror parsed that and stringified each note again, and
+   localStorage got a copy — 0.4 s per autosave with two long articles in the
+   vault ("the app is incredibly slow"). Pass the changed ids
+   (`save([id])`); with the disk mirror on, localStorage does not hold notes
+   (its boot copy is removed at the first save, or an emptied vault would
+   resurrect deleted notes from it).
+57. **The interface is translated as it is drawn** (i18n.js). Write UI text in
+   English as always; add the string to `STRINGS` (or a pattern) and it follows
+   the language. Anything inside `#editor` is the note and is never touched —
+   a word changed there would be saved. A placeholder drawn inside the note by
+   CSS takes a custom property (`--t-caption`), not the attribute.
+58. **A right-click goes to the main process first.** Taking `contextmenu` in
+   the page (preventDefault) stops Electron's `context-menu` event, and with it
+   the spellchecker's suggestions. The page listens to `ui:context-menu`
+   (context-menu.js) and draws the menu there.
+59. **Two agents in one repo.** The Lea shadow replayed this session's prompt
+   in this repo and edited the same files (2026-09-29); it is fenced now
+   (Optimizing CLI `shadow/guard.js`). If files change under you, check
+   `shadow/shadow.log` before assuming anything.
+60. **`npm run kill` closes only this project's builds.** It used to
+   `taskkill /IM Nebula.exe /F` - the installed app included, with the owner's
+   unsaved notes. It now matches each process's executable path against the
+   project folder; `node scripts/kill-nebula.js --dry-run` lists the targets.
 16. **A `clip-path` cuts the border off too.** A clipped shape cannot have a
    `border`; draw it as two layers (outline behind, fill inset) and remember
    that CSS cannot read an element's inline `background`.
@@ -355,6 +396,46 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    against one background is unreadable on the other two. Colours are classes
    (`c-*`, `h-*`) resolved through `tokens.css`, and a highlight sets its own
    ink so the pair can never be chosen badly.
+18. **A sign-in window's page script goes in before its first page, and
+   nothing waits on it for ever.** `Page.addScriptToEvaluateOnNewDocument` on a
+   window that has loaded nothing may not answer until a page loads; waiting
+   for the answer left Mistral's window blank. Loading `about:blank` first to
+   get an answer is worse: the script then misses the next page, Google sees
+   Chromium under a Firefox name and refuses the address ("Try again" worked
+   only because the second page had the script). Register it, load at once
+   (a short cap on the wait). An OAuth "Sign in with Google" address is loaded
+   as it is — its client, return address and state are the sign-in.
+19. **The address a sign-in hands back to works once.** It carries a one-time
+   code. A sign-in window that follows the redirect while the tab is sent there
+   too makes two requests with one code, and the second is refused ("Unauthorized
+   request", or a sign-in that works only after a few tries). Stop the redirect in
+   the window and let the tab alone take it; if the window already arrived, let it
+   finish and reload the tab — never load the same address twice.
+20. **No stand-ins in a service's own tab.** The passkey page script replaces
+   PublicKeyCredential and hides window.chrome — right for Google's sign-in, fatal
+   for a captcha (DeepSeek refused every answer). It runs only where Google's
+   pages are shown, and only on Google hosts. A regex inside a template literal
+   needs doubled backslashes, or `\.` arrives as `.`.
+21. **A click in a <webview> never reaches the app's document.** A menu that
+   closes on an outside mousedown stays open over the page. The host sees only a
+   captured `focus` on the WEBVIEW element (not focusin); main.js turns that into
+   a click outside.
+22. **Tell Google a current browser.** A fixed, years-old Firefox in the user
+   agent is refused as an unsupported browser. `currentFirefox` counts from a
+   known release by the four-week cycle; update its anchor if Mozilla changes
+   the cadence.
+24. **The page can be zoomed (CSS `zoom` on #editor).** Pointer positions and
+   getBoundingClientRect are screen pixels; `left`, `top`, `width` in the page
+   are page pixels. Any new drag or measurement inside the page divides by
+   `editorZoom()` (page-zoom.js), or at 150 % it runs half as far again.
+23. **Electron 44 changed four things this app relies on (0.9.3).** The
+   clipboard is W3C ClipboardItems (`writeImage`/`readImage`/`write({image})`
+   are gone — `writeImageToClipboard` in context-menu.js); `app.commandLine`
+   lower-cases arguments, so `disable-blink-features=WebAuth` also goes into
+   every window's, webview's and popup's `disableBlinkFeatures`; file dialogs
+   open in Downloads unless given a folder (`lastFolder` in main.js); a click
+   in a <webview> reaches the app only as the window's `blur`. Electron no
+   longer downloads itself on `npm install`: `npx install-electron --no`.
 
 ---
 
@@ -401,7 +482,7 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 | **Portable** — `Nebula-portable-*.exe` from a release | `portable` | `<folder of the exe>\Nebula-data` |
 | **Dev** — `npm run dev` | `dev` | `<repo>\.dev-profile` (via `NEBULA_USER_DATA`) |
 
-Inside any of them: `storage\notes\<id>.json`, `storage\meta.json`, `backups\`.
+Inside any of them: `storage\notes\<id>.json`, `storage\meta.json`, `storage\folders.json`, `backups\`.
 
 Electron derives `userData` from the package name, so **all four would be the
 same directory** if nothing intervened — and for a while the portable build in

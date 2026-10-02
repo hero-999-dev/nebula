@@ -168,12 +168,14 @@ export async function runRichPasteChecks(check) {
       transfer.items.add(new File([Uint8Array.from(atob(base64), (ch) => ch.charCodeAt(0))], 'drop.png', { type: 'image/png' }));
       const editor = document.getElementById('editor');
       const rect = editor.getBoundingClientRect();
+      // 100 x 120 of the page's pixels, at whatever the page is zoomed to (0.9.3).
+      const z = Number.parseFloat(editor.style.zoom || '1');
       editor.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer,
-        clientX: rect.left + 100, clientY: rect.top + 120 }));
+        clientX: rect.left + 100 * z, clientY: rect.top + 120 * z }));
     }, PIXEL);
     await win.waitForSelector('.note-image');
     const dropped = await win.locator('.note-image').evaluate((el) => ({ left: el.style.left, top: el.style.top }));
-    check('dropping an image uses the drop coordinates', dropped.left === '100px' && dropped.top === '120px', JSON.stringify(dropped));
+    check('dropping an image uses the drop coordinates', Math.abs(parseFloat(dropped.left) - 100) <= 1 && Math.abs(parseFloat(dropped.top) - 120) <= 1, JSON.stringify(dropped));
     const imageRect = await win.locator('.note-image').boundingBox();
     await win.mouse.move(imageRect.x + 20, imageRect.y + 20);
     await win.mouse.down();

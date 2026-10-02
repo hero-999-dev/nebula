@@ -9,6 +9,8 @@
  * a command can never exist in one and not the other.
  */
 
+import { t } from './i18n.js';
+
 /**
  * @param {object} ctx everything a command might need to act on
  * @returns {Array<{title: string, items: Array}>} an item is
@@ -34,6 +36,11 @@ export function buildMenus(ctx) {
         { id: 'file.exportmd', label: 'Export as Markdown', run: () => actions['export-md']?.() },
         { id: 'file.exporthtml', label: 'Export as HTML', run: () => actions['export-html']?.() },
         { id: 'file.exportpdf', label: 'Export as PDF', run: () => actions['export-pdf']?.() },
+        { id: 'file.exportdocx', label: 'Export as Word (.docx)', run: () => actions['export-docx']?.() },
+        { id: 'file.exportodt', label: 'Export as OpenDocument (.odt)', run: () => actions['export-odt']?.() },
+        { id: 'file.exportdoc', label: 'Export as Word 97–2003 (.doc)', run: () => actions['export-doc']?.() },
+        { id: 'file.exportrtf', label: 'Export as Rich Text (.rtf)', run: () => actions['export-rtf']?.() },
+        { id: 'file.exportenex', label: 'Export for Evernote / Apple Notes (.enex)', run: () => actions['export-enex']?.() },
         { id: 'file.import', label: 'Import a note…', run: () => actions.import?.() },
         { separator: true },
         { id: 'file.folder', label: 'Open notes folder', run: () => shell?.reveal?.('storage') },
@@ -107,7 +114,8 @@ export function commandsOf(menus) {
   for (const menu of menus) {
     for (const item of menu.items) {
       if (item.separator) continue;
-      out.push({ ...item, menu: menu.title, search: `${menu.title} ${item.label}`.toLowerCase() });
+      // Found by its English name and by the name it is shown under (i18n.js, 0.9.3).
+      out.push({ ...item, menu: menu.title, search: `${menu.title} ${item.label} ${t(menu.title)} ${t(item.label)}`.toLocaleLowerCase() });
     }
   }
   return out;
@@ -191,5 +199,6 @@ export function initAppMenu(ctx) {
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 
-  return { menus, commands: commandsOf(menus), close };
+  // Worked out when asked, so the palette searches the names of the language in use.
+  return { menus, get commands() { return commandsOf(menus); }, close };
 }

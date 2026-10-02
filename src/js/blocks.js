@@ -232,8 +232,13 @@ export function insertDivider(root, selection) {
     li.remove();
     if (!list.querySelector('li')) { el = list.previousElementSibling || null; list.remove(); if (!el) el = null; }
   }
-  let block = el === root ? null : el;
-  while (block && block.parentElement !== root) block = block.parentElement;
+  // Inside a toggle list the divider belongs to the part that folds (0.9.3:
+  // "the divider does not work in a toggle list" — it went to the top level,
+  // under the whole toggle).
+  const body = el?.closest?.('.toggle-body');
+  const host = body && root.contains(body) ? body : root;
+  let block = el === root || el === host ? null : el;
+  while (block && block.parentElement !== host) block = block.parentElement;
   const hr = doc.createElement('hr');
   hr.className = 'blk-hr';
   const after = doc.createElement('p');
@@ -243,7 +248,7 @@ export function insertDivider(root, selection) {
     hr.after(after);
     if (!block.textContent.trim() && !block.querySelector('img, .blk-code, .inline-eq, hr, .link-block')) block.remove();
   } else {
-    root.append(hr, after);
+    host.append(hr, after);
   }
   return after;
 }

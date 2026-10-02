@@ -6,9 +6,13 @@
  * never nest into each other.
  */
 
+import { paperSize, marginMm, getWideOrientation, isFluid, sheetMm } from './page-mode.js';
+import { toDocx, toOdt, toDoc, toEnex, enexToNotes, previewDocument, docxToHtml, odtToHtml, rtfToHtml, docKind } from './office.js';
+import { prepareVideos, getVideoMode, setVideoMode, hasVideos } from './export-video.js';
+import { initPdfPreview, PAGED } from './pdf-preview.js';
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
-import { normalizeLists, exitListOnEmptyItem, liftListItemAtStart, carryLine } from './lists.js';
+import { normalizeLists, exitListOnEmptyItem, liftListItemAtStart, carryLine, stepListItems } from './lists.js';
 import { blockFromNode, convertBlock, exitQuoteOnEmptyLine, insertDivider as insertDividerAt, tidyAfterDelete, beforeDelete } from './blocks.js';
 import { enterOutOfWrapper, backspaceOutOfWrapper, formatsAt, dropFormatsOnEmptyLine } from './inline-format.js';
 import { applyInlineFamily, clearInlineFamilyAtCaret, cleanTypingMarkers } from './inline-family.js';
@@ -18,6 +22,7 @@ import { toMarkdown, toHtml, toPrintDocument, toNebulaNote, safeFileName, FORMAT
 import { serializeNote } from './note-markup.js';
 import { dropCopiedAnchor } from './arrows.js';
 import { noteFromFile } from './import.js';
+import { makeToggle } from './toggles.js';
 
 /**
  * Colours are CLASSES, not values written into the note.
@@ -107,10 +112,19 @@ export function stepIndent(current, delta, max = 6) {
 export function parseSize(raw) {
   const n = parseFloat(String(raw).replace(/[^\d.]/g, ''));
   if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.min(400, Math.max(6, Math.round(n)));
+  return Math.min(400, Math.max(5, Math.round(n)));
 }
 
-export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTitle, noteLabels, onImport, onPaste, onLink } = {}) {
+/** Does anything between `node` and the editor set a font or a size? */
+export function hasExplicitFont(node, root) {
+  for (let el = node?.nodeType === 1 ? node : node?.parentElement; el && el !== root; el = el.parentElement) {
+    if (el.style?.fontFamily || el.style?.fontSize) return true;
+    if (el.tagName === 'FONT' && (el.getAttribute('face') || el.getAttribute('size'))) return true;
+  }
+  return false;
+}
+
+export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTitle, noteLabels, onImport, onPaste, onLink, noteFont, setNoteFont, translate = (x) => x, onWideOrientation } = {}) {
   const toolbar = document.getElementById('toolbar');
   const miniBar = document.getElementById('mini-bar');
   if (!toolbar || !editorEl) return null;
@@ -390,12 +404,184 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     return true;
   }
 
+  /** The line a node is in: the nearest block, never the editor. */
+  function lineOf(node) {
+    const el = blockAncestor(node);
+    return el && el !== editorEl && editorEl.contains(el) ? el : null;
+  }
+
+  /** A line with nothing on it but a <br> (and empty formatting). */
+  function isBlankLine(el) {
+    return !el.textContent.replace(/\u200b/g, '').trim()
+      && !el.querySelector('img, hr, .inline-eq, .note-image, .link-block, .blk-code, .note-mention, ul, ol, table');
+  }
+
+  function placeCaretAt(el, atEnd) {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let text = walker.nextNode();
+    if (atEnd) for (let t = text; t; t = walker.nextNode()) text = t;
+    const r = document.createRange();
+    if (text) r.setStart(text, atEnd ? text.nodeValue.length : 0);
+    else r.setStart(el, atEnd ? el.childNodes.length : 0);
+    r.collapse(true);
+    if (!editorEl.contains(document.activeElement)) editorEl.focus({ preventScroll: true });
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(r);
+  }
+
+  /**
+   * The block right before (back) or after the caret's line — but only when
+   * the caret stands at that edge of the line, with nothing drawn between:
+   * no letter, no <br>, no picture. Otherwise null: the key edits inside the
+   * line. (A <br> at the start of a list item is a line of its own: Backspace
+   * after it removes it, it does not reach the block above.)
+   */
+  function neighbourAtEdge(back) {
+    const sel = window.getSelection();
+    if (!sel?.rangeCount || !sel.isCollapsed) return null;
+    const r = sel.getRangeAt(0);
+    const line = lineOf(r.startContainer);
+    if (!line) return null;
+    const side = document.createRange();
+    side.selectNodeContents(line);
+    if (back) side.setEnd(r.startContainer, r.startOffset);
+    else side.setStart(r.startContainer, r.startOffset);
+    if (side.toString().replace(/\u200b/g, '').length) return null;
+    const between = side.cloneContents();
+    const drawn = [...between.querySelectorAll('br, img, hr, .inline-eq, .note-mention, figure')];
+    // Going forward, the <br> that only holds an empty line open is not drawn content.
+    const holder = !back && drawn.length === 1 && drawn[0].nodeName === 'BR' && isBlankLine(line);
+    if (drawn.length && !holder) return null;
+    for (let el = line; el && el !== editorEl; el = el.parentElement) {
+      let sib = back ? el.previousSibling : el.nextSibling;
+      while (sib && sib.nodeType === Node.TEXT_NODE && !sib.nodeValue.trim()) sib = back ? sib.previousSibling : sib.nextSibling;
+      if (sib) return sib.nodeType === Node.ELEMENT_NODE ? sib : null;
+    }
+    return null;
+  }
+
   // A delete that joined two lines: Chromium's style spans and a list split in two (blocks.js).
   let beforeThisDelete = null;
+  let deleteFromProse = false;
   editorEl.addEventListener('beforeinput', (e) => {
     beforeThisDelete = e.inputType?.startsWith('delete') ? beforeDelete(editorEl) : null;
+    const at = window.getSelection()?.anchorNode;
+    const host = at?.nodeType === Node.ELEMENT_NODE ? at : at?.parentElement;
+    deleteFromProse = !!e.inputType?.startsWith('delete') && !host?.closest?.('.image-caption, .shape-text, .code-src');
   }, true);
+
+  /**
+   * After a delete in the prose the caret stays in the prose (0.9.3).
+   *
+   * Emptying a line under a picture, Chromium could leave the caret between
+   * two blocks — on the editor itself — or carry it into the next picture's
+   * caption, the nearest place it can type: "when I delete here the cursor
+   * jumps straight to the caption" (the owner's Ideas note). The caret is put
+   * back on a line where the words were, made if need be.
+   */
+  function keepCaretInProse() {
+    const sel = window.getSelection();
+    if (!sel?.rangeCount) return;
+    const r = sel.getRangeAt(0);
+    const node = r.startContainer;
+    const host = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    const caption = host?.closest?.('.image-caption');
+    let spot = null;              // [parent, index] where an empty line goes
+    if (caption && editorEl.contains(caption)) {
+      const figure = caption.closest('.note-image');
+      if (!figure || figure.closest('.shape-layer, .image-layer')) return;
+      spot = [figure.parentNode, [...figure.parentNode.childNodes].indexOf(figure)];
+    } else if (node === editorEl) {
+      spot = [editorEl, r.startOffset];
+    } else return;
+    const [parent, index] = spot;
+    const before = parent.childNodes[index - 1];
+    const after = parent.childNodes[index];
+    const usable = (el) => el?.nodeType === Node.ELEMENT_NODE && el.matches('p, div:not([class]), h1, h2, h3, blockquote, li') && !el.closest('.shape-layer');
+    let line;
+    if (usable(before)) line = before;
+    else if (usable(after) && !caption) line = after;
+    else {
+      line = document.createElement('p');
+      line.innerHTML = '<br>';
+      parent.insertBefore(line, after ?? null);
+    }
+    if (caption && document.activeElement === caption) caption.blur();
+    if (!editorEl.contains(document.activeElement) || document.activeElement !== editorEl) editorEl.focus({ preventScroll: true });
+    placeCaretAt(line, line === before);
+  }
+
+  // A caret on the editor itself, between two blocks that are not lines — a
+  // divider and a picture — stands on nothing: a click in that gap put one
+  // there, blinking between them. Next to a picture in the text, the picture
+  // is selected instead (0.9.3).
+  //
+  // A loose <br> in that gap is not a line either: the owner's Ideas note had
+  // `<hr><br><figure>`, and the caret stood on it under the divider. It is
+  // looked past, and goes. The check also runs after a delete: taking away
+  // the picture under a divider left the caret between the divider and the
+  // next picture without the selection changing — "the divider has a caret of
+  // its own" (the owner, 0.9.3).
+  let gapCheck = 0;
+  // Which way the caret was sent last: a key, or none for a click.
+  let lastKey = '';
+  editorEl.addEventListener('keydown', (e) => { lastKey = e.key; }, true);
+  editorEl.addEventListener('mousedown', () => { lastKey = ''; }, true);
+  const loose = (n) => n && ((n.nodeType === Node.TEXT_NODE && !n.nodeValue.trim())
+    || (n.nodeType === Node.ELEMENT_NODE && n.tagName === 'BR'));
+  function settleGap() {
+    const sel = window.getSelection();
+    if (!sel?.rangeCount || !sel.isCollapsed || sel.anchorNode !== editorEl) return;
+    let before = editorEl.childNodes[sel.anchorOffset - 1];
+    let after = editorEl.childNodes[sel.anchorOffset];
+    const gap = [];
+    while (loose(before)) { gap.push(before); before = before.previousSibling; }
+    while (loose(after)) { gap.push(after); after = after.nextSibling; }
+    const picture = [after, before].find((n) => n?.nodeType === Node.ELEMENT_NODE && n.matches('.note-image'));
+    const line = (n) => n?.nodeType === Node.ELEMENT_NODE && n.matches('p, div:not([class]), h1, h2, h3, h4, h5, h6, li, blockquote, ul, ol');
+    // Right beside a divider, on no line: ↓ or End → from the heading above it
+    // put the caret there, and it blinked at the divider's left end — "the
+    // divider has a caret of its own" (the owner, 0.9.3). It goes on the way
+    // it was going: down or right to the line under the divider (a picture
+    // there is selected), up or left to the end of the line above; with no
+    // line that way, the divider is picked.
+    const hr = [after, before].find((n) => n?.nodeType === Node.ELEMENT_NODE && n.matches('hr.blk-hr'));
+    if (hr && !(picture && !line(before) && !line(after))) {
+      const up = /^(ArrowUp|ArrowLeft|Backspace|PageUp|Home)$/.test(lastKey) ? true : (lastKey ? false : hr === after);
+      const above = hr.previousElementSibling;
+      const below = hr.nextElementSibling;
+      if (up && line(above)) placeCaretAt(above, true);
+      else if (!up && below?.matches('.note-image') && !below.closest('.shape-layer, .image-layer')) {
+        // Beside the picture, where a picture's selection keeps the caret —
+        // not above the divider, where a key typed next would land.
+        const r = document.createRange();
+        r.setStartBefore(below);
+        r.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(r);
+        editorEl.dispatchEvent(new CustomEvent('nebula-select-image', { detail: below }));
+      }
+      else if (!up && line(below)) placeCaretAt(below, false);
+      else editorEl.dispatchEvent(new CustomEvent('nebula-pick-divider', { detail: hr }));
+      return;
+    }
+    if (!picture || line(before) || line(after)) return;
+    if (gap.some((n) => n.nodeType === Node.ELEMENT_NODE)) {
+      history?.push();
+      gap.forEach((n) => n.remove());
+      dirty();
+    }
+    editorEl.dispatchEvent(new CustomEvent('nebula-select-image', { detail: picture }));
+  }
+  const settleSoon = () => {
+    cancelAnimationFrame(gapCheck);
+    gapCheck = requestAnimationFrame(settleGap);
+  };
+  document.addEventListener('selectionchange', settleSoon);
+  editorEl.addEventListener('input', settleSoon);
+
   editorEl.addEventListener('input', (e) => {
+    if (e.inputType?.startsWith('delete') && deleteFromProse) keepCaretInProse();
     if (e.inputType?.startsWith('delete')) tidyAfterDelete(editorEl, window.getSelection(), beforeThisDelete);
     // Enter copies the line's attributes onto the new line, its arrow anchor too.
     if (e.inputType === 'insertParagraph') dropCopiedAnchor(editorEl, window.getSelection());
@@ -493,22 +679,59 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     return value;
   }
 
+  /**
+   * The block the caret is in, one level under the editor — or under a toggle
+   * (0.9.3): its title and the lines of its body are blocks of their own, and
+   * taking the whole toggle for them turned it into a to-do.
+   */
   function blockOf() {
     const range = selectionInEditor();
     if (!range) return null;
     let el = range.startContainer;
     if (el.nodeType !== Node.ELEMENT_NODE) el = el.parentElement;
-    while (el && el.parentElement !== editorEl) el = el.parentElement;
-    return el && el !== editorEl ? el : null;
+    const top = (p) => p === editorEl || p?.classList?.contains('toggle-body') || p?.classList?.contains('blk-toggle');
+    while (el && !top(el.parentElement)) el = el.parentElement;
+    return el && el !== editorEl && !el.classList.contains('toggle-body') ? el : null;
+  }
+
+  /**
+   * The lines a Tab moves: the block each selected line is in — the line
+   * itself, not the wrapper a font or colour put round several lines, which
+   * took the heading above and the whole list along with it (0.9.3).
+   */
+  function indentBlocks() {
+    const range = selectionInEditor();
+    if (!range) return [];
+    const out = new Set();
+    const add = (node) => {
+      const el = blockAncestor(node);
+      if (el && el !== editorEl && !el.closest('.shape-layer, .blk-code')) out.add(el);
+    };
+    add(range.startContainer);
+    if (!range.collapsed) {
+      const walker = document.createTreeWalker(range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+        ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement, NodeFilter.SHOW_TEXT);
+      for (let t = walker.nextNode(); t; t = walker.nextNode()) if (range.intersectsNode(t) && t.nodeValue.trim()) add(t);
+    }
+    // An item's list moves as one block when the item itself cannot.
+    return [...out].map((el) => (el.tagName === 'LI' ? el.parentElement : el))
+      .filter((el, i, all) => all.indexOf(el) === i && !all.some((o) => o !== el && o.contains(el)));
   }
 
   function indent(delta) {
-    const el = blockOf();
-    if (!el) return;
     history?.push();
-    const next = stepIndent(el.dataset.ind, delta);
-    if (next === 0) delete el.dataset.ind;
-    else el.dataset.ind = String(next);
+    if (stepListItems(editorEl, window.getSelection(), delta)) {
+      normalizeLists(editorEl);
+      dirty();
+      return;
+    }
+    const blocks = indentBlocks();
+    if (!blocks.length) return;
+    for (const el of blocks) {
+      const next = stepIndent(el.dataset.ind, delta);
+      if (next === 0) delete el.dataset.ind;
+      else el.dataset.ind = String(next);
+    }
     dirty();
   }
 
@@ -540,6 +763,24 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     dirty();
   }
 
+  /** The caret's line becomes the title of a toggle list; in a title, the toggle goes back to lines. */
+  function makeToggleHere() {
+    const range = selectionInEditor();
+    if (!range) return;
+    const block = blockFromNode(range.startContainer, editorEl);
+    if (!block || block.closest('.shape-layer, .blk-code')) return;
+    history?.push();
+    const toggle = makeToggle(block.matches('.blk-toggle > :first-child') ? block.parentElement.firstElementChild : block);
+    const title = toggle.firstElementChild;
+    const r = document.createRange();
+    r.selectNodeContents(title);
+    r.collapse(false);
+    if (title.lastChild?.nodeName === 'BR') r.setStartBefore(title.lastChild);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(r);
+    dirty();
+  }
+
   function makeTodo() {
     const el = blockOf();
     if (!el) { cmd('insertHTML', '<div class="blk-todo"><br></div>'); return; }
@@ -561,6 +802,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
    * them inside its own undo entry instead of replacing them wholesale.
    */
   function applyFontSize(px) {
+    setNoteFont?.({ size: px === 17 ? null : px });   // the note's writing size (0.9.3)
     history?.push();
     const range = selectionInEditor();
     if (!range || range.collapsed) {
@@ -638,25 +880,48 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
    * Markdown and HTML are built here and handed over as bytes; PDF is produced
    * by the main process through Chromium's own writer, because a PDF made from
    * the OS print dialog is a picture of the window rather than a document.
+   * Every export that makes pages (PDF, Word, OpenDocument, Rich Text) opens
+   * the preview first (0.9.3); videos go out with or without their picture.
    */
   async function exportNote(format) {
     const api = window.nebula?.note;
     const title = noteTitle?.() || 'Untitled';
     if (!api) { window.print(); return; }          // browser preview: no dialogs
+    if (PAGED[format] && pdfPreview && api.pdfPreview) { pdfPreview.open(format); return; }
     if (format === 'pdf') {
-      await api.pdf({ suggested: safeFileName(title, 'pdf'), document: printDocument(title) });
+      await api.pdf({ suggested: safeFileName(title, 'pdf'), document: await printDocument(title) });
       return;
     }
+    await writeExport(format);
+  }
+
+  /** The note as stored, not as on screen — and its videos as this export takes them. */
+  async function exportHtml() {
+    // A selected picture or a shape being typed in must not travel to another computer inside the file.
+    return prepareVideos(serializeNote(editorEl), getVideoMode(), { poster: (url) => window.nebula?.links?.videoPoster?.(url) });
+  }
+
+  /** The note's paper and margins (Nebula Wide: A4, the way it was last turned). */
+  function exportPage() {
+    const [w, h] = sheetMm(pageNow());
+    return { w, h, margin: marginMm(pageNow()) };
+  }
+
+  /** Build the file for a format and hand it to the main process to save. */
+  async function writeExport(format) {
+    const api = window.nebula?.note;
+    const title = noteTitle?.() || 'Untitled';
     const fmt = FORMATS.find((f) => f.id === format);
-    // The note as stored, not as on screen: a selected picture or a shape being
-    // typed in must not travel to another computer inside the file.
-    const html = serializeNote(editorEl);
-    const content = format === 'html'
-      ? toHtml(html, title)
-      : format === 'nebula'
-        ? toNebulaNote({ title, content: html, labels: noteLabels?.() })
-        : toMarkdown(html, title);
-    await api.export({ suggested: safeFileName(title, fmt?.ext || format), content, format });
+    const html = format === 'nebula' ? serializeNote(editorEl) : await exportHtml();
+    const page = exportPage();
+    const content = format === 'docx' ? await toDocx(html, title, page)
+      : format === 'odt' ? await toOdt(html, title, page)
+        : format === 'doc' || format === 'rtf' ? toDoc(html, title, page)
+          : format === 'enex' ? toEnex(html, title)
+            : format === 'html' ? toHtml(html, title)
+              : format === 'nebula' ? toNebulaNote({ title, content: html, labels: noteLabels?.() })
+                : toMarkdown(html, title);
+    return api.export({ suggested: safeFileName(title, fmt?.ext || format), content, format });
   }
 
   /**
@@ -695,8 +960,38 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   }
 
   /** The note as a standalone white document, for the PDF writer. */
-  function printDocument(title) {
-    return toPrintDocument({ title, body: serializeNote(editorEl), css: appStyles() });
+  async function printDocument(title) {
+    const page = editorEl.dataset.page;
+    return toPrintDocument({ title, body: await exportHtml(), css: appStyles(), size: paperSize(page), margin: `${marginMm(page)}mm` });
+  }
+
+  const pageNow = () => editorEl.dataset.page || 'nw';
+  const pdfPreview = window.nebula?.note?.pdfPreview ? initPdfPreview({
+    overlay: document.getElementById('ov-pdf'),
+    api: window.nebula.note,
+    page: pageNow,
+    // What the preview prints: the PDF's own document, or a file's blocks in its styles.
+    document: async (format) => (format === 'pdf'
+      ? printDocument(noteTitle?.() || 'Untitled')
+      : previewDocument(await exportHtml(), noteTitle?.() || 'Untitled', exportPage())),
+    save: (format, token) => (format === 'pdf'
+      ? window.nebula.note.pdfSave({ token, suggested: safeFileName(noteTitle?.() || 'Untitled', 'pdf') })
+      : writeExport(format)),
+    hasVideos: () => hasVideos(serializeNote(editorEl)),
+    onOrientation: () => onWideOrientation?.(),
+    translate,
+  }) : null;
+
+  /** A .docx, .odt, .doc or .rtf's bytes as HTML; a binary .doc arrives as its text, read by the main process. */
+  async function officeToHtml(name, bytes) {
+    const ext = /\.([^.]+)$/.exec(name)?.[1]?.toLowerCase();
+    const kind = ext === 'doc' || ext === 'rtf' ? docKind(bytes) : ext;
+    if (kind === 'docx' || kind === 'zip') return docxToHtml(bytes);
+    if (kind === 'odt') return odtToHtml(bytes);
+    if (kind === 'rtf') return rtfToHtml(new TextDecoder('windows-1252').decode(bytes));
+    if (kind === 'html') return new TextDecoder().decode(bytes);
+    if (kind === 'text') return new TextDecoder().decode(bytes).split(/\r?\n/).map((l) => `<p>${l.replace(/&/g, '&amp;').replace(/</g, '&lt;') || '<br>'}</p>`).join('');
+    return null;
   }
 
   async function importNote() {
@@ -704,8 +999,27 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     if (!api) return;
     const res = await api.import();
     if (!res?.ok) return;
+    const cannot = () => window.dispatchEvent(new CustomEvent('nebula-toast', { detail: 'That file could not be read' }));
     // Parsed and sanitised HERE: the main process only ever read bytes, and an
     // imported file is not allowed to bring markup the editor did not ask for.
+    if (res.bytes) {
+      // Word, OpenDocument and Rich Text (0.9.3): read to HTML here, then sanitised like any HTML file.
+      const html = await officeToHtml(res.name, res.bytes).catch(() => null);
+      if (html === null) { cannot(); return; }
+      onImport?.(noteFromFile(res.name.replace(/\.[^.]+$/, '.html'), html));
+      return;
+    }
+    // An Evernote export (Apple Notes, Bear, Joplin...): each of its notes, as a note.
+    if (/\.enex$/i.test(res.name)) {
+      let notes = [];
+      try { notes = enexToNotes(res.text); } catch { cannot(); return; }
+      for (const n of notes) {
+        const note = noteFromFile(`${n.title}.html`, n.html);
+        onImport?.({ ...note, title: n.title });
+      }
+      if (!notes.length) cannot();
+      return;
+    }
     onImport?.(noteFromFile(res.name, res.text));
   }
 
@@ -713,6 +1027,23 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     const menu = document.getElementById('menu-export');
     if (!menu) return;
     menu.innerHTML = '<div class="tb-menu__label">Export this note</div>';
+    // Videos with their picture, or as links only (0.9.3): for every export, remembered.
+    const videos = document.createElement('div');
+    videos.className = 'tb-menu__seg';
+    videos.innerHTML = '<span class="seg-label">Videos</span><button type="button" data-videos="with">With</button><button type="button" data-videos="without">Without</button>';
+    const paintVideos = () => {
+      for (const b of videos.querySelectorAll('button')) {
+        const on = b.dataset.videos === getVideoMode();
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', String(on));
+      }
+    };
+    for (const b of videos.querySelectorAll('button')) {
+      b.title = b.dataset.videos === 'with' ? 'Videos as they show in the note: the picture, linked' : 'Videos as their links only';
+      b.addEventListener('click', (e) => { e.stopPropagation(); setVideoMode(b.dataset.videos); paintVideos(); });
+    }
+    paintVideos();
+    menu.appendChild(videos);
     for (const fmt of FORMATS) {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -737,19 +1068,30 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     ul: () => listCommand('insertUnorderedList'),
     ol: () => listCommand('insertOrderedList'),
     todo: makeTodo,
+    toggle: makeToggleHere,
     indent: () => indent(1),
     outdent: () => indent(-1),
     save: () => onSave?.(),
     // Through Electron, so Chromium lays the page out and hands the driver
     // text. `window.print()` let the platform rasterise it, which is what made
     // a printed note look like a photograph of the window.
-    print: () => { const api = window.nebula?.note; if (api?.print) void api.print(); else window.print(); },
+    // Nebula Wide prints on A4 the way its last export was turned (pdf-preview.js).
+    print: () => {
+      const api = window.nebula?.note;
+      const page = isFluid(pageNow()) && getWideOrientation() === 'portrait' ? 'nw-portrait' : pageNow();
+      if (api?.print) void api.print({ page }); else window.print();
+    },
     import: () => void importNote(),
     // Selected words become a link; with nothing selected it inserts one.
     link: () => onLink?.(),
     'export-md': () => void exportNote('md'),
     'export-html': () => void exportNote('html'),
     'export-pdf': () => void exportNote('pdf'),
+    'export-docx': () => void exportNote('docx'),
+    'export-odt': () => void exportNote('odt'),
+    'export-doc': () => void exportNote('doc'),
+    'export-rtf': () => void exportNote('rtf'),
+    'export-enex': () => void exportNote('enex'),
     cut: () => cmd('cut'),
     copy: () => cmd('copy'),
     paste: () => void (onPaste ? onPaste() : pasteFromClipboard()),
@@ -777,7 +1119,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   // Only view (0.8.9): every action that would change the note does nothing;
   // the ones that read it — save, print, export, copy — and import (a new note) stay.
   {
-    const READING = new Set(['save', 'print', 'export-md', 'export-html', 'export-pdf', 'copy', 'import']);
+    const READING = new Set(['save', 'print', 'export-md', 'export-html', 'export-pdf', 'export-docx', 'export-odt', 'export-doc', 'export-rtf', 'export-enex', 'copy', 'import']);
     for (const name of Object.keys(ACTIONS)) {
       if (READING.has(name)) continue;
       const run = ACTIONS[name];
@@ -934,6 +1276,12 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
    */
   function applyFont(stack) {
     const range = selectionInEditor();
+    // The font picked last is the note's writing font (0.9.3): a new line is
+    // written in it. The owner: "I picked a font in a note and I am writing —
+    // that is the default for that note now, where I left off; the places I
+    // wrote in other fonts keep those". The serif is the app's own and means
+    // "none". Nothing already written changes.
+    setNoteFont?.({ family: stack === FONTS[0][1] ? null : stack });
     // Nothing selected, nothing to restyle. 0.6.0 gave this a whole-block
     // fallback because picking a font with the caret parked in a line appeared
     // to do nothing; the user's answer to that is explicit — "when changing the
@@ -985,7 +1333,8 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     paintSizeTarget(false);
   }
   /** The common sizes, behind the caret. Typing a number still works. */
-  const SIZES = [10, 12, 14, 16, 18, 20, 24, 28, 32, 48, 72];
+  // 5 to 9 too (0.9.3): at real size a note's 12px is 9 pt on paper, and smaller is asked for.
+  const SIZES = [5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 24, 28, 32, 48, 72];
   (function buildSizeMenu() {
     const menu = document.getElementById('menu-size');
     if (!menu) return;
@@ -1036,6 +1385,49 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   sizeInput?.addEventListener('change', applySize);
   sizeInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); applySize(); } });
 
+  /**
+   * The note's writing font, if what is typed at this caret would take it:
+   * a new, empty line with no font of its own, outside code, captions and
+   * shapes. A heading keeps its own size.
+   */
+  function writingFontAt(range) {
+    const font = noteFont?.();
+    if (!font || (!font.family && !font.size) || !range?.collapsed) return null;
+    const host = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
+    if (!host || host.closest('.code-src, .blk-code, .shape-layer, .image-caption, .inline-code, .note-mention, .note-tag, .inline-eq')) return null;
+    const block = blockAncestor(host);
+    if (!block || block === editorEl || block.textContent.replace(/\u200b/g, '').length) return null;
+    if (hasExplicitFont(host, editorEl)) return null;
+    const heading = block.matches('h1, h2, h3, h4, h5, h6');
+    return { family: font.family || null, size: heading ? null : font.size || null };
+  }
+
+  // Typing on a new line in a note with a writing font: the letter goes into
+  // a span in that font. Inserted here rather than left to the browser, so the
+  // letter lands in it and nothing is left behind if nothing is typed.
+  editorEl.addEventListener('beforeinput', (e) => {
+    if (e.inputType !== 'insertText' || !e.data || e.isComposing) return;
+    const range = selectionInEditor();
+    const font = writingFontAt(range);
+    if (!font || (!font.family && !font.size)) return;
+    e.preventDefault();
+    history?.typed();          // the step before this letter, as any typing does
+    const span = document.createElement('span');
+    if (font.family) span.style.fontFamily = font.family;
+    if (font.size) span.style.fontSize = `${font.size}px`;
+    span.textContent = e.data;
+    const block = blockAncestor(range.startContainer);
+    const placeholder = block.childNodes.length === 1 && block.firstChild.nodeName === 'BR' ? block.firstChild : null;
+    range.insertNode(span);
+    placeholder?.remove();
+    const caret = document.createRange();
+    caret.setStart(span.firstChild, span.firstChild.nodeValue.length);
+    caret.collapse(true);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(caret);
+    dirty();
+  }, true);
+
   /** Reflect what the caret actually sits in — the selects stay in sync. */
   function syncState() {
     const range = selectionInEditor();
@@ -1044,12 +1436,14 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     if (el.nodeType !== Node.ELEMENT_NODE) el = el.parentElement;
     if (!el) return;
     const cs = getComputedStyle(el);
+    // On a new line of a note with a writing font, the bar shows what will be typed.
+    const writing = writingFontAt(range);
     if (fontName) {
-      const fam = firstFamily(cs.fontFamily);
+      const fam = firstFamily(writing?.family || cs.fontFamily);
       fontName.textContent = fontLabelFor(fam) ?? fam ?? 'Font';
     }
     if (document.activeElement !== sizeInput) {
-      const px = Math.round(parseFloat(cs.fontSize));
+      const px = writing?.size || Math.round(parseFloat(cs.fontSize));
       if (px) sizeInput.value = String(px);
     }
     const block = el.closest('h1,h2,h3,blockquote,p,div');
@@ -1157,6 +1551,53 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       return node.nodeType === Node.TEXT_NODE && caret.getRangeAt(0).startOffset > 0
         && !!node.textContent.trim();
     })();
+    // A picture in the text is not a letter. Backspace at the start of the line
+    // under it, or Delete at the end of the line above, took it away in one
+    // press with nothing to show it was going (the owner's Ideas note, 0.9.3).
+    // The first press selects it, as a divider is armed; the next one — the
+    // picture's own delete — takes it. Only a caret at the very EDGE of its
+    // line counts: the first 0.9.3 build also caught the letter at the start
+    // of a line ("R" under a picture could not be deleted — the picture was
+    // selected instead), and an empty line under a picture could not go.
+    const back = e.inputType === 'deleteContentBackward';
+    const edge = back ? neighbourAtEdge(true) : e.inputType === 'deleteContentForward' ? neighbourAtEdge(false) : null;
+    if (edge?.matches?.('.note-image') && !edge.closest('.shape-layer, .image-layer')) {
+      e.preventDefault();
+      const line = lineOf(window.getSelection().getRangeAt(0).startContainer);
+      const next = line && (back ? line.nextElementSibling : line.previousElementSibling);
+      if (line && isBlankLine(line)) {
+        // An empty line beside a picture simply goes: the picture, or the
+        // words after it, move up ("I cannot bring the picture up", the
+        // owner's Ideas note, 0.9.3 — under a divider the line stayed). With
+        // no line of text to stand in, the picture is selected; Enter on it
+        // opens a line under it again.
+        history?.push();
+        line.remove();
+        if (next && !next.matches('.note-image, hr, .blk-code, .link-block, .shape-layer, .image-layer')) placeCaretAt(next, !back);
+        else editorEl.dispatchEvent(new CustomEvent('nebula-select-image', { detail: edge }));
+        dirty();
+        return;
+      }
+      editorEl.dispatchEvent(new CustomEvent('nebula-select-image', { detail: edge }));
+      return;
+    }
+    // Backspace at the start of a line under an empty line: the empty line goes
+    // and the caret stays where it is. Left to Chromium, the join could leave
+    // the caret at the far end of the line (under a picture, the owner's Ideas
+    // note, 0.9.3), and the next Backspace ate the last letter instead.
+    if (back && edge?.matches?.('p, div:not([class])') && edge.parentElement && isBlankLine(edge)
+      && !edge.querySelector('*:not(br, span, b, strong, i, em, u, s, font)')) {
+      e.preventDefault();
+      history?.push();
+      const sel = window.getSelection();
+      const keep = sel.getRangeAt(0).cloneRange();
+      edge.remove();
+      sel.removeAllRanges();
+      sel.addRange(keep);
+      dirty();
+      return;
+    }
+    // Before the target ranges: next to a picture Chromium may report none.
     const statics = typeof e.getTargetRanges === 'function' ? e.getTargetRanges() : [];
     if (!statics.length) return;
     const live = statics.map((r) => {
@@ -1208,7 +1649,11 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     const caretSelection = window.getSelection();
     // A deliberate text selection is not a request to arm the previous divider.
     if (caretSelection?.rangeCount && !caretSelection.isCollapsed) return;
-    const before = e.inputType === 'deleteContentBackward' ? mergeTarget() : null;
+
+    // From the caret's line when it is in one (a <br> before the caret is not
+    // the start of the line); from the delete's own range when it is not.
+    const inLine = caretSelection?.rangeCount && lineOf(caretSelection.getRangeAt(0).startContainer);
+    const before = back ? (inLine ? neighbourAtEdge(true) : mergeTarget()) : null;
     const hrs = [...new Set([
       ...touching('hr.blk-hr'),
       ...(before?.classList?.contains('blk-hr') ? [before] : []),
@@ -1266,6 +1711,18 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
         // the next Backspace worked on that instead of the divider (0.8.9).
         if (after && !after.matches('.note-image, .blk-code, .link-block, hr, .shape-layer, .image-layer')) {
           placeCaretAtStart(after);
+        } else if (after?.matches('.note-image') && !after.closest('.shape-layer, .image-layer')) {
+          // A picture right under the divider comes up. A caret left between
+          // the two stood on no line at all and blinked there — "a cursor
+          // between the divider and the picture" (the owner, 0.9.3) — so
+          // something is picked instead: going backwards (Backspace), the
+          // divider, which the next Backspace takes away; going forwards
+          // (Delete), the picture. Picking the picture on Backspace made the
+          // next Backspace delete it: a /divider typed and taken back with
+          // Backspace cost the picture under it (the long-note trials, 0.9.3).
+          editorEl.dispatchEvent(back
+            ? new CustomEvent('nebula-pick-divider', { detail: hr })
+            : new CustomEvent('nebula-select-image', { detail: after }));
         } else {
           const r = document.createRange();
           r.setStartAfter(hr);
@@ -1383,6 +1840,23 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     // Leaving a list is checked first: on an empty item both keys mean "I am
     // done with this list", and Backspace especially must not merge the empty
     // item into the numbered line above it.
+    // An empty item one level in: Enter brings it back out a level, as in any
+    // editor. Chromium's own answer left a list inside a list with no item
+    // around it (found inside a toggle list, 0.9.3).
+    if (!mod && e.key === 'Enter' && !e.shiftKey) {
+      const sel = window.getSelection();
+      const at = sel?.isCollapsed ? sel.anchorNode : null;
+      const li = (at?.nodeType === Node.ELEMENT_NODE ? at : at?.parentElement)?.closest?.('li');
+      if (li && editorEl.contains(li) && li.parentElement?.parentElement?.tagName === 'LI'
+        && !li.textContent.replace(/\u200b/g, '').trim() && !li.querySelector('ul, ol, img')) {
+        e.preventDefault();
+        history?.push();
+        stepListItems(editorEl, sel, -1);
+        normalizeLists(editorEl);
+        dirty();
+        return;
+      }
+    }
     if (!mod && (e.key === 'Enter' || e.key === 'Backspace') && !e.shiftKey) {
       if (exitListOnEmptyItem(editorEl, window.getSelection())) {
         e.preventDefault();
@@ -1475,14 +1949,22 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   });
 
   // ----- mini bar on right-click over a selection -----
+  function miniBarAt(x, y) {
+    if (!miniBar) return;
+    miniBar.hidden = false;
+    const w = miniBar.offsetWidth || 260;
+    miniBar.style.left = `${Math.min(x, window.innerWidth - w - 8)}px`;
+    miniBar.style.top = `${Math.max(8, y - 44)}px`;
+  }
   editorEl.addEventListener('contextmenu', (e) => {
+    // In the app the right-click goes to the main process first, which alone
+    // knows about a misspelt word; context-menu.js opens the bar from there.
+    // Taking the event here would stop that from ever arriving (0.9.3).
+    if (window.nebula?.contextMenu) return;
     const range = selectionInEditor();
     if (!range || range.collapsed) return;
     e.preventDefault();
-    miniBar.hidden = false;
-    const w = miniBar.offsetWidth || 260;
-    miniBar.style.left = `${Math.min(e.clientX, window.innerWidth - w - 8)}px`;
-    miniBar.style.top = `${Math.max(8, e.clientY - 44)}px`;
+    miniBarAt(e.clientX, e.clientY);
   });
   miniBar?.addEventListener('mousedown', (e) => e.preventDefault());
   miniBar?.addEventListener('click', (e) => {
@@ -1499,5 +1981,5 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     if (e.target === document.body || e.target === document.documentElement) undoKey(e);
   });
 
-  return { actions: ACTIONS, syncState };
+  return { actions: ACTIONS, syncState, miniBarAt };
 }

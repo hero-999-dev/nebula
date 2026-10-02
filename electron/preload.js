@@ -1,8 +1,11 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webFrame } from 'electron';
 
 contextBridge.exposeInMainWorld('nebula', {
   platform: process.platform,
-  links: { title: (url) => ipcRenderer.invoke('links:title', url) },
+  links: { title: (url) => ipcRenderer.invoke('links:title', url), videoPoster: (url) => ipcRenderer.invoke('links:video-poster', url) },
+  // Real size (0.9.3): the zoom that makes a CSS millimetre a real one on this
+  // screen, and the window's own zoom (Ctrl + / Ctrl −) it is corrected for.
+  display: { realScale: () => ipcRenderer.invoke('display:real-scale'), windowZoom: () => webFrame.getZoomFactor() },
   version: () => ipcRenderer.invoke('app:version'),
   paths: () => ipcRenderer.invoke('app:paths'),
   // Reveal takes a key ('exeDir' | 'userData' | 'storage' | 'backups'), not a
@@ -62,6 +65,23 @@ contextBridge.exposeInMainWorld('nebula', {
     zoom: (how) => ipcRenderer.invoke('view:zoom', how),
     devtools: () => ipcRenderer.invoke('view:devtools'),
   },
+  // Right-click (0.9.3): what was under the pointer arrives from the main
+  // process, which alone knows what the spellchecker found.
+  contextMenu: {
+    on: (fn) => {
+      const handler = (_e, facts) => fn(facts);
+      ipcRenderer.on('ui:context-menu', handler);
+      return () => ipcRenderer.off('ui:context-menu', handler);
+    },
+  },
+  spell: {
+    replace: (word) => ipcRenderer.invoke('spell:replace', word),
+    add: (word) => ipcRenderer.invoke('spell:add', word),
+    language: (lang) => ipcRenderer.invoke('spell:language', lang),
+  },
+  clipboard: {
+    image: (payload) => ipcRenderer.invoke('clipboard:image', payload),
+  },
   quit: () => ipcRenderer.invoke('app:quit'),
   openExternal: (url) => ipcRenderer.invoke('app:open-external', url),
   // Export writes where the user points in the save dialog; the renderer never
@@ -70,7 +90,11 @@ contextBridge.exposeInMainWorld('nebula', {
   note: {
     export: (payload) => ipcRenderer.invoke('note:export', payload),
     pdf: (payload) => ipcRenderer.invoke('note:pdf', payload),
-    print: () => ipcRenderer.invoke('note:print'),
+    // The export preview (0.9.3): made, saved as previewed, or put away.
+    pdfPreview: (payload) => ipcRenderer.invoke('note:pdf-preview', payload),
+    pdfSave: (payload) => ipcRenderer.invoke('note:pdf-save', payload),
+    pdfDiscard: (token) => ipcRenderer.invoke('note:pdf-discard', token),
+    print: (opts) => ipcRenderer.invoke('note:print', opts ?? {}),
     import: () => ipcRenderer.invoke('note:import'),
   },
   updates: {

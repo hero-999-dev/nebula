@@ -124,10 +124,10 @@ describe('safeFileName', () => {
 });
 
 describe('FORMATS', () => {
-  it('offers exactly Markdown, HTML and PDF', () => {
+  it('offers Markdown, HTML, PDF, Word and OpenDocument', () => {
     // No CSV: Notion's CSV is for database views and Nebula has no table block,
     // so it would be an empty file with a confident name.
-    expect(FORMATS.map((f) => f.id)).toEqual(['md', 'html', 'pdf', 'nebula']);
+    expect(FORMATS.map((f) => f.id)).toEqual(['md', 'html', 'pdf', 'docx', 'odt', 'doc', 'rtf', 'enex', 'nebula']);
     expect(FORMATS.every((f) => f.label && f.ext)).toBe(true);
   });
 });
@@ -143,6 +143,14 @@ describe('FORMATS', () => {
  * edge. A document that is white from the moment it loads has neither problem.
  */
 describe('toPrintDocument', () => {
+  it('keeps the shapes and arrows on their canvas, from where the writing starts (0.9.3)', () => {
+    const body = '<div class="shape-layer"><div class="shape rect" style="left:40px;top:20px">box</div></div><p>text</p>';
+    const out = toPrintDocument({ body });
+    expect(out).toContain('class="shape rect"');
+    expect(out).toContain('.shape-layer { position: absolute; inset: auto; left: 0; top: -16px;');
+    expect(toHtml(body, 'n')).not.toContain('shape rect');      // a web page cannot place it
+  });
+
   it('is a complete document', () => {
     const out = toPrintDocument({ title: 'Note', body: '<p>hello</p>' });
     expect(out.startsWith('<!doctype html>')).toBe(true);

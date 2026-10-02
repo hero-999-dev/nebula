@@ -354,7 +354,7 @@ export async function runDenseChecks(check, { docs = [] } = {}) {
         }
         await trial('pasted image, then Delete', site, where, {
           act: async () => {
-            await app.evaluate(({ clipboard, nativeImage }, b64) => clipboard.writeImage(nativeImage.createFromBuffer(Buffer.from(b64, 'base64'))), PIXEL);
+            await app.evaluate(({ clipboard, nativeImage, ClipboardItem }, b64) => clipboard.write([new ClipboardItem({ 'image/png': new Blob([nativeImage.createFromBuffer(Buffer.from(b64, 'base64')).toPNG()], { type: 'image/png' }) })]), PIXEL);
             await press('Control+v');
             const added = await win.waitForFunction(() => { const el = document.querySelector('#editor .note-image.sel'); if (el) el.dataset.denseNew = '1'; return !!el; }, null, { polling: 50, timeout: 3000 }).then(() => true).catch(() => false);
             return added ? null : 'the pasted image did not arrive selected';
@@ -386,6 +386,7 @@ export async function runDenseChecks(check, { docs = [] } = {}) {
         ['Heading 2', 'h2', 'Baslik', 'h2'], ['Heading 3', 'h3', 'Baslik', 'h3'], ['Quote', 'quote', 'Alinti', 'blockquote'],
         ['Bulleted list', 'bullet', 'madde', 'ul'], ['Numbered list', 'numbered', 'madde', 'ol'], ['To-do', 'todo', 'yapilacak', '.blk-todo'],
         ['Code block', 'code', 'let a = 1', '.blk-code'], ['Divider', 'divider', '', 'hr'],
+        ['Toggle list', 'toggle', 'acilir', '.blk-toggle'],
       ];
       for (const site of ends) {
         for (const [label, id, words, selector] of BLOCKS) {

@@ -4,7 +4,7 @@ Calm notes with a real editor. An Electron desktop app for **Windows and macOS**
 that keeps every note as a plain JSON file in your own profile. Installed Windows
 builds offer in-app updates; macOS and portable builds offer a download link.
 
-**Version v0.9.2** ·
+**Version v0.9.3** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 
@@ -74,7 +74,7 @@ So this README describes a small app on purpose. What is here is finished.
   anywhere, resize from a corner, recolour from dots and hold editable text —
   above or behind the words, which never reflow.
 - **An AI panel** of embedded chat webviews (Claude, Gemini, ChatGPT, Mistral,
-  DeepSeek, Copilot, Perplexity, plus any site you add), resizable, with a
+  MathGPT, Copilot, plus any site you add), resizable, with a
   side-scrolling tab strip. Each service keeps its own persistent session and a
   tab switch never reloads it, so a login survives. It touches no note data, by
   design.
@@ -162,6 +162,10 @@ electron/
 src/js/
   main.js             boot: vault status -> store -> editor -> panels
   notes.js            NoteStore — the single source of note state
+  folders.js          folders of the note list; folders.json in the vault
+  note-list.js        the list with folders, and dragging notes into place
+  page-mode.js        a note's page width: Nebula Wide/Narrow, A and B papers
+  page-zoom.js        a note's page zoom; editorZoom() for every drag in the page
   disk-store.js       localStorage <-> disk mirror; returns the vault status
   storage.js          loadJson/saveJson + the saveHook the mirror installs
   bus.js              note-changed / note-opened
@@ -193,11 +197,12 @@ happens between a keystroke and a file.
 npm install
 npm run preflight   # START HERE — version, phase, what changed, what is stale
 npm run dev         # dev app on its OWN profile
-npm test            # 346 unit tests
+npm test            # 640 unit tests
 npm run build && npm run smoke   # checks against the real Electron app
 npm run rebuild                  # local only: rewrite a real article in the app, score it per feature
-npm run old-notes                # the long-note trials on COPIES of this machine's own notes
+npm run old-notes                # the long-note trials on COPIES of Nebula Test's notes
 npm run check:versions           # every surface agrees with package.json
+npm run check:browsers           # the browser the sign-in windows claim is one Google still accepts
 npm run pack:win    # release/Nebula-Setup-*.exe + Nebula-portable-*.exe
 npm run site        # rebuild site/index.html (docs + mind maps)
 npm run icons       # rebuild build/icon.png + icon.ico from vector (Windows)

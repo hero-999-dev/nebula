@@ -251,11 +251,11 @@ describe('migrateNote', () => {
     // The shape's own empty text is a blank line too, so `blanks` counts it.
     // Its text was saved editable (contenteditable="true"), which is on-screen
     // state: `transient` counts it.
-    expect(migrateNote(el)).toEqual({ shapes: 1, code: 1, wrappers: 1, blanks: 0, transient: 1 });
+    expect(migrateNote(el)).toEqual({ shapes: 1, code: 1, wrappers: 1, blanks: 0, transient: 1, gaps: 0 });
   });
 
   it('survives being handed nothing', () => {
-    expect(migrateNote(null)).toEqual({ shapes: 0, code: 0, wrappers: 0, blanks: 0, transient: 0 });
+    expect(migrateNote(null)).toEqual({ shapes: 0, code: 0, wrappers: 0, blanks: 0, transient: 0, gaps: 0 });
   });
 
   it('moves images from their old layers onto the shapes\' canvas, above the shapes there (0.8.8)', () => {
@@ -340,7 +340,7 @@ describe('migrateNote cleans on-screen state an older version saved (0.9.1)', ()
   });
 
   it('is at the version that added these steps', () => {
-    expect(MARKUP_VERSION).toBe('0.9.1');
+    expect(MARKUP_VERSION).toBe('0.9.3');
   });
 });
 

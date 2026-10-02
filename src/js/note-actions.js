@@ -17,9 +17,12 @@ const LABELS = {
   // Says what choosing it switches TO, like Pin/Unpin — no checkbox (owner, 0.9.2).
   readonly: (note) => (note.readOnly ? 'Edit mode' : 'Only view mode'),
   archive: () => 'Archive this note',
+  // Auto order page (0.9.3): what a page line falls across, put right by itself in this note.
+  // Says where it stands (the owner: "say not active"); choosing it turns it the other way.
+  autoorder: (note) => (note.autoOrder ? 'Auto order page: active' : 'Auto order page: not active'),
 };
 
-export function initNoteActions({ store, onChanged, openNote, onLabels }) {
+export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder }) {
   const menu = document.getElementById('note-menu');
   const drawerBody = document.getElementById('drawer-body');
   const tabs = [...document.querySelectorAll('.drawer-tab')];
@@ -49,6 +52,11 @@ export function initNoteActions({ store, onChanged, openNote, onLabels }) {
     menu.querySelector('[data-note-act="archive"]').textContent = LABELS.archive(note);
     const mode = menu.querySelector('[data-note-act="readonly"]');
     if (mode) mode.textContent = LABELS.readonly(note);
+    const order = menu.querySelector('[data-note-act="autoorder"]');
+    if (order) {
+      order.textContent = LABELS.autoorder(note);
+      order.hidden = !note.page || note.page === 'nw';    // Nebula Wide has no pages to order
+    }
     menu.hidden = false;
     // Below the button, pulled back inside the window if there is no room.
     const r = button.getBoundingClientRect();
@@ -66,8 +74,10 @@ export function initNoteActions({ store, onChanged, openNote, onLabels }) {
     const button = [...document.querySelectorAll('.nr-more')].find(b => b.getAttribute('aria-expanded') === 'true');
     close();
     if (act === 'labels') { onLabels?.(id, button); return; }
+    if (act === 'folder') { onFolder?.(id, button); return; }
     if (act === 'pin') store.togglePin(id);
     else if (act === 'readonly') store.toggleReadOnly(id);
+    else if (act === 'autoorder') store.toggleAutoOrder(id);
     else if (act === 'archive') store.archive(id);
     else if (act === 'trash') store.trash(id);
     onChanged?.();

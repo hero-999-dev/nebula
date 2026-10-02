@@ -3,6 +3,8 @@
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
 import { icon } from './icons.js';
+import { t } from './i18n.js';
+import { makeToggle } from './toggles.js';
 import { blockFromNode, convertBlock, insertDivider, ensureLineBox } from './blocks.js';
 
 export const SLASH_ITEMS = [
@@ -13,6 +15,7 @@ export const SLASH_ITEMS = [
   { id: 'bullet', ic: 'bullets', label: 'Bulleted list' },
   { id: 'numbered', ic: 'numbers', label: 'Numbered list' },
   { id: 'todo', ic: 'todo', label: 'To-do' },
+  { id: 'toggle', ic: 'toggle', label: 'Toggle list' },
   { id: 'quote', ic: 'quote', label: 'Quote' },
   { id: 'code', ic: 'codeblock', label: 'Code block' },
   { id: 'divider', ic: 'divider', label: 'Divider' },
@@ -25,14 +28,16 @@ export const SLASH_ITEMS = [
 
 /** Find a live "/query" immediately before the caret. Pure — tested. */
 export function detectSlash(textBeforeCaret) {
-  const m = textBeforeCaret.match(/(?:^|\s)\/([\w-]*)$/);
+  // Letters of any language: "/başlık" and "/überschrift" are queries too (0.9.3).
+  const m = textBeforeCaret.match(/(?:^|\s)\/([\p{L}\p{N}_-]*)$/u);
   if (!m) return null;
   return { query: m[1], start: textBeforeCaret.length - m[1].length - 1 };
 }
 
 export function filterSlash(query) {
-  const q = query.toLowerCase();
-  return SLASH_ITEMS.filter((it) => it.label.toLowerCase().includes(q) || it.id.includes(q));
+  const q = query.toLocaleLowerCase();
+  return SLASH_ITEMS.filter((it) => it.label.toLowerCase().includes(q) || it.id.includes(q)
+    || t(it.label).toLocaleLowerCase().includes(q));
 }
 
 export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
@@ -138,7 +143,9 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
     // place. Left to insertHTML, an empty line right above a picture put the
     // block past the picture, inside the list below it (the owner's Ideas
     // note, 0.9.1). An empty line in a font is empty spans, so it counts too.
-    const own = blank(line) && line.parentElement === editorEl ? line : null;
+    // A line of a toggle's body is a line of its own too (0.9.3): /todo and
+    // /code there went out of the toggle.
+    const own = blank(line) && (line.parentElement === editorEl || line.parentElement?.classList.contains('toggle-body')) ? line : null;
     const caretIn = (el) => {
       const r = document.createRange();
       r.setStart(el, 0);
@@ -167,6 +174,20 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
           dropBlankLine();
         }
         break;
+      case 'toggle': {
+        // The line the command was typed on becomes the toggle's title.
+        const at = line && line !== editorEl && !line.closest('.shape-layer, .blk-code') ? line : null;
+        const toggle = at ? makeToggle(at) : null;
+        if (toggle) {
+          const title = toggle.firstElementChild;
+          const r = document.createRange();
+          if (title.lastChild?.nodeName === 'BR') r.setStartBefore(title.lastChild);
+          else { r.selectNodeContents(title); r.collapse(false); }
+          window.getSelection().removeAllRanges();
+          window.getSelection().addRange(r);
+        }
+        break;
+      }
       case 'divider': {
         // At the top level, as the toolbar's divider is; insertHTML nested it in the line.
         const line = insertDivider(editorEl, window.getSelection());

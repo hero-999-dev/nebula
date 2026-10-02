@@ -24,7 +24,19 @@ import { initFind } from './find.js';
 import { initHistory } from './history.js';
 import { initRichPaste } from './rich-paste.js';
 import { initLabels } from './labels.js';
+import { initLabelFilter } from './label-filter.js';
+import { initDividerSelect } from './dividers.js';
+import { initI18n, initLanguagePicker, t } from './i18n.js';
+import { initContextMenu } from './context-menu.js';
+import { initToggles } from './toggles.js';
+import { initMentions, refreshMentions, removeTagChips } from './mentions.js';
 import { initNoteActions } from './note-actions.js';
+import { FolderStore } from './folders.js';
+import { initPageModes, opensFitted, sheetPx, isFluid, usesRealSize } from './page-mode.js';
+import { restoreWideOrientation } from './pdf-preview.js';
+import { orderPage } from './page-order.js';
+import { initZoomControl, setRealScale, normalizeZoom, FIT, DEFAULT_ZOOM } from './page-zoom.js';
+import { initNoteList } from './note-list.js';
 import { initAppMenu } from './app-menu.js';
 import { initPalette, initShortcuts, initBlocks } from './palette.js';
 
@@ -54,6 +66,9 @@ async function boot() {
   else if (!disk.ok) showStorageError(disk.error);
 
   injectIcons();
+  // The interface in the chosen language (i18n.js): translated as it reaches the page.
+  initI18n();
+  initLanguagePicker();
   initDialog();
 
   // Seed the guide only for a vault we know is genuinely empty. A vault that
@@ -64,6 +79,8 @@ async function boot() {
   // A vault we know is genuinely empty: this is someone's first run.
   const firstRun = disk.ok && disk.empty;
   const store = new NoteStore({ allowSeed: firstRun });
+  // Folders in the list (0.9.3): folders.json in the vault, beside the notes.
+  const folders = await FolderStore.load();
   // When the guide is genuinely new to this vault, open it — otherwise the one
   // note the user was told to look at is the one they never see.
   if (disk.ok && store.ensureGuide(GUIDE_NOTE, GUIDE_VERSION, { unedited: guideUnedited })) {
@@ -76,6 +93,8 @@ async function boot() {
   const editorEl = $('editor');
 
   let listFilter = '';
+  // Filter by label (label-filter.js): set once the list can be drawn.
+  let labelFilter = null;
   let titleTimer = null;
   let titleNoteId = null;
 
@@ -135,6 +154,14 @@ async function boot() {
   // F12 (caught in the main process): say where the picture went.
   const toast = $('toast');
   let toastTimer = null;
+  // A short word from anywhere in the app (a picture copied, 0.9.3).
+  window.addEventListener('nebula-toast', (e) => {
+    if (!toast || !e.detail) return;
+    toast.textContent = t(String(e.detail));
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast.hidden = true; }, 2200);
+  });
   window.nebula?.window?.onSnapshot?.((result) => {
     if (!toast) return;
     toast.textContent = result?.ok
@@ -209,7 +236,11 @@ async function boot() {
   // new shape arrives selected, with its colour bar already open.
   const shapes = initShapes(editorEl, { history, onGeometry: () => arrows?.reflow() });
   const arrows = initArrows(editorEl, { history });
+  // Nebula Wide's sheet for export and print, as it was last turned (pdf-preview.js).
+  restoreWideOrientation();
   const toolbar = initToolbar(editorEl, {
+    translate: t,
+    onWideOrientation: () => pageModes?.paint(),
     onLink: () => richPaste?.open('url'),
     shapes,
     arrows,
@@ -218,6 +249,9 @@ async function boot() {
     onSave: () => { void saveCurrent().catch(showSaveError); },
     noteTitle: () => store.active()?.title ?? '',
     noteLabels: () => store.active()?.labels ?? [],
+    // The note's writing font (0.9.3): the last font and size picked in it.
+    noteFont: () => store.active()?.font ?? null,
+    setNoteFont: (patch) => { if (store.activeId && !isReadOnly()) store.setFont(store.activeId, patch); },
     // An imported file becomes a new note, never an edit to the open one.
     onImport: ({ title, content, labels }) => {
       flushTitle();
@@ -246,53 +280,93 @@ async function boot() {
     },
   });
   initSlashMenu(editorEl, { history, shapes, links: richPaste });
+  initDividerSelect(editorEl, { history, isLocked: isReadOnly });
+  initToggles(editorEl, { history, isLocked: isReadOnly });
+  initMentions(editorEl, {
+    store,
+    history,
+    openNote: (id) => openNote(id),
+    showLabel: (label) => labelFilter?.set({ kind: 'text', label }),
+    isLocked: isReadOnly,
+  });
+  initContextMenu(editorEl, {
+    history,
+    images: richPaste,
+    miniBarAt: (x, y) => toolbar?.miniBarAt?.(x, y),
+    isLocked: isReadOnly,
+  });
   initCodeBlocks(editorEl, { history });
   const find = initFind(editorEl);
 
+  labelFilter = initLabelFilter({
+    store,
+    button: $('label-filter-btn'),
+    panel: $('label-filter'),
+    onChange: () => renderList(),
+    onDelete: (label) => deleteLabelEverywhere(label),
+  });
+
+  /** One note's row in the list: the row itself, and its ⋯ beside it. */
+  function noteItem(note) {
+    // The row is a <button>; the ⋯ has to be a sibling, not a child — a
+    // button inside a button is invalid and never receives the click.
+    const item = document.createElement('div');
+    item.className = 'note-item';
+
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = `note-row${note.id === store.activeId ? ' active' : ''}`;
+    row.innerHTML = '<div class="nr-title"></div><div class="nr-meta"></div>';
+    const title = note.title || 'Untitled';
+    row.children[0].textContent = title;
+    if (note.pinned) {
+      const pin = document.createElement('span');
+      pin.className = 'nr-pin';
+      pin.innerHTML = icon('pin');
+      pin.title = 'Pinned';
+      row.children[0].prepend(pin);
+    }
+    // The collapsed rail shows only this; CSS cannot take a first letter out
+    // of an inline box reliably, so it is handed over explicitly.
+    row.children[0].dataset.initial = title.trim().charAt(0).toUpperCase() || 'U';
+    row.title = title; // the full name is still readable as a tooltip
+    // The line under a name is not translated as a whole (it holds the note's
+    // words), so its two fixed words are, here.
+    const when = relativeTime(note.updatedAt);
+    row.children[1].textContent = `${when === 'now' ? t('now') : when} · ${plainSnippet(note.content, 48) || t('Empty')}`;
+    row.addEventListener('click', () => openNote(note.id));
+
+    item.append(row);
+    if (noteActions) item.append(noteActions.moreButton(note.id));
+    return item;
+  }
+
+  let noteList = null;
+  let pageModes = null;
+  let zoomControl = null;
+  const defaultZoom = () => (opensFitted(store.active()?.page ?? 'nw') ? FIT : DEFAULT_ZOOM);
+
   function renderList() {
-    const notes = store.filter(listFilter);
+    labelFilter?.render();
+    const filtering = !!listFilter.trim() || !!labelFilter?.active();
+    const notes = store.filter(listFilter).filter((n) => labelFilter?.matches(n) ?? true);
     listEl.innerHTML = '';
-    if (!notes.length) {
+    listEl.classList.toggle('filtered', filtering);
+    // Unfiltered, the list is drawn with its folders, and notes can be dragged
+    // about in it (note-list.js). A filter shows one flat list of what matches.
+    const drawn = !filtering && noteList ? noteList.render(notes) : 0;
+    if (!notes.length && !drawn) {
       // NOT an early return: the archive and trash counts have to be redrawn
       // too, and trashing the last note is exactly when they change. Returning
       // here left the trash showing 0 with a note in it.
       const empty = document.createElement('div');
       empty.className = 'note-list-empty';
-      empty.textContent = listFilter ? 'No notes match' : 'No notes yet';
+      empty.textContent = filtering ? t('No notes match') : t('No notes yet');
       listEl.appendChild(empty);
       noteActions?.renderDrawers();
       return;
     }
-    for (const note of notes) {
-      // The row is a <button>; the ⋯ has to be a sibling, not a child — a
-      // button inside a button is invalid and never receives the click.
-      const item = document.createElement('div');
-      item.className = 'note-item';
-
-      const row = document.createElement('button');
-      row.type = 'button';
-      row.className = `note-row${note.id === store.activeId ? ' active' : ''}`;
-      row.innerHTML = '<div class="nr-title"></div><div class="nr-meta"></div>';
-      const title = note.title || 'Untitled';
-      row.children[0].textContent = title;
-      if (note.pinned) {
-        const pin = document.createElement('span');
-        pin.className = 'nr-pin';
-        pin.innerHTML = icon('pin');
-        pin.title = 'Pinned';
-        row.children[0].prepend(pin);
-      }
-      // The collapsed rail shows only this; CSS cannot take a first letter out
-      // of an inline box reliably, so it is handed over explicitly.
-      row.children[0].dataset.initial = title.trim().charAt(0).toUpperCase() || 'U';
-      row.title = title; // the full name is still readable as a tooltip
-      row.children[1].textContent = `${relativeTime(note.updatedAt)} · ${plainSnippet(note.content, 48) || 'Empty'}`;
-      row.addEventListener('click', () => openNote(note.id));
-
-      item.append(row);
-      if (noteActions) item.append(noteActions.moreButton(note.id));
-      listEl.appendChild(item);
-    }
+    if (filtering || !noteList) for (const note of notes) listEl.appendChild(noteItem(note));
     noteActions?.renderDrawers();
   }
 
@@ -304,11 +378,14 @@ async function boot() {
     titleNoteId = note?.id ?? null;
     titleEl.value = note?.title ?? '';
     titleEl.disabled = !note;
+    zoomControl?.paint();        // how close the page is, and with it the page width measured at that zoom
     editor.load(note);
     // Before anything reads the markup: bring what the note SAVED up to what
     // this version writes. A fix that lives in a note's HTML never reaches the
     // notes written before it otherwise — see migrate.js.
     migrateNote(editorEl, { fitShape: shapes?.fit });
+    // A mentioned note that was renamed is shown under its name now.
+    refreshMentions(editorEl, store);
     applyReadOnly();
     // Both are regenerated from their stored source, never trusted from the
     // saved HTML — and the shape bar belongs to a note that is now gone.
@@ -327,7 +404,57 @@ async function boot() {
     find?.close();    // its ranges point into the note that just closed
     setSaveState('');
     renderList();
+    paintOrder();
+    autoOrder(400);              // pictures have their size by then
   }
+
+  /**
+   * Auto order page (0.9.3, page-order.js): the button beside the zoom puts
+   * right what a page line falls across, on every page but Nebula Wide; a note
+   * with it turned on (its ⋯ menu) is put right by itself — when it opens, when
+   * its paper changes, when something is let go, and when typing settles.
+   */
+  const orderBtn = $('btn-order-page');
+  let ordering = false;
+  let orderTimer = 0;
+  const orderChip = $('order-chip');
+  function paintOrder() {
+    const paper = 'paper' in editorEl.dataset;
+    const on = !!store.active()?.autoOrder && paper;
+    if (orderBtn) {
+      orderBtn.disabled = !paper;
+      orderBtn.classList.toggle('on', on);
+      orderBtn.setAttribute('aria-pressed', String(on));
+    }
+    // Like Only view: a word by the title while it is on.
+    if (orderChip) orderChip.hidden = !on;
+  }
+  orderChip?.addEventListener('click', () => {
+    if (store.activeId && store.active()?.autoOrder) store.toggleAutoOrder(store.activeId);
+    paintOrder();
+  });
+  function runOrder({ say = false } = {}) {
+    if (isReadOnly() || !('paper' in editorEl.dataset)) return 0;
+    ordering = true;
+    history.push();
+    const moved = orderPage(editorEl);
+    if (moved) {
+      arrows?.reflow();
+      editorEl.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    ordering = false;
+    if (say) window.dispatchEvent(new CustomEvent('nebula-toast', { detail: moved ? `Moved to the next page: ${moved}` : 'Nothing crosses a page line' }));
+    return moved;
+  }
+  function autoOrder(delay = 250) {
+    clearTimeout(orderTimer);
+    if (!store.active()?.autoOrder) return;
+    orderTimer = setTimeout(() => { if (store.active()?.autoOrder) runOrder(); }, delay);
+  }
+  orderBtn?.addEventListener('mousedown', (e) => e.preventDefault());
+  orderBtn?.addEventListener('click', () => runOrder({ say: true }));
+  editorEl.addEventListener('input', () => { if (!ordering) autoOrder(1200); });
+  window.addEventListener('mouseup', (e) => { if (editorEl.contains(e.target)) autoOrder(250); });
 
   /**
    * Write a pending title now.
@@ -347,6 +474,7 @@ async function boot() {
   }
 
   titleEl.addEventListener('input', () => {
+    pageModes?.paint();          // the PDF's title takes room on page one: the page lines follow it
     setSaveState('saving');
     clearTimeout(titleTimer);
     titleTimer = setTimeout(() => {
@@ -366,7 +494,8 @@ async function boot() {
   $('btn-new').addEventListener('click', () => {
     flushTitle();
     editor.flush();
-    store.createNote('Untitled');
+    // Named in the language in use; it is the note's title from then on.
+    store.createNote(t('Untitled'));
     openNote(store.activeId);
     titleEl.focus();
     titleEl.select();
@@ -378,10 +507,45 @@ async function boot() {
   const labels = initLabels(store);
   const noteActions = initNoteActions({
     onLabels: (id, button) => labels?.open(id, button),
+    onFolder: (id, button) => noteList?.moveMenu(id, button),
     store,
     onChanged: () => { renderList(); openNote(store.activeId); },
     openNote: (id) => openNote(id),
   });
+
+  noteList = initNoteList({ listEl, store, folders, noteItem, onChanged: () => renderList() });
+  // The page width beside Saved (0.9.3): a setting of the note, allowed in Only view too.
+  pageModes = initPageModes({
+    group: $('page-modes'),
+    editorEl,
+    current: () => store.active()?.page ?? 'nw',
+    choose: (id) => { if (store.activeId) store.setPage(store.activeId, id); zoomControl?.paint(); arrows?.reflow(); paintOrder(); autoOrder(); },
+    title: () => titleEl.value,
+    translate: t,
+  });
+  // The page zoom beside the alignment (0.9.3): a setting of the note.
+  zoomControl = initZoomControl({
+    group: $('tb-zoom'),
+    editorEl,
+    frameEl: $('editor-frame'),
+    // A note nobody zoomed opens as its page says: NW and NN at 100 % (the old
+    // size), A4 and the smaller papers at their real size (100 %), the wider
+    // ones fitted to the window (0.9.3).
+    current: () => normalizeZoom(store.active()?.zoom ?? defaultZoom()),
+    sheet: () => (isFluid(store.active()?.page ?? 'nw') ? 0 : sheetPx(store.active()?.page ?? 'nw')),
+    realSized: () => usesRealSize(store.active()?.page ?? 'nw'),
+    windowZoom: () => window.nebula?.display?.windowZoom?.() ?? 1,
+    choose: (v) => {
+      if (store.activeId) store.setZoom(store.activeId, v === defaultZoom() ? null : v);
+      requestAnimationFrame(() => arrows?.reflow());
+    },
+    translate: t,
+    // The scroll bar's width is in the page's pixels: the column is measured again at the new zoom.
+    after: () => pageModes?.paint(),
+  });
+  // How big a real millimetre is on this screen, asked once.
+  void window.nebula?.display?.realScale?.().then((f) => { setRealScale(f); zoomControl?.paint(); arrows?.reflow(); }).catch(() => {});
+  $('btn-new-folder')?.addEventListener('click', () => { void noteList.create(); });
 
   initTheme($('theme-pick'));
   const side = initSideToggle($('side-toggle'));
@@ -462,6 +626,26 @@ async function boot() {
     else whatsNew.maybeOpen();
   }).catch(() => { /* a browser preview has no main process */ });
   on('note-changed', () => renderList());
+  on('lang-changed', () => renderList());
+
+  /**
+   * "⋯ -> Delete label" in the label search (0.9.3): the label leaves every
+   * note, from the title and from the text. The open note is saved first and
+   * shown again after, so what is on screen is what was written.
+   */
+  function deleteLabelEverywhere(label) {
+    flushTitle();
+    editor.flush();
+    const strip = (html) => {
+      const box = document.createElement('div');
+      box.innerHTML = html;
+      return removeTagChips(box, [label]) ? box.innerHTML : null;
+    };
+    const changed = store.deleteLabel(label, strip);
+    if (changed.includes(store.activeId)) openNote(store.activeId);
+    renderList();
+    return changed.length;
+  }
 
   openNote(store.activeId);
 
@@ -500,6 +684,19 @@ async function boot() {
   // toolbar, no notes and only a console line to say why.
   try {
     const ai = initAiPanel({ askText });
+    // A click in an AI page never reaches this document, so a menu opened
+    // over the panel (a tab's right-click, a note's or folder's ⋯) stayed
+    // over the page (the owner, 0.9.3). Focus going into a page counts as a
+    // click outside: every menu closes the way it does for one.
+    const clickOutside = () => document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    // Up to Electron 33 a captured `focus` on the <webview> reached this
+    // document; from Electron 44 only the window's `blur`, with the webview
+    // left as the active element. Both are listened for; a blur that went to
+    // another application (nothing here active) closes nothing.
+    document.addEventListener('focus', (e) => { if (e.target?.tagName === 'WEBVIEW') clickOutside(); }, true);
+    window.addEventListener('blur', () => setTimeout(() => {
+      if (document.activeElement?.tagName === 'WEBVIEW') clickOutside();
+    }, 0));
     if (ai) {
       // Attach the guest when the panel is actually visible, never while it is
       // display:none — that detaches it and forces a reload.

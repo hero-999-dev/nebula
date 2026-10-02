@@ -26,6 +26,16 @@
         <span class="brand-name">Nebula</span>
       </div>
       <input id="side-filter" type="search" placeholder="Filter notes…" aria-label="Filter notes" />
+      <!-- Filter by label (0.9.3): opens on a press; the note's own labels and the
+           #labels written in the text are two groups. -->
+      <button type="button" class="label-filter-btn" id="label-filter-btn" aria-expanded="false" aria-controls="label-filter" title="Filter by label">
+        <span data-icon="tag"></span><span class="lf-text">Filter by label</span><span class="lf-clear" title="Clear the label filter" hidden>×</span>
+      </button>
+      <div class="label-filter" id="label-filter" role="group" aria-label="Filter by label" hidden>
+        <input id="label-filter-search" type="search" placeholder="Find a label" aria-label="Find a label" autocomplete="off" />
+        <div class="lf-group" data-kind="any"><div class="lf-chips"></div></div>
+        <p class="lf-empty">No labels yet</p>
+      </div>
       <nav class="note-list" id="note-list" aria-label="Notes"></nav>
 
       <!-- Per-note menu: pin, archive, delete. One menu, moved to whichever
@@ -34,7 +44,9 @@
         <!-- The owner's order (0.9.2): pin, the view mode, labels, archive, trash last. -->
         <button type="button" data-note-act="pin"></button>
         <button type="button" data-note-act="readonly"></button>
+        <button type="button" data-note-act="autoorder"></button>
         <button type="button" data-note-act="labels">Edit labels</button>
+        <button type="button" data-note-act="folder">Move to folder</button>
         <button type="button" data-note-act="archive"></button>
         <button type="button" data-note-act="trash">Move to trash</button>
       </div>
@@ -52,7 +64,11 @@
             Trash<span class="drawer-count" id="trash-count">0</span>
           </button>
         </div>
-        <button class="btn primary" id="btn-new" type="button">New note</button>
+        <!-- New folder (0.9.3) beside it: the folder icon and a plus. -->
+        <div class="new-row">
+          <button class="btn primary" id="btn-new" type="button">New note</button>
+          <button class="btn new-folder" id="btn-new-folder" type="button" title="New folder" aria-label="New folder"><span data-icon="folder"></span><span class="nf-plus" aria-hidden="true">+</span></button>
+        </div>
         <div class="theme-pick" id="theme-pick" role="group" aria-label="Theme">
           <button type="button" data-theme="main" title="Main — violet">Main</button>
           <button type="button" data-theme="dark" title="Dark">Dark</button>
@@ -61,6 +77,17 @@
         </div>
         <div class="side-meta">
           <span class="app-version" id="app-version" title="About Nebula"></span>
+          <!-- Languages (0.9.3): always open, right beside the version, the way the
+               owner drew it; each name in its own language. On the rail they
+               stand one under another as EN, DE, PL, TR. -->
+          <div class="lang-pick" id="lang-pick">
+            <div class="lang-pick__row" id="lang-row" role="group" aria-label="Language" data-no-i18n>
+              <button type="button" data-lang="en" title="English">English</button>
+              <button type="button" data-lang="de" title="Deutsch">Deutsch</button>
+              <button type="button" data-lang="pl" title="Polski">Polski</button>
+              <button type="button" data-lang="tr" title="Türkçe">Türkçe</button>
+            </div>
+          </div>
           <button class="btn ghost btn-mini" id="btn-check-updates" type="button" title="Check for updates">Check for updates</button>
         </div>
       </div>
@@ -71,8 +98,11 @@
       <header class="page-head">
         <input id="title" class="title-input" placeholder="Untitled" autocomplete="off" spellcheck="true" />
         <button type="button" class="readonly-chip" id="readonly-chip" hidden title="This note is view-only. Click to allow editing.">🔒 Only view</button>
+        <button type="button" class="readonly-chip order-chip" id="order-chip" hidden title="Shapes and pictures a page line falls across go to the next page by themselves. Click to turn it off.">Auto order mode is on</button>
         <div id="note-labels" class="note-labels" aria-label="Note labels"></div>
         <span class="savestate" id="savestate"></span>
+        <!-- The page (0.9.3): Nebula Wide / Narrow and the paper sizes, boxed like the pad. -->
+        <div class="pad page-modes" id="page-modes" role="group" aria-label="Page width"></div>
         <div class="pad" id="pad" role="group" aria-label="Move the editing bar">
           <button type="button" data-pad="top"    title="Editing bar: top"><span data-icon="up"></span></button>
           <button type="button" data-pad="right"  title="Editing bar: right"><span data-icon="right"></span></button>
@@ -100,6 +130,7 @@
             <button type="button" class="tb" data-act="ul" title="Bulleted list"><span data-icon="bullets"></span></button>
             <button type="button" class="tb" data-act="ol" title="Numbered list"><span data-icon="numbers"></span></button>
             <button type="button" class="tb" data-act="todo" title="To-do"><span data-icon="todo"></span></button>
+            <button type="button" class="tb" data-act="toggle" title="Toggle list"><span data-icon="toggle"></span></button>
             <button type="button" class="tb" data-act="outdent" title="Decrease indent (Shift+Tab)"><span data-icon="outdent"></span></button>
             <button type="button" class="tb" data-act="indent" title="Increase indent (Tab)"><span data-icon="indent"></span></button>
             <span class="tb-sep"></span>
@@ -109,7 +140,7 @@
               <button type="button" class="tb" data-menu="menu-export" title="Export this note"><span data-icon="download"></span></button>
               <div class="tb-menu tb-menu--export" id="menu-export" hidden></div>
             </span>
-            <button type="button" class="tb" data-act="import" title="Import a note (.md or .html)"><span data-icon="upload"></span></button>
+            <button type="button" class="tb" data-act="import" title="Import a note (.md, .html, .docx, .odt, .doc, .rtf or .enex)"><span data-icon="upload"></span></button>
             <button type="button" class="tb" data-act="cut" title="Cut (Ctrl+X)"><span data-icon="cut"></span></button>
             <button type="button" class="tb" data-act="copy" title="Copy (Ctrl+C)"><span data-icon="copy"></span></button>
             <button type="button" class="tb" data-act="paste" title="Paste (Ctrl+V)"><span data-icon="paste"></span></button>
@@ -197,6 +228,15 @@
             <button type="button" class="tb" data-act="ac" title="Align center"><span data-icon="alignCenter"></span></button>
             <button type="button" class="tb" data-act="ar" title="Align right"><span data-icon="alignRight"></span></button>
             <button type="button" class="tb" data-act="aj" title="Justify"><span data-icon="alignJustify"></span></button>
+            <span class="tb-sep"></span>
+            <!-- Page zoom (0.9.3): the page closer or further, beside the alignment. -->
+            <span class="tb-zoom" id="tb-zoom" role="group" aria-label="Page zoom">
+              <button type="button" class="tb" data-zoom="out" title="Zoom the page out" aria-label="Zoom the page out">−</button>
+              <select class="tb-select tb-zoom-select" id="zoom-select" title="Page zoom" aria-label="Page zoom"></select>
+              <button type="button" class="tb" data-zoom="in" title="Zoom the page in" aria-label="Zoom the page in">+</button>
+            </span>
+            <!-- Auto order page (0.9.3): what a page line falls across goes to the next page. -->
+            <button type="button" class="tb tb-order" id="btn-order-page" title="Auto order page — move what a page line falls across to the next page" aria-label="Auto order page"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2.5h7l3 3v12H5z"/><path d="M7.5 9.5h5M7.5 13h5"/></svg></button>
           </div>
         </div>
 
@@ -220,6 +260,10 @@
       <div class="ai-resize" id="ai-resize" title="Drag to resize"></div>
       <div class="ai-head">
         <div class="ai-tabs" id="ai-tabs" role="tablist"></div>
+        <!-- Outside the strip, so they stay in place however far it scrolls (0.9.3):
+             load the page again, then + to add a site. -->
+        <button type="button" class="btn ghost ai-x ai-reload" id="ai-reload" title="Reload this page" aria-label="Reload this page"><span data-icon="reload"></span></button>
+        <button type="button" class="ai-tab ai-add" id="ai-add" title="Add a site" aria-label="Add a site">+</button>
         <button type="button" class="btn ghost ai-x" id="ai-close" title="Close"><span data-icon="close"></span></button>
       </div>
       <div class="ai-body" id="ai-body"></div>
@@ -308,6 +352,32 @@
       <div id="whats-new-body"></div>
       <div class="dlg-actions">
         <button class="btn primary" id="whats-new-close" type="button">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- The PDF export's preview (0.9.3): the pages as they will be saved;
+       Nebula Wide chooses A4 across or upright. pdf-preview.js -->
+  <div class="overlay" id="ov-pdf" hidden>
+    <div class="modal modal-pdf" role="dialog" aria-modal="true" aria-labelledby="pdf-title">
+      <div class="pdf-head">
+        <p class="dlg-title" id="pdf-title">Export as PDF</p>
+        <div class="pdf-orient pdf-videos" role="group" aria-label="Videos" hidden>
+          <button type="button" data-videos="with" title="Videos as they show in the note: the picture, linked">▶ With videos</button>
+          <button type="button" data-videos="without" title="Videos as their links only">Links only</button>
+        </div>
+        <div class="pdf-orient" data-orient-group role="group" aria-label="Orientation">
+          <button type="button" data-orient="landscape"><span class="pdf-sheet pdf-sheet--across" aria-hidden="true"></span>Landscape</button>
+          <button type="button" data-orient="portrait"><span class="pdf-sheet pdf-sheet--upright" aria-hidden="true"></span>Portrait</button>
+        </div>
+        <span class="pdf-paper"></span>
+      </div>
+      <div class="pdf-frame">
+        <p class="pdf-status" role="status"></p>
+      </div>
+      <div class="dlg-actions">
+        <button class="btn ghost" data-pdf="cancel" type="button">Cancel</button>
+        <button class="btn primary" data-pdf="export" type="button">Export</button>
       </div>
     </div>
   </div>

@@ -8,6 +8,12 @@ in one context window and explains the codebase. This file is the *rules*.
 
 ---
 
+**NEVER THE INSTALLED APP (owner, 2026-09-28).** No agent, script or test opens, reads, copies,
+lists, screenshots or updates the installed Nebula — `C:\Program Files\Nebula` — or its notes and backups
+(`%APPDATA%\nebula`). Those are the owner's private notes. Work and test only with the dev profile,
+`Nebula Test.exe` and its `Nebula-data`, and throwaway temp profiles. The owner updates the
+installed app themselves from inside it. `npm run old-notes` reads Nebula Test's notes only.
+
 ## Before you start — mandatory preflight
 
 ```bash
@@ -37,7 +43,7 @@ Skipping preflight means the next agent — possibly you, next week — starts b
 | `npm run dev` | Hot-reload dev app **on its own profile** (`.dev-profile`) |
 | `npm test` | Unit tests — after every logic change |
 | `npm run build && npm run smoke` | Electron smoke — after anything touching `electron/`, the preload bridge, or boot |
-| `npm run old-notes` | The long-note trials on COPIES of the notes in this machine's vaults (installed app + Nebula Test). Run it after any editing fix: old notes hold structures new ones never do. `npm run push` runs it and stops on a failed trial (`--no-old-notes` skips it) |
+| `npm run old-notes` | The long-note trials on COPIES of the notes in this machine's vaults (Nebula Test only — never the installed app). Run it after any editing fix: old notes hold structures new ones never do. `npm run push` runs it and stops on a failed trial (`--no-old-notes` skips it) |
 | `npm run rebuild` | Page rebuild (local only, not in the repo) — rewrites the pages in `tests/rebuild/pages.json` in the real app and scores them; `npm run push` runs it when present and fails on any metric that went down |
 | `npm run pack:test` | `Nebula Test.exe` in the project root — the build to actually click |
 | `npm run pack:win` | Local installer + portable exe |
@@ -63,6 +69,8 @@ Every session that changed code ends with **all** of these:
 - [ ] **Deleted is deleted** — anything that keeps a copy of notes (backups, test profiles, caches, the flash) must drop a note when it is deleted. The owner, 2026-09-27: "a note I deleted must not be recoverable — that is a security hole". Never copy real notes anywhere a later delete cannot reach
 - [ ] **`README.md`** — if structure, scripts or workflow changed
 - [ ] **`HANDOVER.md`** — if a new trap or a new command appeared
+- [ ] **Electron first** — before any Nebula update (a test build or a push), check Electron: `npm run check:browsers` says when a newer one is out. Then update it (`npm install --save-dev electron@^X && npx install-electron --no`; for a new major read Electron's breaking changes for every major in between) and do the bug check: `npm test`, `npm run build`, `npm run smoke`. Owner's standing rule, 2026-09-30: "whenever Nebula is about to be updated, check Electron; if there is an update, update Electron, then do a bug check"
+- [ ] **Browsers told to Google** — `npm run check:browsers` (preflight shows it, `npm run push` stops on it): the Firefox and ESR the sign-in windows claim must be current, or Google answers "Try using a different browser". Owner's standing rule, 2026-09-30: "check this on every new version so we do not get the error again". Fix by changing `FIREFOX_RELEASE` / `FIREFOX_ESR` in `src/js/ai-services.js`; a Chromium (Electron) warning means an Electron upgrade is due
 - [ ] `npm run pack:test` and stop — the owner tests `Nebula Test.exe` first. `npm run push` only after they say "push"; see **Releasing** below
 
 `npm run push` re-checks the tracking files and refuses to release quietly if
@@ -120,6 +128,8 @@ installs and runs while being wrong.
 | `npx asar extract-file` | Writes into the **current directory**. Run it in a temp folder — it once overwrote this repo's `package.json`. |
 | Version numbers in prose | Never type one. `package.json` is the source; `scripts/versions.js` stamps README, Prompt, memory and the site, and `npm run push` refuses to commit if they disagree. They had drifted three versions apart. |
 | Unstyled controls | A `<button>` with no `color`/`background` is the browser's grey-on-black default, which passes unnoticed on a light theme and is broken on a dark one. Probe the running app for `rgb(0, 0, 0)` / `rgb(240, 240, 240)` after any theme work. |
+| `npm install` and Electron | From Electron 42 the binary is not downloaded by `npm install`. After installing or upgrading, run `npx install-electron --no`, or smoke and `npm run dev` find no Electron. |
+| An old browser to Google | A sign-in window that claims a years-old browser is refused ("Try using a different browser"). `npm run check:browsers` compares what the app claims with Mozilla's and Google's own lists on every release. |
 | The icon | Built from vector geometry at each shipped size by `build/make-icon.ps1`. Do not let electron-builder derive the `.ico` from one large PNG — three resamplings later, 16px is mush. |
 
 ---

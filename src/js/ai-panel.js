@@ -6,7 +6,8 @@
 
 import { loadJson, saveJson, generateId } from './storage.js';
 
-import { AI_SERVICES } from './ai-services.js';
+import { AI_SERVICES, firefoxUserAgentFor, isGoogleService, mergeServices, siteUrl } from './ai-services.js';
+import { t } from './i18n.js';
 export { AI_SERVICES };
 
 /**
@@ -27,6 +28,8 @@ function chromeUserAgent() {
 }
 
 const CUSTOM_KEY = 'nebula:ai-custom';
+const OVERRIDE_KEY = 'nebula:ai-overrides';
+const HIDDEN_KEY = 'nebula:ai-hidden';
 const WIDTH_KEY = 'nebula:ai-width';
 const ACTIVE_KEY = 'nebula:ai-active';
 
@@ -41,9 +44,12 @@ export function initAiPanel({ askText } = {}) {
   const isElectron = !!window.nebula;
   const views = new Map();
   let custom = loadJson(CUSTOM_KEY, []);
+  let overrides = loadJson(OVERRIDE_KEY, {});
+  let hidden = loadJson(HIDDEN_KEY, []);
+  const all = () => mergeServices(AI_SERVICES, custom, overrides, hidden);
+  // A tab that is no longer there (Perplexity, taken out in 0.9.3) opens Claude.
   let active = localStorage.getItem(ACTIVE_KEY) || 'claude';
-
-  const all = () => ({ ...AI_SERVICES, ...Object.fromEntries(custom.map((c) => [c.id, c])) });
+  if (!all()[active]) active = 'claude';
 
   const savedWidth = Number(localStorage.getItem(WIDTH_KEY));
   if (savedWidth >= 280 && savedWidth <= 900) panel.style.width = `${savedWidth}px`;
@@ -57,7 +63,7 @@ export function initAiPanel({ askText } = {}) {
         const dot = s.dot ? `<span class="ai-dot" style="background:${s.dot}"></span>` : '<span class="ai-dot"></span>';
         return `<button class="ai-tab${id === active ? ' active' : ''}" data-ai="${id}" type="button" title="${esc(s.url)}">${dot}${esc(s.name)}${x}</button>`;
       })
-      .join('') + '<button class="ai-tab ai-add" id="ai-add" type="button" title="Add a site">+</button>';
+      .join('');
   }
 
   /**
@@ -107,7 +113,10 @@ export function initAiPanel({ askText } = {}) {
         // service so signing into one is not signing into another.
         wv.setAttribute('partition', `persist:ai-${id}`);
         wv.setAttribute('allowpopups', '');
-        wv.setAttribute('useragent', chromeUserAgent());
+        // Gemini is Google's own sign-in, which refuses a visit that was Chrome
+        // a page ago and Firefox now: its whole tab is Firefox (0.9.3).
+        wv.setAttribute('useragent', isGoogleService(service.url)
+          ? firefoxUserAgentFor(window.nebula?.platform) : chromeUserAgent());
         // A guest that dies must say so in the panel, not in a console nobody
         // is reading. None of these were listened for before.
         wv.addEventListener('did-fail-load', (ev) => {
@@ -143,30 +152,113 @@ export function initAiPanel({ askText } = {}) {
     const removeId = e.target.closest('[data-remove]')?.dataset.remove;
     if (removeId) {
       e.stopPropagation();
-      custom = custom.filter((c) => c.id !== removeId);
-      saveJson(CUSTOM_KEY, custom);
-      views.get(removeId)?.remove();
-      views.delete(removeId);
-      body.querySelector(`.ai-fallback[data-ai="${removeId}"]`)?.remove();
-      show(active === removeId ? 'claude' : active);
-      return;
-    }
-    if (e.target.closest('#ai-add')) {
-      const name = await askText?.('Site name:', 'My AI');
-      if (!name?.trim()) return;
-      let url = await askText?.('Site URL:', 'https://');
-      if (!url?.trim()) return;
-      url = url.trim();
-      if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
-      try { new URL(url); } catch { return; }   // a malformed src is not a site
-      const entry = { id: generateId('ai'), name: name.trim(), url, dot: '#C15F3C' };
-      custom.push(entry);
-      saveJson(CUSTOM_KEY, custom);
-      show(entry.id);
+      removeSite(removeId);
       return;
     }
     const id = e.target.closest('[data-ai]')?.dataset.ai;
     if (id) show(id);
+  });
+
+  /** A site's tab gone: a site added with + is forgotten, a built-in one hidden. */
+  function removeSite(id) {
+    if (custom.some((c) => c.id === id)) {
+      custom = custom.filter((c) => c.id !== id);
+      saveJson(CUSTOM_KEY, custom);
+    } else if (AI_SERVICES[id]) {
+      hidden = [...new Set([...hidden, id])];
+      saveJson(HIDDEN_KEY, hidden);
+    }
+    views.get(id)?.remove();
+    views.delete(id);
+    body.querySelector(`.ai-fallback[data-ai="${id}"]`)?.remove();
+    const left = Object.keys(all());
+    if (active === id) {
+      if (left.length) show(left[0]);
+      else renderTabs();
+    } else renderTabs();
+  }
+
+  function changeSite(id, patch) {
+    const c = custom.find((x) => x.id === id);
+    if (c) { Object.assign(c, patch); saveJson(CUSTOM_KEY, custom); }
+    else if (AI_SERVICES[id]) { overrides = { ...overrides, [id]: { ...(overrides[id] || {}), ...patch } }; saveJson(OVERRIDE_KEY, overrides); }
+    if (patch.url) {
+      const wv = views.get(id);
+      if (wv) { try { wv.loadURL(patch.url); } catch { wv.setAttribute('src', patch.url); } }
+    }
+    renderTabs();
+  }
+
+  /* ---- Right-click on a tab (0.9.3): its header, its address, delete ---- */
+  const siteMenu = document.createElement('div');
+  siteMenu.className = 'float-menu ai-site-menu';
+  siteMenu.id = 'ai-site-menu';
+  siteMenu.setAttribute('role', 'menu');
+  siteMenu.hidden = true;
+  document.body.append(siteMenu);
+  const closeSiteMenu = () => { siteMenu.hidden = true; siteMenu.replaceChildren(); };
+  function menuItem(label, run, cls = '') {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'menuitem');
+    if (cls) b.className = cls;
+    b.textContent = label;
+    b.addEventListener('click', () => { closeSiteMenu(); void run(); });
+    siteMenu.append(b);
+  }
+  tabsEl.addEventListener('contextmenu', (e) => {
+    const id = e.target.closest('[data-ai]')?.dataset.ai;
+    if (!id) return;
+    e.preventDefault();
+    closeSiteMenu();
+    const site = all()[id];
+    if (!site) return;
+    menuItem(t('Change header'), async () => {
+      const name = await askText?.(t('Header:'), site.name);
+      if (name?.trim()) changeSite(id, { name: name.trim().slice(0, 40) });
+    });
+    menuItem(t('Change website'), async () => {
+      const url = siteUrl(await askText?.(t('Website address:'), site.url));
+      if (url) changeSite(id, { url });
+    });
+    menuItem(t('Delete website'), () => removeSite(id), 'ai-site-menu__delete');
+    if (hidden.length) {
+      menuItem(t('Restore removed sites'), () => {
+        hidden = [];
+        saveJson(HIDDEN_KEY, hidden);
+        renderTabs();
+      });
+    }
+    siteMenu.hidden = false;
+    const w = siteMenu.offsetWidth || 200;
+    const h = siteMenu.offsetHeight || 120;
+    siteMenu.style.left = `${Math.max(6, Math.min(e.clientX, window.innerWidth - w - 6))}px`;
+    siteMenu.style.top = `${Math.max(6, Math.min(e.clientY, window.innerHeight - h - 6))}px`;
+    siteMenu.querySelector('button')?.focus({ preventScroll: true });
+  });
+  document.addEventListener('mousedown', (e) => { if (!siteMenu.hidden && !siteMenu.contains(e.target)) closeSiteMenu(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !siteMenu.hidden) closeSiteMenu(); });
+
+  // + adds a site. It stands outside the strip now, at its right (0.9.3).
+  document.getElementById('ai-add')?.addEventListener('click', async () => {
+    const name = await askText?.('Site name:', 'My AI');
+    if (!name?.trim()) return;
+    const url = siteUrl(await askText?.('Site URL:', 'https://'));
+    if (!url) return;   // a malformed src is not a site
+    const entry = { id: generateId('ai'), name: name.trim(), url, dot: '#C15F3C' };
+    custom.push(entry);
+    saveJson(CUSTOM_KEY, custom);
+    show(entry.id);
+  });
+
+  // Load the open tab's page again (the owner, 0.9.3): the view it shows,
+  // nothing else. A view not built yet has nothing to reload.
+  document.getElementById('ai-reload')?.addEventListener('click', () => {
+    const wv = views.get(active);
+    if (wv && typeof wv.reload === 'function') {
+      body.querySelector('.ai-error')?.classList.remove('on');
+      try { wv.reload(); } catch { /* not attached yet */ }
+    }
   });
 
   // shift+wheel scrolls the tab strip sideways (classic side-scroll)

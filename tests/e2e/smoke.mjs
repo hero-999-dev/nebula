@@ -9,6 +9,7 @@
  * Run AFTER a build:   npm run build && npm run smoke
  */
 import { runV090Checks } from './v090.mjs';
+import { runV093Checks } from './v093.mjs';
 import { _electron as electron } from 'playwright-core';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -420,7 +421,7 @@ try {
       await win.evaluate(() => {
         const rows = document.querySelectorAll('#blocks-body .blocks-table tr');
         const icons = document.querySelectorAll('#blocks-body .bl-ic svg');
-        return !document.getElementById('ov-blocks').hidden && rows.length === 15 && icons.length === 15;
+        return !document.getElementById('ov-blocks').hidden && rows.length === 16 && icons.length === 16;   // 16 since the toggle list (0.9.3)
       }));
     await win.keyboard.press('Escape');
   }
@@ -430,7 +431,8 @@ try {
   {
     const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nebula-export-'));
     await app.evaluate(({ dialog }, { dir, sep }) => {
-      dialog.showSaveDialog = async (_w, opts) => ({ canceled: false, filePath: dir + sep + (opts.defaultPath || 'out') });
+      // The file name only: from Electron 44 the app hands the last folder in defaultPath too.
+      dialog.showSaveDialog = async (_w, opts) => ({ canceled: false, filePath: dir + sep + (String(opts.defaultPath || 'out').split(/[\\/]/).pop()) });
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [dir + sep + 'incoming.md'] });
     }, { dir: outDir, sep: path.sep });
     fs.writeFileSync(path.join(outDir, 'incoming.md'), [
@@ -461,6 +463,20 @@ try {
         document.querySelector('[data-menu="menu-export"]').click();
         [...document.querySelectorAll('#menu-export button')].find((b) => b.dataset.format === f).click();
       }, fmt);
+      // A PDF is previewed first (0.9.3): Export in the preview saves it.
+      if (fmt === 'pdf') {
+        // Up to a minute: on a machine busy with the test run before it, the
+        // hidden print window took longer than the 9 s this once allowed.
+        let ready = false;
+        for (let i = 0; i < 400 && !ready; i += 1) {
+          ready = await win.evaluate(() => !document.getElementById('ov-pdf').hidden && !document.querySelector('#ov-pdf [data-pdf="export"]').disabled);
+          if (!ready) await win.waitForTimeout(150);
+        }
+        const said = await win.evaluate(() => document.querySelector('#ov-pdf .pdf-status')?.textContent || '');
+        check('the PDF preview is made', ready, said);
+        if (ready) await win.click('#ov-pdf [data-pdf="export"]');
+        else await win.click('#ov-pdf [data-pdf="cancel"]');
+      }
       // Wait for the FILE, not for a guess. The PDF is rendered in a window of
       // its own now — loaded, given a moment for its web fonts, then printed —
       // so a fixed wait that was comfortable before is not any more.
@@ -534,9 +550,10 @@ try {
       check('nothing dark is painted on any page of the export',
         boxes.length > 0 && boxes.every((b) => b.rgb === '1 1 1'),
         JSON.stringify(boxes.slice(0, 3)));
-      // A4 at 3.125 units/px is 794x1123; 12.7mm a side leaves 698x1027.
+      // The note's page is Nebula Wide, which prints on A4 turned sideways
+      // (0.9.3): 1123x794 at 3.125 units/px; 12.7mm a side leaves 1027x698.
       check('every page keeps the 1.27cm margin, not just the first',
-        boxes.every((b) => Math.abs(b.w - 698) <= 2 && Math.abs(b.h - 1027) <= 2),
+        boxes.every((b) => Math.abs(b.w - 1027) <= 2 && Math.abs(b.h - 698) <= 2),
         JSON.stringify(boxes.slice(0, 3)));
     }
 
@@ -965,7 +982,7 @@ try {
       return { anyPx: rows.some((r) => /px/.test(r)), first: rows[0],
                menuW: Math.round(menu.width), gap: Math.round(input.right - caret.right) };
     });
-    check('the size rows are plain numbers', !out.anyPx && out.first === '10', out.first);
+    check('the size rows are plain numbers, from 5', !out.anyPx && out.first === '5', out.first);
     check('the size menu is only as wide as its rows', out.menuW <= 90, `${out.menuW}px`);
     check('the size arrow sits inside, against the number', out.gap <= 3, `${out.gap}px`);
   }
@@ -1200,6 +1217,9 @@ try {
    */
   {
     const weights = {};
+    // Under a page zoom Chromium snaps a border to whole screen pixels while an
+    // SVG stroke scales (a hairline apart): compared with the page unzoomed.
+    await win.evaluate(() => { document.getElementById('editor').style.zoom = ''; });
     for (const kind of ['square', 'diamond', 'triangle']) {
       await win.evaluate((k) => {
         document.getElementById('editor').innerHTML = '<p>x</p>';
@@ -1218,6 +1238,9 @@ try {
     }
     check('every shape is outlined at the same weight',
       new Set(Object.values(weights)).size === 1, JSON.stringify(weights));
+    // The zoom put back as the note has it (fit is not offered on Nebula Wide).
+    await win.selectOption('#zoom-select', '110');
+    await win.selectOption('#zoom-select', '100');
   }
 
   /**
@@ -2309,8 +2332,12 @@ try {
       state.titles.includes('Welcome to Nebula Guide'), state.titles.join(' | '));
     check('and the guide is what opens, so it is actually seen',
       state.open === 'Welcome to Nebula Guide', state.open);
-    check('the note that was already there is untouched',
-      JSON.stringify(JSON.parse(fs.readFileSync(path.join(notesDir, 'n_mine.json'), 'utf8'))) === JSON.stringify(mine));
+    // Its words, title and dates. The vault repair 1.5 s after start may stamp
+    // the markup version on it (heal.js) — a repair, not a change; on a loaded
+    // machine it landed before this read and failed a release's smoke (0.9.3).
+    const after = JSON.parse(fs.readFileSync(path.join(notesDir, 'n_mine.json'), 'utf8'));
+    delete after.markupVersion;
+    check('the note that was already there is untouched', JSON.stringify(after) === JSON.stringify(mine), JSON.stringify(after));
   }
   await app.close();
 
@@ -2357,6 +2384,7 @@ try {
   // The guide, and a note as older versions and pasting left them (0.9.1).
   await runDenseChecks(check, { docs: [OLD_NOTE] });
   await runV090Checks(check);
+  await runV093Checks(check);
   await runDeletedChecks(check);
 } catch (err) {
   failure = err;

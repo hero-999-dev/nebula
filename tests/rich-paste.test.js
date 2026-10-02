@@ -253,7 +253,7 @@ describe('rich paste editing regressions', () => {
       const figure = await rich.insertImageBlob(png());
       const bar = document.getElementById('image-bar');
       const lit = () => [...bar.querySelectorAll('button.on')].map((b) => b.dataset.image);
-      expect([...bar.querySelectorAll('[data-image]')].map((b) => b.dataset.image)).toEqual(['back', 'front', 'inline', 'caption', 'del']);
+      expect([...bar.querySelectorAll('[data-image]')].map((b) => b.dataset.image)).toEqual(['back', 'front', 'inline', 'caption', 'crop', 'del']);
       expect(bar.querySelector('[data-image="flow"]')).toBeNull();
       expect(lit()).toEqual(['inline']);
 

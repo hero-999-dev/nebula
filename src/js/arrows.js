@@ -4,6 +4,7 @@
  * without a layout.
  */
 
+import { editorZoom } from './page-zoom.js';
 import { shapeAnchorPoint } from './shape-anchor.js';
 
 export const ARROW_KINDS = ['straight', 'elbow', 'curve'];
@@ -210,6 +211,8 @@ export function initArrows(editorEl, { history } = {}) {
 
   function boxes() {
     const origin = layer().getBoundingClientRect();
+    // Rectangles are on the screen, the arrows' ends on the page (page-zoom.js).
+    const z = editorZoom(editorEl);
     const out = [];
     let order = 0;
     for (const el of editorEl.querySelectorAll('.shape, .link-block, .note-image, p, h1, h2, h3, li')) {
@@ -219,8 +222,8 @@ export function initArrows(editorEl, { history } = {}) {
       if (!r.width && !r.height) continue;
       out.push({
         geometry: el.matches('.shape') ? {
-          left: r.left + r.width / 2 - origin.left - el.offsetWidth / 2,
-          top: r.top + r.height / 2 - origin.top - el.offsetHeight / 2,
+          left: (r.left + r.width / 2 - origin.left) / z - el.offsetWidth / 2,
+          top: (r.top + r.height / 2 - origin.top) / z - el.offsetHeight / 2,
           width: el.offsetWidth, height: el.offsetHeight,
         } : null,
         shapeKind: el.dataset.kind,
@@ -230,13 +233,13 @@ export function initArrows(editorEl, { history } = {}) {
         kind: el.matches('.shape, .link-block, .note-image') ? 'object' : 'text',
         // Paint order: the back canvas, then the text, then the front canvas, each in DOM order.
         z: (el.closest('.shape-layer--behind') ? 0 : el.closest('.shape-layer') ? 200000 : 100000) + order,
-        x: r.left + r.width / 2 - origin.left,
-        y: r.top + r.height / 2 - origin.top,
+        x: (r.left + r.width / 2 - origin.left) / z,
+        y: (r.top + r.height / 2 - origin.top) / z,
         box: {
-          left: r.left - origin.left,
-          top: r.top - origin.top,
-          width: r.width,
-          height: r.height,
+          left: (r.left - origin.left) / z,
+          top: (r.top - origin.top) / z,
+          width: r.width / z,
+          height: r.height / z,
         },
       });
     }
@@ -299,8 +302,9 @@ export function initArrows(editorEl, { history } = {}) {
 
   window.addEventListener('mousemove', (e) => {
     if (!drag) return;
-    const dx = e.clientX - drag.x;
-    const dy = e.clientY - drag.y;
+    const z = editorZoom(editorEl);
+    const dx = (e.clientX - drag.x) / z;
+    const dy = (e.clientY - drag.y) / z;
     if (drag.end === 'move') {
       drag.arrow.dataset.x1 = String(Math.round(drag.x1 + dx));
       drag.arrow.dataset.y1 = String(Math.round(drag.y1 + dy));

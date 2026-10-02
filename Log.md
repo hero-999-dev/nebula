@@ -8,6 +8,352 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+## [2026-10-04 14:00] v0.9.3 - by Claude (twenty-eighth round)
+
+The owner: "without, the notes should look like bookmarks" — then: continue, and push Nebula.
+
+- Videos "without" go out as the bookmark card the note draws (link-block link-bookmark: its kind, ▶ title, address), and so does a video whose still cannot be had. Embeds of web pages, which no paper can show, go out as their bookmark in every export.
+- In documents a bookmark is that card: a bordered, lightly shaded box with BOOKMARK, the title and the address, both linked — Word (pBdr and shading), OpenDocument (a Bookmark paragraph style), Rich Text (\box with \cbpat), Evernote (a styled div), the preview the same; the HTML export styles .link-card like the note. Word opens all three with the box and both links.
+- Release notes for 0.9.3 gained pages and paper, Auto order page, Word / OpenDocument / a Mac's formats with previews and videos, folders and AI tabs; memory.json's current phase says what ships.
+- Electron check before the release: 44.5.1 current; Firefox 157, ESR 140 current.
+- Unit 691/691 before the release run.
+- The first release run stopped at the smoke (nothing committed): run one timed out waiting 9 s for the PDF preview on a machine just busy with the unit tests; the retry failed "the note that was already there is untouched" — the vault repair stamps markupVersion 1.5 s after start (heal.js, a repair, not an edit) and, slowed down, landed before the read. Not reproducible in three runs on their own. The smoke now waits up to a minute for the preview (and says so if it is not made) and compares the note without its markupVersion.
+- The second release run stopped at "a folder is dragged below a note like a note" (the folder landed a row low): the drop aimed at y 30, near the row's middle, and the rows shift as the folder lifts off. It aims at the row's foot now, where a shift still means "under this note". v093 then 138/138 twice.
+
+---
+
+## [2026-10-02 18:00] v0.9.3 - by Claude (twenty-seventh round)
+
+The owner: a preview for docx and odt too; the note formats popular on a Mac; videos are not put on the A4 in an export — at least put them there the way they show in Nebula; exports with or without video, without = only the embed's link.
+
+- The export preview (pdf-preview.js) serves every export that makes pages: PDF, .docx, .odt, .doc, .rtf. For the documents it prints office.js previewDocument — the file's own blocks in the file's styles on the same paper — and Export writes the file itself; the PDF keeps saving its previewed bytes. Its title says which export it is.
+- A Mac's own: Rich Text (.rtf: TextEdit, Pages, Apple Notes) and Evernote (.enex: Apple Notes, Evernote, Bear, Joplin, UpNote), out and in. ENEX: ENML with pictures as resources by MD5 (md5Hex, checked against Node's), to-dos as en-todo; an .enex with several notes imports each. Pages has no open format to write; it opens .docx and .rtf.
+- Videos (export-video.js): "with" puts each video embed on the page as it shows — its still (YouTube's largest real one, or Vimeo's from oEmbed, fetched by the main process: link-metadata.js fetchVideoPoster, https only, no cookies, 4 MB, 8 s), cropped to the card's size with the player's play button drawn over it, linked to the video, its title under it; offline, the link. "without" leaves the link only. The choice sits at the top of the export menu and in the preview (shown when the note has a video), remembered (nebula:export-videos), "with" by default.
+- In Word the still is an online video that plays (wp15:webVideoPr on the picture's blip, as Word's own AddWebVideo writes it, and a settings.xml with compatibility mode 15 — without it Word opened the file in 2007 mode and showed a plain picture). ODT and Rich Text link the still; an HTML export keeps the real player (iframe).
+- Checked outside the tests: Word opens the .docx, .odt and .rtf (the video as an online video, type 16, in the .docx); the .enex is well-formed XML; YouTube and Vimeo stills fetched for real.
+- Guide: New in and section 8 (videos, Mac formats, previews), signed.
+- Unit 690/690, v093 138/138, full smoke 519/519.
+
+---
+
+## [2026-10-02 15:30] v0.9.3 - by Claude (twenty-sixth round)
+
+The owner: auto order does not work; turned on in the ⋯ menu the button should stay pressed; on NW fainter, so it is plainly not to be pressed; the menu should say "not active", and when it is on a word by the title like Only view, "Auto order mode is on"; a new icon (no arrow down, two straight lines in the sheet); and .odt, .doc and .docx in export and import.
+
+- "Does not work": checked on a copy of the owner's Ideas note in a temp profile — on A4 and A5 nothing in it crosses a page line, so nothing moves and the toast says so; on NW, and in Only view (the guide), the button did nothing while looking pressable. Not a fault in the ordering; the state was not visible.
+- The button is pressed (.on, aria-pressed) while the note orders itself; at 28 % opacity and not pressable on NW; dimmed with the rest in Only view. Icon: a sheet with two lines.
+- The ⋯ menu says "Auto order page: not active" / "Auto order page: active". While on, "Auto order mode is on" sits by the title (the Only view chip's look); a click turns it off.
+- office.js: one reader (note → blocks of runs) and three writers — .docx (Office Open XML, styles, numbering with each numbered list from 1, hyperlinks, pictures embedded), .odt (mimetype stored first, automatic span styles, list styles, pictures in Pictures/), .doc (Rich Text, which Word opens as .doc: \pngblip/\jpegblip pictures, HYPERLINK fields). Each on the note's paper and margins (NW: A4 as last turned). Shapes stay out, as in Markdown and HTML.
+- Import: .docx through mammoth (Title style read as h1), .odt read here, a .doc that is Rich Text or HTML read here (lists rebuilt from mark-and-tab lines), a binary .doc read to paragraphs in the main process (word-extractor, external to the bundle). Everything is sanitised by import.js as before. New dependencies: jszip, mammoth, word-extractor (no advisories; the one high audit finding is js-yaml under electron-updater, already there).
+- Checked outside the tests: LibreOffice (headless, to text) and Word (COM, read-only) open all three: 12 paragraphs, the picture, the link, A4 595x842 pt, real lists in .docx and .odt.
+- Guide: New in, section 8 with a Try it; the auto order paragraph updated.
+- Unit 679/679, v093 133/133, full smoke 514/514.
+
+---
+
+## [2026-10-02 14:00] v0.9.3 - by Claude (twenty-fifth round)
+
+The owner: default text 14; for the pages but NW an "auto order page" button right of the page zoom that puts right what runs over, by hand; NW unchanged; and in the note's ⋯ menu a way to turn it on. Asked: what it puts right is what a page line falls across; turned on, it runs by itself in that note.
+
+- Note text is 14px by default (10.5 pt on paper).
+- page-order.js: orderPage moves every shape and floating picture that a page line falls across to 8px under that line (by its top), and gives a picture in the text a top margin of its own (data-page-gap, taken back and measured again on the next run). One taller than a page stays. Nothing happens on NW (no data-paper); the button is disabled there and dimmed in Only view.
+- The page lines now start where the PDF does: the PDF prints the title (22pt, 6 mm under it) above the writing on page one, so the first line is that much sooner (--page-title, measured at the paper's line width, repainted as the title is typed); the print document's editor is a flow-root so the first block's margin stays inside, as on screen. Measured against the PDF: A4 page starts match on pages 2-4; NN and A5 match on pages 2-3 and drift by a line after, where a paragraph pushed over leaves room at the foot of a page that fixed lines cannot know.
+- The ⋯ menu: "Turn on / Turn off auto order page" (hidden on NW notes), note.autoOrder; on, it runs when the note opens, when its paper changes, on letting go in the editor and 1.2 s after typing.
+- Guide: New in, and a section with Try it in section 1.
+- Unit 672/672, v093 129/129, full smoke 510/510.
+
+---
+
+## [2026-10-02 11:30] v0.9.3 - by Claude (twenty-fourth round)
+
+The owner: NW and NN back to the old way, NW wholly ("NW should only go back to the old style"); NN keeps A4 with 6.35 mm margins and its page lines, at the old scale; the papers keep their lines. Exporting an NW note offers two choices, landscape or portrait, with a preview of which page and style the export will be — previews on exports, in a panel that suits the app.
+
+- NW (fluid): no paper on screen (the editor's paper styles hang on data-paper now, which NW does not get), no page lines, the writing as wide as the window, 100 % the screen's own size, no Fit offered.
+- NN: the 746 px A4 line, its page lines and 6.35 mm export, at the screen's own size (100 % = 1). The papers (A3-B5) keep the real-size scale. NW and NN open at 100 %, A3/B4/B3 fitted.
+- PDF export opens a preview (pdf-preview.js, #ov-pdf): the main process prints the note's document to a PDF in userData/pdf-preview and the preview shows that file in Chromium's PDF viewer (a <webview plugins> in its own in-memory partition that follows no link and opens no window); Export saves exactly those bytes. Cancel, Esc or a new render deletes the file; the folder is emptied at start and at quit (deleted notes stay deleted).
+- NW chooses A4 Landscape or Portrait in the preview; remembered (nebula:nw-orientation), and NW prints that way up.
+- Found through the preview: every PDF had come out without shapes or arrows — the print document dropped the canvas with the Markdown's controls. It keeps it now, its corner where the writing starts (Chromium cuts what reaches into a page margin).
+- Guide: NW and NN, the preview (New in, section 1, section 8 with a Try it).
+- Unit 668/668, v093 125/125, full smoke 506/506.
+
+---
+
+## [2026-10-02 09:30] v0.9.3 - by Claude (twenty-third round)
+
+The owner: zoom in Only view too; "Fit to page" named "Fit (25%)" with the percentage live; and (a screenshot in the Ideas note) B4 at 100 % scrolled sideways although the sheet was on screen whole.
+
+- Only view: the toolbar is still dimmed and dead, but the page zoom (#tb-zoom) stays bright and pressable — it is how the note is looked at, not an edit.
+- The fit option reads "Fit (62%)": fit's share of the real size, measured on every paint and on every change of the frame's width, whichever zoom is chosen. Its tooltip is "Fit to page".
+- The early sideways scroll was the 12px gutter beside the sheet in the editor's minimum width: the paper fitted, the gutter did not. The minimum is now the sheet and the scroll bar, the side padding never less than the margin, and the canvas starts at the sheet's edge from 0. Fit keeps its 12px a side.
+- Guide: Fit and its percentage, and zoom in Only view, in section 1.
+- Unit 666/666, v093 119/119, full smoke 500/500.
+
+---
+
+## [2026-10-01 20:30] v0.9.3 - by Claude (twenty-second round)
+
+The owner: is the font bigger than normal? (Yes, to the eye: 100 % is now the paper's real size, and 17px prints as 12.75 pt.) Add sizes 5 to 9, and make the default smaller — first 10px, then "12; 10 looks small".
+
+- The editor's text is 12px (9 pt on paper) unless a note or a span sets its own; headings keep 31 / 24.5 / 20px.
+- The size menu starts at 5 (5, 6, 7, 8, 9, 10, 12 ...); a typed size goes down to 5.
+- Asked and left alone: NN stays A4 with 6.35 mm margins (A4 is the old export's 12.7 mm). New notes are NW and every note keeps its own page — already so, checked in a fresh profile.
+- Unit 666/666, full smoke 497/497 (the first run after the 10px run was stopped had 5 timing failures, v093 alone then passed 116/116 twice).
+
+---
+
+## [2026-10-01 19:30] v0.9.3 - by Claude (twenty-first round)
+
+The owner's Ideas note, with screenshots: "is this a landscape A4?", "is this an A4 on my screen?" (NW and A4 at 100 % showed CSS size, 1123 and 794 screen px), and "the shapes are stuck, as you see" (the guide's shapes beside the A4, in the grey outside the paper).
+
+- Real size was 1 in the app: createWindow starts the monitor question early (nineteenth round), and realScale() set its cache to 1 before Windows answered, so the page, asking a moment later, got 1. Now the question is one shared promise. The PowerShell timeout is 15 s (the modes list is slower on a cold start).
+- The canvas (both shape layers, and with them pictures and arrows) is the paper on a page: from the sheet's left edge, as wide as the sheet. Shapes and pictures are placed from the paper's edge, a dropped picture too (imagePoint measures from the canvas).
+- Guide: the "New in" line for page zoom now says real size and fit to page (the earlier replacement missed it).
+- Tests: v093 (116) checks that 100 % is the zoom the main process measured, and that the canvas is the sheet; the smoke's shape-weight check measures with the page unzoomed (Chromium snaps a 1px border to whole screen pixels under zoom; an SVG stroke scales).
+- Unit 666/666, full smoke 497/497.
+
+---
+
+## [2026-10-01 16:30] v0.9.3 - by Claude (twentieth round)
+
+The owner, holding real paper to the 14-inch screen: NW does not stand like an A4 turned sideways, A4 and A5 are not their real size; scale every paper to its real size, not "164 % for all"; real size should be 100 %; and "Fit to page" at the top, working however the window changes (half the screen).
+
+- 100 % is now the paper's real size for every paper; the steps (50-200 %) are shares of it. The old 'actual' value reads as 100.
+- Why the sheet did not match: in a half-width window the paper (1301 screen px for A4) did not fit; the editor's minimum width was the line plus 28px a side, so the paper's 12.7 mm margins and its drawn edges were cut off and what showed was 199.5 mm, not 210. The side padding is now never less than the paper's margin plus 12px, and the minimum width the whole sheet: real size always shows the whole sheet, edges and all, and scrolls sideways.
+- The monitor's width is read in millimetres from its listed modes (309 mm) where Windows has them, else in whole cm (31): 1.644, not 1.639.
+- Real size takes the window's own zoom (Ctrl + / Ctrl -, webFrame.getZoomFactor) back out.
+- Fit to page ('fit'), first in the box: the whole sheet plus 12px a side as wide as the note's frame; a ResizeObserver on the frame measures it again when the window or the side panels change, and a sheet a hair too wide after the scroll bar is measured is corrected once.
+- A4, NN, A5 and B5 open at 100 % (real size); NW, A3, B4 and B3 open fitted to the window.
+- Tests made zoom-aware (a wide note now opens at a zoom other than 1): embed resize, image drop, arrow snap, triangle outline; shape outline weights compared at 100 %.
+- Electron check before the build: 44.5.1 current. Full smoke 495/495.
+
+---
+
+## [2026-10-01 15:30] v0.9.3 - by Claude (nineteenth round)
+
+The owner: the zoom box is too big — drop "Actual size" beside 164; NN should be an A4 written close to its edges (left, top, right, bottom), like the old A4 export; actual size cannot be 164 for every paper; on a laptop A3 or B3 at real size (or a big zoom) should simply scroll left and right.
+
+- The zoom box shows only the percentage ("164%"); "Actual size" is the option's tooltip. The box is 68 px again.
+- NN is A4 with 6.35 mm margins (printers cannot reach much closer): a 746 px line, pages 1075 px tall; print (the live window's .main padding) and PDF (the export document's @page margin) use the mode's margin. Margins are per mode now (marginMm); the paper's drawn edges follow it. NN opens at actual size like A4.
+- Actual size is one factor for every paper — it is the screen's (cm on screen = cm on paper); an A3 at actual size is simply 1.41× an A4. Kept, and explained in the guide.
+- A page wider than the window no longer squeezes its column: the editor's min-width is the paper's line plus its padding, and the editor frame scrolls sideways. A3 at actual size on the owner's laptop: 1027 px line (in page pixels), the frame scrolls; B3 likewise.
+- The monitor's physical size is asked as the window is created, so actual size is known before the first note opens (it took a few seconds and the first page showed 100 %).
+- Electron check before the build: 44.5.1 current. Full smoke 492/492.
+
+---
+
+## [2026-10-01 14:30] v0.9.3 - by Claude (eighteenth round)
+
+The owner: a very thin line that shows where the export splits the pages, in Nebula's notes; NW equal to A4 turned sideways; A4 and the smaller pages at their real size by default; NW's meaning shown when it is clicked.
+
+- NW is A4 landscape (297 × 210 mm): a 1027 px line, pages 698 px tall, printed and exported on A4 landscape. NN is a 760 px column printed on A4. Every mode now has a column (it fits the room there is).
+- Page breaks: a very thin line every page height (the sheet's height less the 12.7 mm margins), from the top of the writing — a second CSS background on the editor, `--page-break` set by page-mode.js. Approximate: the export keeps code blocks and shapes whole and may move them to the next page.
+- Actual size: the main process reads the monitor's physical width (WMI WmiMonitorBasicDisplayParams, whole cm) once; the factor is the screen's DIP width over that width in CSS pixels (Windows' scaling cancels out). The owner's 14" 1920 px screen, 31 cm: 1.639. The zoom box offers "Actual size (164%)"; A4, A5 and B5 open at it unless the note has a zoom of its own (choosing the page's default stores none). Elsewhere (macOS, unreadable) actual size is 100 %.
+- The column was 10 px short of the paper's line: the editor's scroll bar came out of it. `scrollbar-gutter: stable`, and the bar's width (in the page's pixels, so measured again after every zoom) is taken out of the side padding: A4 at 100 % is exactly 698 px.
+- Pressing a page box shows what it is ("Nebula Wide — A4 turned sideways, 297 × 210 mm") for three seconds.
+- Electron check before the build: 44.5.1 current. Full smoke 490/490 (the PDF margin check now expects NW's A4 landscape: 1027x698 writing area).
+
+---
+
+## [2026-10-01 13:00] v0.9.3 - by Claude (seventeenth round)
+
+The owner: "a zoom ratio for the pages, beside the alignment, set off with a thin line like the others".
+
+- Page zoom (page-zoom.js): after the alignment buttons, a thin line, then − / ratio (50–200 %) / +. CSS `zoom` on the editor: words, pictures, shapes and the page width (a paper mode's sheet too) together; Ctrl +/− still zoom the window. `note.zoom` via NoteStore.setZoom — a setting, 100 % stores nothing.
+- Measured first in the real app: under CSS zoom Chromium gives pointer positions and rectangles in screen pixels while `left` / `width` are page pixels, so at 150 % a shape, a picture and a picture's corner moved 1.5× the pointer. Every drag in the page now divides by `editorZoom()`: shape move/resize (shapes.js), picture move/resize, embed resize, drop point and floating a picture (rich-paste.js), arrows' targets and end drags (arrows.js). The crop frame is page chrome in screen pixels and needed nothing. At 150 % the shape, picture and corner now follow the pointer 1:1; clicking into text was right either way.
+- Electron check before the build: 44.5.1 current. Full smoke 487/487.
+
+---
+
+## [2026-10-01 12:00] v0.9.3 - by Claude (sixteenth round)
+
+The owner: the app opens "as if the screen were split in two"; page modes — A4, A3, A5, B4, B5, B3 by the standards, the page width set by them and the caret with it; today's mode is Nebula's own, Nebula Wide (NW), and a narrower Nebula Narrow (NN); beside Saved, boxed like the arrows.
+
+- Opening: the window was saved maximized with half-screen bounds. `maximize()` on a hidden window shows it at once on Windows (Electron 44), so it came up before the page had painted, and the page first laid itself out at the saved half width. The window is now given the display's work area before loading and is maximized only as it is shown (ready-to-show); leaving maximized restores the saved size. Traced from inside main: invisible and 1920 wide until shown, the page's first layout 1920 wide.
+- Page modes (page-mode.js): NW (whole width), NN (760 px), A3/A4/A5/B3/B4/B5 (ISO 216). A paper's line is its printed line — the sheet's width less the 12.7 mm print margins a side (A4 184.6 mm = 698 px) — so the caret wraps where the paper will; the paper's edges are drawn faintly (CSS gradient from --page-col). Eight boxes beside Saved in the pad's style (NW A3 A4 A5 / NN B3 B4 B5). `note.page` via NoteStore.setPage — a setting, not an edit; Nebula Wide stores nothing. Print and PDF use the note's paper (@page size in the print stylesheet and the export document, `pageSize` in microns for webContents.print). In print the column and edges are dropped (the paper is the page). Guide: "Page width" in section 1 and a New in 0.9.3 line.
+- Electron check before the build: 44.5.1 current. Full smoke 483/483.
+
+---
+
+## [2026-10-01 10:40] v0.9.3 - by Claude (fifteenth round)
+
+The owner: "take DeepSeek out; check the others' log".
+
+- The sign-in log after the fourteenth build: ChatGPT and Copilot each signed in on the first try as Chromium (the engine as it is) — Google's address page, SetSID, handed to the tab (auth.openai.com / auth.copilot.microsoft.com callback), the window closed by itself; no refusal. `sign-in-methods.json` now holds chromium for both, firefox for Mistral and MathGPT.
+- DeepSeek is out of the AI panel (its own captcha, before Google, refused every answer in the app), with its session in Nebula Test; the guide's AI line, README, Prompt and the tests follow. A custom site can still add it back with +.
+- Electron check before the build: 44.5.1 is current (Chrome 155 is out; 152 is within the allowed lag). Unit 655/655, v093 98/98.
+
+---
+
+## [2026-10-01 00:50] v0.9.3 - by Claude (fourteenth round)
+
+The owner: Copilot still fails, DeepSeek's captcha is stuck on "try again", ChatGPT and Copilot the same error.
+
+- The sign-in log (sign-in-log.txt) showed it: for ChatGPT and Copilot the window opened Google's address page as Firefox 157, and ~10 s later — the e-mail typed and Next — Google refused (/v3/signin/rejected, in the page); the window moved to the ESR and showed the address page again ("a screen comes and at once goes to this"), and the owner closed it before the third way, Chromium, was ever tried. DeepSeek is not in the log at all: its captcha is on DeepSeek's own page, before Google.
+- With Electron 44 the engine is a current Chrome (152): a service's own tab now starts as the engine it is (`methodOrder`: chromium, firefox, firefox-esr); Gemini, whose tab is Firefox, still starts as Firefox; what worked is still tried first (Mistral and MathGPT stay on Firefox). A refusal is remembered too: the next window for that site starts with a way Google has not refused. The window's title says why the address page came back ("Google refused — trying another way (2/3): enter your e-mail again", in the app's language).
+- The machine: C: is 98 % full and the commit limit nearly reached (1.2 GB free of 23.8); vitest's workers ran out of memory in a full run. With two workers 41 files passed and heal.test.js (21) crashed for memory; alone it, and the rest, pass.
+
+---
+
+## [2026-09-30 12:40] v0.9.3 - by Claude (thirteenth round)
+
+The owner's "Sign in to AIS" note (all sessions cleared, each tried in turn): Claude, Mistral and MathGPT signed in at once; Gemini not the first time (Google's "Couldn't sign you in" in the tab itself); ChatGPT not ("a screen comes and at once goes to this" — the Google address page), and DeepSeek and Copilot "the same error". Standing rule: "whenever Nebula is about to be updated, check Electron; if there is an update, update Electron, then do a bug check" — and remember it.
+
+- Electron check: `npm run check:browsers` now compares the installed Electron with npm's latest; `npm run push` stops on a newer one with the commands that upgrade it and the bug check to run (npm test, build, smoke). Recorded in AGENTS.md ("Electron first") and in memory. It found 44.5.1 today: upgraded; bug check — unit 654/654, build, full smoke 479/479 (a first run timed out waiting for a window on a relaunch while Nebula Test was open; rich-paste twice alone and the whole smoke again passed).
+- Sign-in log: why ChatGPT, DeepSeek and Copilot fail after Google's page could not be seen here (ChatGPT's sign-in stops at Cloudflare in a fresh session). Every step of a sign-in — the tab sent to Google or refused in the tab, the window, its method, each page, Google's refusal, the next method, the hand-back, a window held back or closed by hand — goes to `sign-in-log.txt` in the copy's folder, last 400 lines. Addresses are redacted (`redactUrl`): host and path, and only the names of query parameters — no code, token, state or e-mail.
+
+---
+
+## [2026-09-30 09:40] v0.9.3 - by Claude (twelfth round)
+
+The owner: "do it" — upgrade Electron (33, Chromium 130) to a current one.
+
+- Electron 44.5.0 (Chromium 152, Node 24.21; Chrome stable is 154). `npm run check:browsers` is all "ok" now.
+- What Electron 34–44 changed that this app relies on:
+  - Clipboard (44): W3C ClipboardItems; `writeImage`, `readImage` and `write({ image })` are gone. `writeImageToClipboard` in context-menu.js (copy picture, F12 snapshot); the e2e files that put pictures on the clipboard or read them back use the new API.
+  - `app.commandLine` lower-cases arguments (36), so the `disable-blink-features=WebAuth` switch may do nothing: WebAuth now also goes into the main window's, every webview's (will-attach-webview), the sign-in window's and every popup's `disableBlinkFeatures`. The v093 passkey check passes on 44.
+  - File dialogs open in Downloads unless given a folder (43): the app remembers the last export/import folder while it runs.
+  - A click in a <webview> reaches the app only as the window's `blur` with the webview active (no captured `focus` any more): the menus close on that too.
+  - Electron is no longer downloaded by `npm install` (42): `npx install-electron --no`; CI does it before smoke, and CI runs Node 22 (Electron 44 needs 22.12+).
+- Two stale smoke expectations fixed on the way: Help → Blocks has 16 rows since the toggle list, and the save-dialog stub takes the file name only.
+- Found by the full smoke (not by Electron; there since the fourth 0.9.3 round): a /divider typed after a paragraph with a picture under it and taken back with Backspace deleted the picture — the first Backspace removed the empty line and selected the picture, the second deleted it. Going backwards the divider is picked now (the next Backspace takes it, the picture stays); Delete still selects the picture. Clicking elsewhere lets a picked divider's selection go too (a picture clicked under it was left with the divider selected).
+- Full smoke run on 44: 479/479.
+
+---
+
+## [2026-09-30 08:50] v0.9.3 - by Claude (eleventh round)
+
+The owner: "check this on every new version so we do not get the error again"; MathGPT still gets "try a different browser"; "we could put a method for each site that works in the background, if a single method does not simply work".
+
+- Sign-in methods: the window tries today's Firefox, then the Firefox ESR, then Chromium as it is (SIGN_IN_METHODS, userAgentForMethod), each from the start, when Google refuses; the one that worked for a site is remembered in `sign-in-methods.json` (userData) and tried first next time. Every one refused: the window shows, in the app's language, that Google refused and to sign in with e-mail on the site, instead of going round again. Request headers follow the window's current browser (a per-contents identity map; Firefox sends no sec-ch-ua).
+- `scripts/check-browsers.js` (`npm run check:browsers`): what the app claims against Mozilla's product-details and Google's Chromium dashboard. `npm run push` stops on a Firefox or ESR behind (`--no-browser-check` to override) and prints the line to change; preflight shows it. FIREFOX_RELEASE {157, 2026-09-29} and FIREFOX_ESR 140 are the record it updates. Found: Electron 33's Chromium is 130, Chrome is 154 — a warning, the fix is an Electron upgrade.
+- MathGPT uses the same path as ChatGPT (the tab is sent to Google, the window opens on Google's address page, Firefox 157 first); its refusals now move on to the other browsers.
+
+---
+
+## [2026-09-30 08:20] v0.9.3 - by Claude (tenth round)
+
+The owner: ChatGPT signs in now; Mistral answers "try again with a different browser"; the reload sign at the top right should be round like +; "the rectangle panel you added goes in front of the AI pages".
+
+- Google is told a current Firefox: the fixed Firefox 128 (July 2024, out of support by 2026) is what Google answers with "Try using a different browser". `currentFirefox` counts from 157 (released 29 September 2026) by Firefox's four-week cycle, never lower, so it does not go stale; the Gemini tab and the sign-in window keep telling the same one. Mistral not retried here (needs the owner's account).
+- Menus over the AI page: a click in a <webview> never reaches the app's document, so a menu opened over the panel (the tab right-click, a note's or folder's ⋯) stayed over the page. Focus going into a webview (only a captured `focus` arrives, not focusin) now counts as a click outside, and every menu closes as for one.
+- Reload and + are the same round button.
+
+---
+
+## [2026-09-30 07:40] v0.9.3 - by Claude (ninth round)
+
+The owner, after all AI sessions were cleared: Claude and Gemini sign in; ChatGPT does not, and its Google sign-in window kept coming back ("it spammed, and clicking another site did not stop it" — the window over the Gemini tab in the Sign in ChatGPT note). "Fix GPT without breaking Claude and Gemini."
+
+- No window spam: the ChatGPT tab, in the background, sent itself to Google again and again and each time a window opened. signInWindowOpener now keeps, per tab, when it was last used (webContents `input-event`) and when its window was closed by hand: a window closed by hand is not opened again by the page until the person uses that tab; a tab nobody is using opens at most two a minute. Claude's popup path is untouched; Gemini's first window always opens.
+- Why ChatGPT's sign-in itself fails is not known: here (fresh, automated session) "Continue with Google" went to /api/auth/error behind Cloudflare's "Verify you are human", a different path from the owner's. Asked for what the window shows after the password.
+- AI sessions of Nebula Test were cleared at the owner's request (Partitions/ai-*; notes, backups and embeds kept), and the probe profiles in %TEMP%.
+
+---
+
+## [2026-09-29 13:30] v0.9.3 - by Claude (eighth round)
+
+The owner: Mistral signed in only after several failed tries, the same in Claude; everything but DeepSeek signs in now, but MathGPT then fails ("Unauthorized request … authorization_invalid", Clerk) and Copilot keeps saying "Authentication required"; DeepSeek's "Login with Google" brings a picture captcha that says "Please try again" however it is answered; the caret beside the divider "still there"; a long pasted message widens the page; right-click on a tab: delete website, change website, change header.
+
+- Sign-in window: the address Google hands back to carries a code that works once, and the window followed the redirect AND sent the tab there — two requests raced with one code, the second refused (the "few failed tries", and Clerk's "Unauthorized request" in MathGPT). The redirect is now stopped in the window and only the tab takes it; a page the window arrived at without a redirect is left to finish there and the tab is reloaded afterwards, never sent to the same address.
+- The passkey page script (and the debugger that places it) only where Google's pages are shown — Gemini's tab, a sign-in window, a popup — and inside it only on Google hosts (a tight host pattern; the template literal had been swallowing its escapes). A service's own tab keeps the browser's own objects: the stand-in PublicKeyCredential and hidden window.chrome are what a captcha looks at. DeepSeek's captcha could not be tried here.
+- The caret beside the divider: Esc (or anything that let a picture in the text go) left the caret on the editor between the divider and the picture, visible again once the picture was not selected. Letting a picture go now puts the caret on the nearest line.
+- A pasted <pre> (MathGPT's JSON error) wraps: `.editor pre` pre-wrap, overflow-wrap anywhere.
+- AI tabs: right-click → Change header, Change website, Delete website; a deleted built-in comes back with Restore removed sites (overrides and hidden list in localStorage, mergeServices/siteUrl in ai-services.js).
+- Copilot: its silent sign-in check is an iframe to login.live.com; "Authentication required" could not be reached without an account — to be seen after the one-time-code fix.
+
+---
+
+## [2026-09-29 10:40] v0.9.3 - by Claude (seventh round)
+
+The owner: "a folder is always at the top once it is made; a note moved above the folder gets pinned — moving must not pin"; Mistral still does not work; DeepSeek's captcha opens, solved right, but says "try again" every time; Copilot connects; take Perplexity out for now. Ideas note (10:07): the caret by the divider is still there; a reload button, + always at the right with reload to its left; MathGPT after Mistral.
+
+- Folders stand among the notes: `folder.order` (in folders.json) on the notes' scale, created-at until dragged, so a note changed later rises above a folder as notes do. Folders are dragged like notes (between the list's notes and folders). A note let go on a folder's top or bottom edge goes above or below it; the middle puts it in.
+- Dragging never pins or unpins: a note let go among the other pin goes to the edge of its own run. `NoteStore.placeNote` became `setPlace` (folder and place, never the pin) and `setOrders`; the order maths is `orderFor` in note-list.js.
+- The caret by the divider: ↓ or → at the end of the heading above a divider put the caret on the editor between the heading and the divider (probe on a copy of the Ideas note). It now goes on the way it was going — the picture under the divider is selected (the caret moved beside it), a line is entered, or the divider is picked; ↑/← go to the line above. Arrows from a picked divider select a picture next to it instead of opening an empty line. ↑/↓ away from a selected picture in the text let it go (the caret was hidden in the heading while the picture stayed outlined).
+- AI panel: Perplexity out, MathGPT (math-gpt.org, the owner can name another) after Mistral; ↻ reload and + stand right of the tab strip, outside its scroll; a remembered Perplexity tab opens Claude.
+- Mistral: in the real app the Google button opens the sign-in window on Google's address page (probe); what fails after that was not visible here — asked the owner for a picture. DeepSeek: login uses Cloudflare Turnstile; with the app's settings and without, no challenge or "try again" appeared here — asked for a picture.
+
+---
+
+## [2026-09-29 09:50] v0.9.3 - by Claude (sixth round)
+
+The owner's Ideas note (08:53): Mistral's Google sign-in window opened blank ("ChatGPT and Gemini work now"); "with a picture at the top there is a caret between the divider and the picture — there should be nothing there; the divider has a caret of its own, two carets"; folders ("drag notes into folders, a click on a folder shows its notes, folders can be named, pinning inside a folder") and "drag the order of the notes, among the pinned ones too".
+
+- Mistral: reproduced with the app's own code against the real site. The window waited for its passkey script with no limit, and on a window that had loaded nothing the debugger never answered — so nothing loaded. Mistral's "Sign in with Google" is an OAuth request, and the window also replaced it with a bare ServiceLogin (fresh-attempt rule from the fifth round), which would have lost Mistral's return address. Now: an OAuth request is loaded as it is; the script is registered and the window loads after 300 ms at most (loading about:blank first was tried and was worse — the script then missed Google's page, which is exactly why the first try used to be refused and "Try again" worked); the window's requests to every Google host are Firefox (the Mistral tab's session listener covered accounts.google.com only); the refusal is also caught when Google reaches it inside the page. Probe result: Google now answers "Couldn't find this account" for a made-up address — the browser check passes. Not tried with a real account.
+- Divider and picture: the Ideas note held `<hr><br><figure>`; migrate.js `dropGapBreaks` takes a loose <br> between two non-line blocks out on open (before normalizeProse made it an empty line). The "second caret": with a picture selected, or after deleting the picture under a divider, the browser's caret stood on the editor between the divider and the picture. The caret is hidden while a picture in the text is selected, and the gap check (loose <br>s looked past and removed) runs after deletes too, selecting the next picture.
+- Folders: folders.json in the vault (names and order), `note.folder` on each note; New folder button beside New note; a click opens/closes, double-click or ⋯ renames, ⋯ -> Delete folder gives its notes back to the list; ⋯ -> Move to folder on a note. Pinned notes inside a folder stay at its top.
+- Order: notes drag between notes (a line shows where), onto a folder, or below everything. `note.order` is on the same scale as `updatedAt`, so notes nobody dragged still rise when changed; a dragged one stays. Dropped among the pinned a note is pinned, out of them unpinned. A filtered list stays flat.
+- Guide: "Folders and the order of your notes" in section 1, and a New in 0.9.3 line.
+
+---
+
+## [2026-09-29 09:00] v0.9.3 - by Claude (fifth round)
+
+The owner, trying Gemini: the tab opened straight on "Couldn't sign you in"; in the sign-in window the first try was refused too, and only "Try again" there gave the Firefox sign-in that worked. "I would like the window's Sign in to work at once."
+
+- The window starts a NEW sign-in (Google's sign-in page with only the address to come back to), not the address the tab was sent to, which carried the tab's refused attempt.
+- Refused in the window anyway, it tries again by itself, twice at most (what the owner did by hand).
+- The tab landing on a Google sign-in page or on the refusal opens the window by itself; a window already open is brought forward and left as it is.
+- Not tried with a real Google account.
+
+---
+
+## [2026-09-29 08:30] v0.9.3 - by Claude (fourth round)
+
+The owner: ChatGPT signs in now, Gemini does not ("Gemini opens straight to the sign-in, which loads later"); a label taken off the title must NOT go from the text — instead ⋯ beside each label with "Delete label"; the Ideas note (07:45): the picture under the divider still would not come up, "a caret between the divider and the picture", and "the caret gets lost at the labels, going down from the mention the labels disappear" (#label2 was gone).
+
+- Labels: taking a label off the title leaves the text alone again. In the label search each label has ⋯ -> Delete label, which says what it will do ("Delete #x from N notes?") and then takes it off every note's title and out of every note's text (NoteStore.deleteLabel, one save). #chips are ordinary text again, so the caret walks through them; as one piece (the second build) the caret could not stand on a line of them and a chip went. What kept the words out of a chip is now: a letter typed at its edge goes outside it, and Enter's copy of the chip on the new line is taken off. The migration removes the contenteditable the second build wrote.
+- Divider and picture: Backspace on the empty line between them left the caret on no line, blinking between the two; now the picture is selected. A click in that gap does the same.
+- Gemini: its whole tab is Firefox from the first page (the panel's own Chrome user agent overrode the main process for every tab), Google's pages get no sec-ch-ua headers, and where a page is told Firefox, navigator.userAgentData and window.chrome are hidden. The passkey API is present again (as in every browser) but says there are no passkeys; the Blink switch stays, so no page can open the Windows dialog. The sign-in window waits for its script before loading. Not tried with a real Google account.
+
+---
+
+## [2026-09-29 07:30] v0.9.3 - by Claude (third round)
+
+The owner, after the second Nebula Test.exe: passkeys solved; Gemini now says "Couldn't sign you in — this browser or app may not be secure"; "do it the Claude way for everything"; labels in one set in the search; a label taken off a note should go from its text; the picture under a divider could not be brought up; the embed could not be resized ("from all four sides").
+
+- Google sign-in the Claude way: a sign-in the person starts in an AI tab (Gemini's Sign in, the redirect ChatGPT and Mistral make) opens in a small window of the app sharing the tab's session, as Firefox; when Google hands back to the service the window closes and the tab goes on from there. The silent check of who is signed in (passive=) and the cookie steps stay in the tab; a window closed by hand reloads the tab. Not tried with a real Google account.
+- Labels: the search shows the title's labels and the text's #labels as one set; a label matches a note that has it either way. Taking a label off a note's title takes its #chips out of that note's text (one undo in the open note); a #chip deleted from the text leaves the title's label.
+- Pictures: an empty line beside a picture always goes, under a divider too, and the picture comes up; with no line of text left the picture is selected. Enter on a selected picture in the text opens a line under it (Shift+Enter over it), Alt+Up/Down moves it past the line above or below. A picture an undo had taken out of the note no longer swallows the next Delete.
+- Embeds: eight handles, four sides and four corners, shown on hover; a new embed has them at once (the first build added its one grip only when a note was opened again - the owner's embed had none).
+- Probe care: an earlier probe here called navigator.credentials.get for real and opened a Windows passkey dialog on the owner's screen; no probe calls WebAuthn any more.
+
+---
+
+## [2026-09-29 06:30] v0.9.3 - by Claude (second round)
+
+The owner tried the first Nebula Test.exe and wrote back in the chat and in the Ideas note (04:56).
+
+- Languages: the four are always open, in the version's line right of it, small (the owner's drawing); folded, the rail shows EN / DE / PL / TR one under another. The spelling check and its suggestions follow the chosen language only (English only when it has no dictionary).
+- Labels: a #word in the text is a label of the text and no longer goes into the note's own labels. "Filter by label" under the filter box opens a search box and two groups, Note labels and In the text; the button names the label picked and its × clears it. A tag chip is one piece (contenteditable=false): Enter after it carried it to the next line and every tag typed below went inside the one above - the owner's note held #label6 inside #label5 inside #label4. Old notes: migrate.repairTagChips takes them apart, words kept (museum exhibit). The six labels the first build had put on the Ideas note's title from its #tags were taken off in Nebula Test's vault.
+- Passkeys: the Windows "Choose a passkey" window still came up in Gemini - the page script did not reach every page in time. Blink's WebAuth is now switched off for the whole app (--disable-blink-features=WebAuth): no page, frame or popup has the API, from the first load.
+- The owner's note, three editing bugs, reproduced on a copy of the note and fixed: Backspace after a <br> at the start of a list item lifted the item out (and the next one armed the divider above) - the break is removed now; the first 0.9.3 build's "select the picture first" caught a LETTER at the start of a line under a picture ("R" could not be deleted) and an empty line under a picture - now only a caret at the very edge of its line counts, an empty line beside a picture simply goes and the words move up; after emptying a line between two pictures the caret could end up on the editor itself or in a caption - it is put back on a line.
+- Toggle lists: a divider, /todo, /code and the to-do button inside a toggle stayed outside it or took the whole toggle; now everything stays in the body (checked: headings, both lists, to-do, quote, code, divider, a toggle in a toggle, the outline menu). Enter on an empty item one level in brings it back out (Chromium left a list inside a list).
+- New from the note: crop a picture (✂ on its bar: drag the frame, Enter crops, Esc cancels, one undo restores; image-crop.js), and resize an embed by its bottom-right corner (width and --embed-h kept on the card; a video keeps its shape).
+
+---
+
+## [2026-09-29 04:10] v0.9.3 - by Claude
+
+From the owner's "Ideas & Bugs" note in Nebula Test (and, in the chat, "when the languages are closed the language should sit above v0.9.2"). Not released: Nebula Test.exe for the owner to try; tests and the push only when the owner says push.
+
+- Slow app / double-click stuck: every autosave wrote EVERY note again - the whole vault stringified, parsed, stringified per note, and copied into localStorage (12 MB in Nebula Test, with the two rebuilt articles): a 0.4 s freeze each time (measured on a copy of the vault: 2 long tasks of 411/417 ms per 80 keys; now none). A save names the notes it is for (NoteStore.save(changed)); the mirror serialises only those; with the notes on disk, localStorage no longer carries a copy (the boot copy is dropped at the first save, so an emptied vault cannot resurrect deleted notes from it). The sidebar line reads the first 40 KB of a note, pictures taken out, not the whole note.
+- Four languages: English, Deutsch, Polski, Türkçe (i18n.js). Closed, the picker is one line with the language in use right above the version; open, the four in a row like the themes. The English text is the key; a MutationObserver translates the interface as it is drawn; the note, the title, note names, labels and the AI pages are never touched. The palette and the / menu find commands by their translated names too; the collapsed rail shows the translated theme and drawer words (attr() stayed English).
+- Right-click: a misspelt word gets its suggestions (one Ctrl+Z takes a correction back) and Add to dictionary; a picture gets Copy image, its caption and Delete image; selected words still get the formatting bar. The main process forwards Chromium's spellchecker facts (electron/context-menu.js); the page draws the menu (context-menu.js). Spelling is checked in the app's language, English and Windows' preferred languages.
+- Tab in a list moves the item under the one above it (Shift+Tab back), not the wrapper round the heading and the list (the owner's "all of them moved"). Outside lists Tab indents the line itself. Old notes: the indent the old Tab put on such a wrapper is removed (migrate.dropWrapperIndents, MARKUP_VERSION 0.9.3, museum exhibit).
+- A click picks a divider (dividers.js): outlined, Backspace/Delete removes it, other keys carry on in the line below; the caret no longer appears "from an odd place".
+- A picture in the text: Backspace at the start of the line under it (or Delete at the end of the line above) silently deleted it with the join; now the first press selects it. Double-click opens its caption. Ctrl+C/Ctrl+X copy the picture itself (PNG through the main process).
+- Toggle lists (toggles.js): toolbar button beside the to-do and /toggle; Enter in the title goes into the body, Enter on an empty last line leaves it, Backspace at the start of the title turns it back into lines; the open state is kept with the note; a list inside a toggle stays inside it.
+- @ mentions another note (a chip that opens it and follows renames), #word + space/Enter adds a label chip and the note's label, and label chips over the note list filter it (mentions.js).
+- A font for each note: the font and size picked last in a note (note.font) are what its new, empty lines are written in; text already written keeps its font; Serif (default)/17 clears it.
+- AI tabs are not offered passkeys (NO_PASSKEYS before every page via the DevTools protocol): the Windows "Choose a passkey" window came up before an address was typed in Google, ChatGPT and Mistral. Browser sign-in handing the session back to the app is not possible for these sites (0.9.0 tried it; cookies do not come back).
+- Windows Firewall question: Nebula opens no server; Chromium's WebRTC (AI tabs, embeds) waited for peers' UDP on every card and announced itself over mDNS. WebRTC now goes through a relay only (disable_non_proxied_udp, mDNS off) - measured: no UDP host candidates. Not reproducible on demand, since Windows asks once per program path.
+- Guide: "New in 0.9.3" and each feature in its section (GUIDE_VERSION 0.9.3, signature ba8043ce); release notes for 0.9.3.
+- `npm run kill` (the first step of pack:test, pack:win and reset) ran `taskkill /IM Nebula.exe /F`, which force-closed the INSTALLED Nebula too, unsaved notes and all - against the never-the-installed-app rule. It now closes only processes whose executable is inside this project (`--dry-run` shows which).
+- Also found this session: the Lea shadow replay of this very prompt was editing this repo at the same time (it reverted its own edits when it noticed); the rig is fenced now, in the Optimizing CLI project.
+
+---
+
 ## [2026-09-28 07:59] v0.9.2 - by Claude
 
 Google sign-in in the app, Theme color, pasted words in the note's font, B/I/U follow the shortcuts, centred bullets, leaving a list keeps the font, the picture bar follows its picture, a clearer note menu.

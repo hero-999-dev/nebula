@@ -54,7 +54,7 @@ screen are obviously the same product.
   drag anywhere, resize from a corner, recolour from dots, hold editable text,
   and sit above or behind the text without reflowing it.
 - An **AI panel** of embedded chat webviews (Claude, Gemini, ChatGPT, Mistral,
-  DeepSeek, Copilot, Perplexity, plus any URL the user adds), resizable, with a
+  MathGPT, Copilot, plus any URL the user adds), resizable, with a
   side-scrolling tab strip. It is deliberately isolated: it touches no note data.
 
 ### Non-negotiables
@@ -95,7 +95,7 @@ screen are obviously the same product.
 
 ## Engineering rules
 
-- Electron 33 + Vite 6 + vanilla ES modules. Vitest for units, playwright-core
+- Electron 44 (Chromium 152) + Vite 6 + vanilla ES modules. Vitest for units, playwright-core
   driving the real Electron app for smoke.
 - The renderer reaches the main process through one `contextBridge` namespace.
   It passes keys, never paths — the main process resolves them and rejects
@@ -120,9 +120,11 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.9.2)
+## Current implementation state (v0.9.3)
 
 **Labels, canvas and browser sign-in:** Labels beside the title with a searchable row-menu picker and native export/import; four image resize corners; bookmark page titles and accurate embed errors; Google sign-in hands off to the default browser. Selection Backspace, locked canvas objects, shape undo, text fitting, rotation controls and shape-outline arrow attachment corrected. Large-note sidebar text extraction avoids parsing base64 payloads. Browser handoff opens the provider in the system browser; there is no third-party OAuth callback or cookie transfer into Nebula.
+
+**Folders and order (0.9.3, in test):** folders in the note list (`storage/folders.json`; `note.folder` on each note), opened and closed with a click, renamed by double-click or ⋯, deleted without deleting a note; folders stand among the notes (`folder.order`) and are dragged like them; notes dragged into a folder, between notes and folders, and among the pinned — dragging never pins or unpins; `note.order` shares `updatedAt`'s scale so undragged notes still rise when edited. AI panel: Claude, Gemini, ChatGPT, Mistral, MathGPT, Copilot, with reload and + fixed at the strip's right; right-click a tab to rename it, change its address or delete it. The Google sign-in window hands the one-time return address to the tab only. Page width beside Saved (`note.page`): Nebula Wide (the old whole-width page; PDF on A4 landscape or portrait, chosen in the export preview), Nebula Narrow (A4 with 6.35 mm margins), and A3–A5/B3–B5, where the line is the paper's printed line and print/PDF use that paper. Page zoom beside the alignment (`note.zoom`, 50–200 %, CSS zoom on the editor; drags divide by editorZoom). Thin page-break lines at each page height; 100 % page zoom = real size (monitor size from WMI); Fit to page first in the box; A4/NN/A5/B5 open at 100 %, NW/A3/B4/B3 fitted. On a page the shape/picture canvas is the sheet. A filtered list is flat. Google sign-in in every AI tab opens in a window of the app sharing the tab's session (Firefox identity, OAuth requests kept whole).
 
 **Working:** the whole editor described above — dock pad, two-row toolbar,
 mini toolbar, slash menu that restyles only the caret's block (including a bare `<div>` line), code blocks with syntax colours (Rust included), a per-note Only view lock, arrows that snap onto shapes and pictures, F12 window snapshots, free-floating shapes with a live angle, arrows that can point at a shape, link, image or text line, pasted images that sit in the text (or float, from the image bar), four-way link paste with embeds in a webview (a YouTube/Vimeo link embeds its player), a Nebula note file (`.nebula.json`, sanitised on import; a raw vault note file also imports) that round-trips the note, deletable arrows, AI panel with tabs, a Chrome user agent, and Sign in in browser,
@@ -175,6 +177,18 @@ Source text has a clear inset from the code panel edge.
 **Pasting (0.9.2):** pasted HTML takes the note's font, size and colour and
   keeps its structure and emphasis; "Theme color (default)" clears fixed ink.
 
+**0.9.3 (the owner's Ideas & Bugs note):** four languages (i18n.js, the
+  English text is the key, translated as the interface is drawn, never the
+  note); a right-click menu drawn by the page from the main process's
+  spellchecker facts (suggestions, Add to dictionary, Copy image, caption);
+  Tab moves a list item; a click picks a divider; Backspace next to a picture
+  in the text selects it first; double-click for a caption; toggle lists
+  (toggles.js); @ note mentions and #word labels (mentions.js) with label chips
+  over the list; a writing font per note (note.font) for new lines; AI tabs
+  offered no passkeys; WebRTC relay-only so Windows never asks about the
+  firewall; a save writes only the notes that changed and localStorage no
+  longer carries the vault when it is on disk.
+
 **Deleted is deleted (0.9.1):** a note deleted from the Trash leaves the
   vault and every backup (overwritten first; best effort on flash and SSD).
   The notes deleted before 0.9.1 are taken out of the backups once, on its
@@ -186,7 +200,7 @@ Source text has a clear inset from the code panel edge.
   without dating it; once per markup version every note in the vault is
   repaired while idle, after a `pre-heal-<version>` backup, and a note whose
   words would change is left alone. The long-note trials also run on a
-  hand-written old note in smoke and, locally, on copies of the real vaults.
+  hand-written old note in smoke and, locally, on copies of Nebula Test's notes.
 
 **Rich paste:** a Bookmark requests only the page title, from the main
   process (no cookies, at most 256 KB and 8 s); URL/Mention fetch nothing. Embed is an
@@ -210,9 +224,10 @@ code-hint input, verified by breaking the guards on purpose and watching the
 suite go red).
 
 **Not built yet, by choice:** graph map, mind map, sheets, flashcards, forums,
-calendar, projects, command palette, full-text search, i18n. All of these exist
+calendar, projects, command palette, full-text search. All of these exist
 in `../Nebula Demo/` and are meant to be ported one at a time through the
 `bus.js` / `disk-store.js` / `storage.js` hooks.
 
 **Known limits:** no one-click auto-update on macOS (no Apple Developer
-certificate); the portable exe cannot update itself; the UI is English only.
+certificate); the portable exe cannot update itself; the interface speaks
+English, German, Polish and Turkish, and strings nobody translated stay English.

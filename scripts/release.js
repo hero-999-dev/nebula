@@ -20,13 +20,15 @@
  *   npm run push -- --dry-run     do everything except commit/tag/push
  *   npm run push -- --no-flash    skip the USB drive mirror
  *   npm run push -- --no-rebuild  skip the page rebuild (tests/e2e/rebuild-page.mjs)
- *   npm run push -- --no-old-notes skip the trials on this machine's own notes
+ *   npm run push -- --no-old-notes skip the trials on Nebula Test's notes
+ *   npm run push -- --no-browser-check  release although the browser the app tells Google it is has fallen behind
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT } from './paths.js';
 import { stampVersions, checkVersions } from './versions.js';
+import { checkBrowsers, printBrowsers } from './check-browsers.js';
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
@@ -131,6 +133,22 @@ if (tryGit('rev-parse', '-q', '--verify', `refs/tags/${tag}`)) {
 }
 
 /**
+ * The browser the sign-in windows tell Google they are must still be one
+ * Google accepts (the owner, 2026-09-30: "check this on every new version so
+ * we do not get the error again"). A Firefox that has fallen behind stops the
+ * release with the line to change; Electron's own Chromium falling behind is
+ * said loudly, since the fix for it is an Electron upgrade.
+ */
+{
+  console.log('\nBrowsers the app tells Google it is:');
+  const browsers = await checkBrowsers();
+  printBrowsers(browsers);
+  if (!browsers.ok && !args.includes('--no-browser-check')) {
+    fail('The browser the app tells Google it is has fallen behind (above). Change it, or pass --no-browser-check.');
+  }
+}
+
+/**
  * Every release says what it changed.
  *
  * The card is only as good as the notes behind it, and the version being
@@ -225,8 +243,8 @@ if (!fs.existsSync(rebuildScript)) {
   else if (code !== 0) console.warn(`\n  ! page rebuild could not finish (exit ${code}); not blocking the release.\n`);
 }
 
-// The long-note trials on COPIES of this machine's own notes (the installed
-// app's vault and Nebula Test's). The owner's rule, 2026-09-27: a bug fixed in
+// The long-note trials on COPIES of the notes in Nebula Test's vault — never
+// the installed app's (owner, 2026-09-28). The owner's rule, 2026-09-27: a bug fixed in
 // the app must not live on in the notes it already touched — and notes this
 // version writes cannot show that, only notes an older version wrote can. A
 // failed trial stops the release; no vault on the machine, or a run that could

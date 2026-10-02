@@ -169,6 +169,7 @@ export const BLOCK_HELP = {
   bullet: 'Bulleted list — Enter on an empty item leaves it',
   numbered: 'Numbered list — Enter on an empty item leaves it',
   todo: 'A line with a checkbox; the button toggles it back',
+  toggle: 'A list whose items fold away under an arrow',
   quote: 'Indented quote',
   code: 'Code block with a language picker and colours',
   divider: 'A horizontal rule',

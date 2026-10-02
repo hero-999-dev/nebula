@@ -23,10 +23,13 @@ const CLASS_STATE = [
   ['.note-arrow.is-selected', 'is-selected'],
   ['.arrow-target', 'arrow-target'],
   ['hr.armed', 'armed'],
+  ['.note-mention.is-missing', 'is-missing'],
 ];
 
 /** Elements that exist only while something is being done: the angle readout. */
 const TRANSIENT_NODES = '.shape-angle';
+// (The crop frame and an embed's grip: the frame is on the page, not in the
+// note; the grip is in the note, rebuilt on load like a shape's handles.)
 
 /**
  * A shape's text is editable only while it is being edited (0.6.4). Without the

@@ -20,7 +20,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'   # Electron 44 needs Node 22.12+ (0.9.3)
           cache: npm
 
       - run: npm ci
@@ -32,6 +32,11 @@ jobs:
 
       # Drives the real Electron app on throwaway profiles. Catches the class of
       # bug jsdom cannot see: the preload bridge, the main process, the vault.
+      # From Electron 42 `npm ci` no longer downloads the Electron binary; the
+      # smoke test drives the real app, so it is fetched here (0.9.3).
+      - name: Electron binary
+        run: npx install-electron --no
+
       - name: Electron smoke test
         run: npm run smoke
 
@@ -72,7 +77,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'   # Electron 44 needs Node 22.12+ (0.9.3)
           cache: npm
 
       - run: npm ci
@@ -118,7 +123,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'   # Electron 44 needs Node 22.12+ (0.9.3)
 
       - uses: actions/download-artifact@v4
         with:

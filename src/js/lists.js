@@ -123,7 +123,7 @@ export function exitListOnEmptyItem(root, selection) {
   if (Array.from(li.children).some(isList)) return false; // it holds a sub-list
 
   const list = li.parentElement;
-  if (!isList(list) || list.parentElement !== root) return false;
+  if (!isList(list) || !(list.parentElement === root || list.parentElement?.classList.contains('toggle-body'))) return false;
 
   const doc = root.ownerDocument;
   const after = [];
@@ -192,14 +192,18 @@ export function liftListItemAtStart(root, selection) {
   if (!liOwnText(li)) return false;          // the empty case belongs to exitList
 
   // Only at the true start of the item, not merely at the start of some node
-  // in the middle of it.
+  // in the middle of it — and not after a line break: an item that starts
+  // with a <br> shows an empty first line, and Backspace on the second line
+  // removes that break. It lifted the whole item out instead (the owner's
+  // Ideas note, 0.9.3: "press Backspace by the B of Bug").
   const before = root.ownerDocument.createRange();
   before.selectNodeContents(li);
   before.setEnd(range.startContainer, range.startOffset);
   if (before.toString().length) return false;
+  if (before.cloneContents().querySelector('br, img, .inline-eq, .note-mention')) return false;
 
   const list = li.parentElement;
-  if (!isList(list) || list.parentElement !== root) return false;
+  if (!isList(list) || !(list.parentElement === root || list.parentElement?.classList.contains('toggle-body'))) return false;
 
   const doc = root.ownerDocument;
   const p = doc.createElement('p');
@@ -256,6 +260,8 @@ function liftOutOfParagraphs(root) {
     // trace that found this started from a heading, so the block the caret was
     // in was a DIV and nothing was lifted at all.
     if (p.tagName === 'LI') continue;
+    // A toggle's body holds whole blocks, lists among them (toggles.js, 0.9.3).
+    if (p.classList?.contains('toggle-body')) continue;
     // Whatever else the paragraph holds keeps a paragraph of its own, in order.
     const before = [];
     const after = [];
@@ -296,4 +302,95 @@ export function normalizeLists(root) {
     if (!z && !a && !b && !c) break;
   }
   return touched;
+}
+
+/** The <li> elements a selection covers, in order, all in the caret's list. */
+function selectedItems(root, range) {
+  const at = (node) => (node.nodeType === 1 ? node : node.parentElement)?.closest?.('li');
+  const first = at(range.startContainer);
+  if (!first || !root.contains(first)) return [];
+  const last = at(range.endContainer);
+  if (!last || last === first || last.parentElement !== first.parentElement) return [first];
+  const items = [];
+  for (let li = first; li; li = li.nextElementSibling) {
+    if (li.tagName === 'LI') items.push(li);
+    if (li === last) break;
+  }
+  return items;
+}
+
+/** Keep the selection across a move: boundary points inside a moved node survive it. */
+function keepSelection(selection, fn) {
+  const range = selection.rangeCount ? selection.getRangeAt(0) : null;
+  const saved = range && [range.startContainer, range.startOffset, range.endContainer, range.endOffset];
+  fn();
+  if (!saved) return;
+  try {
+    const back = saved[0].ownerDocument.createRange();
+    back.setStart(saved[0], saved[1]);
+    back.setEnd(saved[2], saved[3]);
+    selection.removeAllRanges();
+    selection.addRange(back);
+  } catch { /* a boundary that left the note */ }
+}
+
+/**
+ * Tab and Shift+Tab in a list move the ITEM a level, not the list.
+ *
+ * Tab indented the whole block the caret was in, and in a note whose lines
+ * sit in one wrapper (a font or a colour puts one round them) that block was
+ * the wrapper: the heading above and every item of the list moved together —
+ * "I wanted to pull the next one under it with Tab, and all of them moved"
+ * (the owner's Ideas note, 0.9.3). An item now goes under the item above it,
+ * the way it does in every editor, and Shift+Tab brings it back out.
+ *
+ * @param {Element} root the editor
+ * @param {Selection} selection
+ * @param {1|-1} delta
+ * @returns {boolean} true when the caret was in a list (handled, even if the
+ *   item could not move: the first item has nothing to go under)
+ */
+export function stepListItems(root, selection, delta) {
+  if (!selection?.rangeCount) return false;
+  const range = selection.getRangeAt(0);
+  const items = selectedItems(root, range);
+  if (!items.length) return false;
+  const list = items[0].parentElement;
+  if (!isList(list)) return false;
+  const doc = root.ownerDocument;
+
+  if (delta > 0) {
+    const above = items[0].previousElementSibling;
+    if (above?.tagName !== 'LI') return true;          // the first item stays
+    keepSelection(selection, () => {
+      let sub = [...above.children].reverse().find((el) => isList(el));
+      if (!sub || sub !== above.lastElementChild) {
+        sub = doc.createElement(list.tagName.toLowerCase());
+        above.appendChild(sub);
+      }
+      for (const li of items) sub.appendChild(li);
+    });
+    return true;
+  }
+
+  // Out: only a nested list has a level to come out to. A top-level item is
+  // left to the block indent.
+  const parentItem = list.parentElement;
+  if (parentItem?.tagName !== 'LI') return false;
+  keepSelection(selection, () => {
+    // The items after the last one moved become ITS children, so the order on
+    // the page does not change.
+    const after = [];
+    for (let n = items[items.length - 1].nextElementSibling; n; n = n.nextElementSibling) after.push(n);
+    let anchor = parentItem;
+    for (const li of items) { anchor.after(li); anchor = li; }
+    if (after.length) {
+      const last = items[items.length - 1];
+      let sub = [...last.children].find((el) => isList(el) && el.tagName === list.tagName);
+      if (!sub) { sub = doc.createElement(list.tagName.toLowerCase()); last.appendChild(sub); }
+      for (const n of after) sub.appendChild(n);
+    }
+    if (!list.querySelector('li')) list.remove();
+  });
+  return true;
 }

@@ -54,7 +54,7 @@ describe('indent + custom font size', () => {
     expect(parseSize('0')).toBeNull();
     expect(parseSize('abc')).toBeNull();
     expect(parseSize('999')).toBe(400);
-    expect(parseSize('2')).toBe(6);
+    expect(parseSize('2')).toBe(5);
   });
 });
 
@@ -218,9 +218,36 @@ describe('palettes', () => {
   });
 });
 
+describe('the Firefox that Google is told about (0.9.3)', () => {
+  it('is today\'s, counted from 157 on 29 September 2026, four weeks a version', async () => {
+    const { currentFirefox, firefoxUserAgentFor } = await import('../src/js/ai-services.js');
+    expect(currentFirefox(Date.UTC(2026, 8, 30))).toBe(157);
+    expect(currentFirefox(Date.UTC(2026, 9, 27))).toBe(158);
+    expect(currentFirefox(Date.UTC(2027, 8, 30))).toBe(170);
+    expect(currentFirefox(Date.UTC(2025, 0, 1))).toBe(157);      // never older
+    expect(firefoxUserAgentFor('win32', Date.UTC(2026, 8, 30))).toBe('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:157.0) Gecko/20100101 Firefox/157.0');
+    expect(firefoxUserAgentFor('darwin', Date.UTC(2026, 8, 30))).toContain('Macintosh');
+  });
+});
+
+describe('AI tabs the owner changed (0.9.3)', () => {
+  it('renamed, re-addressed, deleted and restored; + sites after the built-in ones', async () => {
+    const { mergeServices, siteUrl } = await import('../src/js/ai-services.js');
+    const built = { a: { name: 'A', url: 'https://a.test' }, b: { name: 'B', url: 'https://b.test' } };
+    const out = mergeServices(built, [{ id: 'c', name: 'C', url: 'https://c.test' }], { a: { name: 'Alpha', url: 'https://alpha.test' } }, ['b']);
+    expect(Object.keys(out)).toEqual(['a', 'c']);
+    expect(out.a).toEqual({ name: 'Alpha', url: 'https://alpha.test' });
+    expect(Object.keys(mergeServices(built, [], {}, []))).toEqual(['a', 'b']);
+    expect(siteUrl('math-gpt.org')).toBe('https://math-gpt.org/');
+    expect(siteUrl('javascript:alert(1)')).toBeNull();
+    expect(siteUrl('  ')).toBeNull();
+    expect(siteUrl('localhost')).toBeNull();
+  });
+});
+
 describe('AI services', () => {
   it('ships the Demo line-up', () => {
-    for (const id of ['claude', 'gemini', 'chatgpt', 'mistral', 'deepseek']) {
+    for (const id of ['claude', 'gemini', 'chatgpt', 'mistral', 'mathgpt', 'copilot']) {
       expect(AI_SERVICES[id], id).toBeTruthy();
       expect(AI_SERVICES[id].url).toMatch(/^https:\/\//);
     }

@@ -211,12 +211,18 @@ body {
   border-left: 0;
   border-top: 1px solid var(--rule);
 }
-#app.side-collapsed .theme-pick button { font-size: 0; padding: 7px 0; }
-#app.side-collapsed .theme-pick button::before { content: attr(data-theme); font-size: 9px; }
+/* The button's own word, small - attr(data-theme) stayed English whatever the
+   language (0.9.3). */
+#app.side-collapsed .theme-pick button { font-size: 9px; padding: 7px 0; overflow: hidden; white-space: nowrap; text-overflow: clip; }
 #app.side-collapsed .side-meta { flex-direction: column; gap: 4px; }
 #app.side-collapsed .btn-mini { font-size: 0; padding: 6px 0; }
 #app.side-collapsed .btn-mini::before { content: "↻"; font-size: 12px; }
 #app.side-collapsed .app-version { font-size: 9px; }
+#app.side-collapsed .lang-pick { width: 100%; order: -1; }
+#app.side-collapsed .lang-pick__row { flex-direction: column; }
+#app.side-collapsed .lang-pick__row button + button { border-left: 0; border-top: 1px solid var(--rule); }
+#app.side-collapsed .lang-pick__row button { font-size: 0; padding: 5px 0; }
+#app.side-collapsed .lang-pick__row button::before { content: attr(data-lang); font-size: 9px; text-transform: uppercase; }
 
 .side input[type="search"] {
   width: 100%;
@@ -393,18 +399,15 @@ body {
    reserved room beside it for the count that is not drawn, pushing the word
    off to one side of a 64px rail. */
 #app.side-collapsed .drawer-tab {
-  font-size: 0;
+  font-size: 9px;
+  line-height: 1.1;
   padding: 5px 0;
   gap: 0;
   justify-content: center;
   text-align: center;
+  overflow: hidden;
 }
-#app.side-collapsed .drawer-tab::before {
-  content: attr(data-drawer);
-  font-size: 9px;
-  line-height: 1.1;
-  text-transform: capitalize;
-}
+#app.side-collapsed .drawer-tab::before { content: none; }   /* not the rail's "+" for .btn */
 #app.side-collapsed .drawer-count { display: none; }
 .note-row.active { background: var(--paper-raised); border-color: var(--rule); }
 .note-row .nr-title {
@@ -428,6 +431,81 @@ body {
 .note-row .nr-title, .note-row .nr-meta { max-width: 100%; }
 
 .side-foot { display: flex; flex-direction: column; gap: 6px; }
+
+/* Filter by label (0.9.3): a button under the filter box; its panel opens on
+   a press and holds a search box and two groups of chips. */
+.label-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 9px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  text-align: left;
+}
+.label-filter-btn:hover { color: var(--ink); background: var(--paper-raised); }
+.label-filter-btn svg { width: 14px; height: 14px; flex: none; }
+.label-filter-btn .lf-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.label-filter-btn.on { border-color: var(--clay); color: var(--clay); font-weight: 600; }
+.label-filter-btn .lf-clear { font-size: 14px; line-height: 1; padding: 0 3px; border-radius: 4px; }
+.label-filter-btn .lf-clear:hover { background: var(--paper-sunken); }
+.label-filter {
+  margin: 6px 0 2px;
+  padding: 8px;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: var(--paper-raised);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.label-filter input[type="search"] { margin-bottom: 6px; }
+.lf-group + .lf-group { margin-top: 8px; }
+.lf-head { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-faint); margin-bottom: 4px; }
+.lf-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.lf-row { display: inline-flex; align-items: center; gap: 1px; max-width: 100%; }
+.lf-more {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.lf-more:hover { color: var(--ink); background: var(--paper-sunken); }
+.lf-menu { min-width: 200px; max-width: 260px; }
+.lf-menu .lf-confirm { margin: 4px 8px 6px; font-size: 12.5px; color: var(--ink-soft); }
+.lf-menu .lf-delete { color: var(--c-red, #c0392b); }
+.lf-menu .lf-delete--yes { font-weight: 600; }
+.lf-none, .lf-empty { font-size: 11.5px; color: var(--ink-faint); margin: 0; }
+#app.side-collapsed .label-filter-btn { display: none; }
+.label-chip {
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 7px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.label-chip:hover { color: var(--ink); background: var(--paper-raised); }
+.label-chip.on { background: var(--clay); border-color: var(--clay); color: var(--paper-sunken); font-weight: 600; }
+:root[data-theme="light"] .label-chip.on, :root[data-theme="white"] .label-chip.on { color: #fff; }
+#app.side-collapsed .label-filter { display: none; }
 
 /* Three themes as a segmented control: which one is on is visible without
    clicking, unlike a button that only says "Theme". */
@@ -465,6 +543,38 @@ body {
 .theme-pick button { border-radius: 0; }
 :root[data-theme="light"] .theme-pick button.on,
 :root[data-theme="white"] .theme-pick button.on { color: #fff; }
+
+/* Languages (0.9.3): always open, in the version's line, right of it - the
+   owner's drawing; small, so all four fit beside the version. */
+.lang-pick { display: flex; flex: 1; min-width: 0; }
+.lang-pick__row {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  background: var(--paper-raised);
+  overflow: hidden;
+}
+.lang-pick__row button {
+  flex: 1 1 auto;
+  min-width: 0;
+  font: inherit;
+  font-size: 9.5px;
+  padding: 3px 1px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lang-pick__row button + button { border-left: 1px solid var(--rule); }
+.lang-pick__row button:hover { color: var(--ink); background: var(--paper-sunken); }
+.lang-pick__row button.on { background: var(--clay); color: var(--paper-sunken); font-weight: 600; }
+:root[data-theme="light"] .lang-pick__row button.on,
+:root[data-theme="white"] .lang-pick__row button.on { color: #fff; }
 
 .side-meta {
   display: flex;
@@ -563,7 +673,9 @@ body {
   overflow-y: auto;
   padding: 16px 28px 40px;
   font-family: var(--serif);
-  font-size: 17px;
+  /* 14px (0.9.3, the owner): 17px read large once pages had real sizes; 10,
+     then 12 were tried. 14px prints as 10.5 pt. A note's own size or a span's still wins. */
+  font-size: 14px;
   line-height: 1.65;
   outline: none;
   min-height: 200px;
@@ -818,7 +930,13 @@ body {
   cursor: pointer;
 }
 .readonly-chip:hover { border-color: var(--clay); color: var(--ink); }
-.note-readonly #toolbar, .note-readonly #mini-bar { opacity: .45; pointer-events: none; }
+.readonly-chip[hidden] { display: none; }
+.note-readonly #mini-bar { opacity: .45; pointer-events: none; }
+/* Only view still zooms (0.9.3, the owner): the page zoom is how the note is
+   looked at, not an edit — it stays bright and pressable; the rest is dimmed. */
+.note-readonly #toolbar { pointer-events: none; }
+.note-readonly #toolbar > .tb-row > :not(#tb-zoom) { opacity: .45; }
+.note-readonly #toolbar #tb-zoom { pointer-events: auto; }
 .note-readonly .title-input { cursor: default; }
 
 /* A short notice at the bottom (F12 snapshot, 0.8.9). */
@@ -838,3 +956,108 @@ body {
   box-shadow: 0 10px 26px var(--shadow);
   overflow-wrap: anywhere;
 }
+
+/* ---- Folders and dragging in the note list (0.9.3) ----------------------
+   A folder is a row like a note's, with a caret that turns when it is open;
+   its notes hang under it on a thin rule. While a note is dragged, a line
+   shows where it will land, and a folder it will go into is tinted. */
+.new-row { display: flex; gap: 6px; }
+.new-row #btn-new { flex: 1; min-width: 0; }
+.btn.new-folder { display: inline-flex; align-items: center; gap: 1px; padding: 6px 9px; color: var(--ink-soft); }
+.btn.new-folder:hover { color: var(--ink); }
+.btn.new-folder svg { width: 16px; height: 16px; }
+.btn.new-folder .nf-plus { font-size: 13px; font-weight: 700; line-height: 1; margin-top: -6px; }
+#app.side-collapsed .new-row { flex-direction: column; }
+#app.side-collapsed .btn.new-folder { display: none; }
+
+.folder-block { margin: 1px 0; }
+.folder-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 13.5px;
+  background: transparent;
+  color: var(--ink);
+  padding: 7px 32px 7px 6px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.folder-row:hover { background: var(--paper-raised); }
+.fr-caret { flex: none; width: 10px; display: inline-grid; place-items: center; color: var(--ink-faint); }
+.fr-caret::before {
+  content: "";
+  border-left: 5px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  transition: transform 120ms ease;
+}
+.folder-row[aria-expanded="true"] .fr-caret::before { transform: rotate(90deg); }
+.folder-row .fr-icon { flex: none; width: 15px; height: 15px; color: var(--clay); }
+.fr-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.fr-count { flex: none; font-size: 11px; color: var(--ink-faint); }
+.folder-notes { margin: 0 0 4px 11px; padding-left: 6px; border-left: 1px solid var(--rule); }
+.folder-empty {
+  margin: 2px 0 6px;
+  padding: 7px 10px;
+  border: 1px dashed var(--rule);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.note-row[draggable="true"] { -webkit-user-drag: element; }
+.note-item.is-dragging { opacity: .45; }
+.note-item.drop-before::before,
+.note-item.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--clay);
+  pointer-events: none;
+}
+.note-item.drop-before::before { top: -1px; }
+.note-item.drop-after::after { bottom: -1px; }
+.folder-item.drop-into .folder-row,
+.folder-empty.drop-into { background: var(--clay-soft); border-color: var(--clay); color: var(--ink); }
+.note-list.drop-end { box-shadow: inset 0 -2px 0 var(--clay); }
+
+.folder-menu { min-width: 190px; max-width: 260px; }
+.folder-menu .fm-confirm { margin: 4px 8px 6px; font-size: 12.5px; color: var(--ink-soft); }
+.folder-menu .fm-delete { color: var(--c-red, #c0392b); }
+.folder-menu .fm-delete--yes { font-weight: 600; }
+.folder-menu .fm-ic svg { width: 15px; height: 15px; }
+
+/* The rail: a folder is its icon; its open notes are initials like the rest. */
+#app.side-collapsed .folder-row { justify-content: center; padding: 8px 0; }
+#app.side-collapsed .folder-row .fr-caret,
+#app.side-collapsed .folder-row .fr-name,
+#app.side-collapsed .folder-row .fr-count { display: none; }
+#app.side-collapsed .folder-notes { margin-left: 0; padding-left: 0; border-left: 0; }
+#app.side-collapsed .folder-empty { display: none; }
+
+/* A folder is dragged too, and a note can be let go just above or below one
+   (the top and bottom quarter of its row): the line runs across the block. */
+.folder-block { position: relative; }
+.folder-block.is-dragging { opacity: .45; }
+.folder-row[draggable="true"] { -webkit-user-drag: element; }
+.folder-block.drop-before::before,
+.folder-block.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--clay);
+  pointer-events: none;
+  z-index: 1;
+}
+.folder-block.drop-before::before { top: -1px; }
+.folder-block.drop-after::after { bottom: -1px; }

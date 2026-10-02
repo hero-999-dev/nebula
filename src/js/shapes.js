@@ -1,3 +1,4 @@
+import { editorZoom } from './page-zoom.js';
 /**
  * Free-floating shapes — they live on ONE overlay layer that spans the whole
  * note and can be dragged anywhere in it (wrap: through — text flows under
@@ -280,8 +281,10 @@ export function initShapes(editorEl, { history, onGeometry } = {}) {
   window.addEventListener('mousemove', (e) => {
     if (!drag) return;
     if (isLocked()) { drag = null; return; }
-    const dx = e.clientX - drag.startX;
-    const dy = e.clientY - drag.startY;
+    // On the page, not on the screen: the page may be zoomed (page-zoom.js).
+    const z = editorZoom(editorEl);
+    const dx = (e.clientX - drag.startX) / z;
+    const dy = (e.clientY - drag.startY) / z;
     if (Math.abs(e.clientX - drag.downX) > 2 || Math.abs(e.clientY - drag.downY) > 2) drag.moved = true;
     if (!drag.moved) return;
     if (drag.layer) drag.layer.style.minHeight = `${drag.extent}px`;

@@ -178,7 +178,7 @@ export async function runRebuildFindingChecks(check) {
     await win.keyboard.type('Line above the picture', { delay: 5 });
     await win.keyboard.press('Enter');
     const before = await win.locator('#editor .note-image').count();
-    await app.evaluate(({ clipboard, nativeImage }, file) => clipboard.writeImage(nativeImage.createFromPath(file)), path.join(root, 'build', 'icon.png'));
+    await app.evaluate(({ clipboard, nativeImage, ClipboardItem }, file) => clipboard.write([new ClipboardItem({ 'image/png': new Blob([nativeImage.createFromPath(file).toPNG()], { type: 'image/png' }) })]), path.join(root, 'build', 'icon.png'));
     await win.keyboard.press('Control+v');
     await win.waitForFunction((n) => document.querySelectorAll('#editor .note-image').length > n, before, { polling: 50 });
     await win.keyboard.type('Line below the picture', { delay: 5 });

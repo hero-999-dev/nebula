@@ -6,7 +6,7 @@
  * uses the CSS Custom Highlight API: ranges are handed to the renderer and
  * painted by `::highlight()`, and the note's HTML is never touched.
  *
- * Chromium has had it since 105 and Electron 33 is Chromium 130, so it is
+ * Chromium has had it since 105 and Electron 44 is Chromium 152, so it is
  * always there in the app; the guard is for a browser preview on something
  * older, where the bar still counts matches and scrolls to them.
  */

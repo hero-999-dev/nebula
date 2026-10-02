@@ -13,6 +13,22 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.9.3': {
+    headline: 'Paper sizes, Word and OpenDocument, four languages, and a faster app.',
+    items: [
+      { title: 'Pages and paper', text: 'Beside Saved, choose Nebula Wide, Nebula Narrow or an A3\u2013B5 paper: the line breaks where it will on paper and thin lines show each page. Beside the alignment, the page zoom: on a paper 100 % is its real size, and Fit makes the sheet as wide as the window.' },
+      { title: 'Auto order page', text: 'The button right of the zoom moves a shape or a picture that a page line falls across to the next page. Turn it on in a note\u2019s \u22ef menu and the note does it by itself.' },
+      { title: 'Word, OpenDocument and a Mac\u2019s own', text: 'Export and import .docx, .odt, .doc, Rich Text and Evernote (.enex, for Apple Notes, Bear and Joplin). PDF and documents show their pages first, and a video goes out as its picture \u2014 it plays in Word \u2014 or as a bookmark.' },
+      { title: 'Folders and your AI tabs', text: 'New folder beside New note; drag notes into folders and into the order you want. Right-click an AI tab to rename it, change its address or remove it; \u21bb reloads it, and MathGPT is in the panel.' },
+      { title: 'English, Deutsch, Polski, Türkçe', text: 'Pick the language beside the version number at the bottom of the sidebar. Menus, buttons, hints and the spelling check follow at once; your notes are never translated.' },
+      { title: 'Spelling suggestions', text: 'Right-click a word with a red underline for its corrections, or add it to the dictionary. A right-click on a picture copies it.' },
+      { title: 'Toggle lists, @ and #', text: 'A line with an arrow folds away what is under it, lists and dividers included. @ mentions another note, #word writes a label into the text, and Filter by label shows the notes with a label on their title or in their text.' },
+      { title: 'Crop pictures, resize embeds', text: '\u2702 on a picture\u2019s bar crops it; an embed is resized from any side or corner. Alt+\u2191 and Alt+\u2193 move a picture in the text.' },
+      { title: 'Google sign-in in its own window', text: 'In every AI tab, Google\u2019s sign-in opens in a small window, the way Claude does it; when you are done the tab is signed in.' },
+      { title: 'A font for each note', text: 'The font and size you picked last in a note are what its new lines are written in; what you already wrote keeps its font.' },
+      { title: 'Faster, and fewer surprises', text: 'Saving no longer pauses the window in a large vault. Tab in a list moves only that item, a click picks a divider, Backspace next to a picture in the text selects it before deleting it, a double-click on a picture opens its caption, AI tabs no longer pop up a passkey window, and Windows no longer asks to let the app through its firewall.' },
+    ],
+  },
   '0.9.2': {
     headline: 'Google sign-in in the app, a theme colour, and pasted words in your note\u2019s font.',
     items: [

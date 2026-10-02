@@ -25,6 +25,21 @@ const parse = (html) => {
 
 const MUSEUM = [
   {
+    when: '0.9.3 test builds: a loose <br> between a divider and a picture, where the caret stood (the owner\'s Ideas note)',
+    html: '<h1>Ideas &amp; Bugs</h1><hr class="blk-hr"><br><figure class="note-image note-image--inline" contenteditable="false" data-block-type="image"><img src="data:,"></figure><div>text</div>',
+    gone: 'hr + br, hr + p',
+  },
+  {
+    when: 'first 0.9.3 build: a #tag chip was editable, so the tags on the lines below went inside it (the owner\'s Ideas note)',
+    html: '<div><span class="note-tag" data-tag="label4">#label4</span> </div><div><span class="note-tag" data-tag="label4"><span class="note-tag" data-tag="label5">#label5</span> </span></div><div><span class="note-tag" data-tag="label4"><span class="note-tag" data-tag="label5"><br></span></span></div>',
+    gone: 'span.note-tag span.note-tag, span.note-tag[contenteditable]',
+  },
+  {
+    when: 'up to 0.9.2: Tab indented the wrapper round a heading and its list — everything moved (the owner\'s Ideas note)',
+    html: '<p>x</p><div data-ind="1"><h3><b>Bugs</b></h3><ul><li>Bulleted list</li><li>next</li></ul></div>',
+    gone: 'div[data-ind]',
+  },
+  {
     when: 'up to 0.9.0: the autosave wrote whatever was on screen — a picture saved selected (the owner\'s Ideas note)',
     html: '<p>text</p><div class="shape-layer" contenteditable="false"><figure class="note-image sel" contenteditable="false"><img src="data:,"></figure></div>',
     gone: '.sel',
