@@ -9,6 +9,14 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+## [2026-10-12 08:27] v0.9.4 - by Claude (the first build of the tag stopped on the Mac; the tag was moved to the fix)
+
+`npm run push` passed every gate on this computer and pushed v0.9.4. On GitHub the Mac job of the Release workflow, and the Tests workflow on Linux, stopped at two unit tests of "Open with Nebula" (tests/open-file.test.js, written earlier in 0.9.4 and never run off Windows): they named files "C:/Users/me/..." with backslashes, which is an absolute path on Windows only. The publish job needs both builds, so no release was made and no installed copy was offered anything.
+
+Done: the two tests build their paths for the machine they run on. Nothing in the app changed. The fix is one commit on top of the release commit, and the tag v0.9.4 was moved to it (the tag had no release yet) so the workflow builds 0.9.4 from a tree whose tests pass on all three systems.
+
+Unit 1121 of 1121 here; the result on GitHub is in the entry that follows, or in the workflow's page.
+
 ## [2026-10-12 08:19] v0.9.4 - by Claude
 
 Two ways to paste, toggle headings, tables, columns, note folders, black holes, a lock on opening, Settings, the guide in four languages, Electron 44.7.
