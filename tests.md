@@ -1,3 +1,7 @@
+## 2026-10-12 (08:27) — 0.9.4: two tests that held on Windows only
+
+- tests/open-file.test.js: the paths of "the files among a command line's arguments" are made with path.resolve and path.join from the temp folder, so they are absolute on macOS and Linux too. On GitHub: 2 failed of 1105 on Linux and on the Mac before; nothing else failed there.
+
 ## 2026-10-12 (07:54) — 0.9.4: the checks before the release
 
 - Electron 44.7.0: unit 1121 of 1121, build, smoke.

@@ -17,20 +17,25 @@ beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nebula-open-'));
 afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
 
 describe('the files among a command line’s arguments', () => {
-  const at = (...parts) => path.resolve('C:\\Users\\me', ...parts);
+  // Paths of the machine the tests run on. They were written "C:\Users\me\…", which is an absolute
+  // path on Windows only: the release also builds on a Mac and the checks also run on Linux, and
+  // there the same name is one file in the folder the tests run in — 0.9.4's first build stopped on it.
+  const home = path.resolve(os.tmpdir(), 'me');
+  const at = (...parts) => path.resolve(home, ...parts);
+  const app = path.resolve(os.tmpdir(), 'Program Files', 'Nebula', 'Nebula.exe');
 
   it('the installed app: its own name, then the file', () => {
-    expect(filesFromArgv(['C:\\Program Files\\Nebula\\Nebula.exe', 'C:\\Users\\me\\Report.docx'])).toEqual(['C:\\Users\\me\\Report.docx']);
+    expect(filesFromArgv([app, at('Report.docx')])).toEqual([at('Report.docx')]);
   });
 
   it('a development run: the app’s script is no document, and switches are not files', () => {
-    expect(filesFromArgv(['electron.exe', 'dist-electron/main.js', '--remote-debugging-port=0', '--inspect', 'notes.md'], 'C:\\Users\\me'))
+    expect(filesFromArgv(['electron.exe', 'dist-electron/main.js', '--remote-debugging-port=0', '--inspect', 'notes.md'], home))
       .toEqual([at('notes.md')]);
-    expect(filesFromArgv(['electron.exe', '.', 'package.json'], 'C:\\Users\\me')).toEqual([]);
+    expect(filesFromArgv(['electron.exe', '.', 'package.json'], home)).toEqual([]);
   });
 
   it('several files, each once, relative ones from where the second copy was started', () => {
-    expect(filesFromArgv(['Nebula.exe', 'a.rtf', 'sub\\b.ODT', 'a.rtf'], 'C:\\Users\\me')).toEqual([at('a.rtf'), at('sub', 'b.ODT')]);
+    expect(filesFromArgv(['Nebula.exe', 'a.rtf', path.join('sub', 'b.ODT'), 'a.rtf'], home)).toEqual([at('a.rtf'), at('sub', 'b.ODT')]);
   });
 
   it('nothing for a kind of file Nebula does not read, or no arguments at all', () => {
