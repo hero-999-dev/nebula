@@ -71,9 +71,13 @@ export async function runV094Checks(check) {
     // ---- What's new fits the window -----------------------------------------
     await win.waitForFunction(() => !document.getElementById('ov-whats-new')?.hidden, null, { polling: 50, timeout: 5000 }).catch(() => {});
     const wn = await win.evaluate(() => {
+      const body = document.getElementById('whats-new-body');
+      // A version with two things to say has nothing to scroll (0.9.5: this check ran on 0.9.4's long
+      // list here and on the new version's short one where the release is built). Made as long as it takes.
+      const said = body.innerHTML;
+      for (let i = 0; i < 60 && body.scrollHeight <= body.clientHeight + 1; i += 1) body.insertAdjacentHTML('beforeend', said);
       const modal = document.querySelector('#ov-whats-new .modal').getBoundingClientRect();
       const button = document.getElementById('whats-new-close').getBoundingClientRect();
-      const body = document.getElementById('whats-new-body');
       return { shown: !document.getElementById('ov-whats-new').hidden, bottom: modal.bottom, button: button.bottom,
         height: window.innerHeight, scrolls: body.scrollHeight > body.clientHeight + 1 };
     });
