@@ -22,10 +22,11 @@ const LABELS = {
   autoorder: (note) => (note.autoOrder ? 'Auto order page: active' : 'Auto order page: not active'),
 };
 
-export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder }) {
+export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder, onHole, holeLabel, trashedHoles, onHoleRestore, onHoleDelete }) {
   const menu = document.getElementById('note-menu');
   const drawerBody = document.getElementById('drawer-body');
   const tabs = [...document.querySelectorAll('.drawer-tab')];
+  // No counters (the owner, 0.9.4: beside folders, black holes, Archive and Trash alike). A page that still has them is filled.
   const counts = {
     archive: document.getElementById('archive-count'),
     trash: document.getElementById('trash-count'),
@@ -36,6 +37,8 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
   if (!menu) return null;
 
   let forId = null;
+  /** What the labels and folder pickers open beside: the ⋯, or the row on the rail. */
+  let anchor = null;
 
   function close() {
     menu.hidden = true;
@@ -44,7 +47,12 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
     forId = null;
   }
 
-  function openFor(id, button) {
+  /**
+   * @param {string} id
+   * @param {HTMLElement} button the row's ⋯
+   * @param {{x: number, y: number}} [point] a right-click: the menu opens there (0.9.4)
+   */
+  function openFor(id, button, point = null) {
     const note = store.get(id);
     if (!note) return;
     forId = id;
@@ -57,24 +65,49 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
       order.textContent = LABELS.autoorder(note);
       order.hidden = !note.page || note.page === 'nw';    // Nebula Wide has no pages to order
     }
+    // Black holes (0.9.4): into one, or out of the one it is in. A note in a
+    // black hole is in no folder.
+    const hole = menu.querySelector('[data-note-act="hole"]');
+    if (hole) {
+      const label = holeLabel?.(note) ?? null;
+      hole.hidden = !label;
+      if (label) hole.textContent = label;
+    }
+    const folder = menu.querySelector('[data-note-act="folder"]');
+    if (folder) folder.hidden = !!note.hole;
     menu.hidden = false;
     // Below the button, pulled back inside the window if there is no room.
-    const r = button.getBoundingClientRect();
+    const r = point
+      ? { left: point.x, top: point.y, bottom: point.y }
+      : button.getBoundingClientRect();
     const w = menu.offsetWidth || 172;
     const h = menu.offsetHeight || 110;
-    menu.style.left = `${Math.min(r.left, window.innerWidth - w - 8)}px`;
+    menu.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - w - 8))}px`;
     menu.style.top = `${r.bottom + 4 + h > window.innerHeight ? Math.max(8, r.top - h - 4) : r.bottom + 4}px`;
     button.setAttribute('aria-expanded', 'true');
+    // On the rail the ⋯ is not drawn, so the pickers open beside the row.
+    anchor = button.offsetParent ? button : (button.closest('.note-item') ?? button);
+  }
+
+  /** A right-click on a note's row (note-list.js). */
+  function openAt(id, x, y) {
+    const button = [...document.querySelectorAll('#note-list .note-item')]
+      .find((el) => el.dataset.id === id)?.querySelector('.nr-more:not(.fr-more)');
+    if (!button) return;
+    close();
+    openFor(id, button, { x, y });
   }
 
   menu.addEventListener('click', (e) => {
     const act = e.target.closest('[data-note-act]')?.dataset.noteAct;
     if (!act || !forId) return;
     const id = forId;
-    const button = [...document.querySelectorAll('.nr-more')].find(b => b.getAttribute('aria-expanded') === 'true');
+    const button = anchor?.isConnected ? anchor
+      : [...document.querySelectorAll('.nr-more')].find(b => b.getAttribute('aria-expanded') === 'true');
     close();
     if (act === 'labels') { onLabels?.(id, button); return; }
     if (act === 'folder') { onFolder?.(id, button); return; }
+    if (act === 'hole') { onHole?.(id, button); return; }
     if (act === 'pin') store.togglePin(id);
     else if (act === 'readonly') store.toggleReadOnly(id);
     else if (act === 'autoorder') store.toggleAutoOrder(id);
@@ -165,6 +198,47 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
     return item;
   }
 
+  /**
+   * A black hole in the Trash (0.9.4): whole and locked — its name and how many
+   * notes it holds, never anything of them. Restore puts it back in its
+   * section; Delete removes it and every note in it, and asks once more when
+   * it holds any: a note in the Trash is one note, this may be fifty.
+   */
+  function holeRow(hole) {
+    const item = document.createElement('div');
+    item.className = 'note-item drawer-item drawer-hole';
+    item.dataset.hole = hole.id;
+
+    const row = document.createElement('div');
+    row.className = 'note-row';
+    row.innerHTML = '<div class="nr-title" data-no-i18n></div><div class="nr-meta"></div>';
+    row.children[0].textContent = hole.name;
+    row.children[0].dataset.initial = hole.name.trim().charAt(0).toUpperCase() || 'B';
+    row.children[1].textContent = hole.notes ? `Black hole · ${hole.notes} ${hole.notes === 1 ? 'note' : 'notes'}` : 'Black hole · empty';
+    row.title = hole.name;
+
+    const bar = document.createElement('div');
+    bar.className = 'drawer-actions';
+    const restore = document.createElement('button');
+    restore.type = 'button';
+    restore.textContent = 'Restore';
+    restore.addEventListener('click', () => { void onHoleRestore?.(hole.id); });
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.textContent = 'Delete';
+    del.addEventListener('click', () => {
+      if (hole.notes && !del.classList.contains('is-sure')) {
+        del.classList.add('is-sure');
+        del.textContent = 'Delete for good?';
+        return;
+      }
+      void onHoleDelete?.(hole.id);
+    });
+    bar.append(restore, del);
+    item.append(row, bar);
+    return item;
+  }
+
   function renderDrawers() {
     for (const [name, set] of Object.entries(SETS)) {
       if (counts[name]) counts[name].textContent = String(set.notes().length);
@@ -182,7 +256,8 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
     head.textContent = openDrawer === 'archive' ? 'Archived' : 'In the trash';
     drawerBody.appendChild(head);
 
-    if (!notes.length) {
+    const holes = openDrawer === 'trash' ? (trashedHoles?.() ?? []) : [];
+    if (!notes.length && !holes.length) {
       const none = document.createElement('div');
       none.className = 'drawer-empty';
       none.textContent = set.empty;
@@ -190,6 +265,7 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
       return;
     }
     for (const note of notes) drawerBody.appendChild(drawerRow(note, set.actions));
+    for (const hole of holes) drawerBody.appendChild(holeRow(hole));
   }
 
   for (const tab of tabs) {
@@ -201,5 +277,5 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
     });
   }
 
-  return { moreButton, renderDrawers, close };
+  return { moreButton, renderDrawers, close, openAt };
 }

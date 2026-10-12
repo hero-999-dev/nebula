@@ -120,7 +120,9 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.9.3)
+## Current implementation state (v0.9.4)
+
+**0.9.4:** a note is a folder (`storage/notes/<id>/<id>.json` with its pictures and videos as files; `nebula-media://`); black holes — notes encrypted with AES-256-GCM behind a 6-digit PIN, an optional passkey and a recovery key; a lock on opening (a gate, not encryption); Settings beside Help (a new note's font, size and page, hiding the AI panel or the black holes, the logo's colours); tables with numbered columns and rows, cell colour, merge and fill; a divider pulled sideways makes columns; a picture in the text at the left, centre or right, in a row or in a line of words; toggle headings and toggles in lists; one right-click menu with two ways to paste (Nebula format, and original format = the same plus the source's size); a font search, added and pinned fonts and the font used last; a theme of one's own with named profiles; the guide and What's new in four languages; AI tabs that sleep; Open with Nebula for Word, OpenDocument and Rich Text files.
 
 **Labels, canvas and browser sign-in:** Labels beside the title with a searchable row-menu picker and native export/import; four image resize corners; bookmark page titles and accurate embed errors; Google sign-in hands off to the default browser. Selection Backspace, locked canvas objects, shape undo, text fitting, rotation controls and shape-outline arrow attachment corrected. Large-note sidebar text extraction avoids parsing base64 payloads. Browser handoff opens the provider in the system browser; there is no third-party OAuth callback or cookie transfer into Nebula.
 

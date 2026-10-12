@@ -1,4 +1,5 @@
 import { _electron as electron } from 'playwright-core';
+import { readNotesIn } from './profiles.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -35,8 +36,7 @@ export async function runRecoveryChecks(check) {
       throw error;
     }
   };
-  const notes = () => fs.readdirSync(path.join(profile, 'storage/notes')).filter(f => f.endsWith('.json'))
-    .map(f => JSON.parse(fs.readFileSync(path.join(profile, 'storage/notes', f), 'utf8')));
+  const notes = () => readNotesIn(path.join(profile, 'storage/notes'));
   try {
     await start();
     await press('#btn-new');

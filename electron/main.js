@@ -1,19 +1,34 @@
-import { app, BrowserWindow, Menu, dialog, shell, ipcMain, session, clipboard, screen } from 'electron';
+import { app, BrowserWindow, Menu, dialog, shell, ipcMain, session, clipboard, screen, protocol, safeStorage, systemPreferences } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { Readable } from 'node:stream';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { installAiSignIn, signInWindowOpener } from './ai-browser-auth.js';
 import { AI_SERVICES, isGoogleService } from '../src/js/ai-services.js';
 import { realScaleFor } from '../src/js/page-zoom.js';
 import { fetchPageTitle, fetchVideoPoster } from './link-metadata.js';
-import { installContextMenu, registerEditingHandlers, writeImageToClipboard } from './context-menu.js';
-import { purgeNoteFromBackups, purgeDeletedFromBackups } from './backup-purge.js';
+import { installContextMenu, registerEditingHandlers, writeImageToClipboard, forgetIgnoredWords } from './context-menu.js';
+import { purgeNoteFromBackups, purgeDeletedFromBackups, purgeHoleNoteFromBackups, purgeHoleFromBackups, purgeHoleFilesFromBackups, purgeUnnamedFromBackups, shredTree, pruneLabelled, oldWayCopies, dropOldWayCopies } from './backup-purge.js';
+import { BlackHoles, WINDOWS_HELLO_SCRIPT, readHelloAnswer } from './black-holes.js';
+import { AppLock } from './app-lock.js';
+import { readLogo, writeLogo, clearLogo, pointShortcuts, makeShortcut } from './app-logo.js';
+import { filesFromArgv, readNoteFile } from './open-file.js';
+import { offerOpenWith } from './open-with.js';
+import {
+  MEDIA_SCHEME, NOTE_ID, externalize, inlinePictures, rehome, removeNoteFolder, tidyVault, addVideo, pictureDataUrl, travelWhole, travelFolder, noteFile, noteIds, snapshotVault, missingMedia, sweepNote, RELEASED_FILE, readReleased, writeReleased, noteReleases,
+  parseMediaUrl, mediaPath, mimeOf, byteRange, isVideoName, VIDEO_EXTENSIONS,
+} from './note-media.js';
 import { initUpdater } from './updater.js';
 import { resolveUserData, appChannel, canSelfUpdate } from './user-data.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// A note's pictures and videos are files in its folder (note-media.js); the
+// note shows a video straight from there. Said before the app is ready, as
+// Electron requires: a scheme pages may load media from, in pieces.
+protocol.registerSchemesAsPrivileged([{ scheme: MEDIA_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);
 
 /**
  * The app's version, not Electron's.
@@ -95,8 +110,11 @@ if (process.platform === 'win32') {
   app.setPath('userData', dir);
 }
 
-/** Notes live here as one JSON file per note. This directory is the vault. */
+/** Notes live here, each in a folder of its own: its JSON file, its pictures, its videos. This directory is the vault. */
 const storageRoot = () => path.join(app.getPath('userData'), 'storage');
+const notesRoot = () => path.join(storageRoot(), 'notes');
+/** The note a vault path is the file of — `notes/<id>.json` — or null. */
+const noteIdOf = (rel) => /^notes[\\/]([\w-]{1,120})\.json$/.exec(String(rel ?? ''))?.[1] ?? null;
 
 /**
  * The folder the last export or import went to. Electron 43 opens every file
@@ -104,6 +122,8 @@ const storageRoot = () => path.join(app.getPath('userData'), 'storage');
  * the last folder for it; the app does, for as long as it runs (0.9.3).
  */
 let lastFolder = null;
+/** /video's dialog is open: asked for again meanwhile, there is still one. */
+let pickingVideo = false;
 
 /**
  * The sheet a print goes on (0.9.3): the note's paper (page-mode.js), in
@@ -139,14 +159,40 @@ function resolveInStorage(rel) {
 }
 
 /**
+ * Where a vault path lies on the disk. To the window a note is
+ * `notes/<id>.json`; on the disk its file is in the note's own folder,
+ * `notes/<id>/<id>.json` (note-media.js).
+ */
+function inStorage(rel) {
+  const id = noteIdOf(rel);
+  return id ? noteFile(notesRoot(), id) : resolveInStorage(rel);
+}
+
+/**
  * Copy the vault aside.
  *
  * Without a label this is the daily safety net: one copy per calendar day in
- * backups/YYYY-MM-DD, newest 7 kept. With a label it is an extra, un-rotated
- * copy — used right before an update installs, so a bad release can never be
- * the last thing that touched a user's notes. Only the dated directories are
- * ever pruned; labelled ones stay until the user removes them.
+ * backups/YYYY-MM-DD, made at the first start of that day, and the newest
+ * alone is kept — seven were, until the owner (0.9.4): "not seven days: a
+ * copy of twenty-four hours, on an exFAT flash drive and a network drive
+ * too." With a label it is an extra, un-rotated copy — used right before an
+ * update installs, so a bad release can never be the last thing that touched
+ * a user's notes. Of the labelled ones the app makes itself — before an
+ * update, before a repair of old notes — the newest of each kind is kept
+ * (backup-purge.js pruneLabelled). A label of any other kind stays until the
+ * user removes it.
+ *
+ * A copy holds a file named `.making` while it is being made: one the app
+ * was closed over is no copy — it is removed and made again — so the copy
+ * before it is never given up for half a one.
+ *
+ * A copy holds the notes' own files; their pictures and videos, which never
+ * change once written, it shares with the vault instead of copying
+ * (note-media.js snapshotVault) — "I do not want the backups to take up a
+ * great deal of room" (the owner, 0.9.4).
  */
+const KEEP_DAILY = 1;
+const MAKING = '.making';
 function snapshotStorage({ label } = {}) {
   try {
     const src = storageRoot();
@@ -154,16 +200,25 @@ function snapshotStorage({ label } = {}) {
     const backupsDir = backupsRoot();
     const name = label ?? new Date().toISOString().slice(0, 10);
     const dest = path.join(backupsDir, name);
+    fsSync.mkdirSync(backupsDir, { recursive: true });
+    const half = (dir) => fsSync.existsSync(path.join(backupsDir, dir, MAKING));
+    const dated = () => fsSync.readdirSync(backupsDir).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+    if (half(name)) fsSync.rmSync(dest, { recursive: true, force: true });
     if (!fsSync.existsSync(dest)) {
-      fsSync.mkdirSync(backupsDir, { recursive: true });
-      fsSync.cpSync(src, dest, { recursive: true });
+      fsSync.mkdirSync(dest, { recursive: true });
+      fsSync.writeFileSync(path.join(dest, MAKING), '');
+      // The daily copy takes the place of the one before it, and where the disk
+      // cannot share a file it takes that one's pictures and videos over
+      // instead of copying them again (note-media.js snapshotVault).
+      const before = label ? null : dated().filter((d) => d !== name && !half(d)).pop();
+      snapshotVault(src, dest, before ? path.join(backupsDir, before) : null);
+      fsSync.rmSync(path.join(dest, MAKING), { force: true });
     }
-    const dirs = fsSync.readdirSync(backupsDir)
-      .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
-      .sort();
-    for (const dir of dirs.slice(0, -7)) {
+    for (const dir of dated().filter((d) => !half(d)).slice(0, -KEEP_DAILY)) {
       fsSync.rmSync(path.join(backupsDir, dir), { recursive: true, force: true });
     }
+    const gone = pruneLabelled(backupsDir);
+    if (gone.length) console.info(`[nebula] backups: older copies of their kind removed — ${gone.join(', ')}`);
     return dest;
   } catch (err) {
     console.warn('[nebula] storage snapshot failed:', err.message);
@@ -184,12 +239,17 @@ function stampVaultMeta() {
       try { meta = JSON.parse(fsSync.readFileSync(file, 'utf8')); } catch { meta = {}; }
     }
     const next = {
-      schemaVersion: 1,
+      // 2: a note's pictures and videos are files in its own folder (0.9.4, note-media.js).
+      // 3: the note's own file is in that folder too.
+      schemaVersion: 3,
       appVersion: APP_VERSION,
       firstOpened: meta.firstOpened ?? new Date().toISOString(),
       lastOpened: new Date().toISOString(),
       // When the notes deleted before 0.9.1 were taken out of the backups.
       ...(meta.deletedNotesPurged ? { deletedNotesPurged: meta.deletedNotesPurged } : {}),
+      // A list of what the person takes out of their notes is kept from here on (note-media.js noteReleases):
+      // should it ever be missing, nothing counts as taken out — rather than everything.
+      releasedList: true,
     };
     fsSync.mkdirSync(storageRoot(), { recursive: true });
     fsSync.writeFileSync(file, JSON.stringify(next, null, 2), 'utf8');
@@ -218,6 +278,178 @@ function purgeOldDeletions() {
   } catch (err) {
     console.warn('[nebula] purging deleted notes from backups failed:', err.message);
   }
+}
+
+/**
+ * Windows Hello or Touch ID, for a black hole that is opened by one (0.9.4,
+ * black-holes.js). On Windows the question is put by Windows PowerShell, which
+ * can reach the Windows Runtime; on a Mac by Electron itself. NEBULA_HELLO
+ * lets a test be the answer: `ok`, `no`, or `none` for a computer without it.
+ */
+function askWindowsHello(ask, reason = '') {
+  return new Promise((resolve) => {
+    import('node:child_process').then(({ execFile }) => {
+      // The question is the app's window's: it stands in front of it, not behind (black-holes.js).
+      let owner = '';
+      try {
+        const handle = ask && mainWindow && !mainWindow.isDestroyed() ? mainWindow.getNativeWindowHandle() : null;
+        if (handle) owner = String(handle.length >= 8 ? handle.readBigUInt64LE(0) : handle.readUInt32LE(0));
+      } catch { owner = ''; }
+      execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', WINDOWS_HELLO_SCRIPT], {
+        env: { ...process.env, NEBULA_HELLO_ASK: ask ? '1' : '', NEBULA_HELLO_REASON: reason, NEBULA_HELLO_WINDOW: owner },
+        timeout: ask ? 130_000 : 20_000,
+        windowsHide: true,
+      }, (err, stdout) => resolve(err ? { available: false, verified: false } : readHelloAnswer(stdout)));
+    }).catch(() => resolve({ available: false, verified: false }));
+  });
+}
+let helloThere = null;
+function helloAvailable() {
+  const forced = process.env.NEBULA_HELLO;
+  if (forced) return Promise.resolve(forced !== 'none');
+  if (process.platform === 'darwin') { try { return Promise.resolve(!!systemPreferences.canPromptTouchID()); } catch { return Promise.resolve(false); } }
+  if (process.platform !== 'win32') return Promise.resolve(false);
+  helloThere ??= askWindowsHello(false).then((a) => a.available);
+  return helloThere;
+}
+/** The question itself: `what` finishes "Nebula — …" (and Touch ID's "Nebula wants to …"). */
+async function helloAsk(what) {
+  const forced = process.env.NEBULA_HELLO;
+  if (forced) return forced === 'ok';
+  if (process.platform === 'darwin') {
+    try { await systemPreferences.promptTouchID(what); return true; } catch { return false; }
+  }
+  if (process.platform !== 'win32') return false;
+  return (await askWindowsHello(true, `Nebula — ${what}`)).verified;
+}
+const helloVerify = (name) => helloAsk(`open the black hole “${name}”`);
+
+/** The vault's black holes (black-holes.js): their keys are wrapped for this user by the operating system. */
+const holesRoot = () => path.join(storageRoot(), 'blackholes');
+const blackHoles = new BlackHoles({
+  root: holesRoot,
+  canProtect: () => { try { return safeStorage.isEncryptionAvailable(); } catch { return false; } },
+  protect: (plain) => safeStorage.encryptString(plain.toString('base64')),
+  unprotect: (box) => Buffer.from(safeStorage.decryptString(box), 'base64'),
+  hello: helloVerify,
+  helloAvailable,
+});
+
+/**
+ * The lock on opening the app (0.9.4, app-lock.js): set in Settings. While it
+ * is shut this process hands the window nothing of the notes — `shut()` is
+ * asked by everything that would: the vault's files, the black holes, the
+ * notes' pictures and videos.
+ */
+const appLock = new AppLock({
+  file: () => path.join(app.getPath('userData'), 'app-lock.json'),
+  hello: () => helloAsk('open the app'),
+  helloAvailable,
+});
+const shut = () => appLock.isLocked();
+
+/**
+ * Each note's folder (0.9.4, note-media.js). The first time a vault is opened
+ * by a version that keeps pictures as files, the vault is put aside as it was
+ * (`backups/pre-note-folders`, never overwritten); then, at every start, any
+ * note still holding pictures in its text is written the new way and what no
+ * note names any more leaves the folders.
+ */
+/** Notes with files nothing in the app took out of them — kept until the person is asked (note-media.js): id → the files. */
+const heldMedia = new Map();
+/** What the person has taken out of their notes since this start (note-media.js noteReleases): deleted at the next one. */
+let released = new Map();
+const releasedFile = () => path.join(storageRoot(), RELEASED_FILE);
+function prepareNoteFolders() {
+  try {
+    if (!fsSync.existsSync(notesRoot())) return;
+    let meta = {};
+    try { meta = JSON.parse(fsSync.readFileSync(path.join(storageRoot(), 'meta.json'), 'utf8')); } catch { /* no stamp yet */ }
+    if (!(meta.schemaVersion >= 2) && fsSync.readdirSync(notesRoot()).some((f) => f.endsWith('.json'))) {
+      if (!snapshotStorage({ label: 'pre-note-folders' })) return;   // no copy put aside, no change of format
+    }
+    // A vault a list has been kept for (meta.json): a list that is gone is an empty one, never none.
+    const done = tidyVault(notesRoot(), { released: readReleased(releasedFile()) ?? (meta.releasedList ? new Map() : null) });
+    // From here on a new list: what is taken out in this run.
+    released = new Map();
+    try { writeReleased(releasedFile(), released); } catch (err) { console.warn('[nebula] note folders: the list of what is taken out could not be started:', err.message); }
+    // What a note no longer names has just left its folder; it leaves the backups too
+    // ("deleted from the backups as well" — the owner).
+    heldMedia.clear();
+    for (const held of done.held) heldMedia.set(held.id, held.files);
+    if (heldMedia.size) console.info(`[nebula] note folders: ${heldMedia.size} notes lost pictures that nothing in the app took out — kept until asked about`);
+    const unnamed = purgeUnnamedFromBackups(notesRoot(), backupsRoot(), { keep: heldMedia });
+    if (unnamed) console.info(`[nebula] backups: ${unnamed} pictures and videos their notes no longer show removed`);
+    // The copy put aside before the pictures left the notes has done its work
+    // once every picture a note names is in that note's folder: it goes then
+    // — "it has no meaning after the move" (the owner). Kept while anything is missing.
+    const aside = path.join(backupsRoot(), 'pre-note-folders');
+    if (fsSync.existsSync(aside) && missingMedia(notesRoot()) === 0) {
+      const removed = shredTree(aside);
+      console.info(`[nebula] note folders: every picture is in its note's folder — the copy put aside before the move is removed (${removed} files)`);
+    }
+    if (done.inside || done.moved || done.swept) console.info(`[nebula] note folders: ${done.inside} note files moved into their folders, ${done.moved} notes written with their pictures as files, ${done.swept} unused files removed`);
+  } catch (err) {
+    console.warn('[nebula] preparing note folders failed:', err.message);
+  }
+}
+
+/**
+ * The copies kept the old way — every picture written into its note's text,
+ * in each of them — removed at this start, not one a day for a week
+ * (backup-purge.js dropOldWayCopies), and a copy the new way made in their
+ * place: there is never a start that leaves the vault without one. Only once
+ * the vault's own move is whole: while a picture is missing from a note's
+ * folder, every old copy stays.
+ */
+async function dropOldBackups() {
+  try {
+    if (!oldWayCopies(backupsRoot()).length || missingMedia(notesRoot()) !== 0) return;
+    const gone = await dropOldWayCopies(backupsRoot());
+    if (!gone.length) return;
+    console.info(`[nebula] backups: copies kept the old way removed — ${gone.join(', ')}`);
+    snapshotStorage();
+  } catch (err) {
+    console.warn('[nebula] removing the backups kept the old way failed:', err.message);
+  }
+}
+
+/** A note's file, served to the note that shows it: a picture whole, a video in the pieces the player asks for. */
+async function serveMedia(request) {
+  if (shut()) return new Response(null, { status: 403 });
+  // A video sealed in a black hole (black-holes.js): opened a piece at a time, for as long as the black hole is open.
+  const sealed = /^nebula-media:\/\/hole\/([\w-]{1,120})\/([\w-]{1,120})\/(vid-[a-z0-9]+-[0-9a-f]{8}\.[a-z0-9]{2,5})(?:[?#].*)?$/.exec(request.url);
+  if (sealed) {
+    const [, holeId, noteId, name] = sealed;
+    const length = blackHoles.videoSize(holeId, noteId, name);
+    if (length === null) return new Response(null, { status: 404 });
+    const wanted = request.headers.get('range');
+    const part = byteRange(wanted, length);
+    if (wanted && !part) return new Response(null, { status: 416, headers: { 'content-range': `bytes */${length}` } });
+    const head = { 'content-type': mimeOf(name), 'accept-ranges': 'bytes', 'cache-control': 'no-store' };
+    if (!length) return new Response(null, { status: 200, headers: { ...head, 'content-length': '0' } });
+    const [from, to] = part ?? [0, length - 1];
+    return new Response(Readable.toWeb(Readable.from(blackHoles.videoPart(holeId, noteId, name, from, to))), {
+      status: part ? 206 : 200,
+      headers: { ...head, 'content-length': String(to - from + 1), ...(part ? { 'content-range': `bytes ${from}-${to}/${length}` } : {}) },
+    });
+  }
+  const named = parseMediaUrl(request.url);
+  const file = named ? mediaPath(notesRoot(), named.id, named.file) : null;
+  if (!file) return new Response(null, { status: 404 });
+  let size;
+  try { size = (await fs.stat(file)).size; } catch { return new Response(null, { status: 404 }); }
+  const asked = request.headers.get('range');
+  const range = byteRange(asked, size);
+  if (asked && !range) return new Response(null, { status: 416, headers: { 'content-range': `bytes */${size}` } });
+  const headers = { 'content-type': mimeOf(file), 'accept-ranges': 'bytes', 'cache-control': 'no-store' };
+  if (!size) return new Response(null, { status: 200, headers: { ...headers, 'content-length': '0' } });
+  const [start, end] = range ?? [0, size - 1];
+  const body = Readable.toWeb(fsSync.createReadStream(file, { start, end }));
+  return new Response(body, {
+    status: range ? 206 : 200,
+    headers: { ...headers, 'content-length': String(end - start + 1), ...(range ? { 'content-range': `bytes ${start}-${end}/${size}` } : {}) },
+  });
 }
 
 /**
@@ -260,6 +492,29 @@ function savedBounds() {
 
 let mainWindow = null;
 let quitRequested = false;
+
+/**
+ * "Open with Nebula" (0.9.4, open-file.js). One copy of the app per vault: a
+ * file opened while Nebula is running goes to the running copy — a second copy
+ * writing the same notes is how notes get lost. The lock is this profile's
+ * own (the folder set above), so Nebula and Nebula Test never share it.
+ */
+const onlyCopy = app.requestSingleInstanceLock();
+if (!onlyCopy) app.quit();
+/** Files handed to the app that the window has not taken yet. */
+const handedFiles = onlyCopy ? filesFromArgv(process.argv) : [];
+function handOver(files) {
+  handedFiles.push(...files);
+  const win = mainWindow;
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+  if (handedFiles.length) win.webContents.send('files:open');
+}
+app.on('second-instance', (_event, argv, cwd) => handOver(filesFromArgv(argv, cwd)));
+// A Mac hands a file over with an event, before the app is ready or after.
+app.on('open-file', (event, file) => { event.preventDefault(); handOver([file]); });
 let saveRequestId = 0;
 const rendererSavers = new Map();
 
@@ -296,6 +551,76 @@ function windowIconPath() {
 }
 
 /**
+ * The logo in colours of the user's own (0.9.4, app-logo.js): set in Settings,
+ * kept in the profile, worn by the window, the taskbar and the shortcuts that
+ * start this copy of the app.
+ */
+const logoDir = () => path.join(app.getPath('userData'), 'logo');
+/** The icon file the window wears: the user's logo where there is one, the app's own otherwise. */
+function windowIcon() {
+  const logo = readLogo(logoDir());
+  if (logo) return process.platform === 'win32' ? logo.ico : logo.png;
+  return path.join(__dirname, windowIconPath());
+}
+/**
+ * The shortcuts that start this copy — on the desktop, in the Start menu, on
+ * the taskbar — pointed at an icon file, or back at the program for its own.
+ * Only for a packaged app: run from source there is no program of ours that a
+ * shortcut would start (NEBULA_SHORTCUT_DIRS lets a test say where to look).
+ */
+/** Whether this copy has shortcuts to look after: Windows, and a packaged app (or a test that says where). */
+const logoShortcutsHere = () => process.platform === 'win32' && (app.isPackaged || !!process.env.NEBULA_SHORTCUT_DIRS);
+/** The program a shortcut to this copy starts: the portable file itself, not the copy it unpacks and runs. */
+const logoTarget = () => process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+/**
+ * Where shortcuts are: the desktop — this user's first, then everyone's — the
+ * Start menu, both, and what is pinned to the taskbar and to Start.
+ */
+function logoShortcutDirs() {
+  const forced = process.env.NEBULA_SHORTCUT_DIRS;
+  if (forced) return forced.split(path.delimiter);
+  const roaming = app.getPath('appData');
+  const pinned = path.join(roaming, 'Microsoft', 'Internet Explorer', 'Quick Launch', 'User Pinned');
+  return [
+    app.getPath('desktop'),
+    process.env.PUBLIC ? path.join(process.env.PUBLIC, 'Desktop') : '',
+    path.join(roaming, 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+    process.env.ProgramData ? path.join(process.env.ProgramData, 'Microsoft', 'Windows', 'Start Menu', 'Programs') : '',
+    path.join(pinned, 'TaskBar'),
+    path.join(pinned, 'StartMenu'),
+    path.join(pinned, 'ImplicitAppShortcuts'),
+  ];
+}
+/**
+ * The shortcuts that start this copy are given the logo — or, with `null`,
+ * the program's own icon again. Never on the spot: a moment after the change,
+ * so that a colour pulled about is not written into the shortcuts at every
+ * step, and a few shortcuts at a time (app-logo.js `pointShortcuts`), so that
+ * the app's own thread is free when Windows asks the window for its new icon.
+ * A newer logo takes over from one that is still being put on.
+ */
+let shortcutsFor = 0;
+let shortcutsTimer = null;
+function pointLogoShortcuts(ico, { after = 600 } = {}) {
+  if (!logoShortcutsHere()) return;
+  const mine = ++shortcutsFor;
+  clearTimeout(shortcutsTimer);
+  shortcutsTimer = setTimeout(() => {
+    pointShortcuts({ dirs: logoShortcutDirs(), target: logoTarget(), icon: ico ?? logoTarget(), shell, stale: () => mine !== shortcutsFor })
+      .catch((err) => console.warn('[nebula] the shortcuts could not be given the logo:', err.message));
+  }, after);
+}
+/** Put a logo on: `null` is the app's own again. */
+function wearLogo(logo) {
+  const win = mainWindow;
+  try {
+    if (process.platform === 'darwin') app.dock?.setIcon(logo ? logo.png : path.join(__dirname, '../build/icon.png'));
+    else if (win && !win.isDestroyed()) win.setIcon(logo ? (process.platform === 'win32' ? logo.ico : logo.png) : path.join(__dirname, windowIconPath()));
+  } catch (err) { console.warn('[nebula] the window could not be given the logo:', err.message); }
+  pointLogoShortcuts(logo?.ico ?? null);
+}
+
+/**
  * The window's own frame, minus the strip Windows draws.
  *
  * `titleBarStyle: 'hidden'` keeps the resize borders and the native
@@ -328,7 +653,7 @@ function createWindow() {
     // The .ico on Windows, not the 1024px PNG: the title bar draws at 16px, and
     // handing Electron one huge bitmap makes it downscale — which is what made
     // the title-bar and taskbar mark look mushy. The .ico carries a real 16px.
-    icon: path.join(__dirname, windowIconPath()),
+    icon: windowIcon(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -573,8 +898,35 @@ function registerShellHandlers() {
     if (canceled || !filePath) return { ok: false, canceled: true };
     lastFolder = path.dirname(filePath);
     try {
-      await fs.writeFile(filePath, binary ? Buffer.from(content) : content, binary ? undefined : 'utf8');
-      return { ok: true, path: filePath };
+      if (binary || format !== 'nebula') {
+        await fs.writeFile(filePath, binary ? Buffer.from(content) : content, binary ? undefined : 'utf8');
+        return { ok: true, path: filePath };
+      }
+      // A Nebula note travels whole (note-media.js): its pictures and its
+      // smaller videos are written into it, and the videos too large for a
+      // file of text go into a folder beside it — whatever their size, and
+      // out of a black hole too, while it is open.
+      const whole = await travelWhole(content, notesRoot(), {
+        sealed: {
+          size: (holeId, noteId, name) => blackHoles.videoSize(holeId, noteId, name),
+          read: async (holeId, noteId, name) => {
+            const parts = [];
+            const size = blackHoles.videoSize(holeId, noteId, name) ?? 0;
+            if (size) for await (const part of blackHoles.videoPart(holeId, noteId, name, 0, size - 1)) parts.push(part);
+            return Buffer.concat(parts);
+          },
+          write: async (holeId, noteId, name, dest) => (await blackHoles.exportVideo(holeId, noteId, name, dest)).ok,
+        },
+      });
+      await fs.writeFile(filePath, whole.text, 'utf8');
+      let beside = 0;
+      let failed = whole.left;
+      const folder = travelFolder(filePath);
+      if (whole.beside.length) {
+        await fs.mkdir(folder, { recursive: true });
+        for (const video of whole.beside) { if (await video.put(path.join(folder, video.name))) beside += 1; else failed += 1; }
+      }
+      return { ok: true, path: filePath, ...(beside ? { videosBeside: beside, folder: path.basename(folder) } : {}), ...(failed ? { videosLeft: failed } : {}) };
     } catch (err) {
       return { ok: false, error: err.message };
     }
@@ -742,30 +1094,8 @@ function registerShellHandlers() {
     });
     if (!canceled && filePaths?.[0]) lastFolder = path.dirname(filePaths[0]);
     if (canceled || !filePaths?.length) return { ok: false, canceled: true };
-    try {
-      const file = filePaths[0];
-      const name = path.basename(file);
-      // Word and OpenDocument (0.9.3): the bytes go to the renderer, which reads
-      // them (office.js) and sanitises the result like any HTML file. The old
-      // binary .doc is read to its text here (word-extractor), as paragraphs.
-      if (/\.(docx|odt|doc|rtf)$/i.test(name)) {
-        const bytes = await fs.readFile(file);
-        if (bytes.length > 64 * 1024 * 1024) return { ok: false, error: 'too large' };
-        if (/\.doc$/i.test(name) && bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0) {
-          const { default: WordExtractor } = await import('word-extractor');
-          const doc = await new WordExtractor().extract(bytes);
-          const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          const html = String(doc.getBody() ?? '').split(/\r?\n/).map((line) => `<p>${esc(line) || '<br>'}</p>`).join('');
-          return { ok: true, name: name.replace(/\.doc$/i, '.html'), text: html };
-        }
-        return { ok: true, name, bytes: new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength) };
-      }
-      const text = await fs.readFile(file, 'utf8');
-      // The renderer parses and sanitises it; the main process only reads bytes.
-      return { ok: true, name, text };
-    } catch (err) {
-      return { ok: false, error: err.message };
-    }
+    // Read as a file handed to the app is (open-file.js): the window parses and sanitises it.
+    return readNoteFile(filePaths[0], notesRoot());
   });
 }
 
@@ -887,6 +1217,9 @@ function realScale(win) {
 }
 async function measureRealScale(win) {
   let realScaleCache = 1;
+  // NEBULA_REAL_SCALE lets a test be the screen it needs: 1 is what a Mac answers.
+  const forced = Number(process.env.NEBULA_REAL_SCALE);
+  if (Number.isFinite(forced) && forced >= 0.5 && forced <= 3) return forced;
   if (process.platform !== 'win32') return realScaleCache;
   try {
     const { execFile } = await import('node:child_process');
@@ -929,6 +1262,21 @@ app.on('web-contents-created', (_event, contents) => {
       installAiSignIn(contents, { popupOptions, openSignIn, firefoxAlways, log: signInLog });
     }
   }
+  if (contents.getType() === 'webview') {
+    // A tab that was typed in may hold words a reload would lose, so it is not
+    // put to sleep (0.9.4, src/js/ai-services.js). The page hears only THAT a
+    // key that writes was pressed in this view, and whether it was Enter —
+    // never which key: Nebula does not read what is written in a chat.
+    contents.on('before-input-event', (_event, input) => {
+      if (input.type !== 'keyDown') return;
+      const key = String(input.key || '');
+      const writes = key.length === 1 || ['Enter', 'Backspace', 'Delete', 'Process'].includes(key);
+      if (!writes || ((input.control || input.meta) && !/^[vx]$/i.test(key))) return;
+      const host = contents.hostWebContents;
+      if (!host || host.isDestroyed() || host !== mainWindow?.webContents) return;
+      host.send('ai:typed', { wc: contents.id, enter: key === 'Enter' && !input.shift });
+    });
+  }
   contents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown' || input.key !== 'F12' || input.control || input.alt || input.shift || input.meta) return;
     event.preventDefault();
@@ -938,25 +1286,261 @@ app.on('web-contents-created', (_event, contents) => {
 });
 
 app.whenReady().then(async () => {
+  if (!onlyCopy) return;       // the running copy has the file; this one is on its way out
   app.userAgentFallback = app.userAgentFallback
     .replace(/ Electron\/[\d.]+/gi, '')
     .replace(/ Nebula(?: Test)?\/[\d.]+/gi, '');
   // The app draws its own menus beside the logo, so the native bar goes.
   Menu.setApplicationMenu(null);
+  // A portable copy tells Windows itself that it opens documents: no installer did (open-with.js).
+  if (process.platform === 'win32' && app.isPackaged && process.env.PORTABLE_EXECUTABLE_FILE) {
+    void offerOpenWith({ exe: process.env.PORTABLE_EXECUTABLE_FILE, name: APP_TITLE });
+  }
   registerShellHandlers();
-  registerEditingHandlers(ipcMain, () => mainWindow);
+  // "Ignore" on a misspelt word lasts until the app closes: what the last run
+  // put aside leaves the dictionary now (context-menu.js, 0.9.4).
+  const ignoredWords = {
+    read: () => (Array.isArray(readPrefs().spellIgnored) ? readPrefs().spellIgnored : []),
+    write: (words) => writePrefs({ spellIgnored: words }),
+  };
+  forgetIgnoredWords(session.defaultSession, ignoredWords.read());
+  ignoredWords.write([]);
+  registerEditingHandlers(ipcMain, () => mainWindow, ignoredWords, (url) => (shut() ? null : pictureDataUrl(notesRoot(), url)));
+  // The pictures a note names, written into its markup — for an export, a
+  // copy for another program, a crop: wherever the picture itself is needed.
+  ipcMain.handle('media:inline', (e, html) => (e.sender === mainWindow?.webContents && !shut() ? inlinePictures(String(html ?? ''), notesRoot()) : String(html ?? '')));
+  // The notes whose lost pictures and videos wait for an answer: how many each, never their names.
+  ipcMain.handle('media:held', (e) => (e.sender === mainWindow?.webContents && !shut() ? [...heldMedia].map(([id, files]) => ({ id, files: files.length })) : []));
+  // The answer "delete them": those files alone, and only the ones the note still does not name — out of its folder and every backup.
+  ipcMain.handle('media:drop-held', (e, id) => {
+    if (e.sender !== mainWindow?.webContents || shut()) return { ok: false };
+    const files = heldMedia.get(String(id ?? ''));
+    if (!files) return { ok: false, error: 'missing' };
+    try {
+      const text = fsSync.readFileSync(noteFile(notesRoot(), String(id)), 'utf8');
+      if (!JSON.parse(text)?.id) return { ok: false, error: 'unreadable' };
+      const only = new Set(files);
+      const removed = sweepNote(notesRoot(), String(id), text, { videos: true, only });
+      purgeUnnamedFromBackups(notesRoot(), backupsRoot(), { only: new Map([[String(id), only]]) });
+      heldMedia.delete(String(id));
+      return { ok: true, removed };
+    } catch (err) {
+      console.warn('[nebula] removing a note’s lost pictures failed:', err.message);
+      return { ok: false, error: 'failed' };
+    }
+  });
+  // The answer "put them back": the window is given their names and writes them into the note again, at its end.
+  // They are no longer waiting then; should the note not be saved after all, the next start asks again.
+  ipcMain.handle('media:take-held', (e, id) => {
+    if (e.sender !== mainWindow?.webContents || shut()) return { ok: false };
+    const files = heldMedia.get(String(id ?? ''));
+    if (!files) return { ok: false, error: 'missing' };
+    heldMedia.delete(String(id));
+    return { ok: true, files: files.filter((name) => fsSync.existsSync(path.join(notesRoot(), String(id), name))) };
+  });
+  ipcMain.handle('media:data-url', (e, url) => (e.sender === mainWindow?.webContents && !shut() ? pictureDataUrl(notesRoot(), String(url ?? '')) : null));
+  // A copy is made while the key is still down: this one answers at once.
+  ipcMain.on('media:inline-sync', (e, html) => { e.returnValue = e.sender === mainWindow?.webContents && !shut() ? inlinePictures(String(html ?? ''), notesRoot()) : String(html ?? ''); });
   // Webviews load arbitrary sites — allow only what chat UIs legitimately need.
   const ALLOWED_PERMISSIONS = new Set([
     'media', 'notifications', 'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'openExternal',
   ]);
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
+  session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => {
+    // The font menu's "Add a font" lists the fonts of this computer (0.9.4).
+    // Only the app's own window may ask: an embedded page must not learn them.
+    if (permission === 'local-fonts') { cb(wc === mainWindow?.webContents); return; }
     cb(ALLOWED_PERMISSIONS.has(permission));
   });
 
   try { fsSync.rmSync(pdfPreviewDir(), { recursive: true, force: true }); } catch { /* another copy has one open */ }
   snapshotStorage();
   purgeOldDeletions();
+  prepareNoteFolders();
   stampVaultMeta();
+  dropOldBackups();
+  protocol.handle(MEDIA_SCHEME, serveMedia);
+
+  // Black holes (0.9.4): the window asks, this process holds the keys. Only the
+  // app's own window may ask, and a fault answers as a refusal, never a crash.
+  // The logo in the user's own colours (app-logo.js): the window draws it, this
+  // process checks the pictures, keeps them and puts them on. Only the app's own window may ask.
+  const logoCall = (name, run) => ipcMain.handle(`logo:${name}`, async (e, ...args) => {
+    if (e.sender !== mainWindow?.webContents) return { ok: false, error: 'not allowed' };
+    try { return await run(...args); } catch (err) { console.warn(`[nebula] logo ${name} failed:`, err.message); return { ok: false, error: 'failed' }; }
+  });
+  // `own`: which logo this build came with — the test build has one of its own, which only it offers.
+  logoCall('get', () => ({
+    ok: true,
+    colors: readLogo(logoDir())?.colors ?? null,
+    own: CHANNEL === 'test' || process.env.NEBULA_LOGO_OWN === 'test' ? 'test' : 'main',
+    shortcuts: logoShortcutsHere(),
+  }));
+  // A shortcut on the desktop that wears the logo: the program file there cannot.
+  logoCall('shortcut', () => {
+    if (!logoShortcutsHere()) return { ok: false, error: 'unavailable' };
+    const res = makeShortcut({ dir: logoShortcutDirs()[0], name: APP_TITLE, target: logoTarget(), icon: readLogo(logoDir())?.ico ?? logoTarget(), shell });
+    return { ok: res.ok, made: !!res.made, error: res.error };
+  });
+  logoCall('set', (colors, images) => {
+    const res = writeLogo(logoDir(), colors, images);
+    if (!res.ok) return res;
+    // The window wears it now; the shortcuts follow a moment later, without holding this up.
+    wearLogo(res);
+    return { ok: true, colors: res.colors };
+  });
+  logoCall('clear', () => {
+    clearLogo(logoDir());
+    wearLogo(null);
+    return { ok: true };
+  });
+  // A shortcut made since the logo was set wears the program's own icon: it is given the logo at the next start —
+  // once the app is up, not while it starts.
+  { const logo = readLogo(logoDir()); if (logo) pointLogoShortcuts(logo.ico, { after: 5000 }); }
+
+  // The lock on opening the app (app-lock.js): the window asks, this process
+  // decides. Only the app's own window may ask.
+  const lock = (name, run) => ipcMain.handle(`lock:${name}`, async (e, ...args) => {
+    if (e.sender !== mainWindow?.webContents) return { ok: false, error: 'not allowed' };
+    try { return await run(...args); } catch (err) { console.warn(`[nebula] app lock ${name} failed:`, err.message); return { ok: false, error: 'failed' }; }
+  });
+  // Whether there is a passkey here is looked up only for Settings (`hello`): the window's question before it starts must not wait for it.
+  lock('state', (what) => appLock.state({ withHello: what?.hello === true }));
+  lock('set', (how) => appLock.set(how ?? {}));
+  lock('unlock', (by) => appLock.unlock(by ?? {}));
+  lock('clear', (by) => appLock.clear(by ?? {}));
+  // Off keeps the lock and stops the asking; a passkey is added beside the PIN, or taken away.
+  lock('turn', (on, by) => appLock.turn(on === true, by ?? {}));
+  lock('passkey', (on, by) => appLock.passkey(on === true, by ?? {}));
+  // "Lock Nebula": shut now. The black holes let go of their keys, and the
+  // window is loaded again — it holds nothing then, and asks before it shows anything.
+  lock('now', () => {
+    if (!appLock.lockNow()) return { ok: false, error: 'unset' };
+    blackHoles.lockAll();
+    setImmediate(() => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.reload(); });
+    return { ok: true };
+  });
+
+  const hole = (name, run) => ipcMain.handle(`holes:${name}`, async (e, ...args) => {
+    if (e.sender !== mainWindow?.webContents || shut()) return { ok: false, error: 'not allowed' };
+    try { return await run(...args); } catch (err) { console.warn(`[nebula] black hole ${name} failed:`, err.message); return { ok: false, error: 'failed' }; }
+  });
+  hole('list', async () => ({ ok: true, holes: blackHoles.list(), hello: await helloAvailable() }));
+  // A black hole is locked by a PIN, always; a passkey is an addition (black-holes.js).
+  hole('create', (how) => blackHoles.create({ name: how?.name, pin: how?.pin, hint: how?.hint, passkey: how?.passkey === true }));
+  // Its answer, asked before a note is taken out of it.
+  hole('prove', (id, by) => blackHoles.prove(String(id ?? ''), by ?? {}));
+  hole('passkey', (id, on) => blackHoles.setPasskey(String(id ?? ''), on === true));
+  hole('unlock', async (id, by) => {
+    // The sealed videos its notes no longer show went as it opened: they leave the backups too.
+    const { swept, ...res } = await blackHoles.unlock(String(id ?? ''), by ?? {});
+    if (swept?.length) purgeHoleFilesFromBackups(backupsRoot(), String(id), swept);
+    return res;
+  });
+  hole('lock', (id) => ({ ok: blackHoles.lock(String(id ?? '')) }));
+  hole('lock-all', () => { blackHoles.lockAll(); return { ok: true }; });
+  // Sealed whole: a note that still names pictures in the notes folder (it was
+  // just moved in) has them written into it first — the folder goes with its plain file.
+  hole('write', (id, noteId, json) => blackHoles.write(String(id ?? ''), String(noteId ?? ''), inlinePictures(String(json ?? ''), notesRoot())));
+  hole('remove', (id, noteId) => {
+    const res = blackHoles.remove(String(id ?? ''), String(noteId ?? ''));
+    // Deleted is deleted: its sealed copies leave the backups too.
+    if (res.ok) purgeHoleNoteFromBackups(backupsRoot(), String(id), String(noteId));
+    return res;
+  });
+  hole('rename', (id, name) => blackHoles.rename(String(id ?? ''), name));
+  // A video file for a note in a black hole: sealed there, never in the notes folder.
+  hole('add-video', (id, noteId, source) => blackHoles.addVideo(String(id ?? ''), String(noteId ?? ''), String(source ?? '')));
+  // A note moved in with its videos: each is sealed under the name it has, from the note's own folder.
+  hole('import-video', (id, noteId, file) => {
+    const source = mediaPath(notesRoot(), String(noteId ?? ''), String(file ?? ''));
+    if (!source) return { ok: false, error: 'missing' };
+    return blackHoles.addVideo(String(id ?? ''), String(noteId), source, String(file));
+  });
+  // A note taken out with its videos: each is written into the note's own folder, in the clear.
+  hole('export-video', async (id, noteId, file) => {
+    const dest = mediaPath(notesRoot(), String(noteId ?? ''), String(file ?? ''));
+    if (!dest) return { ok: false, error: 'missing' };
+    const res = await blackHoles.exportVideo(String(id ?? ''), String(noteId), String(file), dest);
+    return res.ok ? { ok: true, url: `nebula-media://note/${noteId}/${file}` } : res;
+  });
+  hole('change-pin', (id, pin) => blackHoles.changePin(String(id ?? ''), pin));
+  hole('hint', (id, hint) => blackHoles.setHint(String(id ?? ''), hint));
+  hole('trash', (id) => blackHoles.trash(String(id ?? '')));
+  hole('restore', (id) => blackHoles.restore(String(id ?? '')));
+  hole('delete', async (id, by) => {
+    const res = await blackHoles.delete(String(id ?? ''), by ?? {});
+    if (res.ok) purgeHoleFromBackups(backupsRoot(), String(id));
+    return res;
+  });
+  app.on('before-quit', () => blackHoles.lockAll());
+
+  // The files the app was opened with, read for the window: each once.
+  ipcMain.handle('files:take', async (e) => {
+    if (e.sender !== mainWindow?.webContents || shut()) return [];
+    const files = handedFiles.splice(0);
+    return Promise.all(files.map((file) => readNoteFile(file, notesRoot())));
+  });
+
+  // A video file dropped into a note: copied into that note's folder (0.9.4).
+  ipcMain.handle('media:add-video', async (e, id, source) => {
+    if (e.sender !== mainWindow?.webContents || shut()) return { ok: false, error: 'not allowed' };
+    return addVideo(notesRoot(), String(id ?? ''), String(source ?? ''));
+  });
+  // /video (0.9.4): a video file chosen from the computer. Only its path goes
+  // back; it is copied into the note, or sealed into its black hole, as a dropped one is.
+  ipcMain.handle('media:pick-video', async (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win || e.sender !== mainWindow?.webContents) return { ok: false };
+    if (pickingVideo) return { ok: false, canceled: true };
+    const options = {
+      title: 'Add a video',
+      defaultPath: lastFolder || undefined,
+      properties: ['openFile'],
+      filters: [{ name: 'Video', extensions: VIDEO_EXTENSIONS }, { name: 'All files', extensions: ['*'] }],
+    };
+    // On Windows the dialog is nobody's child. /video is typed, and Chromium
+    // hides the pointer while one types until the mouse moves over its window;
+    // a dialog owned by that window shares the hidden pointer and, the window
+    // being held still under it, never sees the move that would bring it back —
+    // "the cursor disappears in the video picker" (the owner, 0.9.4).
+    pickingVideo = true;
+    let picked;
+    try { picked = await (process.platform === 'win32' ? dialog.showOpenDialog(options) : dialog.showOpenDialog(win, options)); }
+    finally { pickingVideo = false; }
+    if (!win.isDestroyed()) win.focus();
+    const { canceled, filePaths } = picked;
+    if (canceled || !filePaths?.[0]) return { ok: false, canceled: true };
+    lastFolder = path.dirname(filePaths[0]);
+    return { ok: true, path: filePaths[0] };
+  });
+  // A video the app's own player cannot play (an AVI, a WMV): the system's
+  // player is asked to. Only a video file of a note's own folder, by its address.
+  ipcMain.handle('media:open-outside', async (e, url) => {
+    if (e.sender !== mainWindow?.webContents || shut()) return { ok: false };
+    const named = parseMediaUrl(String(url ?? ''));
+    const file = named && isVideoName(named.file) ? mediaPath(notesRoot(), named.id, named.file) : null;
+    if (!file || !fsSync.existsSync(file)) return { ok: false, error: 'missing' };
+    const error = await shell.openPath(file);
+    return error ? { ok: false, error } : { ok: true };
+  });
+
+  // "Clear session data" on an AI tab (0.9.4): that tab's own cookies, site
+  // storage and cache — its sign-in — and nothing else. Each tab has a session
+  // of its own (persist:ai-<id>), so no other tab and no note is touched.
+  ipcMain.handle('ai:clear-session', async (e, id) => {
+    if (e.sender !== mainWindow?.webContents) return false;
+    if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(id)) return false;
+    try {
+      const ses = session.fromPartition(`persist:ai-${id}`);
+      await ses.clearStorageData();
+      await ses.clearCache();
+      await ses.clearAuthCache();
+      return true;
+    } catch (err) {
+      console.warn('[nebula] clearing an AI tab session failed:', err.message);
+      return false;
+    }
+  });
 
   ipcMain.handle('display:real-scale', (e) => realScale(BrowserWindow.fromWebContents(e.sender)));
   ipcMain.handle('storage:root', () => storageRoot());
@@ -971,8 +1555,19 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('storage:read', async (_e, rel) => {
+    // Shut (app-lock.js): "could not be read", never "not there" — the window must not take it for an empty vault.
+    if (shut()) return { ok: false, missing: false, error: 'locked' };
     try {
-      const data = await fs.readFile(resolveInStorage(rel), 'utf8');
+      let data;
+      try {
+        data = await fs.readFile(inStorage(rel), 'utf8');
+      } catch (err) {
+        // A note file that could not be moved into its folder at the start is still read where it lies.
+        if (err.code !== 'ENOENT' || !noteIdOf(rel)) throw err;
+        data = await fs.readFile(resolveInStorage(rel), 'utf8');
+      }
+      // A note is handed over as it is stored: the window shows its pictures
+      // from their files (note-media.js), and holds none of them as text.
       return { ok: true, data };
     } catch (err) {
       // "not there" and "could not be read" are different answers. Collapsing
@@ -984,22 +1579,47 @@ app.whenReady().then(async () => {
   // Atomic: write a temp file then rename over the target, so a note file is
   // never left half-written (a crash or a racing write can't corrupt it).
   ipcMain.handle('storage:write', async (_e, rel, content) => {
-    const abs = resolveInStorage(rel);
+    if (shut()) throw new Error('Nebula is locked');
+    const abs = inStorage(rel);
     await fs.mkdir(path.dirname(abs), { recursive: true });
+    // A note's pictures go to its folder as files, and its file keeps their
+    // names (note-media.js): the files first, so the text never names one
+    // that is not there.
+    const noteId = noteIdOf(rel);
+    const stored = noteId ? rehome(externalize(content, noteId, notesRoot()).text, noteId, notesRoot()) : content;
+    // What this write takes out of the note is written down as taken out by the person — so that the next start
+    // deletes it without asking — and written down first: cut off between the two, the note still names the file.
+    if (noteId) {
+      let before = null;
+      try { before = await fs.readFile(abs, 'utf8'); } catch { /* a new note */ }
+      if (before !== null) {
+        try { if (noteReleases(released, noteId, before, stored)) writeReleased(releasedFile(), released); }
+        catch (err) { console.warn('[nebula] what is taken out of a note could not be written down:', err.message); }
+      }
+    }
     const tmp = `${abs}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
-      await fs.writeFile(tmp, content, 'utf8');
+      await fs.writeFile(tmp, stored, 'utf8');
       await fs.rename(tmp, abs);
     } catch (err) {
       await fs.rm(tmp, { force: true }).catch(() => {});
       throw err;
     }
+    // A picture taken out of the note keeps its file until the next start: an undo may still want it.
     return { ok: true, path: abs };
   });
 
   ipcMain.handle('storage:list', async (_e, relDir) => {
+    if (shut()) return { ok: false, files: [], error: 'locked' };
     try {
-      const files = await fs.readdir(resolveInStorage(relDir));
+      const dir = resolveInStorage(relDir);
+      const files = await fs.readdir(dir);
+      // The notes: each is a folder with its file in it, named to the window as `<id>.json`.
+      if (dir === notesRoot()) {
+        const ids = noteIds(dir);
+        if (!ids) throw new Error('the notes could not be listed');
+        return { ok: true, files: [...ids].map((id) => `${id}.json`) };
+      }
       return { ok: true, files: files.filter((f) => f.endsWith('.json') && f !== 'meta.json') };
     } catch (err) {
       // A missing directory really is an empty vault — a first run. Anything
@@ -1012,13 +1632,16 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('storage:delete', async (_e, rel) => {
+    if (shut()) return { ok: false };
     try {
       const abs = resolveInStorage(rel);
       if (!rel || abs === storageRoot()) return { ok: false };
+      // A note: its file is in its folder, which goes whole just below (and a flat file of an older vault with it).
       await fs.rm(abs, { recursive: true, force: true });
       // A note deleted from the vault (the Trash's Delete) leaves every backup
       // with it: a deleted note must not be recoverable (owner, 2026-09-27).
       const note = /^notes[\\/]([\w-]+)\.json$/.exec(String(rel));
+      if (note && NOTE_ID.test(note[1])) removeNoteFolder(notesRoot(), note[1]);   // its pictures and videos with it
       if (note) purgeNoteFromBackups(backupsRoot(), note[1]);
       return { ok: true };
     } catch {
@@ -1027,7 +1650,7 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.handle('storage:reveal', async (_e, rel) => {
-    const abs = resolveInStorage(rel);
+    const abs = inStorage(rel);
     try {
       await fs.access(abs);
       shell.showItemInFolder(abs);

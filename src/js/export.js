@@ -1,6 +1,8 @@
 import { cleanTypingMarkers } from './inline-family.js';
+import { fileVideoLines } from './file-video.js';
 
 import { normalizeLabels } from './labels.js';
+import { gridOf, tellHeight } from './table-grid.js';
 
 /**
  * A note, as Markdown or as a standalone HTML file.
@@ -11,15 +13,16 @@ import { normalizeLabels } from './labels.js';
  * came out of Chromium's own PDF writer, laid out as a document. So: real
  * export, in the three formats Notion offers that mean anything here.
  *
- * (No CSV. Notion's CSV is for database views, and Nebula has no table block —
- * it would be an empty file with a confident name.)
+ * (No CSV. Notion's CSV is for database views; a note's table, 0.9.4, is part
+ * of its text and goes out with it — as a Markdown table, as a table in HTML
+ * and the PDF, and row by row in the office formats.)
  *
  * These are pure string→string functions over a parsed document, so they are
  * testable in jsdom without an editor, an app, or a filesystem.
  */
 
 /** Elements that are not prose and never reach a document. */
-const DROP = '.shape-layer, .code-head, .image-h, .image-del, .link-del, .link-embed-hint, .find-bar, script, style, iframe, object, embed';
+const DROP = '.tbl-ui, .shape-layer, .code-head, .image-h, .image-del, .link-del, .link-embed-hint, .find-bar, script, style, iframe, object, embed';
 
 /**
  * Only what would change meaning if left alone.
@@ -35,6 +38,8 @@ const ESCAPE_MD = /([\\`*_[\]])/g;
 function parse(html, drop = DROP) {
   const doc = new DOMParser().parseFromString(String(html ?? ''), 'text/html');
   cleanTypingMarkers(doc.body);
+  // A video file of the note's own cannot travel in a document: a line with its name (0.9.4).
+  fileVideoLines(doc);
   doc.body.querySelectorAll(drop).forEach((el) => el.remove());
   return doc;
 }
@@ -141,6 +146,21 @@ function blockMd(el) {
   if (el.classList.contains('blk-todo')) {
     return [`- [${el.classList.contains('done') ? 'x' : ' '}] ${inlineMd(el).trim()}`];
   }
+  // A table (0.9.4): its first row heads it, as Markdown wants one to; a merged
+  // cell stands on its first place and the places it reached over are empty.
+  if (el.classList.contains('blk-table')) {
+    const table = el.querySelector('table');
+    const grid = table ? gridOf(table) : null;
+    if (!grid?.rows || !grid.cols) return [];
+    const rows = grid.matrix.map((row, r) => Array.from({ length: grid.cols }, (_, c) => {
+      const at = grid.where.get(row[c]);
+      if (!at || at.r !== r || at.c !== c) return '';
+      return Array.from(row[c].childNodes).map((n) => (n.nodeName === 'BR' ? '\n' : inlineMd(n))).join('')
+        .replace(/\n+$/, '').trim().replace(/\|/g, '\\|').replace(/\n/g, '<br>');
+    }));
+    const line = (cells) => `| ${cells.join(' | ')} |`;
+    return [[line(rows[0]), line(rows[0].map(() => '---')), ...rows.slice(1).map(line)].join('\n')];
+  }
   if (tag === 'hr') return ['---'];
   // An image's caption follows it as an italic line.
   if (tag === 'figcaption') {
@@ -198,6 +218,8 @@ export function toHtml(html, title = 'Note') {
   });
   doc.body.querySelectorAll('[contenteditable]').forEach((el) => el.removeAttribute('contenteditable'));
   doc.body.querySelectorAll('iframe, webview').forEach((el) => el.remove());
+  // A table's row that was pulled low is as low here as in the note.
+  doc.body.querySelectorAll('.blk-table tr[style]').forEach(tellHeight);
   // A video "with" (export-video.js): a web page can hold the real player, as the note does.
   doc.body.querySelectorAll('figure.note-video[data-video]').forEach((fig) => {
     const src = fig.dataset.video;
@@ -233,7 +255,25 @@ export function toHtml(html, title = 'Note') {
   .note-image { position: relative !important; left: auto !important; top: auto !important; max-width: 100%; }
   .note-image img { width: 100%; height: 100%; object-fit: contain; }
   .note-image .image-caption { position: static; margin-top: 4px; font-style: italic; text-align: center; }
+  /* Where a picture stands on its line, and pictures side by side (0.9.4). */
+  .note-image--inline { margin: .8em 0; }
+  .note-image--center { margin-left: auto; margin-right: auto; }
+  .note-image--right { margin-left: auto; margin-right: 0; }
+  .note-image--row { display: inline-block; vertical-align: top; max-width: max(calc((100% - 1px) / var(--row, 2) - 12px), calc(100% - 13px - var(--beside, 100%))); margin-right: 12px; }
+  /* A picture standing in a line of words: a character of the line. */
+  .note-image--inword { display: inline-block; vertical-align: bottom; margin: 0 3px; }
+  /* A divider that splits the page: two columns, the divider upright between them. */
+  .blk-cols { display: flex; align-items: stretch; margin: .6em 0; }
+  .blk-col { flex: 1 1 0; min-width: 0; }
+  .blk-col:not(:first-child):not(:last-child) { flex: 0 0 calc(var(--w, 33%) - 29px); }
+  .blk-col:first-child { flex: 0 0 calc(var(--split, 50%) - 15px); }
+  hr.blk-vr { flex: 0 0 auto; align-self: stretch; width: 0; height: auto; margin: 0 14px; border: none; border-left: 1px solid #ddd; }
   .blk-todo { list-style: none; }
+  /* A table (0.9.4): its columns as wide as the note has them. */
+  .blk-table { margin: 1em 0; overflow-x: auto; }
+  .blk-table table { table-layout: fixed; width: 0; border-collapse: collapse; }
+  .blk-table td { border: 1px solid #ccc; padding: .3rem .55rem; vertical-align: top; overflow-wrap: anywhere; }
+  .blk-table tr[style*="--row"] > td { padding-top: clamp(0px, (var(--row) - 1lh - 1px) / 2, .3rem); padding-bottom: clamp(0px, (var(--row) - 1lh - 1px) / 2, .3rem); }
   /* Bookmarks as the note draws them (0.9.3). */
   .link-card { display: block; margin: .8em 0; padding: .6rem .85rem; border: 1px solid #ddd; border-radius: 8px;
                background: #f7f7f5; color: inherit; text-decoration: none; }
@@ -330,6 +370,7 @@ export function toPrintDocument({ title = 'Untitled', body = '', css = '', margi
     }
     el.removeAttribute('contenteditable');
   });
+  doc.body.querySelectorAll('.blk-table tr[style]').forEach(tellHeight);
   // The shape layer is positioned against the editor, and the resize grips and
   // code-block buttons are controls, not content.
   doc.body.querySelectorAll('.shape-h, .code-copy, .code-del, .code-hint, .image-h, .link-del').forEach((el) => el.remove());

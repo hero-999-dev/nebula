@@ -26,12 +26,16 @@ export async function runDeletedChecks(check) {
   };
   note(vault, 'n-keep', 'Keep');
   note(vault, 'n-bin', 'Into the bin');
-  for (const b of ['2026-09-01', 'pre-update-0.8.8-1']) {
-    note(path.join(backups, b, 'notes'), 'n-keep', 'Keep');
-    note(path.join(backups, b, 'notes'), 'n-bin', 'Into the bin');
-    note(path.join(backups, b, 'notes'), 'n-gone', 'Deleted before 0.9.1');
+  // Two backups that stay through the start: one kept the new way (each note's file in its folder), and one a person
+  // put there under a name of their own, the old way (the file flat). A copy of the app's own making kept the old way
+  // would be gone at the start, whole (note-folders.mjs).
+  for (const id of ['n-keep', 'n-bin', 'n-gone']) {
+    const title = { 'n-keep': 'Keep', 'n-bin': 'Into the bin', 'n-gone': 'Deleted before 0.9.1' }[id];
+    note(path.join(backups, '2026-09-01', 'notes', id), id, title);
+    note(path.join(backups, 'kept-by-hand', 'notes'), id, title);
   }
-  const copies = (id) => fs.readdirSync(backups).filter((b) => fs.existsSync(path.join(backups, b, 'notes', `${id}.json`)));
+  // A backup made by an older build holds the note's file flat; one made now holds it in the note's folder.
+  const copies = (id) => fs.readdirSync(backups).filter((b) => fs.existsSync(path.join(backups, b, 'notes', `${id}.json`)) || fs.existsSync(path.join(backups, b, 'notes', id, `${id}.json`)));
 
   let app;
   try {
@@ -65,11 +69,11 @@ export async function runDeletedChecks(check) {
     await win.waitForFunction(() => ![...document.querySelectorAll('.drawer-item')].some((i) => i.textContent.includes('Into the bin')), null, { polling: 50 });
     let gone = false;
     for (let i = 0; i < 40 && !gone; i++) {
-      gone = !fs.existsSync(path.join(vault, 'n-bin.json')) && copies('n-bin').length === 0;
+      gone = !fs.existsSync(path.join(vault, 'n-bin.json')) && !fs.existsSync(path.join(vault, 'n-bin')) && copies('n-bin').length === 0;
       if (!gone) await win.waitForTimeout(100);
     }
     check('a note deleted from the Trash is gone from the vault and from every backup', gone, JSON.stringify(copies('n-bin')));
-    check('...and the note that was kept is still everywhere', fs.existsSync(path.join(vault, 'n-keep.json')) && copies('n-keep').length >= 2);
+    check('...and the note that was kept is still everywhere', fs.existsSync(path.join(vault, 'n-keep', 'n-keep.json')) && copies('n-keep').length >= 2);
   } finally {
     await app?.close().catch(() => {});
     fs.rmSync(profile, { recursive: true, force: true });

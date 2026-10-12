@@ -38,6 +38,110 @@ export function noteHasLabel(n, pick) {
 }
 
 /**
+ * Show where a label is in the open note (0.9.4, the owner: "the label search
+ * lists the notes; when I press one of them it should show the places the
+ * label is, the way Ctrl+F does"). The #chips of that label are painted with
+ * the CSS Custom Highlight API — like the find bar, nothing in the note is
+ * marked up, so nothing is saved or undone.
+ * @param {Element} root the editor
+ * @param {string|null|undefined} label none clears the paint
+ * @returns {Element[]} the chips of that label, in order
+ */
+const LABEL_HIT = 'nebula-label-hit';
+const LABEL_HIT_CURRENT = 'nebula-label-hit-current';
+export function paintLabelHits(root, label, current = -1) {
+  const can = typeof CSS !== 'undefined' && typeof CSS.highlights !== 'undefined' && typeof Highlight === 'function';
+  if (can) { CSS.highlights.delete(LABEL_HIT); CSS.highlights.delete(LABEL_HIT_CURRENT); }
+  const want = String(label ?? '').toLocaleLowerCase();
+  if (!root || !want) return [];
+  const chips = [...root.querySelectorAll('span.note-tag')]
+    .filter((chip) => String(chip.dataset.tag || chip.textContent.replace(/^#/, '')).toLocaleLowerCase() === want);
+  if (can && chips.length) {
+    const range = (chip) => { const r = root.ownerDocument.createRange(); r.selectNodeContents(chip); return r; };
+    // The one stepped to stands out from the rest, as the find bar's does.
+    const rest = chips.filter((_, i) => i !== current).map(range);
+    if (rest.length) CSS.highlights.set(LABEL_HIT, new Highlight(...rest));
+    if (chips[current]) CSS.highlights.set(LABEL_HIT_CURRENT, new Highlight(range(chips[current])));
+  }
+  return chips;
+}
+
+/**
+ * The little bar that steps through a label's places in the open note (0.9.4,
+ * the owner: "it lights up like Ctrl+F, but with several in one note there is
+ * no going from one to the next"). The find bar's look and the find bar's
+ * place: the label, "2 of 5", ↑ ↓ and ✕. ✕ puts the bar and the paint away
+ * until another note is opened or another label picked.
+ * @param {HTMLElement} editorEl
+ * @param {{frame?: HTMLElement}} [opts]
+ */
+export function initLabelHits(editorEl, { frame = editorEl?.parentElement } = {}) {
+  if (!editorEl || !frame) return { show: () => [], clear() {} };
+  const bar = document.createElement('div');
+  bar.className = 'find-bar label-bar';
+  bar.id = 'label-bar';
+  bar.hidden = true;
+  bar.innerHTML = '<span class="label-bar__name" data-no-i18n></span><span class="find-count"></span>'
+    + '<button type="button" class="find-btn" data-hit="prev" title="Previous">↑</button>'
+    + '<button type="button" class="find-btn" data-hit="next" title="Next">↓</button>'
+    + '<button type="button" class="find-btn" data-hit="close" title="Close">✕</button>';
+  frame.append(bar);
+  const nameEl = bar.querySelector('.label-bar__name');
+  const countEl = bar.querySelector('.find-count');
+
+  let label = null;
+  let chips = [];
+  let index = 0;
+  let dismissed = false;
+
+  function draw({ reveal = false } = {}) {
+    if (dismissed || !label) {
+      paintLabelHits(editorEl, null);
+      bar.hidden = true;
+      return;
+    }
+    chips = paintLabelHits(editorEl, label, index);
+    if (index >= chips.length) { index = Math.max(0, chips.length - 1); chips = paintLabelHits(editorEl, label, index); }
+    bar.hidden = !chips.length;
+    nameEl.textContent = `#${label}`;
+    countEl.textContent = chips.length ? `${index + 1} of ${chips.length}` : '';
+    // With one place there is nowhere to step to.
+    for (const b of bar.querySelectorAll('[data-hit="prev"], [data-hit="next"]')) b.hidden = chips.length < 2;
+    if (reveal && chips[index]) {
+      const view = editorEl.getBoundingClientRect();
+      const at = chips[index].getBoundingClientRect();
+      if (at.top < view.top || at.bottom > view.bottom) chips[index].scrollIntoView({ block: 'center' });
+    }
+  }
+
+  bar.addEventListener('mousedown', (e) => e.preventDefault());     // the caret stays in the note
+  bar.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-hit]')?.dataset.hit;
+    if (!act) return;
+    if (act === 'close') { dismissed = true; draw(); return; }
+    if (!chips.length) return;
+    index = (index + (act === 'next' ? 1 : chips.length - 1)) % chips.length;
+    draw({ reveal: true });
+  });
+
+  return {
+    /**
+     * @param {string|null} next the label picked in the filter, or none
+     * @param {{opened?: boolean}} [how] a note was just opened: start at its first place, in view
+     * @returns {Element[]} the label's chips in the note
+     */
+    show(next, { opened = false } = {}) {
+      const changed = String(next ?? '').toLocaleLowerCase() !== String(label ?? '').toLocaleLowerCase();
+      label = next || null;
+      if (changed || opened) { index = 0; dismissed = false; }
+      draw({ reveal: opened || changed });
+      return dismissed || !label ? [] : chips;
+    },
+    clear() { label = null; draw(); },
+  };
+}
+
+/**
  * @param {object} opts
  * @param {import('./notes.js').NoteStore} opts.store
  * @param {HTMLButtonElement} opts.button

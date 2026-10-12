@@ -177,7 +177,7 @@ export function exitQuoteOnEmptyLine(root, selection) {
   const node = selection.anchorNode;
   const el = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
   const quote = el?.closest('blockquote');
-  if (!quote || !root.contains(quote) || quote.parentElement !== root) return false;
+  if (!quote || !root.contains(quote) || !(quote.parentElement === root || quote.parentElement?.classList.contains('blk-col'))) return false;
   let line = el === quote ? null : el;
   while (line && line.parentElement !== quote) line = line.parentElement;
   const empty = (n) => !n.textContent.replace(/​/g, '').trim() && !n.querySelector?.('img, hr, .inline-eq');
@@ -235,7 +235,9 @@ export function insertDivider(root, selection) {
   // Inside a toggle list the divider belongs to the part that folds (0.9.3:
   // "the divider does not work in a toggle list" — it went to the top level,
   // under the whole toggle).
-  const body = el?.closest?.('.toggle-body');
+  // And in a column it stays in the column (0.9.4): a flat divider there is
+  // what is pulled sideways to cut the column again.
+  const body = el?.closest?.('.toggle-body, .blk-col');
   const host = body && root.contains(body) ? body : root;
   let block = el === root || el === host ? null : el;
   while (block && block.parentElement !== host) block = block.parentElement;
@@ -274,7 +276,7 @@ export function tidyAfterDelete(root, selection, before = null) {
   if (!selection?.rangeCount) return false;
   const range = selection.getRangeAt(0);
   let el = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
-  if (!el || !root.contains(el) || el.closest('.blk-code, .shape-layer, .image-layer, .inline-eq')) return false;
+  if (!el || !root.contains(el) || el.closest('.blk-code, .shape-layer, .image-layer, .inline-eq, .blk-table')) return false;
   const block = el.closest('p, li, blockquote, h1, h2, h3, h4, h5, h6, .blk-todo, div') ?? root;
   if (block === root) return false;
   let changed = false;

@@ -53,20 +53,29 @@ if (place()) {
  */
 async function regenerateGuide() {
   const { GUIDE_NOTE } = await import(new URL('../src/js/seed-notes.js', import.meta.url).href);
+  // The guide may stand under another language's title (0.9.4): it is written
+  // back in English here, and the app puts it in its own language when it starts.
+  const { guideTitles } = await import(new URL('../src/js/guide-i18n.js', import.meta.url).href);
+  const titles = guideTitles(GUIDE_NOTE);
   const dir = path.join(ROOT, 'Nebula-data', 'storage', 'notes');
   fs.mkdirSync(dir, { recursive: true });
   const now = Date.now();
   let written = 0;
-  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
-    const full = path.join(dir, file);
+  // A note is a folder with its file in it (0.9.4: notes/<id>/<id>.json); a vault
+  // an older build wrote still has its note files lying flat, and the app moves
+  // those in when it starts. Both are looked at.
+  const files = fs.readdirSync(dir, { withFileTypes: true }).map((entry) => (entry.isDirectory() ? path.join(dir, entry.name, `${entry.name}.json`) : path.join(dir, entry.name)))
+    .filter((full) => full.endsWith('.json') && fs.existsSync(full));
+  for (const full of files) {
     let note;
     try { note = JSON.parse(fs.readFileSync(full, 'utf8')); } catch { continue; }
-    if (note?.title !== GUIDE_NOTE.title || note.deletedAt) continue;
-    fs.writeFileSync(full, JSON.stringify({ ...note, content: GUIDE_NOTE.content, readOnly: true, updatedAt: now }));
+    if (!titles.includes(note?.title) || note.deletedAt) continue;
+    fs.writeFileSync(full, JSON.stringify({ ...note, title: GUIDE_NOTE.title, content: GUIDE_NOTE.content, readOnly: true, updatedAt: now }));
     written += 1;
   }
   if (!written) {
-    fs.writeFileSync(path.join(dir, 'n-guide.json'), JSON.stringify({ id: 'n-guide', title: GUIDE_NOTE.title, content: GUIDE_NOTE.content, readOnly: true, createdAt: now, updatedAt: now }));
+    fs.mkdirSync(path.join(dir, 'n-guide'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'n-guide', 'n-guide.json'), JSON.stringify({ id: 'n-guide', title: GUIDE_NOTE.title, content: GUIDE_NOTE.content, readOnly: true, createdAt: now, updatedAt: now }));
   }
   console.log(`  Guide regenerated in Nebula Test (${written || 'new'}).`);
 }

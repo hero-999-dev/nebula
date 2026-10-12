@@ -147,20 +147,23 @@ export class NoteStore {
    *   refreshed, so nothing added to it after a vault's first run was ever seen.
    * @returns {boolean} whether a note was added (a refresh in place returns false)
    */
-  ensureGuide(note, version, { unedited } = {}) {
+  ensureGuide(note, version, { unedited, titles } = {}) {
     if (!note || !version) return false;
     if (localStorage.getItem(STORAGE_KEY_GUIDE) === version) return false;
 
-    const existing = this.notes.find((n) => n.title === note.title && !n.deletedAt);
+    // The guide may stand under another language's title (0.9.4, guide-i18n.js).
+    const names = Array.isArray(titles) && titles.length ? titles : [note.title];
+    const existing = this.notes.find((n) => names.includes(n.title) && !n.deletedAt);
     if (existing && existing.content !== note.content && unedited?.(existing.content)) {
       existing.content = note.content;
+      existing.title = note.title;
       existing.updatedAt = Date.now();
       if (note.readOnly) existing.readOnly = true;   // the guide arrives locked (0.8.9)
       this.save();
     }
 
     // A fresh vault was just seeded with it; only stamp the version.
-    const already = this.notes.some((n) => n.title === note.title);
+    const already = this.notes.some((n) => names.includes(n.title));
     if (!already) {
       const now = Date.now();
       this.notes.unshift({
@@ -198,12 +201,14 @@ export class NoteStore {
     emit('note-opened', { id });
   }
 
-  createNote(title = 'Untitled') {
+  /** @param {string} [title] @param {{hole?: string}} [where] a black hole it is made in (0.9.4) */
+  createNote(title = 'Untitled', { hole } = {}) {
     const now = Date.now();
     const note = {
       id: generateId('n'),
       title,
       content: '',
+      ...(hole ? { hole } : {}),
       createdAt: now,
       updatedAt: now,
     };
@@ -227,9 +232,70 @@ export class NoteStore {
     emit('note-changed', { id: note.id });
   }
 
-  /** Notes on the main list: not archived, not in the trash. */
+  /** Notes on the main list: not archived, not in the trash, not in a black hole. */
   live() {
-    return this.notes.filter((n) => !n.archivedAt && !n.deletedAt);
+    return this.notes.filter((n) => !n.archivedAt && !n.deletedAt && !n.hole);
+  }
+
+  /**
+   * Black holes (0.9.4, black-holes.js): notes kept encrypted. While one is
+   * open its notes are here, marked `hole`; they are listed under it, not
+   * among the notes, and the disk mirror seals them into it (disk-store.js).
+   */
+  inHole(hole) {
+    return this.notes.filter((n) => n.hole === hole && !n.archivedAt && !n.deletedAt)
+      .sort((a, b) => (!!b.pinned !== !!a.pinned ? (b.pinned ? 1 : -1) : sortKey(b) - sortKey(a)));
+  }
+
+  /**
+   * A black hole was opened: its notes join the store. Nothing is saved —
+   * they are on the disk as they are — except a note that is also here as a
+   * plain note (a move into the black hole that was cut short): the sealed
+   * one stands, and the save takes the plain file away.
+   */
+  addHoleNotes(hole, notes) {
+    const again = [];
+    for (const note of notes ?? []) {
+      if (!note?.id) continue;
+      note.hole = hole;
+      delete note.folder;
+      const at = this.notes.findIndex((n) => n.id === note.id);
+      if (at < 0) { this.notes.push(note); continue; }
+      if (this.notes[at].hole === hole) continue;
+      this.notes[at] = note;
+      again.push(note.id);
+    }
+    if (again.length) this.save(again);
+    emit('note-changed', { id: null });
+  }
+
+  /**
+   * A black hole was locked: its notes leave the store. NOT a deletion and
+   * nothing is saved — the caller has saved first and tells the mirror to
+   * forget them (disk-store.js forgetNotes).
+   * @returns {string[]} the notes that left
+   */
+  dropHole(hole) {
+    const ids = this.notes.filter((n) => n.hole === hole).map((n) => n.id);
+    if (!ids.length) return ids;
+    this.notes = this.notes.filter((n) => n.hole !== hole);
+    if (ids.includes(this.activeId)) {
+      this.activeId = this.sorted()[0]?.id ?? null;
+      if (this.activeId) localStorage.setItem(STORAGE_KEY_ACTIVE, this.activeId);
+      else localStorage.removeItem(STORAGE_KEY_ACTIVE);
+    }
+    emit('note-changed', { id: null });
+    return ids;
+  }
+
+  /** Into a black hole, or out of one with null. Not an edit: the date stays. */
+  setHole(id, hole) {
+    const note = this.get(id);
+    if (!note || (note.hole ?? null) === (hole ?? null)) return note;
+    if (hole) { note.hole = hole; delete note.folder; } else delete note.hole;
+    this.save([id]);
+    emit('note-changed', { id });
+    return note;
   }
 
   archived() {
@@ -323,6 +389,15 @@ export class NoteStore {
       const hay = `${n.title} ${normalizeLabels(n.labels).map(label => "#" + label).join(" ")} ${noteText(n.content)}`.toLowerCase();
       return hay.includes(q);
     });
+  }
+
+  /**
+   * The guide in another language (guide-i18n.js, 0.9.4): its title and its
+   * page change together. Not an edit — the guide keeps its date and its place.
+   */
+  setGuide(id, { title, content }) {
+    if (typeof title !== 'string' || typeof content !== 'string') return null;
+    return this.#mark(id, { title, content });
   }
 
   /** Flip one flag on one note and save. Returns the note, or null. */

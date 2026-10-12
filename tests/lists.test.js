@@ -24,6 +24,28 @@ describe('normalizeLists', () => {
     expect(shape(el)).toBe('<ul><li>one</li></ul><ol><li>first</li><li>second</li></ol>');
   });
 
+  it('keeps the caret in its item when the list is lifted out of the line it fell into', () => {
+    // What the bar's Bulleted list leaves on an empty line: the list inside the line's own wrapper.
+    // Moved out of it, the caret fell on the note itself, beside the list — and the next Backspace
+    // armed the divider over it (the owner's Ideas note, 0.9.4).
+    const el = root('<hr class="blk-hr"><div></div><p>under</p>');
+    document.body.append(el);
+    el.querySelector('div').innerHTML = '<ul><li><span><br></span></li></ul>';
+    const span = el.querySelector('li span');
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    const r = document.createRange();
+    r.setStart(span, 0);
+    r.collapse(true);
+    sel.addRange(r);
+    expect(normalizeLists(el)).toBe(true);
+    expect(shape(el)).toBe('<hr class="blk-hr"><ul><li><span><br></span></li></ul><p>under</p>');
+    expect(sel.anchorNode).toBe(span);
+    expect(sel.anchorOffset).toBe(0);
+    expect(sel.isCollapsed).toBe(true);
+    el.remove();
+  });
+
   it('keeps the order when the buried list was not the last item', () => {
     const el = root('<ul><li>a</li><li><ol><li>n</li></ol></li><li>b</li></ul>');
     normalizeLists(el);

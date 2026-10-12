@@ -107,6 +107,38 @@ src/js/
   updater.js         the update card
   about.js          version, build channel, folders
   dialog.js  icons.js  theme.js  seed-notes.js
+
+0.9.4:
+electron/
+  note-media.js      a note is a folder: notes/<id>/<id>.json + its pictures and
+                     videos as files; taken out and put back at storage:read/write;
+                     nebula-media://note/<id>/<file>
+  black-holes.js     encrypted notes (AES-256-GCM): storage/blackholes/<hole>/<note>.bh,
+                     key wrapped by a 6-digit PIN (scrypt) and safeStorage, optionally
+                     by a passkey, and by a recovery key
+  app-lock.js        the lock on opening: <profile>/app-lock.json, an scrypt verifier —
+                     a gate, not encryption; main refuses notes while it is shut
+  app-logo.js        the logo's colours: PNGs from the renderer -> .ico under
+                     <profile>/logo; the window's icon and this build's shortcuts
+  open-with.js  open-file.js   "Open with Nebula" for .docx/.doc/.odt/.rtf
+src/js/
+  settings.js  settings-panel.js   Settings (nebula:settings): a new note's font,
+                     size and page; hide the AI panel / the black holes; the lock; the logo
+  app-lock.js        the lock screen and its part of Settings
+  black-holes.js     the black holes' section of the sidebar and their dialogs
+  logo.js  logo-editor.js          the logo drawn as SVG, its themes and its editor
+  theme-custom.js  theme-editor.js "Your own theme": five colours, named profiles
+  table.js  table-grid.js  table-size.js   tables: cells, colour, merge, fill, resize
+  columns.js         a divider pulled sideways splits the part above it into columns
+  image-place.js     where a picture in the text stands: left/centre/right, in a row
+                     (--row, --beside), in a line of words; the drag and its mark
+  drop-mark.js  block-drag.js      the mark a dragged block lands at; cards, videos
+                     and code blocks dragged by their title line
+  gap-caret.js       a click between, under or beside blocks finds or makes a line
+  auto-arrows.js     --> and <-- typed become arrows
+  file-video.js  held-media.js     a video file in the note's folder, and its player
+  guide-i18n.js  guide-de.js  guide-pl.js  guide-tr.js   the guide in four languages
+  paste-clean.js     pasted words in the note's dress; keepSize for "Paste original format"
 ```
 
 **Data flows one way:** a keystroke edits the store, the store writes
@@ -501,6 +533,40 @@ Double-click files in the repo root: `Nebula Test.exe` (test build),
 `Open portable build.bat` (the packed portable exe on its own vault).
 
 ---
+
+### 0.9.4: what to know before touching it
+
+- **A note is a folder.** `storage/notes/<id>/<id>.json`, pictures and videos
+  beside it. The renderer still works with data URLs for pictures; main takes
+  them out at `storage:write` and puts them back at `storage:read`
+  (`electron/note-media.js`). Tests that count note files count folders.
+- **Two locks, two jobs.** The lock on opening (`electron/app-lock.js`) only
+  keeps the window shut: main answers no `storage:*`, `holes:*` or `media:*`
+  call while it is. A black hole is what encrypts. Do not describe the first
+  as protection of the files.
+- **The guide has four languages.** A change to the English text
+  (`src/js/seed-notes.js`) is not finished until `guide-de/pl/tr.js` follow
+  (`node scripts/guide-blocks.js --check`) and the four signatures are in
+  `GUIDE_SIGNATURES` (`--signatures`); the previous set is kept under a name of
+  its own so an unedited guide in a vault is still recognised.
+- **Words in the interface are translated by their English text** (`i18n.js`
+  `STRINGS`, `PATTERNS`). The app's name is never declined in any language.
+- **Pasting.** `cleanPastedHtml` drops a source's font, colour and ground;
+  `keepSize` (Paste original format) keeps its size. A copy from a note of
+  Nebula's goes through `cleanNebulaHtml` and keeps a chosen font.
+- **A font that is not on this computer is not added to the font list**; the
+  bar names the font words are drawn in (`shownFont` in `toolbar.js`).
+- **A toggle is `div.blk-toggle > title + .toggle-body`.** A frame without its
+  title is taken apart by `healToggles` (after every edit and when a note opens).
+- **Pictures in a row** carry `--row` (how many share the line) and `--beside`
+  (what the others take); `tidyRows` writes both.
+- **Shortcut icons.** The logo's colours reach this build's shortcuts through
+  `shell.writeShortcutLink`, two at a time off the main thread's hot path
+  (`pointShortcuts`). The program file's own icon is never changed.
+- **End-to-end suites** for all of this: `tests/e2e/v094.mjs`, `layout.mjs`,
+  `table.mjs`, `table-edges.mjs`, `note-folders.mjs`, `black-holes.mjs`,
+  `settings.mjs`, `open-with.mjs`, `ai-sleep.mjs`. `settings.mjs`, `table.mjs`
+  and `table-edges.mjs` are run by hand (`node tests/e2e/<name>.mjs` after a build).
 
 ## 8. Read next
 

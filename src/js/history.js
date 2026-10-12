@@ -278,7 +278,21 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
     // Ctrl+Z went to Chromium's own undo instead of this one.
     const hadFocus = editorEl.contains(editorEl.ownerDocument.activeElement);
     const html = unpack(state.html);
+    // A video's player is the same player after the step. Put back as markup
+    // it was a new one, black until its file had been read again — "Ctrl+Z
+    // makes the video I added a black screen for a second" (the owner, 0.9.4).
+    const players = new Map();
+    for (const player of editorEl.querySelectorAll('video[src]')) {
+      const src = player.getAttribute('src');
+      if (!players.has(src)) players.set(src, player);
+    }
     editorEl.innerHTML = html;
+    for (const fresh of players.size ? editorEl.querySelectorAll('video[src]') : []) {
+      const kept = players.get(fresh.getAttribute('src'));
+      if (!kept) continue;
+      players.delete(fresh.getAttribute('src'));
+      fresh.replaceWith(kept);
+    }
     if (hadFocus && !editorEl.contains(editorEl.ownerDocument.activeElement)) editorEl.focus({ preventScroll: true });
     const selection = editorEl.ownerDocument.defaultView?.getSelection?.();
     writeCaret(editorEl, state.caret, selection);
@@ -292,7 +306,7 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
     else if (state.caret) {
       const node = nodeAt(editorEl, state.caret.start);
       const el = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-      const host = el?.closest('.shape-text, .image-caption');
+      const host = el?.closest('.shape-text, .image-caption, .blk-table td');
       if (host && hadFocus) {
         host.setAttribute('contenteditable', 'true');
         host.closest('.shape')?.classList.add('editing');

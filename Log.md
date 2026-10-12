@@ -8,6 +8,748 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-10-12 08:19] v0.9.4 - by Claude
+
+Two ways to paste, toggle headings, tables, columns, note folders, black holes, a lock on opening, Settings, the guide in four languages, Electron 44.7.
+
+* (no commits since the last release)
+
+---
+
+## [2026-10-12 07:54] v0.9.4 - by Claude (the owner: "push 0.9.4" — what was done before the release ran)
+
+The owner said push. Everything below was done before `npm run push`, which then ran its own gates again.
+
+- Electron 44.5.1 -> 44.7.0 (`npm run check:browsers` had it behind; the same major, no breaking changes to read). A test instance left running by a run that hung at 06:10 held the old files and was closed first.
+- The smoke suite had not run since notes became folders and Settings joined the menus. Brought up to both: note files are found in either layout (`tests/e2e/profiles.mjs` `noteFilesIn`, `readNotesIn`, `noteFileOf`, used by smoke, recovery, ideas-note and dense), six menus, 21 blocks in Help -> Blocks, no counters beside Archive and Trash, the three headings found among the six rows "/head" gives now. The sweep of stale test profiles knows the newer suites' folders.
+- The toggle check that failed about one run in three ("a click on the arrow still folds it"): the embed above the toggle settles into its "could not load" card a moment after the note opens and the toggle moves down with it; the click was aimed at where the title had been. The check measures the title once it stands still, and again for the second click. Passed 6 runs of 6 afterwards and in the full smoke run; the move itself was reasoned from the note's markup, not measured.
+- The long-note trials on copies of Nebula Test's notes (`npm run old-notes`) found nothing to read (they looked for notes/<id>.json); they read note folders now and take a note's pictures along. On one note 10 trials then failed, for three reasons, none of them a loss of words:
+  1. A `<br>` after the last words of a line (pasted paragraphs end in one) draws nothing, and Enter then Backspace there take it away; the trials compared markup and called that a change. The comparison leaves such a `<br>` out. A `<br>` that is all a line has, or that follows another, still counts.
+  2. A divider made on a new line above empty lines and deleted with Backspace takes those empty lines first. That is the rule the owner asked for ("the empty white row underneath is still there") — the trial could not give the note back there.
+  3. An emptied code block leaves the caret on the empty line that was already under it.
+  For 2 and 3 the trials now pick a paragraph with words right under it, where the note has one. 42 of 42 afterwards.
+- The local page rebuild (not in the repository) read the vault the old way too. It reads note folders, keeps the article's pictures beside its report, keeps what the owner did with the note in Nebula Test (its folder, its place), and no longer puts back a note that is not in the vault any more. Both pages 100 %, as in 0.9.3; 41 trials passed.
+- A test took four words of a paragraph the owner had pasted into a note as its sample; neutral words stand there now.
+- README, HANDOVER, Prompt and memory.json describe 0.9.4.
+
+Unit 1121 of 1121. Smoke 916 of 916 (the run before the last fix: 915, the toggle click). Old-notes 42 of 42. Rebuild 100 % and 100 %.
+
+## [2026-10-12 06:58] v0.9.4 - by Claude (the note "Buraya bak" again: two ways to paste, a toggle's frame stuck, a picture that would not grow to the right, the font the bar names; not released)
+
+The owner's note "Buraya bak", three new pictures with a line each (06:24-06:32):
+1. "Instrument Sans is the same font as Segoe UI; why does it say that up there, it does not change" — the bar read "Instrument Sans" on words pasted from a page, drawn in Segoe UI.
+2. "It does not grow to the right any more, and the toggle list is stuck at the top left."
+3. "Let us do it like this: paste as Nebula format (the note's format, its font and so on); paste as original format (the same font as in Nebula — the other font setting goes, no font of another source; only the source's font size, and bold, italic, underlined etc. where it has them); the option paste only text goes. Like this for now."
+
+Done:
+- Pasting (paste-clean.js `cleanPastedHtml(html, { keepSize })`, `pastedSizePx`; rich-paste.js; context-menu.js): "Paste original format" is the paste as Nebula format plus the SIZE the words were copied in (px, pt, rem, a size word or `<font size>`; 8 to 96; not inside a heading or code). Bold, italic, underline, lists and links are kept by both, as before. No font, colour or ground of the source. This turns round the build of 05:31, which kept the font and not the size. "Paste only text" is gone from the right-click menu; the mode 'text' is gone from the paste handler. A paste is no "font used" any more.
+- The bar's font name (toolbar.js `shownFont`): a stack whose first font is not on this computer is named after the first font in it that is — `"Instrument Sans", system-ui, "Segoe UI"` reads "Segoe UI". The app's own fonts keep the app's names. The "Last used font" row is named, and written, the same way.
+- The toggle (toggles.js `healToggles`): words selected from a toggle's title down into its body and deleted left the frame alone, a `<div class="blk-toggle">` holding a line break; no key had a rule for it. Such a frame becomes plain lines (an empty line when it holds nothing) — after every edit, before Enter or Backspace in one, and when a note opens. The owner's note opens without it.
+- Pictures side by side (image-place.js `tidyRows`, editor.css, export.js): a picture of a row could have its share of the line and no more; beside a narrow one it stopped at half the line with room left at its right. Each now knows what the others take (`--beside`) and may have the room they leave; together never more than the line. The others are told on every move of a resize.
+- Guide and What's new in four languages ("two ways to paste"); new signatures, the last ones kept as the thirty-second test build.
+
+Not done: the paragraph pasted earlier in that note with the page's ground and colour is the owner's own example and was left as it is.
+
+Unit 1121 of 1121 (66 files). End to end: v094 111, layout 128, rich-paste 20, table 66, table-edges 151, v093 138, settings 123. v094's check "a click on the arrow still folds it" failed in 2 runs of 5 and passed in 3; it failed once before this round too (05:30 entry) — not looked into, and I cannot say this round did not make it likelier. Not run: smoke, old-notes, rebuild, dense, editing-edges, reported, guide, black-holes, note-folders. Not tried by hand: a paste from a real browser page. Test build packed. Not pushed.
+
+## [2026-10-12 06:15] v0.9.4 - by Claude ("+ Add a font" no longer stands under the fonts it opened; not released)
+
+The owner: "we press + Add a font, the fonts open, and at the very bottom + Add a font is still there — what is the sense of it showing a second time, after the click?" None: pressed again it only listed the same fonts again.
+
+Done (toolbar.js `paintRows`, editor.css): once the button has listed the computer's fonts it is hidden. It is back as `+ Add “name”` for a name typed into the search that is in no list, and as "+ Add a font" when the menu is opened anew. Where the computer's fonts cannot be read (nothing was listed), it stays.
+
+Unit 1113 of 1113. End to end: v094 110 (+2), settings 123 — the settings suite's first run wrote nothing at all and ended; run again it passed in full, cause not looked for. Test build packed. Not pushed.
+
+## [2026-10-12 06:07] v0.9.4 - by Claude (a font that is not on this computer is not added after all, and the app says so in the owner's words; not released)
+
+The owner, on the build of 05:44, which listed such a font with the stack it came with and said "Added. That font is not on this computer, so its stand-in is shown": first "what is that error?", then, once it was explained: "then let it say: not on this computer, cannot be added."
+
+Done: the entry of 05:45 is taken back. A font that is not on this computer cannot be put into the list — by the + of "Last used font", by its pin, or by a name typed into the search — and the app says "That font is not on this computer, so it cannot be added" (tr: "Bu yazı tipi bu bilgisayarda yok, eklenemez"). `cleanFontStacks`, `readFontStacks` and the `stacks` of `fontRows`/`fontChoices`/`customFontStack` are gone. What the 05:44 build listed (the names under `nebula:font-stacks`) is taken off the list and the pins at the next start, and that key is removed. The "Last used font" row still shows the font and still writes words in it at a press; only the list refuses it.
+
+A slip of mine on the way, caught by the unit tests before the build: the edit of i18n.js took the line 'Pin to the top' out with the two it replaced. Put back.
+
+Unit 1113 of 1113 (66 files). End to end: v094 108, settings 123. Test build packed. Not pushed.
+
+## [2026-10-12 05:45] v0.9.4 - by Claude (the + of the last used font refused "Instrument Sans"; not released)
+
+The owner, on the build of 05:31: "pressing add font, Instrument Sans gives the error 'that font is not in computer'" — the font of the paragraph pasted from the dark page in the note "Buraya bak". True of the font (it is the page's own web font; neither C:\Windows\Fonts nor the user's fonts have it), and no use to the owner, who sees the words in some face and wants that in the list.
+
+Done: a font that is not on this computer is put into the list with the stack it came with (`"Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif`), kept in `nebula:font-stacks` (`cleanFontStacks`: only a stack that begins with its own name, nothing that could end a style). In the menu and in Settings' font for new notes it is written with that stack, so words in it look as the pasted ones do: the stand-in the stack names here, the font itself on a computer that has it. The app says so once, when it is added: "Added. That font is not on this computer, so its stand-in is shown". Its × takes the stack away with it. A bare name typed into the search that is not on this computer is still refused — there is nothing to show it in. Nebula does not fetch fonts from the web.
+
+Not changed: the paragraph pasted before 05:31 in that note still wears the page's ground and colour — it is the owner's own example; a new paste of it comes in the font alone.
+
+Unit 1116 of 1116 (66 files). End to end: v094 109, settings 122, rich-paste 20. Test build packed. Not pushed.
+
+## [2026-10-12 05:30] v0.9.4 - by Claude (the note "Buraya bak": the original paste is the font alone, the caret keeps its colour, the font used last; not released)
+
+The owner's note "Buraya bak", two pictures with a line each. (1) "After pasting, the caret's colour changed on one line; on another line it is the original." (2) "When I say keep the copied format I did not say take the background too; I want it copied as its font only (the font's colour and size should fit the main source). And: the font used last should stand over Add font as 'last used font', and this font I copied and pasted should have a + (add font) and the pin beside it when the mouse is on it." The Ideas note has not changed since 02:10.
+
+Done:
+- Paste original format (paste-clean.js `cleanPastedHtml(html, { keepFont: true })`, rich-paste.js): the words come in the font they were copied in and nothing else of the source's dress — no colour, no size, no ground, no animation. The face is read from each run of words before the cleaning and put back as one span a line (a span a run where a line has two faces); code keeps its own. I read "the main source" as the note: colour and size are the note's. If the owner meant the page the words came from, this is the one thing to turn round.
+- The caret: `.editor { caret-color: var(--ink) }`. Left to itself it took the colour of the words it stood in — on a line pasted from a dark page that page's pale grey.
+- The font menu: "Last used font" over "+ Add a font" — the font picked last or brought in by an original paste, kept in `nebula:font-last`. Beside it, under the pointer: a + ("Add to the list") when it is not in the list, and the pin. A font that is not on this computer (a page's own web font) cannot be added, and the app says so.
+- Found on the way, and older than this round: a pasted box of two or more paragraphs (`<div><p>..</p><p>..</p></div>`, what most pages hand over) came out of the cleaner EMPTY — lifting the second paragraph took the document's body apart. Nebula format then fell back to the plain text. Fixed, with a test.
+- Guide (four languages, new signatures; the last ones kept as the thirty-first test build) and What's new (four languages).
+
+Unit 1113 of 1113 (66 files). End to end: v094 106, rich-paste 20, settings 122, v093 138, layout 127, table 66. Two suites failed checks once and passed on the runs after it, in places this round did not touch: v094's two toggle clicks (1 run of 4) and layout's picture pulled to the left (1 run of 3). Not run: smoke, old-notes, rebuild, dense, editing-edges, reported, guide, black-holes. Not tried by hand: a paste from a real browser page (the tests write the clipboard themselves). Test build packed. Not pushed.
+
+## [2026-10-12 05:05] v0.9.4 - by Claude (the logo no longer changing in Nebula Test: the shortcuts are gone through gently; not released)
+
+The owner, on the build of 04:50: "it does not change now in Nebula Test; it did before. Leave the program file's icon; only the shortcuts' should change. And keep the shortcut button." (And, on a sentence of mine that could be read two ways: the shortcuts, the taskbar and the Start menu follow the LOGO's theme; only the mark at the top left follows the app's theme. That is what was built; nothing to change there.)
+
+What changed between the build that worked (04:00) and the one that did not (04:50): everyone's desktop and Start menu and the pins of Start were added to the places shortcuts are looked for, and Windows was asked to redraw its icons (`ie4uinit.exe -show`). Measured in the packaged test build on this computer, with its real folders: one change of the logo held the app's own thread for 1034 ms, reading every shortcut in one go. That is the thread Windows asks for the window's new icon straight after `setIcon`; asked while it stands still, it gets no answer. I could not watch the taskbar itself from a test, so this is the likely cause, not a proven one.
+
+Done: `pointShortcuts` (app-logo.js) is asynchronous — the folders are listed without blocking, the shortcuts are read two at a time with the process let go in between, and a newer logo takes over from one still being put on. The main process puts the logo on the window at once, answers the window at once, and gives the shortcuts the logo 600 ms after the last change (5 s after a start). `ie4uinit` is not called any more: the build that worked did not call it. Measured again, the same way: the change is answered in 12-15 ms, and in the four seconds after it the longest wait for the main process was about 100 ms (median 1.5 ms). The button "Put a shortcut on the desktop" stays.
+
+e2e: settings 122/122, black-holes 69/69, v094 97/97 on this build; the other suites as they ran on the build before (the change is in the logo's shortcuts alone). Not run: smoke, old-notes, rebuild, dense, editing-edges, reported, guide. Not pushed.
+
+## [2026-10-12 04:50] v0.9.4 - by Claude (the logo: themes of its own, "Nebula's own" in the test build only, more shortcuts; not released)
+
+The owner, on the build of 04:00, in the chat.
+
+1. "Nebula's own belongs to the test app only; normal apps must not have it." The test build has a logo of its own (iris) and offers it first as "Nebula's own"; no other build has that chip. In every build "Main" is the logo Nebula comes with (the violet one) — in a normal app that is the build's own logo, and choosing it keeps nothing; in the test build it is one more to put on. The main process says which (`logo:get` → `own`).
+2. "A + beside Contrast: users add themes for the logo alone, and name them." Logo themes (logo.js `cleanLogoThemes`, `saveLogoTheme`, `renameLogoTheme`; kept in `nebula:logo-themes`): + asks for a name, offering one, and keeps the colours on the logo under it; each has a ×, asked first; a double-click on its name renames it. A name the editor has already — a fixed theme's, a profile's — is refused.
+3. "A change made to a ready one is kept as a new theme." A colour changed while a fixed theme or a profile is on the logo makes a logo theme named after it ("Contrast 2", `nextLogoName`), and the changes after it go into that; a colour changed on a logo theme changes that theme. Nothing the app comes with is written over.
+4. "When it is set it should change in the shortcuts, in the program files' logos, on the taskbar where it is pinned, in the Start menu." Shortcuts are looked for in more places now: this user's desktop and everyone's, both Start menus, and what is pinned to the taskbar and to Start (main.js `logoShortcutDirs`); after they change, Windows is told to draw its icons anew (`ie4uinit.exe -show`). The program file's own icon cannot be done: it is built into the file, and rewriting a running program is not something the app does to itself. What is offered instead: "Put a shortcut on the desktop" (app-logo.js `makeShortcut`), which makes one that starts this copy and wears the logo — the sheet says why.
+5. "A logo theme does not mean the logo at the top left of the app is that one; that stays with the app's theme." It was so and is so: the mark in the title strip is drawn in the theme's accent. A check holds it now.
+
+The guide: the logo's sentence in section 1, four languages; the signatures before this kept as "thirtieth test build".
+
+e2e: settings 122/122, black-holes 69/69, v094 97/97, v093 138/138, layout 127/127, note-folders 60/60, rich-paste 20/20, table 66/66, table-edges 152/152, ai-sleep 16/16. Not run: smoke, old-notes, rebuild, dense, editing-edges, reported, guide. Not tried: the packaged app against the real desktop, Start menu and taskbar — the shortcuts were a test's own, in a folder of its own. Not pushed.
+
+## [2026-10-12 04:00] v0.9.4 - by Claude (Contrast as a ready profile; black holes: a PIN always, a passkey beside it, their password to delete one and to take a note out; the logo's colours in Settings; not released)
+
+The owner, on the build of 03:00, in the chat.
+
+1. "Call Black & White Contrast 'Contrast'; those two themes (the other is Matcha) are in Your own theme, as ready profiles, and users can delete them if they like." The owner's own saved profile (read from Nebula Test's settings: #F7F7F7 ground and sidebar, #2B2B2B lines, accent and words) is the ready profile **Contrast** now, beside Matcha (theme-custom.js). A ready profile has a × like any other; a deleted one is remembered (`nebula:theme-ready-removed`) and "Bring back the ready profiles" restores them. A saved copy named "Black & White Contrast" with Contrast's colours is Contrast and is not listed twice.
+2. Black holes (electron/black-holes.js, src/js/black-holes.js):
+   - "The 6-digit PIN compulsory, the passkey optional, as the app's lock." A new black hole is always made with a PIN; "Also open with a passkey" is a box in the dialog, and "Add a passkey" / "Remove the passkey" are in an open black hole's menu. The passkey is a second copy of the key, wrapped by the operating system alone (as a passkey-only black hole's key was). Opening shows the PIN's box and a "Use the passkey" button; nothing is asked of the system until it is pressed. A black hole of the earlier builds that a passkey alone opens still opens, and "Set a PIN" in its menu makes it a PIN black hole with a passkey beside it. After the recovery key on another computer the passkey's copy is dropped and added anew.
+   - "Deleting a black hole must need its password." `delete(id, by)` checks the answer in the main process — PIN, passkey or recovery key — before anything is shredded; the Trash's Delete (after "Delete for good?") opens the question. Moving one to the Trash asks nothing: it comes back from there.
+   - "A note put into a black hole can be moved back up among the notes the same way, and that asks for the password too — for the notes that are in one already as well." The rows of an open black hole are dragged (note-list.js); let go among the notes, or on a folder, the note is taken out and placed there. That, and "Take out of the black hole" in the note's menu, ask for the black hole's answer first (`prove`).
+3. "The logo in Settings, at the bottom left, and at its right its colours — the colours of Nebula's logo on the desktop; in the style of Your own theme; the star, the moon, the ground and the rest; and the user's themes and the ready ones can be put on the logo, Contrast for one." A fourth group in the Settings sheet (logo-editor.js): the logo large and at 32 and 16 px; themes to put on it (Nebula's own, the four fixed themes, the ready profiles, the saved ones); five slots — Background, Border, Moon, Moon's shade, Star — the colour bar with its code, and the ready colours, all the theme editor's own pieces. The drawing (logo.js) is the shipped icon's geometry from make-icon.ps1, so Nebula's own is the icon on the desktop already. The window draws it at 256, 64, 48, 32, 24 and 16 px; the main process (app-logo.js) checks each picture is a PNG of its size, writes an .ico of them under a name made from the colours (Windows remembers an icon by its file's name) into `<profile>/logo`, and puts it on the window and the taskbar (`setIcon`) and on the shortcuts whose target is this copy of the app — on the desktop, in the Start menu, pinned to the taskbar, two folders deep (`shell.writeShortcutLink`). Back at Nebula's own nothing is kept and the shortcuts point at the program again. Only a packaged app touches real shortcuts. What cannot be done: a program file standing on the desktop itself keeps the icon built into it — the sheet says so.
+
+The guide and What's new: the black holes' paragraph and entry, the ready profiles, the logo in Settings — four languages, 152 blocks; the signatures before this kept as "twenty-ninth test build".
+
+e2e: settings 113/113, black-holes 69/69, v094 97/97 (+1; its three profile checks follow the ready profiles), v093 138/138, layout 127/127, note-folders 60/60, rich-paste 20/20, table 66/66, table-edges 152/152, ai-sleep 16/16. Not run: smoke, old-notes, rebuild, dense, editing-edges, reported, guide. Not pushed.
+
+## [2026-10-12 03:00] v0.9.4 - by Claude (the lock as the owner wants it; the caret under a divider; the bar's line; pins on hover; "Serif"; not released)
+
+The owner, on the build of 01:40, in the chat and in two notes (the Ideas note, changed 02:10, and a note of their own, "sfdfsfd").
+
+In the chat:
+1. "Beside Nebula's own, say in brackets what it is." The first choice of Settings' font and text size reads "Nebula’s own (Serif)" and "Nebula’s own (14)" — the size from `BASE_FONT_SIZE` (toolbar.js), which a test holds to app.css. Found on the way: picking 17 still meant "the app's own size" (the size before 0.9.3; it is 14), and the guide said so in four languages. Both put right.
+2. "For the lock the 6-digit PIN must be compulsory; a passkey is added as an option; the person logs in with whichever they like." A lock is a PIN now, always (electron/app-lock.js, rewritten). A passkey is added beside it — a box when the lock is set, "Add a passkey" later, which asks for the PIN first and then for the passkey's own yes — and then either opens the app. "Remove the passkey" takes it away at a press.
+3. "Turn the lock off should turn the locking off, not delete the lock; deleting must be called Remove lock." Two things now: off keeps the file (its PIN, hint, passkey and recovery key) with `on: false`, and "Turn the lock on" brings the same lock back with nothing to type; "Remove lock" deletes it. Both, and adding a passkey, ask for the lock's answer first.
+4. "When Nebula is locked the passkey is called at once by itself; the person should have to press log in." The lock screen shows the PIN's box and, where a passkey was added, a button "Log in with passkey"; the system is asked nothing until it is pressed. The same in the dialogs of Settings ("Use the passkey").
+A lock of the build of 01:40 is still read (v1: `lock: 'pin'`, or `lock: 'hello'` — a passkey with no PIN, which that build allowed): the second opens and is removed by the passkey, and is set anew with a PIN.
+Found on review, before it left the machine: "turn the lock on" set the app open, also for a lock that was on and shut — a call the window could make at the lock screen. It leaves such a lock exactly as it is now, and the passkey cannot be taken away while the lock is shut (tests/app-lock.test.js "while the lock is shut").
+
+In the Ideas note:
+5. "The divider line at the right does not cover the two icons at the bottom" (a snapshot): the line between the bar's two columns was the second column's left border, so it ended where that column did. Both columns draw it now, one over the other (editor.css).
+6. "When I take the mouse to the fonts, the pin at the side": a font's pin is drawn only while the pointer is on that font; a pinned one keeps it.
+7. "A bug again, the caret under the divider — look at the picture" (the caret pressed against a divider at the foot of a column) and "when I click where I want, the caret should be there, on that line: that is how we stop the caret getting lost or stuck." Three faults, all in the app's own rules:
+   - Backspace on the empty line under a divider, when that line was the last thing of its column (or of the note, or of a toggle): the line was removed and the caret set "after the divider", on no line. On the note itself `settleGap` then moved it; in a column nothing did. That last line stays now and the divider is offered at once; the next Backspace takes it and the caret goes to the end of the line above. Where a card, a code block, a table or another divider comes up under it, the divider is picked (as over a picture) instead of a caret left between the two. `settleGap` also answers for a column.
+   - A divider made with the bar left the caret after the `<br>` of the new line, which `neighbourAtEdge` did not read as the start of a line: the first Backspace was left to the browser, which took the divider and kept the line. `placeCaretEnd`/`placeCaretAt` stand before that `<br>`; `neighbourAtEdge` reads a blank line's `<br>` as nothing drawn, going back too.
+   - A click on bare ground (gap-caret.js): under a divider that ends a note or a column a line is made; the ground just past a divider's own strip goes to the line on that side; and the empty foot of a column goes to that column's last line — it went to the paragraph under the columns.
+
+In "sfdfsfd":
+8. "Although I changed the main font in Settings, the title and the lines below say serif (default); take the word default away from serif." The font is "Serif". The note's title is written in the note's writing font (on screen; main.js `paintTitleFont`). The second line of the owner's note in the serif I could not make happen again — typed lines keep the font here, after Enter and after an empty line, and the suite now types three; if it shows again, the steps are wanted.
+
+The guide (four languages, 152 blocks): the lock's paragraph and its "New in" entry reworded, "Serif" and 14, the title in the note's font; the signatures before this are kept as "twenty-eighth test build". What's new reworded.
+
+e2e: settings 98/98, v094 96/96, v093 138/138, layout 127/127, black-holes 58/58, note-folders 60/60, rich-paste 20/20, table 66/66, table-edges 152/152, ai-sleep 16/16 (all but settings on the build before the last change to electron/app-lock.js, which settings and the unit tests ran after). Not run: smoke, old-notes, rebuild, dense, editing-edges, reported, guide. Not pushed.
+
+## [2026-10-12 01:40] v0.9.4 - by Claude (the Ideas note again: the bar's dividers at the side, the font menu's length and its pins, Settings beside Help, a lock on opening; not released)
+
+The owner: "let us look at the Ideas for Nebula note again". The note (Nebula Test's vault, changed 2026-10-12 00:56) holds one snapshot — the bar at the right, the font menu open — and two paragraphs.
+
+1. "At the right, make the line longer, the divider line." Last round this was read as the note's margins and I asked whether the bar's short lines were meant; the snapshot shows the bar at the right, so they were. The lines between the bar's groups were 20 px in a column of 46; they run the width of their column now (editor.css `.tb-sep` at a side: `align-self: stretch`). The margins of last round stay as they are.
+2. "Make the font block longer — Cascadia is left below." The font menu was held to 520 px like every other menu and its fifteen fonts need about 560, so the list scrolled and the last name was cut. It is as tall as its fonts where the window has the room (toolbar.js `positionMenu`: 760 px for the font menu, the window's height less its margins at most).
+3. "A pin beside the fonts, so the ones I like stand at the top." Each row of the font menu has a pin; a press puts the font first in the list (in the order pinned, a thin line under the pinned ones), the next press takes it down again. Kept on this computer (`nebula:fonts-pinned`). `fontRows` takes `pinned`; `togglePinned` is the press.
+4. "Settings beside Help at the top; pressing it brings the settings up: a default font, a default note size, a default mode, hiding the AI tabs, hiding the black holes entirely, a PIN or a passkey when the app is opened — as a black hole has."
+   - **Settings** is a title of its own after Help that opens a sheet at a press (app-menu.js: a `direct` menu), and a command in the palette. The store is settings.js (`nebula:settings`), the sheet settings-panel.js. A change is kept as it is made.
+   - **New notes**: font, text size, page. Read as: "default font", "default note size" the text size, "default mode" the page — the owner's own word for the pages is "modes" (page-mode.js). A new note gets them as its own writing font and page (notes.js `setFont`, `setPage`), so nothing of an existing note changes. Found on the way: in a note with nothing in it the first line is the note itself, and the writing font was only given to a line — so the first words of a new note came out in the app's font. `writingFontAt` now takes the bare first line too.
+   - **Hide the AI panel**: the panel shut, its button out of the pad (whose last button then stands as tall as both rows), "Toggle AI panel" out of the View menu and the palette (app-menu.js: an item's `when`). Back shut when turned off.
+   - **Hide the black holes**: their section, their button and a note's "Move into a black hole" gone; the open ones are locked first; those in the Trash are not drawn either. Nothing is deleted.
+   - **Lock on opening** (electron/app-lock.js, src/js/app-lock.js): a 6-digit PIN with an optional hint, or the passkey; five free tries then a growing wait; a recovery key shown once, which opens the app and takes the lock off. The window asks before it starts anything — nothing is read, no menu is built — and the main process refuses the vault's files, the black holes and the notes' pictures and videos while it is shut (`shut()` in main.js), so the gate is not only a screen. File → Lock Nebula (there only where a lock is set) saves, shuts and loads the window again. It is a lock, not encryption: `app-lock.json` in the profile keeps what the PIN hashes to (scrypt), the notes' files are as they were, and the sheet, the guide and What's new say so — a black hole is what encrypts. Taking the lock off asks for its answer once more.
+   - A fault of my own, found by the rich-paste suite before it left the machine: the window's question "is there a lock" also waited for "has this computer a passkey", which on Windows is a PowerShell script — seconds added to every start. The state is told without it now; only Settings asks for it.
+
+The guide: three entries in "New in 0.9.4", a paragraph on Settings in section 1, a sentence on the pins in section 3 — English, Deutsch, Polski, Türkçe (152 blocks each); the signatures of the guide as it was are kept as "twenty-seventh test build". What's new: one item, in the four languages.
+
+Not done, and to ask: "default mode" may have meant something else than the page (the theme, or an AI tab's sleep); "hide the AI tabs" was read as the whole panel, not single tabs. Electron still 44.5.1.
+
+e2e: settings 59/59 (new), v094 96/96, v093 138/138, black-holes 58/58, layout 127/127, table 66/66, table-edges 152/152, note-folders 60/60, ai-sleep 16/16, rich-paste 20/20. Not run: smoke, old-notes, rebuild, dense, editing-edges, reported, guide (it is run from smoke). Not pushed.
+
+## [2026-10-11 23:30] v0.9.4 - by Claude (the Ideas note, its Bug part: bullets under a divider, the right-hand margin, the code block's button, an embed gone grey; not released)
+
+The owner: "look at the Ideas for Nebula note and put it right". The note (Nebula Test's vault, changed 2026-10-11 22:50) holds five ideas and, under "Bug", three findings with two snapshots.
+
+The five ideas were all built on 2026-10-07 (the entry of 12:50: the video kept through Ctrl+Z, no size limit on videos, the arrow that folds Black holes, /video and its player, keep awake as the default) and are still in the list. Nothing was done to them again.
+
+1. "The divider under Bug gets selected - it happens with a divider, a bullet point and a picture, in that order." The bar's Bulleted list on the empty line between a divider and a picture left the caret on the note itself, beside the new list and on no line: Chromium puts the list inside the line's own wrapper, `normalizeLists` lifts it out, and a node that is moved drops the selection onto its parent. The caret was still drawn in the bullet. Backspace then found no line, read the divider as what it was against and armed it; the next Backspace took the divider away. `normalizeLists` (lists.js) now puts the selection back where it was, in the item. Backspace in the empty bullet makes it a line again, as everywhere else.
+2. "On the right side the divider falls short." Read as: the writing began 28 px from the frame at the left and ended 38 px from it at the right, because the scroll bar (10 px) stood between the two - so a divider, and since the last round a table that fills its line, ended short of the frame. On Nebula Wide the scroll bar's room is now always kept (`scrollbar-gutter: stable`) and taken out of the right padding: 28 px at both sides, and the lines no longer move when a note grows long enough to scroll. The paper sizes were like this already. A reading - the other one would be the short lines between the groups of the bar when it stands at the right.
+3. "Let the code block go beside the code in a line, up among the icons": the bar's Code block button stands right after Inline code in the second row (index.html); it was at the end of the first, after the arrows.
+4. A snapshot of a YouTube embed that is a flat grey box, "why is this such a grey screen": that is what Chromium draws where a page's process is gone (crashed, or ended by the system). Made on purpose with `forcefullyCrashRenderer` it is the same grey; nothing loaded the page again, so it stayed grey until the note was opened anew. An embed whose process is gone is now loaded again (link-preview.js: three times within a minute, each a little later; after that it is left alone). Why the process went on the owner's machine is not known - the note and its six embeds load in a new profile, twice over, with no process gone.
+
+Not changed: the guide (nothing new to describe; signatures as they were). Electron still 44.5.1.
+
+e2e: v094 96/96, table-edges 152/152, table 66/66, layout 127/127, v093 138/138, rich-paste 20/20, note-folders 60/60. Not run: smoke, old-notes, rebuild, dense, editing-edges, reported, guide. Not pushed.
+
+## [2026-10-11 21:50] v0.9.4 - by Claude (the "urgent bugs" note, second round: four findings; not released)
+
+The owner: "can you look at the urgent bugs part again". The note (Nebula Test's vault, changed 2026-10-11 20:38) held four new findings, each with a snapshot.
+
+1. "there is a bug, none of the three works - I click the caret up there and cannot take it back": a table, a video and a picture, each at the top of a column with an empty line over it. The line took the caret, but Backspace did nothing: columns.js holds Backspace at the very start of a column (it would join the column to what is outside it). Now an empty first line with something under it simply goes (toolbar.js `dropEmptyLine`; the column's guard lets that one case through). The same for the first line of a note, and Delete on an empty line over a table or a video takes the line away, as it did over a picture. The caret goes to the table's first cell, or to the line under the video or the picture.
+   - Found on the way: a note opens with the caret on the note itself (editor, 0), and a click on the first line does not move it - to the browser the two places are one. The delete rules read the caret's line and found none; with an empty first line over a picture, Delete took the picture and the line under it in one press. `standInLine` puts such a caret into its line before the rules run.
+2. "let the right side of the table be in line with the black line - widen it": the + for a column had room of its own at the table's right (18 px, and 2 more kept back), so a table that took all the room there was ended 20 px short of where the page's dividers end. The + now hangs out in the page's margin (absolutely placed, so the page does not scroll sideways for it); in a column with another at its right it keeps its room. `settle` gives the pixels the rounding leaves over back to the narrowest columns: a table that fills its place ends on the edge to the pixel. A table made before is as wide as it was; its last column's line pulled to the right stops on the edge.
+3. "twelve boxes fit, I think - 8x12": the squares a new table is asked for with are 8 x 12 (were 8 x 10), and as wide as the two numbers under them.
+4. "in some places I cannot make it smaller any more - what does this making smaller go by, in the rows and in the columns? let us put these right - let it not be a line": a column went down to 24 px, a row only to a line of words with the room over and under it (34 px). One rule now: a row is pulled as low as a column may be narrow, 24 px (`MIN_ROW` = `MIN_COL`), so a cell can be a square. A row of one line gives up the room over and under its words (the row's height is told to the stylesheet as `--row`, table-grid.js `tellHeight`; editor.css clamps the cells' padding by it; a note never holds it - note-markup.js); a row with more lines is pulled no lower than its words need. A height once given stays given (pulled all the way up it is 24 px, not taken off). The page written out and the printed page draw the row as low (export.js).
+
+Not changed: the guide (nothing new to describe; signatures as they were). Electron still 44.5.1.
+
+e2e: table-edges 152/152 (+15), table 66/66, v093 138/138, v094, layout, rich-paste and note-folders without a failure (one run of table.mjs lost four pulls of the mouse while the owner was at the machine - the window lost the focus; run again alone, 66/66). Not pushed.
+
+## [2026-10-10 13:20] v0.9.4 - by Claude (a portable copy offers itself for documents; the description is the name; not released)
+
+The owner, on the test build: "a right-click on a docx and the like - Open with Nebula is not among the suggested ones; and let Nebula's description be Nebula alone".
+
+- What was found (the registry, read only): nothing had told Windows about `Nebula Test.exe` - only the installer writes that (build/installer.nsh), and a portable copy has none. The owner had picked the exe by hand once; Windows then listed it under the exe's FileDescription, which electron-builder takes from package.json's `description` - the long sentence.
+- electron/open-with.js (new): a portable copy (win32, packaged, `PORTABLE_EXECUTABLE_FILE`) says it itself when it starts, for this user (HKCU\Software\Classes): `Applications\<exe>` with FriendlyAppName, its command and SupportedTypes, `<Name>Portable.Document`, and itself under `.docx/.doc/.odt/.rtf\OpenWithProgids`. Offered, never the default; names of its own, so the installed Nebula's `Nebula.Document` is not written over. A start that finds it said for the place the copy is in writes nothing (two `reg query`).
+- package.json `description` is "Nebula" (the test build: "Nebula Test", build-test.json extraMetadata); the sentence the site shows under the name is `tagline` now (scripts/build-site.js).
+- Checked on this PC with the new test build: the exe's FileDescription reads "Nebula Test"; started once, it wrote its keys; `SHAssocEnumHandlers` (what Explorer's Open with asks) lists "Nebula Test" as recommended for .docx, .doc, .odt and .rtf.
+
+Unit 996/996 (+3, tests/open-file.test.js). Not pushed.
+
+## [2026-10-10 12:40] v0.9.4 - by Claude (a row's height is pulled; not released)
+
+The owner, told that only a column's line could be pulled: "let the height of a row be pulled too".
+
+- The line under a row's number (y1, y2...) is pulled to make the row higher or lower (`.tbl-rowgrip` in each `th.tbl-y`, table.js). While it is pulled the row's height stands beside the line in millimetres, as a column's width does over its line.
+- The note holds it as `<tr style="height: 84px;">` (table-grid.js `heightOf`, `setHeight`, `MAX_ROW` 800). It is the least the row is drawn: words that need more make the row higher. A row is pulled no lower than its words need, and pulled down to that it has no height of its own again.
+- `plainTable` keeps a row's height in pixels and nothing else of a row's dress (so a redraw, an undo step, a copy keep it); import.js `sanitize` keeps it (pixels, up to 800).
+- `insertRow` puts a row of its own between the others and `deleteRows` takes the rows themselves out: a height stays with the row it was given to. Before, the rows' elements stayed where they were and only the cells moved.
+- The guide (four languages): one sentence. Signatures: the last four are kept as the twenty-sixth test build's; new `'0.9.4': '37ab0948'`, de `fd018e89`, pl `d730d750`, tr `0d370f41`. What's new: half a sentence.
+
+Unit 993/993 (+5); e2e: table-edges 137/137 (+6), table 66/66, layout and v094 without a failure. Not pushed.
+
+## [2026-10-10 03:10] v0.9.4 - by Claude (the owner's "Acil Buglar" note: a table and the room it has, one right-click menu, the size of a new table; not released)
+
+The owner wrote a note in Nebula Test, "Acil Buglar" (urgent bugs), with eight snapshots, on the twenty-fifth test build. What it says, and what was done:
+
+- **"Do you see the bug?"** — a table in a column lay over the video in the column beside it once the AI panel had made the page narrower. **"In NW there should be no widening to the side like this"** — a table of thirteen columns made the whole page scroll sideways. A table now never reaches over the edge of the place it stands on (table.js `fitTable`, `settle`, `roomFor`):
+  - a new table, a column added or put in, rows pasted: the columns' own widths take the room there is — each gives of what it has over the narrowest, and a column added where there is no room is as wide as the others on average, so all stay alike;
+  - a column's line cannot be pulled wider than the room that is left;
+  - the place made narrower under a table (a panel opened, the window pulled, another page size, a column's divider moved — a `ResizeObserver` on the editor and on each table's host): the table is drawn narrower, each column by the same share. That is the screen's alone: `data-w` holds the column's own width while it is drawn narrower, note-markup.js writes it back for the save and for every undo step, a copy carries the own width (`plainTable`), and with room again the table is as wide as it was made.
+- **"Let there be the right to put more from left to right"** (under a table of forty columns pulled to the narrowest): the narrowest a column is pulled to is 24 px, not 44 (table-grid.js `MIN_COL`).
+- **"While making a table's column smaller and larger, let the mm — the size of the lines — be seen"**: the width of the column being pulled stands over its line in millimetres, as it is drawn and printed (`.tbl-tip`, `millimetres`).
+- **"A press on the left corner — why do select-all and Merge come up? They should not."** A click on the corner does nothing now; the corner is only taken to move the table. A right-click on it offers "Delete table", and so does a right-click in a cell. Ctrl+A twice in a cell still selects every cell.
+- **"When a table is added there has to be a setting for its size."** The Table button and /table open a small panel first (table-size.js): 8 × 10 squares to point at, two numbers to type (up to 100 × 60), the arrows to change it; Enter alone makes five by five; Escape, a press elsewhere or a letter typed closes it.
+- **"Let THIS menu be the main menu, and the others be joined with it"** (four snapshots: the menu in a table, the bare one, the spelling one, and the one over selected words). context-menu.js draws one menu everywhere in a note: the formatting row; on a misspelt word its suggestions, Add to dictionary and Ignore; in a table the table's choices; Cut and Copy (grey with nothing selected; for selected cells, the cells); the three pastes; Select all. A picture keeps its own, a table's numbering its row's or column's alone, a locked note Copy. The menu is as high as the window allows (it was cut at 360 px).
+- The guide (four languages): the one menu (two places), the size asked for, the width in millimetres, the corner, the page's edge. Signatures: the last four are kept as the twenty-fifth test build's; new `'0.9.4': 'cc2e6edd'`, de `13e63480`, pl `5a9fada2`, tr `9406a37f`. What's new: one sentence. i18n.js: Rows, Columns, "Drag to move the table".
+
+Unit 988/988 (+4); e2e: table-edges 131/131 (+14), table 66/66, v093 138/138, v094 87/87 (one run failed "a click on the arrow still folds it", a mouse check, and passed twice after — the PC was in use), layout 127/127, rich-paste 20/20, note-folders 60/60. Not pushed.
+
+Not done, said to the owner: rows are as high as their words — there is no line to pull for a row's height; a table printed or exported to PDF on a page narrower than the one it was made on is not fitted there.
+
+## [2026-10-10 01:20] v0.9.4 - by Claude (a new table is 5×5; the table trials and what they found; not released)
+
+The owner, on the twenty-fourth test build: "three by three is small, let it be five by five; and test the table in different scenarios — how could I make it go wrong? — and fix it so that it does not."
+
+- **A new table is five rows of five cells** (table-grid.js `NEW_ROWS`, `NEW_COLS`). Its columns are made no wider than the place it is put on takes — the page, a column, a toggle's body — and no narrower than 72 px (table.js `fitColumns`); on a page with room they are 140 as before.
+- **The trials** are tests/e2e/table-edges.mjs (117 checks, a real app): after each thing done, every table of the note is looked over whole — a cell on every place, the numbering matching, nothing of a table outside one, no block in a cell. And in tests/table.test.js a run of 120 × 30 random changes (merge, unmerge, rows and columns in and out, fill, paste, save and open) with the grid checked after each: the grid itself held, nothing found there.
+- **Found and put right:**
+  - The bar's **to-do** button with the caret in a cell put the whole table into a to-do line (the table was gone). **List** and **numbered list** made a list of the note's first line; **indent** indented a cell; **code block** went to the top of the note. Now: to-do, lists, toggle, indent, outdent and the outline menu do nothing in a cell; a code block, a divider and a table go under the table (toolbar.js; codeblock.js `after`).
+  - **Left / centre / right / justify** put a block into the cell. Now they line up the words of the caret's cell, or of the selected cells (table.js `align`, kept as `text-align` on the cell — the one style a cell keeps; kept by a merge's unmerging, a fill, a copy, a file).
+  - **Ctrl+A in a cell** selected the whole note, and the next letter wrote over all of it. Now: the cell's words; again, every cell of the table; a third time, the note.
+  - **A table copied with the lines around it** (Ctrl+A, Ctrl+C) was pasted with the numbering, the + and the browser's styles on it, and then taken for a drawn table: no row numbers, a column too many. Now a copy from a note holds a table plain (paste-clean.js, table-grid.js `plainTable`), a table is drawn again whenever it does not stand as it was drawn (`isDressed`), and a heading cell, a caption or a button in a table from elsewhere is cleared away.
+  - **Paste from the right-click menu or the bar** with the caret in a cell took the focus out of the cell (rich-paste.js: a cell is a field like a caption), and left the menu's choice set for the next Ctrl+V on a line.
+  - **Tab with cells selected** left the selection's mark on the cell left behind; **a right-click in selected cells** let all but one go. Now Tab lets them go, and a right-click in them offers "Delete rows" / "Delete columns" for all of them.
+  - **A table that is the first thing of a note** had no way to get a line written over it: ↑ from its first row makes one, as ↓ from the last row did.
+  - A file brought in keeps a column's width and a cell's alignment (import.js); every other style still goes.
+- The guide (four languages): five by five, Ctrl+A, the alignment buttons. Signatures: the last four are kept as the twenty-fourth test build's; new `'0.9.4': '292f1445'`, de `b179ba45`, pl `57b0d7dd`, tr `8643b4c4`. What's new: one sentence.
+
+Unit 984/984 (+8); e2e: table-edges 117/117 (new), table 63/63, rich-paste 20/20, layout 127/127, v093 138/138, v094 87/87. Not pushed.
+
+## [2026-10-09 21:30] v0.9.4 - by Claude (rows and columns are put in between by a right-click, not by a + on the numbering; not released)
+
+The owner, on the twenty-third test build: "let it be a right-click, then add column and add row — not the way you did it."
+
+- The + that stood on the lines beside a number while the pointer was on it (the entry below) is gone: `.tbl-ins`, its styles and its two titles.
+- **A right-click in a cell** (context-menu.js `tableItems`, which asks table.js `menu(target)`): Insert row above, Insert row below, Insert column left, Insert column right, then Delete row and Delete column — first in the menu, over the three pastes and Select all; under the formatting row and the pastes when words are selected. The caret goes into the new row or column, beside the cell that was clicked. On a number of the numbering the menu holds that row's or that column's choices alone. For a merged cell, above and below, left and right are its own edges, and deleting takes every row or column it reaches over. A locked note offers none of it.
+- table.js `run(act, wrap, { at, to, keep })`: a row or column put in before `at` with the caret kept on `keep`; rows or columns `at`..`to` taken away without anything being selected. One Ctrl+Z each. `insertRow` and `insertColumn` (table-grid.js) are as they were.
+- The guide (four languages): the sentence in section 4's "Tables" now says the right-click. Signatures: the last four are kept as the twenty-third test build's; new `'0.9.4': 'b7fc797a'`, de `ab268bc1`, pl `feab1e38`, tr `e81109f4`. What's new and i18n.js: the four choices' words.
+
+Unit 976/976; e2e: table 61/61 (a real right-click in the app), v093 138/138, v094 87/87. Not pushed.
+
+## [2026-10-09 21:00] v0.9.4 - by Claude (a row or a column put in between two; not released)
+
+The owner, on the twenty-second test build: "let there also be adding a row and a column in between."
+
+- With the pointer on a number of a table's numbering, a + stands on the lines at its two sides — over the x numbers, left of the y numbers. A click puts a new column, or a new row, in there, and the caret into its first free cell. It stays a moment after the pointer leaves the number, long enough to be reached (a delayed `visibility`), and is the screen's like the rest (`.tbl-ins`, inside the numbering, never saved). After the last column and under the last row the two + bars do it, as before.
+- table-grid.js: `insertRow(table, at)` and `insertColumn(table, at)` — `addRow` and `addColumn` are these at the end. A merged cell that reaches across the line reaches over the new row or column too: it is not cut in two. A new column's width is put in between the others' widths, which stay with their columns.
+- table.js `run('ins-row' | 'ins-col', wrap, at)`; one Ctrl+Z takes it back. Not shown in a locked note, nor while cells are being selected, filled, a column pulled or a block moved.
+- The guide (four languages): one sentence in section 4's "Tables". Signatures: the last four are kept as the twenty-second test build's; new `'0.9.4': 'ee9f1fe2'`, de `04cd6f67`, pl `5c75bbf4`, tr `68351909`. What's new: one sentence in "Tables". i18n.js: the two marks' titles.
+
+Unit 976/976 (+1); e2e: table 57/57 (+5), layout 127/127. Not pushed.
+
+## [2026-10-09 20:20] v0.9.4 - by Claude (tables; not released)
+
+The owner, on the twenty-first test build: "now let there be tables. A simple table; we can make it wider to the right and left; over the boxes a numbering as in Excel, but as x1 and y1 — at the left and on top; with the highlight colours we colour the back of the selected part of a table; the selected part can be merged and unmerged — the merge choice comes up at the lower right; in Excel one pulls from the lower right corner to carry on and copy: here the same, pulled from the lower left; a + along the bottom makes the table longer and one at the right makes it wider; and tables move as pictures do."
+
+- **What a note holds** is a plain table and nothing else: `<div class="blk-table" data-block-type="table" contenteditable="false"><table><colgroup><col style="width: 140px">…</colgroup><tbody><tr><td contenteditable="true" class="h-yellow" colspan="2">…</td>…`. Each cell is a place of its own to write in, as a caption is. A cell's colour is a highlight class on the cell, so it follows the theme; a merged cell is one cell with a colspan and a rowspan; a column's width is on its `<col>`.
+- **src/js/table-grid.js (new)** — the table as a grid, with no screen: where each cell stands (`gridOf`), a block of places grown round merged cells (`rectOf`), the rows written out again from the grid (`layout`), merge and unmerge (what the merged cells held is kept, a line each), a row or a column added and deleted, the fill (`fillTarget`, `fillCells`, `seriesAt`: one cell is copied with its colour; 1, 2 goes on with 3, 4; "Day 1" with "Day 2"; several cells repeat), and cells as rows of words with tabs (`toTsv`, `fromTsv`, `putRows`).
+- **src/js/table.js (new)** — the screen and the hands. Drawn when a note is shown and never saved (everything carries `tbl-ui`; note-markup.js takes it out, with the classes `sel`, `act`, `fill` of the cells): the numbering x1… over the columns and y1… beside the rows (the numbers are drawn by the stylesheet from `data-n`, so the note's text and Find hold no words of the app's), the line at the right of each x that is pulled for the column's width (no narrower than 44 px), the corner that takes the table (block-drag.js: `.blk-table` in `DRAG_BLOCK`, `.tbl-corner` a grip) and selects all of it on a click, a + under the table for a row and one at its right for a column, the square at the selection's lower left, and at its lower right the choices: Merge, Unmerge, and — for whole rows, columns or the whole table selected as such — Delete row(s), Delete column(s), Delete table.
+- Cells are selected by pulling the mouse from one to another, by Shift and a click, or by the numbering; the caret waits in the first of them. A highlight colour (toolbar.js `applyHilite` asks `hiliteCells` first) then colours their backs, and with only a caret in a cell that cell's; the same colour again takes it off. Words selected inside one cell are highlighted as words.
+- Keys: Tab and Shift+Tab step from cell to cell (Tab in the last one makes a row), the arrows cross a cell's edge into its neighbour and out of the table (under the last row a line is made if there is none), Enter is a new line in the cell, Delete or Backspace empties the selected cells, Esc lets go of them. Ctrl+C and Ctrl+X take selected cells as rows of words with tabs (and a small HTML table for other programs); rows of words pasted in a cell go one cell each from there and the table grows for them; plain words are typed into the cell. A cell takes words only: nothing is dropped into one, and a pasted picture does not land in one.
+- `/table` in the slash menu and a Table button on the bar (index.html, icons.js `table`); `/` is not offered inside a cell. A table goes after the caret's line, in place of it when it is empty, in a column or a toggle's body too, with a line under it.
+- **Other parts of the app that had to know**: gap-caret.js (`NO_CARET`: a click beside or under a table finds a line), toolbar.js (a cell's keys and deletes are its own; Backspace under a table does not take it), inline-family.js (`td` is the block a mark's edges are lifted to — without it, highlighting words in a cell cut the row and the table in two; a cell's own colour is not handed down to its words), history.js (the caret goes back into its cell after a step), migrate.js (`migrateBlankLines` would have emptied a table with nothing written in it: a table is no line), import.js (`blk-table` is a class a file may carry), blocks.js, slash-menu.js, arrows.js, rich-paste.js, columns.js, dividers.js, export.js (`.tbl-ui` never reaches a file).
+- **One fault found on the way and its cause**: every block of a note is a layer of its own (`.editor > * { z-index: 2 }`, the shapes' rule), and the block after is drawn over whatever reaches out of one. With cells selected down to the last row, the choices hang under the table — over the next line, which took the click meant for them and let the selection go. The block that holds the choices rises (`:has(.tbl-chip)`).
+- **Out of the note**: Markdown — a table, its first row heading it; HTML and PDF — a table with its columns' widths and its colours; Word, OpenDocument and Rich Text — row by row, cells with " | " between them, as they wrote any table before (a real table there is not made yet).
+- The guide (all four languages): a bullet in "New in 0.9.4", section 4 is now "Lists, to-dos, quotes, dividers and tables" with a part "Tables" (two new blocks and a heading: 151 blocks). Signatures: the last four are kept as the twentieth test build's; new `'0.9.4': '14a368ab'`, de `b93092a5`, pl `b35d7af0`, tr `2c0a44eb`. What's new: "Tables", in four languages. i18n.js: the choices' and the buttons' words.
+- Left as it is, to be said: the fill square is at the lower LEFT, as asked (Excel's is at the lower right, where Merge stands here). A row or a column is added at the end only — none is put in between two. A table wider than the page reaches over its edge: the columns are made narrower by hand.
+
+Unit 975/975 (+27, tests/table.test.js); e2e: table 52/52 (new), layout 127/127, v093 138/138, v094 87/87, note-folders 60/60, rich-paste 20/20, guide 8/8. No full smoke, rebuild or old-notes; not pushed.
+
+## [2026-10-09 12:40] v0.9.4 - by Claude (a click between, under or beside cards, videos and code blocks finds a line or makes one; not released)
+
+The owner, on the twentieth test build: "under the videos the cursor disappears, sometimes I cannot click — in general this happens with every new feature we add. By the way, ChatGPT signed in at the first try."
+
+- Seen in the app, on a note of four videos: a click in the gap between two videos one under the other, or under a video that is the last thing in the note, put the caret on the first line of the note or on a line well below — out of sight — and what was typed went there. A card, a video and a code block take no caret; such a click is a click on the note itself, and Chromium, with nothing to stand on there, chose a line far away. It was so for every block of the kind, and before this build too: each new kind of block brought it again.
+- **Settled once for all of them** (src/js/gap-caret.js, new; main.js `initGapCaret`): a press on the note itself, or on a column itself, that has one of these blocks (`NO_CARET`: `.link-block, .blk-code`) over it, under it or level with it is answered by the app (`placeForClick`). A line right over or under the place takes the caret, as near the click as its words go. With none — two such blocks one under the other, one as the last thing or the first — a line is made in the gap with the caret in it; one Ctrl+Z takes it away. Beside a block, its upper half is "over it", its lower half "under it". A locked note gets nothing.
+- Pictures are left as they were: a click beside a picture in the text selects it and Enter opens a line under it. A new kind of block that takes no caret has only to be named in `NO_CARET`.
+- block-drag.js: a press becomes a pull after 8 pixels, not 5 — an unsteady click on a video's picture stays the click that plays it.
+- ChatGPT's first sign-in (the open question since 2026-09-30): the owner says it went through at the first try. Closed; nothing was changed for it in this version.
+
+Unit 948/948; e2e: layout 127/127, v093 138/138, v094 87/87, note-folders 60/60, rich-paste 20/20. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-09 11:45] v0.9.4 - by Claude (the name is never declined; the pointer in /video's dialog; cards, videos and code blocks dragged like pictures; not released)
+
+The owner, on the nineteenth test build: "Witaj w Nebuli should be Witaj w Nebula, and do not change the Nebula name; adding a /video, the mouse is not seen in the video picker, the cursor disappears; and videos, embedded websites, code blocks and so on should all be draggable like pictures."
+
+- **The name.** Polish declined it — "Witaj w Nebuli", "wewnątrz Nebuli", "Ustaw Nebulę" — in the guide (its title too), What's new and one line of the interface; German had one genitive ("Nebulas violettes Dokumentsymbol"). It is "Nebula" everywhere now. Turkish writes its endings after an apostrophe ("Nebula’ya"), which leaves the name whole, and was left. tests/guide-i18n.test.js fails on any word that starts with "Nebul" and is not "Nebula", in the three guides, the translated What's new and every interface string.
+- The guide's Polish title changed with it. A vault's guide still under "Witaj w Nebuli – przewodnik" is still known as the guide (guide-i18n.js `FORMER_TITLES`) and gets this build's page and title while nobody wrote in it.
+- **The pointer in /video's dialog** (electron/main.js `media:pick-video`). Not reproduced by a test — the tests' keys are not the keyboard's — so this is the reading of it: Chromium hides the pointer while one types until the mouse moves over its window (Windows' "hide pointer while typing"); /video is typed; the dialog was the window's child, shares its hidden pointer, and holds the window still, so the move that would bring the pointer back never reaches it. On Windows the dialog is now nobody's child, so it has a pointer of its own. What that costs: the dialog no longer holds the window, and the note can be clicked behind it; asked for again meanwhile nothing more opens (`pickingVideo`), and the window is brought forward when the dialog closes. The video still goes in where the caret was. **For the owner to try**; if the pointer is still gone the reading was wrong.
+- **Cards, videos and code blocks are dragged** (src/js/block-drag.js, new; main.js `initBlockDrag`). A bookmark, an embedded page, an embedded video and a video file are taken by their title line; a video file by its picture too, except the strip along its lower edge where the player's own controls are (`PLAYER_STRIP`); a code block by its top line, not by the language, Copy, ✕ or the code. An embedded page itself cannot take the card: it is another page and keeps the mouse. The same mark as a picture's shows the place between two blocks (image-place.js `gapAwayFrom`, taken out of the picture's drag, which uses it too), on the note or in a column; nothing moves until the button is let go; Esc leaves it; one Ctrl+Z puts it back. A press that does not move is the click it was — a card's link opens, a video plays — and the click that ends a drag is swallowed. Only a block standing in a row of its own, on the note or in a column, is taken; a locked note gives nothing.
+- A video file is moved, not taken out and put in again (`moveBefore`), so it goes on playing. An embedded page is put in again and loads anew: its frame is the app's own element.
+- Not done: a toggle and a list are words and are not dragged; a block inside a coloured wrapper is not taken.
+- Guide: one sentence in section 8 under the embed's resizing, four languages; What's new: one sentence on the pictures' item, four languages; signatures renewed (the nineteenth test build's four kept).
+
+Unit 940/940; e2e: layout 116/116, note-folders 60/60, v094 87/87, guide 8/8, rich-paste 20/20. No full smoke, rebuild or old-notes; not pushed. Preflight: Electron 44.5.1 is behind 44.7.0 — for the push.
+
+---
+
+## [2026-10-08 11:30] v0.9.4 - by Claude (what the person deletes is gone without a question; only a loss nothing in the app made is asked about; not released)
+
+The owner, on the build that asked whenever a note lost more than three pictures at once: "what I do not understand: when someone deletes and closes, why should it come back? It has to be gone altogether." And, told how it would be changed: "let us arrange the fault detection to that — this way it works against sudden crashes too."
+
+- The count is out (`looksLikeLoss`, `ASK_ABOVE`). What decides is who took the file out. Everything the window does to a note is written through the app (main.js `storage:write`); each such write is looked at (note-media.js `noteReleases`): the files the note named before and does not name after are *released* by the person, one named again — an undo — is released no longer. The list is kept in the vault (`storage/released.json`, `readReleased`, `writeReleased`) for the next start.
+- At a start (`tidyVault` `released`): an unnamed file on the list goes — from the folder and from every backup — without a word, five as well as one. An unnamed file that is not on it stays and is asked about (Put back in the note, Delete, Open the note): nothing in the app took it out — a fault, or the note's file changed outside the app. The backups keep exactly those (`purgeUnnamedFromBackups` `keep`).
+- Against a sudden end every step errs towards keeping and asking: the list is written before the note is, so cut off between the two the note still names the file; a note's file is replaced whole or not at all, and one that cannot be read is not judged; a list that is there but cannot be read is an empty list — nothing taken out, everything unnamed asked about — and a vault a list has been kept for (`meta.json` `releasedList`) whose list is gone is treated the same. Only a vault no build ever kept a list for sweeps as it always did, once.
+- What this gives up, against the build before: a fault inside the window that takes pictures out of the note on the screen and saves that is a write through the app, and counts as the person's. The editor's own two checks (what is saved names all it shows; a repair takes nothing out) stay.
+- The question says so: "…and they were not taken out in Nebula." Guide: the sentence under "Deleted is deleted" says what you take out is gone however much it is, and when Nebula asks; four languages; signatures renewed (the eighteenth test build's four kept).
+
+Unit 927/927; e2e: note-folders 60/60, black-holes 58/58, deleted 6/6, rich-paste 20/20, v094 87/87, guide 8/8. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-08 11:10] v0.9.4 - by Claude (lost pictures put back into the note; not released)
+
+The owner: "is there an answer, when a fault does happen?" Where a save is refused nothing is lost — the note on the disk is whole. Where a note has lost its pictures and the app asks, the files were kept but nothing put them back into the note. Two ways were put to the owner — back at the end of the note, or the note as the backup has it (which overwrites what was written since, and the one daily copy may already be the faulty one); "the first: put back in the note", and: "add a warning too, that they have to be put back in their old place."
+
+- The question has a third answer, first in the row: **Put back in the note** (src/js/held-media.js `heldMarkup`; electron/main.js `media:take-held`). What is typed is saved, the files are written into the note again at its end — each picture a picture in the text, no wider than a pasted one, each video its player, and a line to type on after them — and the note is shown. Nothing is deleted; at the next start nothing is asked.
+- The warning, twice: in the question, under what it asks ("Put back, they are added at the end of the note: you have to move them to where they were."), and when it is done ("Put back at the end of the note. Move them to where they were.").
+- Should the note not be saved after all, the files are unnamed again at the next start and the question comes again.
+- Guide: one sentence more under "Deleted is deleted", four languages; signatures renewed (the seventeenth test build's four kept).
+- Found while testing it: tests/e2e/note-folders.mjs's `until` did not await what it was given, so a condition that was a promise counted as met at once — the checks of the question written the entry before ("Delete takes them out…", "Open the note…") had passed without waiting for anything. It awaits now; with that the same checks pass for what they say, twice over.
+
+Unit 925/925; e2e: note-folders 58/58 (twice), guide 8/8. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-08 10:50] v0.9.4 - by Claude (a note is never written without its pictures by a fault; a large loss is asked about; not released)
+
+What the last entry cost: should a fault ever write a note without its pictures, the next start would delete them, from the backups too. The owner: "what is the answer to that?" — two layers were put to them, and: "both, it is better."
+
+- **At the source** (src/js/editor.js). The files a note's markup names are its `nebula-media://…` addresses (`namedIn`). (1) What is saved names every file the editor shows: where the stored markup is not the editor's own to the letter (something on screen was taken out of it), every address in the one must be in the other. (2) What the app itself makes of a note on the way in — a repair, a repaint (`adopt`) — names every file the note named before: only a person takes a picture out. A note that fails either is not written at all, as an edit or as a repair: what is on the disk stays, the banner says why ("…would have been saved without N of the pictures or videos it shows…", "This note did not open whole…"), every later try says it again, and opening the note again starts afresh. `flush` answers false and does not throw, so closing the app is never held up by it. Neither can be tripped by an edit: taking a picture out changes what the editor shows and what is saved alike.
+- **At the start** (electron/note-media.js `looksLikeLoss`, `unnamedOf`, `tidyVault` → `held`). A note that no longer names more than three of its files, or any of them where there were at least two, keeps them — in its folder and in every backup (`purgeUnnamedFromBackups` `skip`) — and the app asks (src/js/held-media.js, after What's new): the note, how many, Delete and Open the note; Later closes it. Delete removes the files that were asked about and no others (`sweepNote` `only`, the purge's `only`); Open the note deletes nothing and the question comes again at the next start. One picture taken out of a note that had only that one, or up to three out of more, goes without a question as before.
+- Nothing is remembered between starts: what is held is worked out again each time from the note and its folder.
+- Guide: one sentence under "Deleted is deleted", four languages; signatures renewed (the sixteenth test build's four kept).
+- tests/e2e/black-holes.mjs: the ten checks that failed straight after a build were the helper pressing a menu entry 100 ms after asking for the menu; it waits for the entry now, and two runs straight after a build pass.
+
+Unit 923/923; e2e: note-folders 55/55, black-holes 58/58 (twice, straight after a build), deleted 6/6, rich-paste 20/20, layout 99/99, v094 87/87, v093 138/138, open-with 12/12, guide 8/8 — none of them met a refused save. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-07 19:50] v0.9.4 - by Claude (what a note no longer shows leaves the backups too; not released)
+
+The owner, on the reading of the last entry: "I did not say take Restore out of the Trash; I did not want a backup of something deleted kept for seven days." That was so already for a note or a black hole deleted from the Trash. One thing was not: a picture or a video taken out of a note that lives on left the note's folder at the next start but stayed in the backups that shared it — a day in the daily copy, until the next update in the copy put aside before one. The owner: "close that too, deleted from the backups as well."
+
+- At a start, after the vault's own sweep, what a living note's text no longer names leaves that note's folder in every copy, a person's label among them (backup-purge.js `purgeUnnamedFromBackups`, called in main.js `prepareNoteFolders`). Not at the save: an undo in between still has it, in the vault and in the backups alike.
+- The note's text in the vault decides, not what the vault's folder holds: a file the note still names stays in the backups even when the vault has lost it. A note whose file cannot be read is not judged; a note gone from the vault is the other purge's; a file that is no picture or video is nobody's.
+- A sealed video taken out of a note in a black hole went when the black hole was next opened; `unlock` now names what it swept (`swept`, kept in the main process) and those files leave every backup too (`purgeHoleFilesFromBackups` — a sealed video's name only).
+- What it costs, said to the owner before: a picture taken out yesterday cannot be had back from a backup. And one more, said now: should a fault ever write a note without its pictures, the next start takes them out of the backups as well — the copy's words would still be there, the pictures not.
+- Guide: one sentence under "Deleted is deleted", four languages; signatures renewed (the fifteenth test build's four kept).
+
+Unit 914/914; e2e: note-folders 51/51, deleted 6/6, black-holes 58/58, guide 8/8. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-07 19:35] v0.9.4 - by Claude (a black hole goes to the Trash; not released)
+
+The owner, told that a note deleted from the Trash is in no backup and offered a way to bring back yesterday's note: "if someone deletes, there should be no bringing back from the Trash; black holes should be able to be put in the Trash too." Read as: deleted from the Trash stays gone for good (nothing to change, and no restore-from-backup is built), and a black hole is no longer deleted straight from its menu.
+
+- A black hole's ⋯ menu says "Move to trash" where it said "Delete black hole" with its question. It goes whole (electron/black-holes.js `trash`): locked first — what was typed saved, its notes out of the window, its key let go of — and `trashedAt` written into hole.json. Nothing else of it changes on the disk; its notes stay sealed, in the backups too.
+- In the Trash it is one row (note-actions.js `holeRow`, class `drawer-hole`): its name, "Black hole · N notes", Restore and Delete — never anything of its notes. It cannot be opened there, by PIN, passkey or recovery key (`unlock` → `trashed`, and a wrong PIN is not counted), and a note's menu no longer offers it.
+- Restore (`restore`) puts it back in its section, locked, as it was. Delete removes it for good with every note in it, in the backups too (the `delete` there was) — and where it holds notes the button first turns into "Delete for good?": a note in the Trash is one note, this may be fifty.
+- The window keeps the two apart (black-holes.js `holes` / `binned`; `toTrash`, `restore`, `destroy`, `trashed`); the main process lists both with `trashedAt`.
+- Guide: one sentence in the folders section, four languages; What's new, four languages; signatures renewed (the fourteenth test build's four kept). The strings of the old question are out of i18n.js.
+
+Unit 913/913; e2e: black-holes 58/58 (three runs; the two runs straight after the build failed ten checks from "moved in" on, the menu not yet there when the helper pressed — as seen before after a build), note-folders 50/50, deleted 6/6, guide 8/8. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-07 19:25] v0.9.4 - by Claude (one daily copy, the newest; a disk that cannot share; not released)
+
+The owner: "not seven days — a copy of twenty-four hours, on an exFAT flash drive and network drives too"; and asked what the backup of a 2 GB note (1.8 GB video, 190 MB pictures, the rest words) would be, what backups are for, and how a user brings one back.
+
+- Of the daily copies only the newest is kept (main.js `KEEP_DAILY = 1`): made at the first start of a day, the one before it removed then. Labelled ones as before: the newest of each kind.
+- Where the disk cannot share a file (exFAT, a network folder) a copy has to hold the bytes. A daily copy now takes the pictures and videos over from the copy it replaces — moved, by name and size — instead of copying them again (note-media.js `snapshotVault(src, dest, before)`, `taken`). So the 1.8 GB video is copied once, on the day it comes, not at the first start of every day, and the old and the new copy never both hold it. A labelled copy takes nothing over.
+- A copy holds `.making` while it is made; one the app was closed over is removed and made again, and is neither kept as the newest nor taken from. With one copy kept, half a copy must not stand for a whole one.
+- The 2 GB note: where the disk shares (NTFS, APFS, ext4) the copy is the words, about 10 MB; where it cannot, 2 GB — once.
+- Not built, said to the owner: there is no way in the interface to bring a note back from a backup. The Trash is the way back for a deleted note; deleted from the Trash it is in no backup, by the owner's rule of 2026-09-27. A note as it was yesterday: Import on the note's file in the Backups folder (it comes in as a new note with its pictures).
+- Guide: the sentence on the dated copy in section 10 and its "Try it", four languages; What's new, four languages; signatures renewed (the thirteenth test build's four kept). docs/UPDATING.md: the daily copy, the pre-update copy, restoring one note.
+
+Unit 911/911; e2e: note-folders 50/50, deleted 6/6, black-holes 51/51 (49 counted once in a run straight after the build, none failing; 51 alone), guide 8/8. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-07 18:50] v0.9.4 - by Claude (backups kept the old way removed at the start; not released)
+
+The owner, told that the seven old copies would leave one a day for a week (a vault of 7.6 MB, 87 MB of backups): "drop the old copies, do not make it wait seven days — it eats the user's disk." I first made them small where they lay (pictures out of the text, shared with the vault; 87 MB to 18.6 MB, every note read back the same). The owner: "delete the old copies altogether" — it must work for every user and take back the room the old way of backing up took. The slimming is out of the code again.
+
+- At the start, once the vault's own move is whole (`missingMedia` 0), every copy of the app's own making that is kept the old way is removed, overwritten (backup-purge.js `oldWayCopies`, `dropOldWayCopies`; main.js `dropOldBackups`, not awaited, the app given its turn between two files): the daily ones (`YYYY-MM-DD`), and those put aside before an update or a repair (`pre-update-…`, `pre-heal-…`). Kept the old way: a note's file lies flat in the copy's `notes`.
+- Then a copy of today is made the new way (`snapshotStorage`), so no start leaves the vault without one. The copy the app makes at the very start of the first run is made before the pictures leave the notes: it is one of those removed and made again.
+- What this costs, said to the owner: after the update there is no copy from before it — the copy 0.9.3 puts aside before installing goes with the rest. The same reasoning as for `pre-note-folders` ("it has no meaning after the move"), and the same condition.
+- Left alone: a copy under a label a person made; `pre-note-folders` (prepareNoteFolders removes it); a copy kept the new way.
+- A copy is renamed `going-<name>` before its files go, so that one the app was closed over is finished at the next start and is never counted among the copies of its kind (`staleLabelled` would otherwise take it for the newest).
+- Where the disk cannot share a file (exFAT, a network drive) a copy holds the pictures themselves, as files: seven days of them. Not changed here.
+- In the test vault, on the owner's word: every copy removed (seven dated, pre-heal-0.9.4, pre-note-folders, the two small `before-…` ones). The app makes today's at its next start.
+
+Unit 908/908; e2e: note-folders 49/49, deleted 6/6 (its seeded backups now one the new way and one under a person's label), black-holes 51/51. No guide change. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-07 13:35] v0.9.4 - by Claude (labelled backups: only the newest of each kind; not released)
+
+The owner, asked whether the labelled backups of older versions should go: "yes, delete them; only the newest of each kind is kept."
+
+- Of the copies the app itself puts aside under a label — before an update is installed (`pre-update-<version>-<time>`), before the repair of old notes at a version (`pre-heal-<version>`) — only the newest of each kind stays (backup-purge.js `staleLabelled`, `pruneLabelled`, run after every backup): an update's by the time in its name, a repair's by its version, part by part (0.10.0 is newer than 0.9.4). Until now each was kept for good, one more with every version. A label of any other kind — one a person made — is left alone.
+- In the test vault: pre-heal-0.9.1 and pre-heal-0.9.3 are removed; pre-heal-0.9.4 stays.
+
+Guide: one sentence in section 10, four languages; signatures renewed (the twelfth test build's four kept).
+Unit 904/904; e2e: note-folders 46/46, deleted 6/6, black-holes 51/51, open-with 12/12, guide 8/8. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-07 13:15] v0.9.4 - by Claude (the owner's answers on the eleventh test build: no counters, a hint, four dashes, backups that share; not released)
+
+The owner, on the four questions: "1 yes; and an option to set a hint for a black hole; delete the three old black holes; 2: at the fourth dash; 4: one copy is right; pre-note-folders has no meaning once the pictures are in the note's folder — delete it; I do not want the backups to take a great deal of room — tell me how the backups work."
+
+- No counters anywhere: Archive and Trash lost theirs too.
+- A divider at the fourth dash (`DIVIDER_DASHES` 4): three dashes stay dashes.
+- A hint for a black hole's PIN (electron/black-holes.js `hint`, `setHint`): optional, set when the black hole is made, changed or taken away from its menu while it is open ("Add a hint" / "Change hint"), shown under the PIN when it is asked for. It is kept in the clear in hole.json — it is shown to whoever is asked, so it is no secret — and one that gives the PIN away is refused; a new PIN the hint would tell takes the hint away. A black hole opened by the passkey has none.
+- The copy put aside before the note folders (`backups/pre-note-folders`) goes by itself: at a start, once every picture and video a note names is in that note's folder (note-media.js `missingMedia` is 0), it is overwritten and removed (backup-purge.js `shredTree`). It is still made before a vault is first moved, and kept while anything is missing.
+- Backups no longer copy what never changes (note-media.js `snapshotVault`): a note's own file is copied, its pictures and videos — written once, never changed — are shared with the vault (a hard link: a second name for the same bytes). Seven days of backups hold a video once, not eight times. Where the disk cannot share a file (another drive, a flash drive's FAT) it is copied as before. Because the bytes may be shared, `shred` only overwrites a file that has no other name left: a video taken out of a note leaves the vault and stays in the backups that had it, as a copy did; a note deleted for good is taken out of the vault and of every backup, and the last place takes the bytes with it — deleted stays deleted.
+- In the test vault: the three black holes of the first build (Deneme 1, Deneme 2, Deneme3) are deleted, their sealed files overwritten, in the backups too.
+
+How the backups work, as told to the owner: one copy of the vault a day (at the first start of the day), the newest seven kept; and copies under a label that are never pruned — before each update is installed (`pre-update-…`), before the repair of old notes at each version (`pre-heal-…`). The test vault holds 106 MB of backups for 7.6 MB of notes: eleven whole copies of notes that still had their pictures as text. From now on a daily copy costs the notes' text only. Asked: whether the labelled copies of older versions should go.
+
+Guide: sections 1, 4 and 10, four languages; What's new three items, four languages; signatures renewed (the eleventh test build's four kept).
+Unit 903/903; e2e: layout 99/99, note-folders 46/46, black-holes 51/51, open-with 12/12, deleted 6/6, ai-sleep 16/16, v094 87/87, v093 138/138, rich-paste 20/20, guide 8/8. One check of note-folders was too strict about a cropped picture saved before its undo (its file waits for the next start, by design) and is loosened. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-07 12:50] v0.9.4 - by Claude (the owner's notes on the tenth test build: black holes, videos, columns, the note's file in its folder; not released)
+
+The owner rewrote the Ideas note after trying the build: new ideas, bugs, and answers to the thirteen questions. All of it, in the order it was written.
+
+Ideas:
+- Dashes: "when it goes past four dashes it should become a divider by itself." The fifth dash on a plain line that holds nothing else makes the line a divider, with a line under it (auto-arrows.js `dashesToDivider`); one Ctrl+Z gives the dashes back. Not in a list, a heading, a quote or code. In a column the divider is made in the column (`insertDivider` took it out to the note before).
+- Black hole PINs are six digits, and the two boxes say what goes in each ("Six digits." / "The same PIN once more."), one under the other. A black hole made with four keeps its four — its length is on the black hole (`digits`, four where nothing is written) — until its PIN is changed, which makes it six.
+- "Ctrl+Z makes the video I added a black screen for a second": an undo step put the note back as markup, so the player was a new one. The step now keeps every player whose address is still in the note (history.js).
+- No size limit on videos, in a black hole too. Adding one never had a limit; the export had (200 MB). A Nebula note now takes every video along (note-media.js `travelWhole`): those that fit 200 MB inside the file, the rest — and the kinds a data address has no name for — in a folder beside the file, named after it ("My note videos"), which the import looks in (`stageTravelled`). A note in an open black hole takes its sealed videos along the same way.
+- An arrow beside "Black holes" folds the whole section (kept in `nebula:holes-folded`); the black holes stay as they are, open or locked.
+- /video: a video file chosen from the computer (`media:pick-video`), put in as a dropped one is. "Every kind of video file": MKV, AVI, WMV, FLV, MPEG, 3GP, M2TS beside MP4, M4V, WebM, OGV, MOV are held, copied, sealed and exported (.ts is left out: a TypeScript file far more often than a video). Holding is not playing: the player is Chromium's. What it cannot play (an AVI, a WMV) says so on its card and offers "Open in another program" (`media:open-outside`; not for a sealed video).
+- "A simple video player in the app … use the video style of the owner's study pages" (their player page: a black picture, under it a bar of round buttons and the clock at the right). The card has that bar now (file-video.js): ↩ 10s, 10s ↪, the speed (1× 1.25× 1.5× 2× 0.5× 0.75×), the whole screen, and where the video is. It is drawn on the screen and never saved with the note (note-markup.js `TRANSIENT_NODES`).
+- AI tabs are awake by default; a tab sleeps by itself only once it is told "Let it sleep when unused" (`nebula:ai-may-sleep`; the list of tabs to keep awake, `nebula:ai-awake`, is not read any more).
+
+Bugs:
+- "In the right-click menu, text colour and highlight have no picture under them": the small formatting bar's A and H had no colour bar, and the menu copies those buttons. They have one now, painted with the editing bar's.
+- "The JSON files inside the folder too, I do not want them apart" (and answer 1): a note is one folder — `storage/notes/<id>/<id>.json` with its pictures and videos beside it. Schema 3. To the window a note is still `notes/<id>.json`; the main process knows where that lies (`inStorage`, note-media.js `noteFile`). A vault kept the old way is put this way at its next start (`moveNotesIn`: where a note has both, the one written last is the note). A note file whose name is no id (a space in it) stays flat and is a note all the same — found by the 0.9.3 checks, whose "Shopping list" note had vanished. `purgeDeletedFromBackups` counts the notes in folders as living; before that fix it would have taken a new-layout vault for an empty one (refused) or, mixed, emptied the backups of the notes in folders. place-test-exe.js writes the guide where the vault keeps it.
+- A picture alone in a column: "I cannot write under this". A column that ends with a picture, an embed, a code block or a divider is given a line to write on (`healColumns`).
+- A line and a picture under it in a column: "I cannot take the picture one back up." Over a neighbour of one line the nearest gap was still the picture's own; pulled clear of itself a picture now goes one place that way at least (image-place.js).
+- "Take the counters away beside the notes and the black holes; the lock to the left, it runs into the three dots; say passkey, not Windows Hello; waiting for passkey; the passkey comes up behind Nebula." The counts are gone from folder rows and black holes. The lock is an icon at the left of the name: shut on a locked one (a click opens), open on an open one (a click locks). "Passkey" everywhere. And the question is now asked for Nebula's own window (`IUserConsentVerifierInterop.RequestVerificationForWindowAsync`, the window's handle in NEBULA_HELLO_WINDOW), so it stands in front of it; asked plainly it was nobody's window and Windows put it behind. Tried here with a real prompt owned by a small window: the system's dialog became the foreground window within a quarter of a second, and went away with its owner. Should that way fail, it is asked the plain way.
+
+The answers: (1) inside — done. (2) yes. (3) and (8) wanted explaining — in the report. (4) "no limit on the columns": `MAX_COLS` is no count any more; a column is cut for as long as both parts keep a few words' room (48px and the divider's own, as a share of the line: `leastShare`) and never under 5% of the line. (5) nothing more. (6) "not enough, no limit" — the videos above. (7) six digits, passkey, in front — above. (9) what was meant: "the editing bar — page zoom is too wide, and put page order beside increase indent; add /paragraph". The zoom's signs are slim and its ratio as wide as its words (132px → 94px), Auto order page stands beside the indents, and /paragraph is the plain line (the slash item Text is called Paragraph; /text still finds it). (10) skipped. (11) "log ChatGPT out": the test profile's ChatGPT tab is cleared (its partition folder removed with the app closed). (12) no Mac to build on. (13) not now.
+
+Tests around it: the first run of an e2e suite after a build is slower and its drags can land late — that was the failing run noted in the last entry (and a `sleep` in the command line was simply not run, which looked like an empty result). Run again, every suite is steady.
+
+Guide: sections 1, 4, 7, 8, 10 and four items of "New in 0.9.4", four languages; What's new four items, four languages; signatures renewed (the tenth test build's four kept).
+Unit 898/898; e2e: layout 99/99, note-folders 45/45, black-holes 48/48, open-with 12/12, deleted 6/6, ai-sleep 16/16, v094 87/87, v093 138/138, rich-paste 20/20, guide 8/8. The test vault's own notes, copied to a throwaway profile and opened by this build: five notes into five folders, nothing left flat, the three black holes of the first build asking for four digits. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-06 18:15] v0.9.4 - by Claude (after part 9 — what was left undone: pictures out of memory, videos in an exported note, Word/ODT/RTF, more columns, a picture in a line of words; not released)
+
+The owner, on the list of what the nine parts had left: "do the ones that were not done too." (This entry is dated by the machine's clock; the entries under it were dated a day ahead.)
+
+Pictures are no longer whole in the window's memory (electron/main.js, note-media.js):
+- Part 7 put a note's pictures into files but still wrote them back into the text for the window, so an open note held every picture as text. Now the window is handed the note as it is stored and shows each picture from its file (`nebula-media://note/<id>/<hash>.png`). `storage:read` no longer writes pictures in; `storage:write` no longer sweeps the folder (a picture cut and brought back by Ctrl+Z must still be there — the sweep is at start).
+- Where the picture itself is needed, it is written in on request: `media:inline` (an export — one place, `exportHtml()` in toolbar.js), `media:inline-sync` (a copy: the clipboard must be filled in the event), `media:data-url` (crop), `clipboard:image` with the file's address, and a note going into a black hole (sealed whole, pictures inside).
+
+Videos travel with an exported Nebula note (note-media.js `inlineForTravel`, `stageVideos`):
+- Export as Nebula note writes the note's video files into the file, 200 MB of video in all; what does not fit is left out and said ("Too large to travel with the note: N videos"). Imported or opened with Nebula, the videos become files at once (`notes/incoming-…`, taken into the note's folder at its first save; cleared at start if never saved). A note file may be 420 MB now; the 64 MB limit of part 9 had caught note files too and is for documents only.
+
+Word, OpenDocument and Rich Text (src/js/office.js):
+- A picture in the text goes out at the side it stands (left, middle, right), its caption with it; pictures sharing a line share a paragraph, each at most its share of the line; a floating picture is centred as before.
+- Columns go out as columns: a table of one row, no border but the rule between its cells, each column its share of the line — .docx `w:tbl` (fixed layout, every cell ending in a paragraph, a paragraph between two tables and after a last one), .odt `table:table` with its column and cell styles, Rich Text `\trowd … \cell … \row`. `readBlocks` reads a column as a flow of its own (`{type: 'columns', cols: [{share, blocks}]}`); Evernote and Markdown have no columns and get one column after the other with a rule between (`flatBlocks`).
+- Seen in LibreOffice (all three converted to PDF in a throwaway profile): three columns with their rules and widths, the three sides, a row of two, a picture in a line. Word itself could not be started from here (its automation refused), so Word has not opened these files yet.
+
+More than two columns (src/js/columns.js, editor.css, export.js):
+- A divider pulled sideways over a column cuts that column in two where the pointer is — a divider lying in a column, or one of the note pulled up into it; the mark stands in that column, the column tinted. Up to four on a line (`MAX_COLS`), none narrower than 15% (`MIN_COL`; two columns keep their fifth). What the column held keeps the wider part.
+- `data-split` names every divider's place, left to right ("25,50,80"); a block of two is written exactly as before ("50"), so nothing stored changes. Each column between two dividers carries its share (`--w`); the first is `--split` wide, the last takes the rest, so each divider stands at its place on the line.
+- An upright divider dragged moves alone, between its neighbours; one taken away joins the two columns at its sides, and the last ends the columns. `healColumns` keeps two to four columns with a divider between each two and takes a fifth into the fourth.
+
+A picture standing in a line of words (src/js/image-place.js, rich-paste.js):
+- The picture bar's new last place, a▫a: the picture becomes a character of the line before it (`span.note-image.note-image--inline.note-image--inword` — a span, since a figure read back from a file would end the paragraph). Dragged, a mark shows the caret it will go to; its corners resize it; Enter lets go of it with the caret right after it (Shift: before); Delete takes it away and leaves its line. It has no caption, no side and no row; a side on the bar, or the same button, takes it out onto a line of its own, and floating does too.
+- It is a picture of its line in Markdown, HTML, Word, OpenDocument, Rich Text and Evernote.
+
+Not done, and why: the Mac build. A .dmg cannot be made on Windows (electron-builder needs macOS for it); the Mac side of Open with, the document icon there, Touch ID and the line-spacing bug are unseen until someone builds and runs it on a Mac.
+
+Guide: sections 4, 7, 8 and three items in "New in 0.9.4", four languages; What's new three items, four languages; signatures renewed (the ninth test build's four kept).
+Unit 884/884; tests/e2e/layout.mjs 89/89 (30 new); note-folders 33/33; black-holes 45/45; open-with 12/12; ai-sleep 16/16; v094 87/87; v093 138/138; rich-paste 20/20; guide 8/8; deleted 6/6. One run of layout (12) and note-folders (4) failed straight after a build with the machine busy, and passed alone before and after — timing, not found. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-07 01:00] v0.9.4 - by Claude (part 9: Open with Nebula and the violet document icon; videos in black holes; not released)
+
+The owner's Ideas note: "an Open with Nebula entry in Windows and on the Mac — for a docx, a doc, an odt and the other files (not PDF yet); and when Nebula is the default, a file in violet tones: the logo shaped like the auto order page button made violet, fitting the emblem, the Nebula logo at the bottom right." And, on the black holes: "why can video files not be put in a black hole?"
+
+Open with Nebula:
+- The icon (build/make-doc-icon.ps1, vector like the app's, `npm run icons`): the sheet of the auto-order-page button — a page with its top right corner cut, lines of writing — in the app's violets, the app's mark on its dark tile at the bottom right. build/doc.ico (nine sizes), doc.icns (written by the script: 'icns' and PNG entries), doc.png, doc-preview.png.
+- Windows (build/installer.nsh, package.json nsis.include): Nebula is OFFERED for .docx .doc .odt .rtf — `Nebula.Document` (its name, DefaultIcon resources\doc.ico, how to open), `.ext\OpenWithProgids`, `Applications\Nebula.exe\SupportedTypes` — and never makes itself the default: electron-builder's own `fileAssociations` writes the app over whatever opens a .docx today, so it is not used for Windows. A reader who picks Nebula and "Always" gets the violet icon. Uninstalling takes it all away. The installer was COMPILED with the script (into a temp folder, then deleted) and doc.ico is in the packed resources; it was NOT RUN — running it would install over the owner's Nebula, which is never touched. So what Explorer shows after an install has not been seen.
+- macOS (package.json mac.fileAssociations): the same four kinds, rank Alternate (in Open With, not the default), doc.icns. Not built or seen here.
+- The app (electron/open-file.js, new): a file's path among the arguments at start, the `open-file` event on a Mac, or `second-instance` while it runs — read as File → Import reads one (the handler now shares `readNoteFile`), handed to the window once (`files:take`), a new note; the file is never changed. Any kind File → Import reads opens this way.
+- One copy of the app per vault now (`app.requestSingleInstanceLock`, the lock is the profile's own, so Nebula and Nebula Test do not share it): a second start hands its file over, brings the window forward and goes away. Two copies writing one vault was always a way to lose notes; it was simply possible before.
+- Found on the way: every toolbar action is switched off while the open note is in Only view, and the guide is — a file opened into a fresh Nebula did nothing. `importFile` is among the actions that stay, as `import` is.
+
+Videos in black holes (electron/black-holes.js):
+- Why not at first: a note in a black hole is one sealed file opened in memory, and a video is a file beside its note, played from the disk in parts. Now a video is sealed beside its note — `<note>~vid-….bhv`: "NBV1", the piece size (1 MiB), the length, then the video in pieces, each sealed by itself with AES-256-GCM (the hole, the note, the file, the piece's number and the whole length bound in: pieces cannot be swapped, dropped or cut off). The player's requests (`nebula-media://hole/<hole>/<note>/<file>`, byte ranges) are answered by opening only the pieces asked for, in memory, while the black hole is open.
+- A video dropped on a note in a black hole is sealed there; a note moved in takes its videos along (sealed first, then the plain ones go with the note's folder), and taken out gets them back as files. A note deleted takes its videos with it, in the backups too. A video taken out of a note goes the next time the black hole is opened (an undo in between still has it), unless a note of it could not be read.
+
+Guide: sections 7, 8 and one item in "New in 0.9.4", four languages; What's new one item, four languages; signatures renewed (the eighth test build's four kept).
+Unit 861/861; tests/e2e/open-with.mjs 12/12 (new); black-holes.mjs 45/45; note-folders 28/28; v094 87/87; layout 59/59; ai-sleep 16/16; v093 138/138; guide 8/8; deleted 6/6. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-06 22:00] v0.9.4 - by Claude (part 8: black holes — notes kept encrypted; not released)
+
+The owner's Ideas note: "a black hole section beside the folders — notes kept wholly inside it, encrypted to the standards of the trade, stored in a folder of their own inside Nebula; they are for notes that must be safe, and opening one in the app asks for a password: a 4-digit PIN, set when the black hole is made — or a passkey (fingerprint, the computer's PIN)."
+
+On the disk (electron/black-holes.js, new):
+- `storage/blackholes/<hole>/hole.json` — its name, how it is locked, its key wrapped — and `<note>.bh` for each note: "NBH1", then the whole note (title, words, pictures written in) sealed with AES-256-GCM under the black hole's own 256-bit key, a fresh nonce at every save, the hole's and the note's ids bound in (a file moved or renamed does not open). Nothing of a note is anywhere else: not in the notes folder, not in a folder of pictures beside it.
+- The key is kept only wrapped. By the PIN: scrypt (N = 2^16, r 8, p 1) of the four digits and a salt wraps it — and since four digits are ten thousand guesses whatever the derivation, that is wrapped once more by the operating system for this user (Electron safeStorage: DPAPI, the Keychain), so files copied off the computer (a backup, a flash drive) cannot be guessed at. Where the system cannot keep a key the PIN alone wraps it.
+- By Windows Hello or Touch ID instead of a PIN ("passkey"): the key is wrapped by the operating system alone and handed over after it said yes. Windows: `UserConsentVerifier` through Windows PowerShell (the Windows Runtime; `CheckAvailabilityAsync` answered "Available" on this machine); Mac: `systemPreferences.promptTouchID`. THE WINDOWS PROMPT ITSELF HAS NOT BEEN SEEN: nobody was there to lend a finger, and the tests play its answer (NEBULA_HELLO=ok|no|none). It may open behind the window; the owner's try will tell.
+- A recovery key, 160 random bits as 32 letters and digits, shown once when the black hole is made: it opens it on another computer, after Windows is installed again, or when the PIN is forgotten (and asks for a new PIN). Without the PIN and without that key nobody opens it.
+- Five wrong PINs, then every try waits: 30 s, doubling, a quarter of an hour at most; counted in hole.json, so a restart does not reset it.
+- Deleted is deleted: a note deleted from a black hole, and a black hole deleted, are overwritten and removed, in every backup too (backup-purge.js). A note moved INTO a black hole is sealed first and then its plain file is deleted the way a deleted note's is — out of the vault, its pictures' folder and every backup.
+
+In the window (src/js/black-holes.js, new; notes.js; disk-store.js):
+- The round button beside New folder makes one (name; 4-digit PIN twice, or Windows Hello). The black holes stand under the notes: locked, a name and "locked"; open, its notes as a folder shows them, "+ Add a note", "Lock". A note goes in by a drag onto it or from its ⋯ ("Move into a black hole"), and out by "Take out of the black hole". ⋯ on a black hole: Lock / Open, Rename, Change PIN, Delete (asks).
+- While a black hole is open its notes are in the note store, marked `hole`; they are not among the list's notes, the search or "the next note to open". The disk mirror writes each note where it belongs — `placed`: the vault or a black hole — the new place first, then deleted from the old. Locking saves, takes the notes out of the store and makes the mirror forget them (a note that leaves the store otherwise IS a deletion). A file in the notes folder is a plain note whatever it says of itself.
+- A black hole locks itself after ten minutes without a key, a click or the wheel (`nebula:holes-idle-minutes`, 0 for never), and all are locked when the app starts or the page loads again; the main process lets go of every key when the app quits.
+- A video file cannot be kept in a black hole (it is a file beside its note): dropping one says so, and a note holding one cannot be moved in.
+
+Said plainly:
+- A 4-digit PIN protects against someone at the keyboard, and the operating system's wrap against someone with the files. Someone who can run programs as this Windows user, with the files, can try all ten thousand PINs in an hour or so. A longer PIN or a passphrase would close that; four digits were the owner's word.
+- While a black hole is open, its notes are in the app's memory in the clear, and what is done with them is as open as with any note (export, copy, the AI panel).
+- The names of black holes, how many notes each holds and when they were changed can be read on the disk.
+
+Guide: sections 1 and 10 and one item in "New in 0.9.4", four languages; What's new one item, four languages; signatures renewed (the seventh test build's four kept).
+Unit 843/843; tests/e2e/black-holes.mjs 38/38 (new); note-folders 28/28; v094 87/87; layout 59/59; ai-sleep 16/16; v093 138/138; guide 8/8; deleted 6/6. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-06 18:00] v0.9.4 - by Claude (part 7: a folder for each note — pictures and videos as files; not released)
+
+The owner's Ideas note: "a copy of the pictures and videos put into a note — a folder of its own for each note, the files kept in there; let us change how the files are kept, inside storage again." And, on this turn: "part 7; the questions on your mind and what was not changed, last."
+
+On the disk (electron/note-media.js, new):
+- `storage/notes/<id>.json` is the note as before; `storage/notes/<id>/` is its folder, made when it first holds something. A picture is `<24 hex of its sha256>.png|jpg|gif|webp|bmp|avif|svg` there, and `nebula-media://note/<id>/<file>` in the note's file. The id is in the path, under the one host `note`: a browser writes a host in small letters and an id is not always small letters.
+- Pictures change hands at the disk and nowhere else: `storage:read` hands a note over with its pictures written into it again (`inlinePictures`), `storage:write` takes them out (`externalize`), the files first, then the text. So the editor, undo, copy and paste, cropping, every export and the Nebula-note file are untouched — a note's file is small (the Ideas note: 2.4 MB of text before), and a save while typing writes the words only; a picture's file is written once.
+- A picture taken out of a note loses its file at that save (`sweepNote`; an undo writes it again). A note deleted from the Trash loses its folder, shredded, in the vault and in every backup (backup-purge.js: `purgeNoteFromBackups` and `purgeDeletedFromBackups` take folders too).
+- At a start (`prepareNoteFolders`): the first time, the vault is put aside as it was — `backups/pre-note-folders`, never overwritten; without that copy nothing is changed — then every note still holding pictures in its text is written the new way (`tidyVault`) and what no note names any more leaves the folders. A note whose file cannot be read keeps everything. `meta.json` schemaVersion is 2.
+- A note that names a file of another note (a copy of a note) gets its own copy of the file (`rehome`). A note file taken out of a vault and imported brings its pictures when its folder lies beside it.
+
+Videos (new: there was no way to keep a video file in a note):
+- A video file — mp4, m4v, webm, ogv, mov — dropped on a note is copied by the main process into the note's folder (`media:add-video`, the path from `webUtils.getPathForFile` in the preload; `vid-<time>-<random>.<ext>`) and stands after the line it was dropped on, as a card like an embedded video: the browser's own player, the file's name under it, ×, the resize handles (src/js/file-video.js, `.link-block.link-embed.link-file`).
+- The note plays it straight from the folder: the `nebula-media` scheme (privileged: standard, secure, stream), served by the main process with byte ranges, only files of a note's folder, only to the app's own session.
+- A video's file goes at the next start after it left the note, not at the save — an undo in between still has it.
+- In a file for another program a video file is a line "▶ name" (export.js `parse`, export-video.js `prepareVideos`). A note exported as a Nebula note names the video but does not carry it.
+
+Not done, said plainly: pictures are still whole in memory while the app runs (this is the disk's layout, not the app's memory); the note's own .json lies beside its folder, not in it; a video cannot be pasted, only dropped; videos do not travel in an exported note; the daily backups copy the folders whole, videos too.
+
+For the push: tests/e2e/smoke.mjs, old-notes.mjs and the rebuild test have not been run against the new layout.
+
+Guide: sections 7 and 10 and one item in "New in 0.9.4", four languages; What's new one item, four languages; signatures renewed (the sixth test build's four kept). tests/fixtures/clip.webm: one second of a test card, 64 × 36, made once with ffmpeg.
+Unit 811/811; tests/e2e/note-folders.mjs 28/28 (new); v094.mjs 87/87; layout.mjs 59/59; ai-sleep.mjs 16/16; v093.mjs 138/138; guide 8/8; deleted 6/6. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-06 15:00] v0.9.4 - by Claude (pictures after the owner's try; part 6: sleeping AI tabs, the sidebar's last row; not released)
+
+The owner's note, read again after the part 5 build: "a bug in making pictures bigger and smaller, and a problem adding a third picture"; and the line about the lower part that must not overflow now stands under the snapshot of the app loading. Then: "go on; what was not done can stay".
+
+Pictures:
+- A third picture beside two was pushed under them: each picture of a row was at most half the line. Each now knows how many share its line (`--row` on the figure, written by image-place.js `tidyRows`, counted again on load) and is at most that share; three, four … fit as two did.
+- Making a picture bigger and smaller: a picture in the text was resized from the width it was GIVEN, which a narrow page, a column or a row may have drawn smaller — so the first part of a pull did nothing, and a pull outward stored a width it could not have. It is resized from the width it is drawn at and never given more than is drawn. One in the middle of its line grows to both sides, so its corner follows the pointer at twice the pull.
+- Not reproduced beyond these two; if the owner meant something else, a word on what was pulled and what happened.
+
+The sidebar's last row: "Check for updates" was written there and moved into About by the script; until the script ran it squeezed the languages to "E… D… P… T…" (the snapshot). It is in About from the start (index.html).
+
+Sleeping AI tabs (src/js/ai-services.js, ai-panel.js; electron/main.js, preload.js):
+- Measured on a throwaway profile: 455 MB with nothing open (main 113, GPU 147, network 49, the page 146); every AI tab opened once +170 to 300 MB, plus an audio and a video-capture service (260 MB) once a site asks for devices; closing the panel keeps all of it (the pages are not reloaded by closing, either — checked).
+- A tab not looked at for 20 minutes — another tab in front, the panel closed, or the window minimised — has its view removed (the memory goes with it) and remembers its address; opening it loads that address again. Its tab is paler, its dot a ring.
+- Sleeping is a reload later, and the owner: "if somebody's temporary chat is in there I would not want to break it". So a tab stays awake when a reload could lose something we can know of without reading the page: its address says temporary / incognito; or keys were pressed in it since its address last changed and the address names no saved chat (a temporary chat whose address does not say so; words on a new chat never sent); or the last key pressed was not Enter (words not sent); or it is playing sound or loading. The main process tells the page only THAT a writing key was pressed in a view and whether it was Enter (`ai:typed` {wc, enter}) — never the key.
+- Right-click a tab: Keep awake / Let it sleep when unused (kept in `nebula:ai-awake`), and Put to sleep for a tab not on screen. `nebula:ai-sleep-minutes` in localStorage sets the time (0: never); there is no control for it yet.
+- Not covered: words pasted with the mouse only (no key), a temporary chat started by clicking a suggestion on a site whose address does not say so. Keep awake is the answer there.
+
+ChatGPT, "the first time I entered the e-mail it failed, the second time it worked": Nebula Test's own sign-in log shows exactly that on 2026-09-30 — the sign-in window began as Firefox, Google refused it after the e-mail step, the window went on to the next way and asked for the e-mail again. Since the build of that evening it begins as Chromium for ChatGPT and Copilot, and the log shows both signed in at the first try (09-30 22:53, 10-01 08:20); what works is remembered per site. Nothing changed now. The installed app's log was not read (never the installed app).
+
+Mac line spacing after A4 → A3 → NW: the owner's steps on Windows, and again as a screen whose real scale is 1 (what a Mac answers: NEBULA_REAL_SCALE, a new test switch in electron/main.js): every line 32.2 px apart before and after, the markup plain <p>s. Not reproduced, nothing changed; a note exported as a Nebula note from the Mac after it happens would show whether it is the markup or the drawing.
+
+Guide: section 1 (the AI panel) and one item in "New in 0.9.4", four languages; What's new one item, four languages; signatures renewed (the fifth test build's four kept).
+Unit 786/786; tests/e2e/ai-sleep.mjs 16/16 (new); layout.mjs 59/59; v094.mjs 87/87; v093.mjs 138/138; guide 8/8. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-05 13:00] v0.9.4 - by Claude (part 5: pictures on their line, side by side; a divider that splits the page; not released)
+
+The owner's Ideas note, read again: "one mode fixes the picture at the left — make that an alignment setting … so I can put the picture left or right as I like" (two snapshots from Word: in line with the text, and between the lines anywhere); "I would have liked to put this picture beside the other one — it must not spill over when the window is at the side of the screen"; "dividers should be able to split the page … I add a divider and drag it to the right side; it should show how it will be dropped, and place it if the user agrees"; "split the page down the middle — only that part — so I can write on the right; later another divider below, and the old way again under it".
+
+Pictures (src/js/image-place.js, new):
+- A picture in the text stands left, in the middle or at the right of its line: `note-image--center` / `--right` on the figure, four more buttons on its bar (shown for pictures in the text only), the current place lit.
+- Two pictures share a line: `note-image--row` on each; they stay blocks of the note (inline-block, each at most half the line), so everything that selects, moves and deletes pictures goes on working, and a narrow window makes them smaller instead of cutting them off. A row of one is no row (tidied on load, undo, delete, floating).
+- A picture in the text can be dragged (it could not be moved by the mouse at all): sideways on its own line it snaps left / middle / right as it goes; over another picture an upright mark stands at that picture's side; between two blocks a flat mark lies there. Nothing moves until the button is let go; Esc gives it up; one Ctrl+Z undoes it.
+
+Columns (src/js/columns.js, new; the mark is src/js/drop-mark.js):
+- A divider is dragged. Up or down: a flat mark, and it moves there. Sideways by 40px or more: it stands up — an upright mark at the pointer and a tint over the part it will split. That part is everything between the divider and the next divider (or columns) above it; with the pointer held lower than the divider, below it; with the pointer over a block of that part, from that block. Let go: `<div class="blk-cols" data-split="50" style="--split: 50%"><div class="blk-col">…</div><hr class="blk-vr"><div class="blk-col">…</div></div>`, what was there in the wider column, an empty line in the other with the caret in it, and a line under the columns when nothing follows. The dragged divider IS the upright one.
+- The upright divider: dragged sideways it moves the split (20–80 %, sticky at the half and the thirds); a click picks it and Backspace / Delete puts the two columns back into one flow, left first.
+- Columns do not nest and need both columns: `healColumns` (on input, on load, on undo, and in migrate.js) puts right whatever an edit left — an emptied column gets its line, a block that lost a column becomes one flow again, no word lost. Backspace at the very start of a column and Delete at its very end do nothing, so a column is not joined to what stands outside it.
+- The places that looked for "the block one level under the note" know a column is such a level: toolbar.js blockOf, slash-menu.js, lists.js (leaving a list), blocks.js (leaving a quote), inline-format.js, rich-paste.js (a pasted picture or link card stays in its column), migrate.js (an empty column is not "a blank line").
+- In a file for another program the columns are one flow, left then right, with a rule between (the upright divider is an `<hr>`): Markdown, Word, OpenDocument, Rich Text, Evernote. PDF and print keep the columns; the HTML export has their CSS.
+
+Not done, said plainly: a picture cannot stand in the middle of a line of words (Word's "in line with text") — it is always on a line of its own or beside other pictures; Word/ODT/RTF still centre every picture whatever its place in the note; the columns are two, not three.
+
+Guide: section 4 (dividers), section 7 (pictures) and two items in "New in 0.9.4", in the four languages; What's new two items in four languages; signatures renewed (the fourth test build's four kept).
+Unit 773/773; tests/e2e/layout.mjs 51/51 (new); v094.mjs 86/86; v093.mjs 138/138; guide 8/8. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-05 10:00] v0.9.4 - by Claude (a theme of one's own, Matcha a ready profile; not released)
+
+The owner: take Matcha out of the row; at the far right a button, like the one that adds a folder, that opens upward, over Archive and Trash, a custom profile editor — background, sidebar / darkest tone, lines, accent, text — changing the app live; a name and "Save this profile" on top; Matcha there as the ready template. Modelled on the custom theme screen of the Pixel Pomo Android app (its CustomThemeScreen).
+
+- Four fixed themes again (Main, Dark, Light, White) and a palette button at their right (`#btn-theme-custom`). It opens `#theme-editor` in the sidebar, above the drawer tabs: name + Save this profile, the profiles (Matcha always, saved ones with a ×, "Last edited" for colours never saved), five slots, the long bar of the chosen slot (press it for any colour) with a code field, 28 ready colours of the Pixel Pomo palette, and a warning when the words cannot be read on their ground.
+- src/js/theme-custom.js: the colour math and the profiles — five picks become every token (`deriveTokens`: raised and sunken paper, three inks, rule, accent and its soft tone, `--on-clay` for words on the accent, shadow, color-scheme). src/js/theme.js: the picks are worn as inline tokens on `<html>` over the fixed theme of the same tone (`data-theme` main or light, `data-profile="custom"`), so every rule written for dark or light themes still holds; a fixed theme takes them all off. A test build's saved `matcha` is read as the custom theme wearing Matcha. src/js/theme-editor.js: the panel; every pick calls `theme.wearCustom` — the app is the preview.
+- Kept in localStorage: `nebula:theme` (`custom`), `nebula:theme-custom` (the colours worn), `nebula:theme-profiles` (the saved ones). Deleting a profile asks first; Matcha's name cannot be taken.
+- The picked background is the app's ground; the note's sheet lies a tone above it, as in Main.
+- Opening Archive or Trash puts the editor away and the editor puts them away: they share the room.
+- Guide (section 1 and "New in 0.9.4") and What's new rewritten in the four languages; signatures renewed, the third test build's four kept.
+- Unit 748/748; tests/e2e/v094.mjs 86/86; v093.mjs 138/138; guide 8/8. No full smoke, rebuild or old-notes; not pushed.
+
+---
+
+## [2026-10-05 08:00] v0.9.4 - by Claude (Matcha made dark; not released)
+
+The owner, on seeing Matcha as a light theme: "look at the Pixel Art Kit in the Pixel Pomo folder — like the Main theme, dark green and a white font."
+
+- Matcha is Main's twin in green now. Its tones are the Art Kit's own MATCHA palette (BG #1a2420, CANVAS_BG #141c18, PANEL_HI #35483c, ACCENT #a6e3a1, SELECTED_ROW #3a5f3a, WORK, ERROR, ON_SURFACE, ON_DIM), with the words lifted to near-white (#F1F6EE) as asked. A dark theme: `color-scheme: dark`, the dark note colours of :root, and it is out of every rule that told the light themes apart again.
+- Guide and What's new say "dark green with white words", in the four languages; signatures renewed (the second test build's four kept).
+- Unit 733/733; tests/e2e/v094.mjs 73/73 (Matcha: a dark green ground, white ink, contrast over 10 on text and over 4.5 on its buttons).
+
+---
+
+## [2026-10-05 01:00] v0.9.4 - by Claude (labels after the owner's try; part 4: fonts and Matcha; not released)
+
+The owner, after trying the labels: "#abc, the first label I made, changed to #ace — it stopped being kept: only #ac was left"; "the label lights up like Ctrl+F, but with several in one note there is no going from one to the next"; then: part 4.
+
+- A label could be shortened and never lengthened: letters typed at a chip's end were put outside it (the 0.9.3 rule that kept "#errands word" apart). Now a space or a mark at the end still ends the label, and letters and digits typed straight on are the label's own; the place right behind a chip counts as its end too. #abc → #ace is one chip, tag "ace".
+- The label's places in a note have a bar (label-filter.js initLabelHits): the label, "2 of 5", ↑ ↓ and ✕, in the find bar's look and place (under it when both are open). The one stepped to is lit stronger than the rest; ✕ puts bar and paint away until another note or label.
+- **Matcha**, a fifth theme in the middle of the row: near-white paper, deep green ink, a matcha accent; a light theme, so every rule that tells light from dark learned its name, and it takes the light note colours.
+- **Fonts.** A copy made inside Nebula keeps a font and a size somebody chose (cleanNebulaHtml: what is not the app's own face and size, and not a heading's or inline code's own); the default still goes, so default words take the font where they land. Pasted lines are written in the note's writing font, as typed ones are (dressInNoteFont — each pasted block's words in a span with it; loose words too on an empty line; a heading takes the face only).
+- **The Font menu** has a search and "+ Add a font": the fonts of this computer (queryLocalFonts — `local-fonts` is granted to the app's own window only), under the app's own; picking one adds it to the reader's list (localStorage `nebula:fonts`, × takes it off) and applies it. A name typed that is in no list can be added if the computer has it (measured).
+- Guide and What's new: Matcha, fonts and labels, in the four languages; signatures renewed (the first test build's four kept, so its guide is still known as unwritten-in).
+- Unit 733/733; tests/e2e/v094.mjs 73/73. No full smoke, rebuild or old-notes run.
+
+---
+
+## [2026-10-04 22:30] v0.9.4 - by Claude (privacy, the guide in four languages, AI session data, part 3: labels; not released)
+
+The owner passed on a reader's question — "is the app saving data from the AI chat?" — and then: "add it [the answer, to the guide], go on with the notes, add a clear-session option to the AI panel's right-click, above Delete, and Delete should ask 'are you sure'"; and a reader's word on the guide: "it would be better if, when you switch to Deutsch, the whole welcome page and its information switched too."
+
+- The answer, checked in the code: no. An AI tab is a `<webview>` on its own `persist:ai-<id>` session; nothing reads a chat's page, nothing of it is stored or sent. What is kept locally is the session (cookies, site data, cache), `sign-in-methods.json` (site and method name) and `sign-in-log.txt` (redacted addresses). The app's own requests are the update check, a bookmark's title and a video's still.
+- Guide: a new section **9 · Your privacy** says so (Where your notes live is 10, Code blocks 11), and "New in 0.9.4" lists this release; the sentences about Ctrl + / Ctrl − zooming, the right-click menu, toggles, folders and AI tabs were brought up to date. GUIDE_VERSION 0.9.4.
+- **The guide in the language of the app** (guide-i18n.js, guide-de.js, guide-pl.js, guide-tr.js): one entry for each of the English guide's 148 blocks with words, plus the title and the shapes' words; code samples, dividers and the stage are the English guide's own. A translation that is a block short is not used at all. The vault's guide follows the language at start and on every change of language — title and page — while nobody has written in it (its signature is one that shipped; the four of 0.9.4 are in GUIDE_SIGNATURES), without dating it. A guide somebody typed in stays as it is. `node scripts/guide-blocks.js` lists the blocks, `--check` the counts, `--signatures` the signatures. Help → Guide page gives the guide in the app's language; place-test-exe and old-notes know the four titles.
+- **What's new** for 0.9.4 is written, in the four languages (RELEASE_NOTES_I18N, notesIn); older sheets stay English.
+- **AI tab → Clear session data** (`ai:clear-session`: that tab's storage, cache and auth cache; the tab loads again), above Delete website; both ask first, in the menu itself.
+- **Labels (part 3 of the Ideas note):** typing `#` opens the labels already in use — of titles and of texts — narrowed as you type; nothing is lit unless what was typed is a label, so Space and Enter still make the label as typed, and ↓ or Tab pick from the list. A chip's `data-tag` follows its word as it is edited (it kept the first word: "#abc changed to #abd — abd stays among the labels"), and a chip whose # is deleted is words again. With a label picked in Filter by label, the open note shows where it is: its chips painted with the Custom Highlight API (nothing written into the note), the first brought into view when a note is opened from the list, a label of the title ringed.
+- Found on the way: a chip put in by script with an ordinary space after it took the next typed letter into itself (a trailing space collapses and the caret counts as in the chip) — the space is a no-break one, as a typed one is.
+- Unit 723/723; tests/e2e/v094.mjs 60/60; v093.mjs 138/138 (its AI tab checks follow the new menu); guide.mjs 8/8. No full smoke, rebuild or old-notes run.
+
+---
+
+## [2026-10-04 20:30] v0.9.4 - by Claude (part 2 of the Ideas note: toggles; not released)
+
+The owner, after trying part 1: "when text is selected the right-click menu and the copy menu should be one — and go on with the notes." The Ideas note had two new snapshots: Ctrl + / Ctrl − with only a caret ("what grows? something moves but I cannot tell what") and "full folders should have + Add a note at the top too".
+
+- Over selected words a right-click opens ONE menu: the formatting bar's buttons as its first row (drawn from the bar itself), then Cut, Copy, the three pastes and Select all. Nothing in it takes the focus, so the words stay selected.
+- Ctrl + / Ctrl − with only a caret sized the editor's direct child — in a list the whole list — and words carrying a size of their own did not move. It sizes the LINE the caret is in now (the size box does too), the line's own words letting go of their size; the keys no longer change the note's writing size. The owner's note was left with `font.size 16` by the first build: the size box sets it back.
+- "+ Add a note" stands at the top of every open folder, not only an empty one; a note dragged onto it goes into the folder.
+- Toggles (the second Ideas note):
+  - A click just before a title's first letter folded the toggle (the arrow's zone was 24 of the 26px before the words); it is 20 now, and the caret goes to the start.
+  - Enter at the start of a title with words puts an empty line ABOVE the toggle (it emptied the title into the body) — the way to get a caret before a toggle that opens a note or follows an embed, where neither arrow key could go.
+  - Ctrl+B (or I, strike) then typing on an empty line came out plain in a note with a writing font: the letter is put in by hand there and never saw Chromium's typing state. It is wrapped in what was switched on.
+  - A list item becomes a toggle IN its list (`<li><div class="blk-toggle">`), its sub-list what folds; it used to be taken out and the list split in two. Enter and Backspace in such a toggle are handled by toggles.js (Chromium's own answer broke the item out of the list) and marked, so toolbar.js's list rules do not act on the same key.
+  - Headings that fold: `/toggle-h1`, `/toggle-h2`, `/toggle-h3`, and the toggle button on a heading keeps it a heading; the arrow sits at the middle of the heading's line.
+  - The toggle button on a title takes the toggle away again (it put a second toggle inside the first).
+- Unit 705/705; tests/e2e/v094.mjs 41/41; tests/e2e/v093.mjs 138/138 (toggles and lists live there). No full smoke, rebuild or old-notes run.
+
+---
+
+## [2026-10-04 19:00] v0.9.4 - by Claude (part 1 of the Ideas note, not released)
+
+The owner: "read the note in Nebula Test and act on it; split the tasks into parts, I will check step by step." The note is "Ideas For Nebula and Testing For Nebula" in Nebula Test's vault (about thirty items, eleven snapshots). Part 1 is the small things; the parts still to do are in memory.json `next`.
+
+- What's new ran off the bottom of the window: the sheet (and Shortcuts, Blocks, About) is at most 86 % of the window high and its list scrolls; the button stays in reach.
+- Paste from the right-click menu, the bar and Edit did nothing while Ctrl+V worked: the page may not read the clipboard (`clipboard-read` is not granted, and Electron no longer runs execCommand('paste')). The main process makes a real paste now (`edit:paste`), which arrives as the paste event Ctrl+V sends. The menu offers three ways: Paste as Nebula format, Paste original format, Paste only text.
+- "I paste a web page and the screen goes to the top": focus coming back from the "Paste as" address put a caret at the top of the note first. restoreRange focuses without scrolling.
+- Pasted words went black-on-dark in another theme: insertHTML wrote the ink of the theme that was on onto what it inserted (`<b style="color: rgb(…)">`). It comes off after the paste (undressInserted), and notes already written lose every frozen theme ink on opening and in the vault repair (dropFrozenInk, MARKUP_VERSION 0.9.4, an exhibit in the residue museum). A colour the source page gave ("original format") is not touched.
+- Ctrl + and Ctrl − size the words, one step along the size list (they did nothing: the app has no native menu to carry an accelerator). The View menu's zoom items keep working, without a key beside them.
+- `-->` and `<--` become → and ← as they are typed (auto-arrows.js); not in code; one Ctrl+Z gives the characters back.
+- Spelling: "Ignore" beside "Add to dictionary" — the word is left alone until the app closes (kept in the dictionary meanwhile, taken out at the next start); English is checked as American and British together.
+- A thin line between the page sizes and the pad, and the two closer together.
+- An empty folder shows "+ Add a note" above "Drag notes here"; the note is made in that folder.
+- The folded rail no longer shows ⋯ over a note's initial; a right-click on a note or a folder (folded or not) opens its menu at the pointer.
+- While the app loads, the bar and the page stood side by side: the bar's place is set before the vault is read, and the page is served with it on top.
+- Unit 701/701; tests/e2e/v094.mjs 23/23 (joined to the smoke run). No smoke, rebuild or old-notes run: the owner tests Nebula Test.exe first.
+- Not done yet, for the push: the guide's "New in" and What's new for these, README/Prompt where they name the shortcuts.
+
+---
+
 ## [2026-10-04 14:00] v0.9.3 - by Claude (twenty-eighth round)
 
 The owner: "without, the notes should look like bookmarks" — then: continue, and push Nebula.

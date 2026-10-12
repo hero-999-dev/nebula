@@ -10,6 +10,10 @@
 const bound = new WeakSet();
 const titles = new Map();
 const TITLE_CACHE_MAX = 100;
+/** An embed whose process is gone is loaded again: so many times within so long, each a little later. */
+const REVIVE_TRIES = 3;
+const REVIVE_WITHIN_MS = 60_000;
+const REVIVE_WAIT_MS = 400;
 
 /** "https://www.example.com/a/" and "example.com/a" are the same address. */
 const bareAddress = (s) => String(s ?? '').trim().toLowerCase()
@@ -85,6 +89,23 @@ export function bindLinkPreview(card, { onTitle, placeholder } = {}) {
       if (e.errorCode === -3 || e.isMainFrame === false) return; // aborted, or a sub-frame
       failed = true;
       if (hint) hint.hidden = false;
+    });
+    // A page whose process is gone — it crashed, or the system ended it for
+    // its memory — left a flat grey box where the video was for as long as the
+    // note stayed open: "why is this such a grey screen" (the owner's Ideas
+    // note, 0.9.4). It is loaded again; one that keeps going is left alone.
+    let gone = 0;
+    let goneAt = 0;
+    frame.addEventListener('render-process-gone', () => {
+      const now = Date.now();
+      if (now - goneAt > REVIVE_WITHIN_MS) gone = 0;
+      goneAt = now;
+      gone += 1;
+      if (gone > REVIVE_TRIES) { failed = true; if (hint) hint.hidden = false; return; }
+      setTimeout(() => {
+        if (!frame.isConnected) return;
+        try { frame.reload(); } catch { /* taken out of the note meanwhile */ }
+      }, REVIVE_WAIT_MS * gone);
     });
     frame.addEventListener('did-finish-load', () => {
       loaded = true;

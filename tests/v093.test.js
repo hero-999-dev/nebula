@@ -144,7 +144,7 @@ describe('four languages', () => {
     expect(detectSlash('/başlık')?.query).toBe('başlık');
     expect(detectSlash('text /überschrift')?.query).toBe('überschrift');
     setLang('tr');
-    expect(filterSlash('başlık').map((i) => i.id)).toEqual(['h1', 'h2', 'h3']);
+    expect(filterSlash('başlık').map((i) => i.id)).toEqual(['h1', 'h2', 'h3', 'toggle-h1', 'toggle-h2', 'toggle-h3']);
     setLang('en');
   });
 });
@@ -160,7 +160,8 @@ describe('right-click suggestions', () => {
     expect(spellLanguages('tr', available)).toEqual(['tr']);
     expect(spellLanguages('de', available)).toEqual(['de-DE']);
     expect(spellLanguages('pl', available)).toEqual(['pl']);
-    expect(spellLanguages('en', available)).toEqual(['en-US']);
+    // English is American and British together (0.9.4); see tests/v094.test.js.
+    expect(spellLanguages('en', available)).toEqual(['en-US', 'en-GB']);
     expect(spellLanguages('de', ['en-US'])).toEqual(['en-US']);
     expect(spellLanguages('tr', [])).toEqual([]);
   });
@@ -276,15 +277,17 @@ describe('0.9.3 markup', () => {
     expect(dropWrapperIndents(root)).toBe(1);
     expect(root.innerHTML).toBe('<div><h3>Bugs</h3><ul><li>a</li></ul></div><div data-ind="2">one line</div><p data-ind="1">p</p><div class="blk-todo" data-ind="1">t</div>');
     expect(dropWrapperIndents(root)).toBe(0);
-    expect(MARKUP_VERSION).toBe('0.9.3');
+    expect(MARKUP_VERSION >= '0.9.3').toBe(true);
   });
 
-  it('makes a toggle from a line, and from a list item without splitting the list wrong', () => {
+  it('makes a toggle from a line, and from a list item inside its list', () => {
     const root = dom('<p>Title <b>bold</b></p><ul><li>a</li><li>b</li><li>c</li></ul>');
     const toggle = makeToggle(root.querySelector('p'));
     expect(toggle.outerHTML).toBe('<div class="blk-toggle" data-open="true"><p class="toggle-title">Title <b>bold</b></p><div class="toggle-body"><p><br></p></div></div>');
     makeToggle(root.querySelectorAll('li')[1]);
-    expect(root.innerHTML.replace(/<div class="blk-toggle".*?<\/div><\/div>/g, 'T')).toBe('T<ul><li>a</li></ul>T<ul><li>c</li></ul>');
+    // 0.9.3 took the item out of the list and split the list in two; from
+    // 0.9.4 the item stays where it is and holds the toggle (tests/v094.test.js).
+    expect(root.innerHTML.replace(/<div class="blk-toggle".*?<\/div><\/div>/g, 'T')).toBe('T<ul><li>a</li><li>T</li><li>c</li></ul>');
   });
 });
 

@@ -42,8 +42,23 @@ export function menuFacts(params) {
 export function spellLanguages(lang, available = []) {
   const want = { en: ['en-US', 'en-GB'], de: ['de-DE', 'de'], pl: ['pl', 'pl-PL'], tr: ['tr', 'tr-TR'] };
   const pick = (code) => (want[code] || []).find((tag) => available.includes(tag));
-  const chosen = pick(lang) ?? pick('en');
-  return chosen ? [chosen] : [];
+  // English is checked as American and British together (the owner, 0.9.4:
+  // "only the American spelling is corrected") — "colour" and "color" both pass.
+  const english = () => want.en.filter((tag) => available.includes(tag));
+  if (lang === 'en') return english();
+  const chosen = pick(lang);
+  return chosen ? [chosen] : english().slice(0, 1);
+}
+
+/**
+ * "Ignore" (0.9.4): the word is left alone until the app closes. Chromium has
+ * no such list, so the word goes into the dictionary and is remembered here;
+ * what is remembered is taken out again when the app next starts.
+ */
+export function forgetIgnoredWords(ses, words = []) {
+  for (const word of words) {
+    try { ses.removeWordFromSpellCheckerDictionary(String(word)); } catch { /* never added */ }
+  }
 }
 
 /**
@@ -59,9 +74,29 @@ export function installContextMenu(win) {
 /**
  * @param {Electron.IpcMain} ipcMain
  * @param {() => Electron.BrowserWindow|null} getWindow only this window may ask
+ * @param {{read: () => string[], write: (words: string[]) => void}} [ignored] the words "Ignore" put aside
  */
-export function registerEditingHandlers(ipcMain, getWindow) {
+export function registerEditingHandlers(ipcMain, getWindow, ignored = null, pictureOf = null) {
   const ours = (event) => event.sender === getWindow()?.webContents;
+
+  // Paste from a menu (0.9.4). The page may not read the clipboard itself
+  // (`clipboard-read` is not granted, and Electron no longer runs
+  // execCommand('paste')), so "Paste" in the right-click menu, the bar and
+  // Edit did nothing while Ctrl+V worked. A real paste is made here; it
+  // arrives in the page as the same paste event Ctrl+V sends.
+  ipcMain.handle('edit:paste', (event, how) => {
+    if (!ours(event)) return false;
+    if (how === 'plain') event.sender.pasteAndMatchStyle();
+    else event.sender.paste();
+    return true;
+  });
+  ipcMain.handle('spell:ignore', (event, word) => {
+    if (!ours(event) || typeof word !== 'string' || !word.trim()) return false;
+    const w = word.trim();
+    const added = event.sender.session.addWordToSpellCheckerDictionary(w);
+    if (added && ignored) ignored.write([...new Set([...ignored.read(), w])]);
+    return added;
+  });
 
   // Chromium replaces the word it underlined; the page has already put the
   // note's undo step in place before asking.
@@ -86,9 +121,12 @@ export function registerEditingHandlers(ipcMain, getWindow) {
 
   // A picture onto the clipboard as a picture (for Paint, Word, a chat) and as
   // HTML (for another note). The page sends it as a PNG data URL.
-  ipcMain.handle('clipboard:image', async (event, { dataUrl, html } = {}) => {
-    if (!ours(event) || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return false;
-    const image = nativeImage.createFromDataURL(dataUrl);
+  ipcMain.handle('clipboard:image', async (event, { dataUrl, html, url } = {}) => {
+    if (!ours(event)) return false;
+    // A picture the note shows from its file (0.9.4): read from there.
+    const source = typeof url === 'string' && pictureOf ? pictureOf(url) : dataUrl;
+    if (typeof source !== 'string' || !source.startsWith('data:image/')) return false;
+    const image = nativeImage.createFromDataURL(source);
     if (image.isEmpty()) return false;
     await writeImageToClipboard(image, typeof html === 'string' && html ? html : null);
     return true;

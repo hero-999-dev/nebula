@@ -33,8 +33,13 @@ export const ICONS = {
   tag: S('<path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1 1 0 0 1 0 1.4l-7.3 7.3a1 1 0 0 1-1.4 0z"/><circle cx="8" cy="8" r="1.4"/>'),
   // The language picker (0.9.3): a globe - an outline, the equator and one meridian.
   globe: S('<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 2.6 3.9 5.6 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.6-3.9-9s1.3-6.4 3.9-9z"/>'),
+  /** A black hole's lock (0.9.4): shut, and with its shackle swung open. */
+  lock: S('<rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
+  unlock: S('<rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.6-1.7"/>'),
   /** A pushpin, for a pinned note. A bare dot said nothing about why. */
   pin: S('<path d="M9 4h6l-1 5 3.5 3.5H6.5L10 9z"/><path d="M12 12.5V20"/>'),
+  /** A theme of one's own (0.9.4): a painter's palette with three wells and its thumb hole. */
+  palette: S('<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8h2.3a3.6 3.6 0 0 0 3.6-3.6C20.5 6.8 16.7 3.5 12 3.5z"/><circle cx="7.9" cy="11.6" r="1.1"/><circle cx="10.4" cy="7.9" r="1.1"/><circle cx="14.8" cy="8" r="1.1"/>'),
   /** A folder in the note list (0.9.3): a tab on the left, the body under it. */
   folder: S('<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>'),
 
@@ -89,6 +94,8 @@ export const ICONS = {
   emoji: S('<circle cx="12" cy="12" r="8.5"/><path d="M8.8 14.5a4.2 4.2 0 0 0 6.4 0"/><circle cx="9.2" cy="9.8" r=".9" fill="currentColor" stroke="none"/><circle cx="14.8" cy="9.8" r=".9" fill="currentColor" stroke="none"/>'),
   clip: S('<path d="M19 11.5 12 18.5a4.5 4.5 0 0 1-6.4-6.4l7.6-7.6a3 3 0 0 1 4.3 4.3l-7.6 7.6a1.6 1.6 0 0 1-2.2-2.2l6.9-6.9"/>'),
   bookmark: S('<path d="M6 4.5h12v15l-6-4-6 4z"/>'),
+  /** A video file (0.9.4): a screen with a play mark. */
+  video: S('<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m10.5 9.2 4.6 2.8-4.6 2.8z"/>'),
   search: S('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>'),
   spell: S('<path d="M3 16 7 6l4 10"/><path d="M4.4 13h5.2"/><path d="m13.5 15 2.5 2.5 5-5.5"/>'),
   preview: S('<path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8z"/><path d="M14 3.5V10h5"/><circle cx="12" cy="14.5" r="2"/><path d="M8 14.5c1.4-2 6.6-2 8 0-1.4 2-6.6 2-8 0z"/>'),
@@ -105,6 +112,7 @@ export const ICONS = {
   quote: S('<path d="M4 5.5v13"/>'
     + '<path d="M9 8.5h3.2v3.2c0 1.9-1.1 3.2-3.2 3.6v-1.5c1-.3 1.5-.9 1.5-1.7H9z" fill="currentColor" stroke="none"/>'
     + '<path d="M15.4 8.5h3.2v3.2c0 1.9-1.1 3.2-3.2 3.6v-1.5c1-.3 1.5-.9 1.5-1.7h-1.5z" fill="currentColor" stroke="none"/>'),
+  table: S('<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M3 9.5h18"/><path d="M3 14.5h18"/><path d="M9 4.5v15"/><path d="M15 4.5v15"/>'),
   divider: S('<path d="M3 12h18"/><path d="M6 7h12" opacity=".35"/><path d="M6 17h12" opacity=".35"/>'),
   heading: S('<path d="M5 5v14"/><path d="M13 5v14"/><path d="M5 12h8"/><path d="M17 19V9l3-1.5"/>'),
   // The three headings used one icon between them, so H1, H2 and H3 were three

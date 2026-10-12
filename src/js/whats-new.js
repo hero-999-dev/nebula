@@ -5,7 +5,8 @@
  * is to say and whether it has been said already, and both of those are pure
  * functions with tests. This only draws and remembers.
  */
-import { RELEASE_NOTES, notesFor, shouldShow } from './release-notes.js';
+import { RELEASE_NOTES, notesFor, notesIn, shouldShow } from './release-notes.js';
+import { getLang } from './i18n.js';
 
 const KEY = 'nebula:whats-new-seen';
 
@@ -53,7 +54,8 @@ export function initWhatsNew(els, opts = {}) {
   }
 
   function show(entry) {
-    draw(entry);
+    // In the language of the app when the entry has been translated (0.9.4).
+    draw(notesIn(entry, opts.lang?.() ?? getLang()));
     const title = document.getElementById('whats-new-title');
     if (title) title.textContent = `What’s new in v${entry.version}`;
     overlay.hidden = false;

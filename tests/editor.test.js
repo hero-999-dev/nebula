@@ -70,7 +70,13 @@ describe('slash menu', () => {
     expect(filterSlash('').length).toBe(SLASH_ITEMS.length);
     expect(filterSlash('cod')[0].id).toBe('code');
     expect(filterSlash('shape')[0].id).toBe('shape');
-    expect(filterSlash('head').map((i) => i.id)).toEqual(['h1', 'h2', 'h3']);
+    // The plain headings first, then the three that fold (0.9.4).
+    expect(filterSlash('head').map((i) => i.id)).toEqual(['h1', 'h2', 'h3', 'toggle-h1', 'toggle-h2', 'toggle-h3']);
+    // /paragraph is the plain line the outline dropdown calls Paragraph — /text still finds it (0.9.4).
+    expect(filterSlash('paragraph').map((i) => i.id)).toEqual(['text']);
+    expect(filterSlash('text')[0].id).toBe('text');
+    // /video: a video file from the computer (0.9.4).
+    expect(filterSlash('video').map((i) => i.id)).toEqual(['video']);
   });
 
   it('every item names a real icon', () => {

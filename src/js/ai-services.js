@@ -93,6 +93,82 @@ export const AI_SERVICES = {
 };
 
 /**
+ * A tab nobody is looking at goes to sleep (0.9.4).
+ *
+ * The owner's Ideas note, over a task manager showing Nebula at 750 MB: "the
+ * AI panels can go to sleep when they are not used, as in other browsers — but
+ * if that works like reloading the page and somebody's temporary chat is in
+ * there, I would not want to break it." Measured: every tab that was opened
+ * once holds 170 to 300 MB for as long as the app runs, the panel open or not.
+ *
+ * Sleeping IS loading the page again later — there is no other way to give
+ * the memory back — so a tab sleeps only when that loses nothing we can know
+ * of. The app does not read a page to find out; it goes by the address, and by
+ * whether keys were pressed in the tab since the address last changed:
+ *
+ *   – a temporary or incognito chat (the address says so) stays awake;
+ *   – so does a tab that was typed in while its address names no saved chat —
+ *     a temporary chat on a site whose address does not say so, or words on a
+ *     new chat's page that were never sent;
+ *   – and one that was typed in last without Enter: words not sent yet;
+ *   – and one that is playing sound, or still loading.
+ *
+ * A saved chat comes back from its own address, so it may sleep.
+ */
+export const SLEEP_AFTER_MS = 20 * 60 * 1000;
+
+/** An address that says the chat is not kept: ChatGPT's ?temporary-chat=true, Claude's ?incognito. */
+export function isTemporaryChat(raw) {
+  try {
+    const u = new URL(raw);
+    return /temporary|incognito|private[-_]?chat/i.test(`${u.pathname}${u.search}${u.hash}`);
+  } catch { return false; }
+}
+
+/** An address that names one saved chat: a long id among its parts (/c/<uuid>, /chat/<uuid>, /app/<hex>). */
+export function namesSavedChat(raw) {
+  try {
+    return new URL(raw).pathname.split('/').some((part) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(part)
+      || (/^[A-Za-z0-9_-]{12,}$/.test(part) && /\d/.test(part) && /[A-Za-z]/.test(part)));
+  } catch { return false; }
+}
+
+/**
+ * Whether loading a tab's page again could lose something.
+ * @param {{url: string, typed?: boolean, lastKeyEnter?: boolean, audible?: boolean, loading?: boolean}} tab
+ *   `typed`: a key was pressed in it since its address last changed; `lastKeyEnter`: the last of them was Enter
+ */
+export function wouldLoseOnReload({ url, typed = false, lastKeyEnter = false, audible = false, loading = false }) {
+  if (audible || loading) return true;
+  if (isTemporaryChat(url)) return true;
+  if (!typed) return false;
+  return !namesSavedChat(url) || !lastKeyEnter;
+}
+
+/**
+ * Whether a tab is put to sleep now.
+ * @param {object} tab what wouldLoseOnReload takes, and:
+ * @param {number} tab.now
+ * @param {number} tab.lastSeen when it was last on screen
+ * @param {boolean} [tab.onScreen] it is the tab being looked at
+ * @param {boolean} [tab.keepAwake] the reader said to leave it
+ * @param {number} [after] how long unseen, in ms
+ */
+export function shouldSleep({ now, lastSeen, onScreen = false, keepAwake = false, ...tab }, after = SLEEP_AFTER_MS) {
+  if (onScreen || keepAwake || !(after > 0) || !Number.isFinite(after)) return false;
+  if (now - lastSeen < after) return false;
+  return !wouldLoseOnReload(tab);
+}
+
+/** How long a tab may go unseen, from the stored minutes (0: never sleep; nothing stored: twenty). */
+export function sleepAfterMs(stored) {
+  if (stored === null || stored === undefined || stored === '') return SLEEP_AFTER_MS;
+  const minutes = Number(stored);
+  if (!Number.isFinite(minutes) || minutes < 0) return SLEEP_AFTER_MS;
+  return minutes === 0 ? Infinity : minutes * 60 * 1000;
+}
+
+/**
  * The tabs the panel shows (0.9.3): the built-in services less the ones taken
  * away, each with the name and address it was given, then the sites added
  * with +. A right-click on a tab changes its name ("header") or address, or

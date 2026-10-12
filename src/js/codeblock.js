@@ -89,12 +89,23 @@ export function paintAllCode(root) {
   });
 }
 
-export function insertCodeBlock(editorEl, lang = 'javascript', history = null, { instead = null } = {}) {
+export function insertCodeBlock(editorEl, lang = 'javascript', history = null, { instead = null, after = null } = {}) {
   editorEl.focus();
   history?.push();
 
   let block = null;
-  if (instead?.parentNode) {
+  if (after?.parentNode && editorEl.contains(after)) {
+    // Under a block the caret was in but cannot be split by: a table (table.js).
+    const holder = document.createElement('div');
+    holder.innerHTML = codeBlockHtml('', lang);
+    block = holder.firstElementChild;
+    after.after(block);
+    if (!block.nextElementSibling) {
+      const line = document.createElement('p');
+      line.innerHTML = '<br>';
+      block.after(line);
+    }
+  } else if (instead?.parentNode) {
     // In place of the empty line it was asked for on. insertHTML lets Chromium
     // choose where, and on an empty line over a picture it chose the next
     // place it could type in: past the picture, inside the list below it (the

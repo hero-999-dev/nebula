@@ -11,8 +11,8 @@ import { buildMenus, commandsOf, filterCommands } from '../src/js/app-menu.js';
 const menus = () => buildMenus({ actions: {}, history: {}, find: {}, palette: {}, shortcuts: {} });
 
 describe('the five menus', () => {
-  it('are File, Edit, View, Window and Help, in that order', () => {
-    expect(menus().map((m) => m.title)).toEqual(['File', 'Edit', 'View', 'Window', 'Help']);
+  it('are File, Edit, View, Window and Help, in that order — and Settings beside Help (0.9.4)', () => {
+    expect(menus().map((m) => m.title)).toEqual(['File', 'Edit', 'View', 'Window', 'Help', 'Settings']);
   });
 
   it('gives every item a label and something to run', () => {

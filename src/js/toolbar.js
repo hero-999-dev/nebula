@@ -12,6 +12,8 @@ import { prepareVideos, getVideoMode, setVideoMode, hasVideos } from './export-v
 import { initPdfPreview, PAGED } from './pdf-preview.js';
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
+import { pickTableSize } from './table-size.js';
+import { insertTable, hiliteCells, alignCells, tableAt } from './table.js';
 import { normalizeLists, exitListOnEmptyItem, liftListItemAtStart, carryLine, stepListItems } from './lists.js';
 import { blockFromNode, convertBlock, exitQuoteOnEmptyLine, insertDivider as insertDividerAt, tidyAfterDelete, beforeDelete } from './blocks.js';
 import { enterOutOfWrapper, backspaceOutOfWrapper, formatsAt, dropFormatsOnEmptyLine } from './inline-format.js';
@@ -22,7 +24,8 @@ import { toMarkdown, toHtml, toPrintDocument, toNebulaNote, safeFileName, FORMAT
 import { serializeNote } from './note-markup.js';
 import { dropCopiedAnchor } from './arrows.js';
 import { noteFromFile } from './import.js';
-import { makeToggle } from './toggles.js';
+import { makeToggle, unmakeToggle, toggleHandled } from './toggles.js';
+import { icon } from './icons.js';
 
 /**
  * Colours are CLASSES, not values written into the note.
@@ -73,7 +76,8 @@ export const U_STYLES = ['u-single', 'u-double', 'u-bold', 'u-wavy', 'u-dash'];
  * back to the browser default on macOS.
  */
 export const FONTS = [
-  ['Serif (default)', '"Charter", "Iowan Old Style", Georgia, serif'],
+  // "Serif", not "Serif (default)" (the owner, 0.9.4): what a new note is written in is chosen in Settings now.
+  ['Serif', '"Charter", "Iowan Old Style", Georgia, serif'],
   ['Sans', '"Inter", "Segoe UI", system-ui, sans-serif'],
   ['Arial', 'Arial, Helvetica, sans-serif'],
   ['Calibri', 'Calibri, "Segoe UI", sans-serif'],
@@ -102,6 +106,112 @@ export function fontLabelFor(family) {
   const hit = FONTS.find(([, stack]) => firstFamily(stack).toLowerCase() === want);
   return hit ? hit[0] : null;
 }
+
+/**
+ * A font name as it may be kept: one line, no quotes or punctuation that would
+ * end a CSS value, not endless. '' when nothing usable is left. Pure — tested.
+ */
+export function cleanFontName(raw) {
+  return String(raw ?? '').replace(/["'`;{}<>\\,]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+}
+
+/** A font stack as it may be kept: nothing in it that could end a CSS value, not endless. */
+export function cleanFontStack(raw) {
+  return String(raw ?? '').replace(/[;{}<>\\()@!]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+}
+
+/** The stack a font added by name is written with: quoted, and a generic after it. */
+export function customFontStack(name) {
+  return `"${cleanFontName(name)}", serif`;
+}
+
+/**
+ * The font menu's rows for what was typed in its search (0.9.4): the app's
+ * own fonts and the ones the reader added first, then the fonts of this
+ * computer that are not among them. Pure — tested.
+ * Pinned fonts (0.9.4: "a pin beside the fonts, so the ones I like stand at
+ * the top") come first, in the order they were pinned.
+ * @param {string} query
+ * @param {{custom?: string[], installed?: string[], pinned?: string[], limit?: number}} [have]
+ * @returns {{own: Array<{label: string, stack: string, custom: boolean, pinned: boolean}>, installed: string[], add: string}}
+ *   `add` is the name typed when no row is exactly it — the name "Add" would add
+ */
+export function fontRows(query, { custom = [], installed = [], pinned = [], limit = 40 } = {}) {
+  const q = String(query ?? '').trim().toLowerCase();
+  const known = new Set(FONTS.map(([, stack]) => firstFamily(stack).toLowerCase()));
+  const mine = [];
+  for (const name of custom) {
+    const clean = cleanFontName(name);
+    if (!clean || known.has(clean.toLowerCase())) continue;
+    known.add(clean.toLowerCase());
+    mine.push({ label: clean, stack: customFontStack(clean), custom: true });
+  }
+  const pins = pinned.map((name) => String(name ?? '').toLowerCase());
+  const place = (row) => pins.indexOf(row.label.toLowerCase());
+  const every = [...FONTS.map(([label, stack]) => ({ label, stack, custom: false })), ...mine]
+    .map((row) => ({ ...row, pinned: place(row) >= 0 }));
+  const own = [...every.filter((row) => row.pinned).sort((a, b) => place(a) - place(b)), ...every.filter((row) => !row.pinned)]
+    .filter((row) => !q || row.label.toLowerCase().includes(q) || firstFamily(row.stack).toLowerCase().includes(q));
+  const seen = new Set();
+  const others = [];
+  for (const family of installed) {
+    const key = String(family || '').toLowerCase();
+    if (!key || known.has(key) || seen.has(key) || (q && !key.includes(q))) continue;
+    seen.add(key);
+    others.push(family);
+  }
+  others.sort((a, b) => a.localeCompare(b));
+  const typed = cleanFontName(query);
+  const exact = typed && (known.has(typed.toLowerCase()) || FONTS.some(([label]) => label.toLowerCase() === typed.toLowerCase()) || seen.has(typed.toLowerCase()));
+  return { own, installed: others.slice(0, limit), add: typed && !exact ? typed : '' };
+}
+
+/** The fonts the reader added to the menu, and the ones pinned to its top: names, kept on this computer. */
+const CUSTOM_FONTS_KEY = 'nebula:fonts';
+const PINNED_FONTS_KEY = 'nebula:fonts-pinned';
+const FONT_STACKS_KEY = 'nebula:font-stacks';
+function readNames(key) {
+  try { const v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []; } catch { return []; }
+}
+function writeNames(key, list) {
+  try { localStorage.setItem(key, JSON.stringify(list.slice(0, 60))); } catch { /* this session only */ }
+}
+export const readCustomFonts = () => readNames(CUSTOM_FONTS_KEY);
+export const readPinnedFonts = () => readNames(PINNED_FONTS_KEY);
+
+/** The font used last — picked from the menu, or brought in by a paste: `{label, stack}`. */
+const LAST_FONT_KEY = 'nebula:font-last';
+/**
+ * A font as the menu remembers it used: its name and the stack it is written
+ * with; null for anything that names no font. Pure — tested.
+ */
+export function lastFontOf(stack) {
+  const clean = cleanFontStack(stack);
+  const family = cleanFontName(firstFamily(clean));
+  if (!family) return null;
+  return { label: fontLabelFor(family) ?? family, stack: clean };
+}
+export function readLastFont() {
+  try { return lastFontOf(JSON.parse(localStorage.getItem(LAST_FONT_KEY) || 'null')?.stack); } catch { return null; }
+}
+
+/**
+ * The pinned names after a press on a font's pin: taken off when it was on,
+ * put at the end when it was not. Pure — tested.
+ */
+export function togglePinned(pinned, label) {
+  const key = String(label ?? '').toLowerCase();
+  if (!key) return [...pinned];
+  const without = pinned.filter((name) => String(name).toLowerCase() !== key);
+  return without.length === pinned.length ? [...pinned, String(label)] : without;
+}
+
+/** The size the note is written in where nothing says otherwise: app.css `.editor` (tests/settings.test.js holds the two together). */
+export const BASE_FONT_SIZE = 14;
+
+/** The common sizes, behind the size box's caret — and what Settings offers a new note. */
+// 5 to 9 too (0.9.3): at real size a note's 12px is 9 pt on paper, and smaller is asked for.
+export const FONT_SIZES = [5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 24, 28, 32, 48, 72];
 
 /** Clamp indent level on the current block. Pure — tested. */
 export function stepIndent(current, delta, max = 6) {
@@ -136,10 +246,17 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   const colorBar = document.getElementById('color-bar');
   const hiliteBar = document.getElementById('hilite-bar');
 
-  /** The bars under A and H show the real colour of the theme that is on. */
+  /**
+   * The bars under A and H show the real colour of the theme that is on — on
+   * the editing bar, and on the small bar over selected words, which the
+   * right-click menu copies ("text colour and highlight have no picture under
+   * them there", the owner, 0.9.4).
+   */
   function paintColorBars() {
-    if (colorBar) colorBar.style.background = lastColor ? tokenValue(lastColor, 'color') : 'var(--ink)';
-    if (hiliteBar) hiliteBar.style.background = lastHilite ? tokenValue(lastHilite, 'backgroundColor') : 'transparent';
+    const color = lastColor ? tokenValue(lastColor, 'color') : 'var(--ink)';
+    const hilite = lastHilite ? tokenValue(lastHilite, 'backgroundColor') : 'transparent';
+    for (const bar of [colorBar, ...document.querySelectorAll('.tb-bar[data-bar="color"]')]) if (bar) bar.style.background = color;
+    for (const bar of [hiliteBar, ...document.querySelectorAll('.tb-bar[data-bar="hilite"]')]) if (bar) bar.style.background = hilite;
   }
 
   const dirty = () => editorEl.dispatchEvent(new Event('input', { bubbles: true }));
@@ -422,7 +539,10 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     if (atEnd) for (let t = text; t; t = walker.nextNode()) text = t;
     const r = document.createRange();
     if (text) r.setStart(text, atEnd ? text.nodeValue.length : 0);
-    else r.setStart(el, atEnd ? el.childNodes.length : 0);
+    // In a line with no words the caret stands before the <br> that holds it
+    // open, never after it: after it, it is drawn in the same place and is not
+    // at the start of the line to anything that asks (see placeCaretEnd).
+    else r.setStart(el, atEnd ? el.childNodes.length - (el.lastChild?.nodeName === 'BR' ? 1 : 0) : 0);
     r.collapse(true);
     if (!editorEl.contains(document.activeElement)) editorEl.focus({ preventScroll: true });
     window.getSelection().removeAllRanges();
@@ -449,8 +569,12 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     if (side.toString().replace(/\u200b/g, '').length) return null;
     const between = side.cloneContents();
     const drawn = [...between.querySelectorAll('br, img, hr, .inline-eq, .note-mention, figure')];
-    // Going forward, the <br> that only holds an empty line open is not drawn content.
-    const holder = !back && drawn.length === 1 && drawn[0].nodeName === 'BR' && isBlankLine(line);
+    // The <br> that only holds an empty line open is not drawn content: going
+    // forward, and — outside a list — going back too. A caret after it is at
+    // the start of that line all the same; read as "inside the line", a
+    // Backspace on the new line under a divider was left to the browser, which
+    // took the divider at once and kept the line (the owner's Ideas note, 0.9.4).
+    const holder = drawn.length === 1 && drawn[0].nodeName === 'BR' && isBlankLine(line) && (!back || !line.matches('li'));
     if (drawn.length && !holder) return null;
     for (let el = line; el && el !== editorEl; el = el.parentElement) {
       let sib = back ? el.previousSibling : el.nextSibling;
@@ -460,6 +584,64 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     return null;
   }
 
+  /**
+   * A caret on the note itself, before a line, stands in that line. A note
+   * opens with it there, and a click on the first line does not move it: to
+   * the browser the two places are one. The rules below read the caret's line,
+   * and found none — with an empty first line over a picture, Delete took the
+   * picture and the line under it in one press.
+   */
+  function standInLine() {
+    const sel = window.getSelection();
+    if (!sel?.rangeCount || !sel.isCollapsed) return;
+    const { startContainer: host, startOffset: at } = sel.getRangeAt(0);
+    if (host !== editorEl && !host.classList?.contains('blk-col')) return;
+    const line = host.childNodes[at];
+    if (line?.nodeType === Node.ELEMENT_NODE && line.matches('p, div:not([class]), h1, h2, h3, h4, h5, h6')) placeCaretAt(line, false);
+  }
+
+  /**
+   * An empty line that a delete has nothing to join to, and that goes all the
+   * same: the first line of the note or of a column, with something under it
+   * (Backspace), and an empty line over a table or a video (Delete — over a
+   * picture it went already). The owner, with a table, a video and a picture
+   * each at the top of a column and an empty line over each (the "urgent
+   * bugs" note, 0.9.4): "none of the three works — I click the caret up there
+   * and cannot take it back".
+   *
+   * The caret goes where it can stand next: the line over it (Delete), the
+   * first cell of a table, the line that follows; a picture with no line to go
+   * to is selected.
+   * @returns {boolean} whether a line went
+   */
+  function dropEmptyLine(back) {
+    const sel = window.getSelection();
+    if (!sel?.rangeCount || !sel.isCollapsed) return false;
+    const line = lineOf(sel.getRangeAt(0).startContainer);
+    const host = line?.parentElement;
+    if (!line || !(host === editorEl || host.classList.contains('blk-col'))) return false;
+    if (!line.matches('p, div:not([class]), h1, h2, h3, h4, h5, h6') || !isBlankLine(line)) return false;
+    const step = (el, side) => { let to = el[side]; while (to?.matches('.shape-layer, .image-layer')) to = to[side]; return to; };
+    const over = step(line, 'previousElementSibling');
+    const under = step(line, 'nextElementSibling');
+    if (!under || (back ? over : !under.matches('.blk-table, .link-block'))) return false;
+    history?.push();
+    line.remove();
+    const TEXT = 'p, div:not([class]), h1, h2, h3, h4, h5, h6, blockquote, li';
+    const lineIn = (el) => (el.matches(TEXT) ? el : el.matches('.blk-cols, .blk-toggle, ul, ol') ? el.querySelector(TEXT) : null);
+    const cell = under.matches('.blk-table') ? under.querySelector('td') : null;
+    if (!back && over?.matches(TEXT)) placeCaretAt(over, true);
+    else if (cell) placeCaretAt(cell, false);
+    else {
+      let to = null;
+      for (let el = under; el && !to; el = step(el, 'nextElementSibling')) to = lineIn(el);
+      if (to) placeCaretAt(to, false);
+      else if (under.matches('.note-image')) editorEl.dispatchEvent(new CustomEvent('nebula-select-image', { detail: under }));
+    }
+    dirty();
+    return true;
+  }
+
   // A delete that joined two lines: Chromium's style spans and a list split in two (blocks.js).
   let beforeThisDelete = null;
   let deleteFromProse = false;
@@ -467,7 +649,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     beforeThisDelete = e.inputType?.startsWith('delete') ? beforeDelete(editorEl) : null;
     const at = window.getSelection()?.anchorNode;
     const host = at?.nodeType === Node.ELEMENT_NODE ? at : at?.parentElement;
-    deleteFromProse = !!e.inputType?.startsWith('delete') && !host?.closest?.('.image-caption, .shape-text, .code-src');
+    deleteFromProse = !!e.inputType?.startsWith('delete') && !host?.closest?.('.image-caption, .shape-text, .code-src, .blk-table');
   }, true);
 
   /**
@@ -531,9 +713,13 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     || (n.nodeType === Node.ELEMENT_NODE && n.tagName === 'BR'));
   function settleGap() {
     const sel = window.getSelection();
-    if (!sel?.rangeCount || !sel.isCollapsed || sel.anchorNode !== editorEl) return;
-    let before = editorEl.childNodes[sel.anchorOffset - 1];
-    let after = editorEl.childNodes[sel.anchorOffset];
+    // On the note itself — or on a column of it, which is a flow of its own
+    // (0.9.4): a caret left there beside a divider stood pressed against it.
+    const host = sel?.anchorNode;
+    if (!sel?.rangeCount || !sel.isCollapsed || !host) return;
+    if (host !== editorEl && !(host.nodeType === Node.ELEMENT_NODE && host.classList.contains('blk-col') && editorEl.contains(host))) return;
+    let before = host.childNodes[sel.anchorOffset - 1];
+    let after = host.childNodes[sel.anchorOffset];
     const gap = [];
     while (loose(before)) { gap.push(before); before = before.previousSibling; }
     while (loose(after)) { gap.push(after); after = after.nextSibling; }
@@ -663,6 +849,8 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     }
   }
   const applyHilite = (cls) => withSelection(() => {
+    // In a table the colour is the back of the selected cells (table.js).
+    if (hiliteCells(editorEl, cls, colorClasses(HILITE_COLORS))) return;
     if (clearAtCaret(colorClasses(HILITE_COLORS))) return;
     applyToBlockOrSelection(colorClasses(HILITE_COLORS), alreadyApplied(cls) ? '' : cls);
   });
@@ -689,9 +877,9 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     if (!range) return null;
     let el = range.startContainer;
     if (el.nodeType !== Node.ELEMENT_NODE) el = el.parentElement;
-    const top = (p) => p === editorEl || p?.classList?.contains('toggle-body') || p?.classList?.contains('blk-toggle');
+    const top = (p) => p === editorEl || p?.classList?.contains('toggle-body') || p?.classList?.contains('blk-toggle') || p?.classList?.contains('blk-col');
     while (el && !top(el.parentElement)) el = el.parentElement;
-    return el && el !== editorEl && !el.classList.contains('toggle-body') ? el : null;
+    return el && el !== editorEl && !el.matches('.toggle-body, .blk-col, .blk-cols') ? el : null;
   }
 
   /**
@@ -740,6 +928,12 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     const r = document.createRange();
     r.selectNodeContents(el);
     r.collapse(false);
+    // A line with nothing but the <br> that holds it open: before that <br>.
+    // After it the caret is drawn in the same place, but stands "inside" the
+    // line — and the first Backspace on a line just made under a divider was
+    // not read as a Backspace at the start of a line (the owner's Ideas note, 0.9.4).
+    if (el.lastChild?.nodeName === 'BR' && el.childNodes.length === 1) r.setStart(el, 0);
+    r.collapse(true);
     sel.removeAllRanges();
     sel.addRange(r);
   }
@@ -770,7 +964,26 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     const block = blockFromNode(range.startContainer, editorEl);
     if (!block || block.closest('.shape-layer, .blk-code')) return;
     history?.push();
-    const toggle = makeToggle(block.matches('.blk-toggle > :first-child') ? block.parentElement.firstElementChild : block);
+    // On a title the button takes the toggle away again, as the to-do button
+    // does a to-do. It used to put a second toggle inside the first (0.9.4).
+    const own = block.closest('.blk-toggle');
+    if (own && (own.firstElementChild === block || own.firstElementChild?.contains(block))
+      && !own.firstElementChild.classList.contains('toggle-body')) {
+      const line = unmakeToggle(own);
+      // A list item may hold the body's lines after its words: the start is the safe place there.
+      if (line.tagName === 'LI') {
+        const r = document.createRange();
+        r.setStart(line, 0);
+        r.collapse(true);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(r);
+      } else {
+        placeCaretEnd(line);
+      }
+      dirty();
+      return;
+    }
+    const toggle = makeToggle(block);
     const title = toggle.firstElementChild;
     const r = document.createRange();
     r.selectNodeContents(title);
@@ -801,14 +1014,26 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
    * plain spans the browser owns, and setting one more property on them keeps
    * them inside its own undo entry instead of replacing them wholesale.
    */
-  function applyFontSize(px) {
-    setNoteFont?.({ size: px === 17 ? null : px });   // the note's writing size (0.9.3)
+  function applyFontSize(px, { remember = true } = {}) {
+    // The note's writing size (0.9.3). The app's own is no size of the note's: it was still read as 17, the size before 0.9.3.
+    if (remember) setNoteFont?.({ size: px === BASE_FONT_SIZE ? null : px });
     history?.push();
     const range = selectionInEditor();
     if (!range || range.collapsed) {
-      const block = blockOf();
-      if (!block) return;
-      block.style.fontSize = `${px}px`;
+      // With only a caret, the LINE it is in — its list item, its paragraph.
+      // It used to be the editor's direct child, so in a list the whole list
+      // took the size, and words that carried a size of their own did not
+      // move at all: "what grows? something moves but I cannot tell what"
+      // (the owner, 0.9.4). The line's own words let go of their size, so the
+      // line is seen to change; a list nested in the item keeps its own.
+      const line = range ? blockAncestor(range.startContainer) : null;
+      if (!line || line === editorEl || line.closest('.blk-code, .code-src')) return;
+      line.style.fontSize = `${px}px`;
+      for (const el of line.querySelectorAll('[style*="font-size"]')) {
+        if (el.closest('.shape, .note-image, .blk-code, .inline-eq, .katex, .link-block') || blockAncestor(el) !== line) continue;
+        el.style.removeProperty('font-size');
+        if (!el.getAttribute('style')?.trim()) el.removeAttribute('style');
+      }
       dirty();
       return;
     }
@@ -898,7 +1123,11 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   /** The note as stored, not as on screen — and its videos as this export takes them. */
   async function exportHtml() {
     // A selected picture or a shape being typed in must not travel to another computer inside the file.
-    return prepareVideos(serializeNote(editorEl), getVideoMode(), { poster: (url) => window.nebula?.links?.videoPoster?.(url) });
+    // The note shows its pictures from their files (0.9.4); a file for another
+    // program holds the pictures themselves, so they are written in first.
+    let html = serializeNote(editorEl);
+    if (window.nebula?.media?.inline && html.includes('nebula-media://note/')) html = await window.nebula.media.inline(html).catch(() => html);
+    return prepareVideos(html, getVideoMode(), { poster: (url) => window.nebula?.links?.videoPoster?.(url) });
   }
 
   /** The note's paper and margins (Nebula Wide: A4, the way it was last turned). */
@@ -921,7 +1150,12 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
             : format === 'html' ? toHtml(html, title)
               : format === 'nebula' ? toNebulaNote({ title, content: html, labels: noteLabels?.() })
                 : toMarkdown(html, title);
-    return api.export({ suggested: safeFileName(title, fmt?.ext || format), content, format });
+    const res = await api.export({ suggested: safeFileName(title, fmt?.ext || format), content, format });
+    // A Nebula note carries its videos inside it, up to a size; the rest stay behind.
+    // The videos too large for the note's own file lie in a folder beside it: the two belong together.
+    if (res?.videosBeside) window.dispatchEvent(new CustomEvent('nebula-toast', { detail: `Videos in the folder “${res.folder}” beside the note: ${res.videosBeside}. Keep the folder with the file.` }));
+    else if (res?.videosLeft) window.dispatchEvent(new CustomEvent('nebula-toast', { detail: `Videos that could not be taken along: ${res.videosLeft}` }));
+    return res;
   }
 
   /**
@@ -999,7 +1233,17 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     if (!api) return;
     const res = await api.import();
     if (!res?.ok) return;
+    await takeFile(res);
+  }
+
+  /**
+   * A file read by the main process — chosen in File → Import, or handed to
+   * the app by "Open with Nebula" (0.9.4) — becomes a note.
+   * @param {{ok: boolean, name: string, text?: string, bytes?: Uint8Array}} res
+   */
+  async function takeFile(res) {
     const cannot = () => window.dispatchEvent(new CustomEvent('nebula-toast', { detail: 'That file could not be read' }));
+    if (!res?.ok) { cannot(); return; }
     // Parsed and sanitised HERE: the main process only ever read bytes, and an
     // imported file is not allowed to bring markup the editor did not ask for.
     if (res.bytes) {
@@ -1082,6 +1326,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       if (api?.print) void api.print({ page }); else window.print();
     },
     import: () => void importNote(),
+    importFile: (res) => takeFile(res),
     // Selected words become a link; with nothing selected it inserts one.
     link: () => onLink?.(),
     'export-md': () => void exportNote('md'),
@@ -1101,7 +1346,13 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     // The button inserts whatever kind was chosen last — picking Circle from
     // the menu and then pressing the button again gave a rectangle.
     'shape-rect': () => insertShape(lastShape),
-    codeblock: () => insertCodeBlock(editorEl, 'javascript', history),
+    // With the caret in a table's cell it goes under the table: a cell holds words (table.js).
+    codeblock: () => { const table = tableAt(editorEl); insertCodeBlock(editorEl, 'javascript', history, table ? { after: table } : {}); },
+    // Its size is asked for first (table-size.js): Enter makes five by five.
+    table: () => {
+      const anchor = toolbar.querySelector('[data-act="table"]')?.getBoundingClientRect() ?? { left: 200, top: 100, bottom: 100 };
+      void pickTableSize(anchor).then((size) => { if (size) withSelection(() => insertTable(editorEl, history, size)); });
+    },
     divider: () => insertDivider(),
     bold: () => { cmd('bold'); notePending('bold'); },
     italic: () => { cmd('italic'); notePending('italic'); },
@@ -1111,15 +1362,28 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     eq: () => equation?.open(),
     color: () => applyTextColor(lastColor),
     hilite: () => applyHilite(lastHilite),
-    al: () => cmd('justifyLeft'),
-    ac: () => cmd('justifyCenter'),
-    ar: () => cmd('justifyRight'),
-    aj: () => cmd('justifyFull'),
+    // In a table it is the cells' words that are lined up — the selected cells', or the caret's.
+    // Chromium's own command put a block into the cell.
+    al: () => { if (!alignCells(editorEl, 'left')) cmd('justifyLeft'); },
+    ac: () => { if (!alignCells(editorEl, 'center')) cmd('justifyCenter'); },
+    ar: () => { if (!alignCells(editorEl, 'right')) cmd('justifyRight'); },
+    aj: () => { if (!alignCells(editorEl, 'justify')) cmd('justifyFull'); },
   };
+  /**
+   * A table's cell holds words, not lines (table.js): what turns a line into
+   * a list, a to-do or a toggle, or moves it in, does nothing with the caret in
+   * one. These took the cell for a line of the note: the to-do button put the
+   * whole table into a to-do, the list buttons made a list of the note's first
+   * line, and Tab's button indented a cell (0.9.4, the table trials).
+   */
+  for (const name of ['ul', 'ol', 'todo', 'toggle', 'indent', 'outdent']) {
+    const run = ACTIONS[name];
+    ACTIONS[name] = (...args) => (tableAt(editorEl) ? undefined : run(...args));
+  }
   // Only view (0.8.9): every action that would change the note does nothing;
   // the ones that read it — save, print, export, copy — and import (a new note) stay.
   {
-    const READING = new Set(['save', 'print', 'export-md', 'export-html', 'export-pdf', 'export-docx', 'export-odt', 'export-doc', 'export-rtf', 'export-enex', 'copy', 'import']);
+    const READING = new Set(['save', 'print', 'export-md', 'export-html', 'export-pdf', 'export-docx', 'export-odt', 'export-doc', 'export-rtf', 'export-enex', 'copy', 'import', 'importFile']);
     for (const name of Object.keys(ACTIONS)) {
       if (READING.has(name)) continue;
       const run = ACTIONS[name];
@@ -1142,7 +1406,9 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     const anchor = menuAnchor.getBoundingClientRect();
     const shell = document.getElementById('edit-shell');
     const margin = 8;
-    openMenu.style.maxHeight = `${Math.min(520, window.innerHeight - 2 * margin)}px`;
+    // The font menu is as tall as its fonts, where the window has the room (the owner, 0.9.4:
+    // "make the font block longer — Cascadia is left below"); the others keep their 520.
+    openMenu.style.maxHeight = `${Math.min(openMenu.classList.contains('tb-menu--font') ? 760 : 520, window.innerHeight - 2 * margin)}px`;
     const rect = openMenu.getBoundingClientRect();
     let x = anchor.left;
     let y = anchor.bottom + 4;
@@ -1252,6 +1518,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     // selection — same trap as the size field.
     withSelection(() => {
       const kind = e.target.value === 'p' ? 'text' : e.target.value;
+      if (tableAt(editorEl)) return;                 // a cell is no line to make a heading of
       const block = blockFromNode(window.getSelection()?.anchorNode, editorEl);
       if (block && convertBlock(block, kind)) dirty();
     });
@@ -1296,11 +1563,196 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     dirty();
   }
 
+  /* ----- the font menu (0.9.4: "a search in the fonts, and a button to add a
+     font" — the owner). A search field on top; under it the app's fonts and
+     the ones added; with something typed, or after "Add a font", the fonts of
+     this computer too — picking one adds it to the list and applies it. ----- */
+  const writeCustomFonts = (list) => writeNames(CUSTOM_FONTS_KEY, list);
+  let customFonts = readCustomFonts();
+  let pinnedFonts = readPinnedFonts();
+  // One test build (2026-10-12) put fonts that are not on this computer into the
+  // list, with the stack they came with. The owner: "then let it say it is not
+  // on this computer and cannot be added". What that build added is taken off.
+  try {
+    const were = Object.keys(JSON.parse(localStorage.getItem(FONT_STACKS_KEY) || '{}') ?? {}).map((name) => name.toLowerCase());
+    if (were.length) {
+      customFonts = customFonts.filter((f) => !were.includes(f.toLowerCase()));
+      pinnedFonts = pinnedFonts.filter((f) => !were.includes(f.toLowerCase()));
+      writeCustomFonts(customFonts);
+      writeNames(PINNED_FONTS_KEY, pinnedFonts);
+    }
+    localStorage.removeItem(FONT_STACKS_KEY);
+  } catch { /* nothing kept, nothing to take off */ }
+  /** The font used last, and the menu's way of showing it (set when the menu is built). */
+  let lastFont = readLastFont();
+  let paintLastFont = () => {};
+  function usedFont(stack) {
+    const font = lastFontOf(stack);
+    if (!font) return;
+    lastFont = font;
+    try { localStorage.setItem(LAST_FONT_KEY, JSON.stringify(font)); } catch { /* this session only */ }
+    paintLastFont();
+  }
+  /** The families installed on this computer, asked for once ("Add a font"). */
+  let installedFonts = null;
+  let showInstalled = false;
+
+  async function loadInstalledFonts() {
+    if (installedFonts) return installedFonts;
+    try {
+      const fonts = await window.queryLocalFonts?.();
+      installedFonts = fonts ? [...new Set(fonts.map((f) => f.family).filter(Boolean))] : [];
+    } catch {
+      installedFonts = [];       // not allowed, or not there: a name can still be typed and added
+    }
+    return installedFonts;
+  }
+
+  /** Whether a face of that name is on this computer: it changes how wide words are set. */
+  function fontIsInstalled(name) {
+    try {
+      const ctx = document.createElement('canvas').getContext('2d');
+      const width = (family) => { ctx.font = `32px ${family}`; return ctx.measureText('Nebula mwil 0123 ĞŻß').width; };
+      return ['monospace', 'serif', 'sans-serif'].some((generic) => width(`"${name}", ${generic}`) !== width(generic));
+    } catch {
+      return true;               // cannot tell: let the name through
+    }
+  }
+
+  /**
+   * The font words in `stack` are DRAWN in on this computer, as the bar and the
+   * menu name it. A stack whose first font is one of the app's keeps the app's
+   * name for it. Any other is named after the first font in it this computer
+   * has: words pasted from a page said `"Instrument Sans", system-ui, "Segoe
+   * UI"`, the bar read "Instrument Sans", and the words stood in Segoe UI —
+   * "Instrument Sans is the same font as Segoe UI; why does it say that up
+   * there?" (the owner, 0.9.4).
+   * @returns {{label: string, stack: string}} the stack to write that font with
+   */
+  const GENERIC_FONTS = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-serif', 'ui-sans-serif', 'ui-monospace', 'ui-rounded', 'emoji', 'math', 'fangsong', '-apple-system', 'blinkmacsystemfont']);
+  const fontsHere = new Map();
+  const fontIsHere = (name) => {
+    const key = name.toLowerCase();
+    if (!fontsHere.has(key)) fontsHere.set(key, fontIsInstalled(name));
+    return fontsHere.get(key);
+  };
+  function shownFont(stack) {
+    const first = firstFamily(stack);
+    const own = fontLabelFor(first);
+    if (own || !first) return { label: own ?? '', stack };
+    const names = String(stack).split(',').map((part) => cleanFontName(part)).filter(Boolean);
+    const drawn = GENERIC_FONTS.has(first.toLowerCase()) ? first
+      : names.find((name) => !GENERIC_FONTS.has(name.toLowerCase()) && fontIsHere(name)) ?? first;
+    if (drawn.toLowerCase() === first.toLowerCase()) return { label: first, stack };
+    const ours = FONTS.find(([, s]) => firstFamily(s).toLowerCase() === drawn.toLowerCase());
+    return ours ? { label: ours[0], stack: ours[1] } : { label: drawn, stack: customFontStack(drawn) };
+  }
+
+  function pickFont(label, stack) {
+    // Through withSelection: if anything has taken the selection since the
+    // words were highlighted, applyFont's collapsed-caret branch would
+    // quietly restyle the WHOLE line instead — "selecting some places
+    // still changes the font of the whole area".
+    withSelection(() => applyFont(stack));
+    if (fontName) fontName.textContent = label;
+    usedFont(stack);
+    closeMenus();
+  }
+
+  /** Whether a font of that name is in the menu's list: the app's own, or one that was added. */
+  const fontListed = (name) => FONTS.some(([label, stack]) => label.toLowerCase() === name.toLowerCase() || firstFamily(stack).toLowerCase() === name.toLowerCase())
+    || customFonts.some((f) => f.toLowerCase() === name.toLowerCase());
+
+  /**
+   * A font of this computer put into the list. One that is not on it — a web
+   * page's own, come in with pasted words — cannot be: there is no face to
+   * write it in, and the app says so.
+   * @returns {string} its name as it is kept, or '' when it could not be
+   */
+  function listFont(name) {
+    const clean = cleanFontName(name);
+    if (!clean) return '';
+    if (fontListed(clean)) return clean;
+    if (!fontIsInstalled(clean)) {
+      window.dispatchEvent(new CustomEvent('nebula-toast', { detail: 'That font is not on this computer, so it cannot be added' }));
+      return '';
+    }
+    customFonts = [...customFonts, clean];
+    writeCustomFonts(customFonts);
+    return clean;
+  }
+
+  function addFont(name) {
+    const clean = listFont(name);
+    if (clean) pickFont(clean, customFontStack(clean));
+  }
+
   function buildFontMenu() {
     const menu = document.getElementById('menu-font');
     if (!menu) return;
-    menu.innerHTML = '<div class="tb-menu__label">Font</div>';
-    for (const [label, stack] of FONTS) {
+    menu.innerHTML = '<div class="tb-menu__label">Font</div>'
+      + '<input type="search" class="tb-menu__search" id="font-search" placeholder="Find a font" aria-label="Find a font" autocomplete="off" spellcheck="false">'
+      + '<div class="tb-menu__rows" id="font-rows"></div>'
+      + '<div class="tb-menu__last" id="font-last" hidden></div>'
+      + '<button type="button" class="tb-menu__add" id="font-add">+ Add a font</button>';
+    const search = menu.querySelector('#font-search');
+    const rows = menu.querySelector('#font-rows');
+    const lastEl = menu.querySelector('#font-last');
+    const addBtn = menu.querySelector('#font-add');
+
+    /**
+     * The font used last, over "+ Add a font" (the owner, 0.9.4): picked from
+     * the menu, or come in with pasted words. With the pointer on it, a + that
+     * puts it into the list — where it is not in it — and a pin.
+     */
+    paintLastFont = () => {
+      lastEl.replaceChildren();
+      lastEl.hidden = !lastFont || !!search.value.trim();
+      if (lastEl.hidden) return;
+      // Named, and written, as the font it is drawn in here.
+      const font = shownFont(lastFont.stack);
+      const head = document.createElement('div');
+      head.className = 'tb-menu__label';
+      head.textContent = 'Last used font';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.font = font.stack;
+      const name = document.createElement('span');
+      name.className = 'label';
+      name.dataset.noI18n = '';
+      name.textContent = font.label;
+      name.style.fontFamily = font.stack;
+      btn.appendChild(name);
+      const listed = fontListed(font.label);
+      const pinnedNow = pinnedFonts.some((f) => f.toLowerCase() === font.label.toLowerCase());
+      const tool = (cls, title, run) => {
+        const el = document.createElement('span');
+        el.className = cls;
+        el.setAttribute('role', 'button');
+        el.title = title;
+        el.setAttribute('aria-label', title);
+        el.addEventListener('click', (e) => { e.stopPropagation(); run(); });
+        btn.appendChild(el);
+        return el;
+      };
+      if (!listed) tool('tb-menu__plus', 'Add to the list', () => { if (listFont(font.label)) paintRows(); }).textContent = '+';
+      const pin = tool('tb-menu__pin', pinnedNow ? 'Unpin' : 'Pin to the top', () => {
+        // Pinned, it is in the list: a font that is not there yet is put there first.
+        const kept = listFont(font.label);
+        if (!kept) return;
+        const label = fontLabelFor(kept) ?? kept;
+        pinnedFonts = togglePinned(pinnedFonts, label);
+        writeNames(PINNED_FONTS_KEY, pinnedFonts);
+        paintRows();
+        if (!pinnedNow) rows.scrollTop = 0;
+      });
+      pin.innerHTML = icon('pin', 'ic');
+      pin.setAttribute('aria-pressed', String(pinnedNow));
+      btn.addEventListener('click', () => pickFont(font.label, font.stack));
+      lastEl.append(head, btn);
+    };
+
+    const row = (label, stack, { onPick, removable = false, pinned = null } = {}) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.dataset.font = stack;
@@ -1310,20 +1762,116 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       // early and leave the row with no font at all.
       const labelEl = document.createElement('span');
       labelEl.className = 'label';
+      labelEl.dataset.noI18n = '';
       labelEl.textContent = label;
       labelEl.style.fontFamily = stack;
       btn.appendChild(labelEl);
-      btn.addEventListener('click', () => {
-        // Through withSelection: if anything has taken the selection since the
-        // words were highlighted, applyFont's collapsed-caret branch would
-        // quietly restyle the WHOLE line instead — "selecting some places
-        // still changes the font of the whole area".
-        withSelection(() => applyFont(stack));
-        if (fontName) fontName.textContent = label;
-        closeMenus();
+      // The pin: a press puts the font at the top of the list, or takes it down again.
+      if (pinned !== null) {
+        const pin = document.createElement('span');
+        pin.className = 'tb-menu__pin';
+        pin.innerHTML = icon('pin', 'ic');
+        pin.setAttribute('role', 'button');
+        pin.setAttribute('aria-pressed', String(pinned));
+        pin.title = pinned ? 'Unpin' : 'Pin to the top';
+        pin.setAttribute('aria-label', pin.title);
+        pin.addEventListener('click', (e) => {
+          e.stopPropagation();
+          pinnedFonts = togglePinned(pinnedFonts, label);
+          writeNames(PINNED_FONTS_KEY, pinnedFonts);
+          paintRows();
+          if (!pinned) rows.scrollTop = 0;       // it went to the top: shown there
+        });
+        btn.appendChild(pin);
+      }
+      if (removable) {
+        const x = document.createElement('span');
+        x.className = 'tb-menu__x';
+        x.textContent = '×';
+        x.title = 'Remove from the list';
+        x.addEventListener('click', (e) => {
+          e.stopPropagation();
+          customFonts = customFonts.filter((f) => f.toLowerCase() !== label.toLowerCase());
+          writeCustomFonts(customFonts);
+          // A font that is no longer in the list is no longer pinned in it.
+          if (pinnedFonts.some((f) => f.toLowerCase() === label.toLowerCase())) {
+            pinnedFonts = pinnedFonts.filter((f) => f.toLowerCase() !== label.toLowerCase());
+            writeNames(PINNED_FONTS_KEY, pinnedFonts);
+          }
+          paintRows();
+        });
+        btn.appendChild(x);
+      }
+      btn.addEventListener('click', onPick ?? (() => pickFont(label, stack)));
+      return btn;
+    };
+
+    function paintRows() {
+      const found = fontRows(search.value, { custom: customFonts, pinned: pinnedFonts, installed: (showInstalled || search.value.trim()) ? (installedFonts ?? []) : [] });
+      rows.replaceChildren();
+      found.own.forEach((f, i) => {
+        // A thin line under the pinned ones, where the rest of the list begins.
+        if (i > 0 && !f.pinned && found.own[i - 1].pinned) {
+          const rule = document.createElement('div');
+          rule.className = 'tb-menu__rule';
+          rows.appendChild(rule);
+        }
+        rows.appendChild(row(f.label, f.stack, { removable: f.custom, pinned: f.pinned }));
       });
-      menu.appendChild(btn);
+      if (found.installed.length) {
+        const head = document.createElement('div');
+        head.className = 'tb-menu__label';
+        head.textContent = 'On this computer';
+        rows.appendChild(head);
+        for (const family of found.installed) rows.appendChild(row(family, customFontStack(family), { onPick: () => addFont(family) }));
+      }
+      if (!found.own.length && !found.installed.length && !found.add) {
+        const none = document.createElement('div');
+        none.className = 'tb-menu__none';
+        none.textContent = 'No font matches';
+        rows.appendChild(none);
+      }
+      // A name that is in no list can still be added, if the computer has it.
+      addBtn.dataset.name = found.add;
+      addBtn.textContent = found.add ? `+ Add “${found.add}”` : '+ Add a font';
+      // Pressed, it has done its work: the computer's fonts are in the list, and
+      // a second "+ Add a font" under them would open nothing more ("what is it
+      // doing there a second time, after the click?" — the owner, 0.9.4). It is
+      // back for a typed name that is in no list, and when the menu opens anew.
+      addBtn.hidden = showInstalled && (installedFonts?.length ?? 0) > 0 && !found.add;
+      paintLastFont();
     }
+
+    search.addEventListener('input', () => {
+      paintRows();
+      // The computer's fonts join the search once they are known.
+      if (search.value.trim() && !installedFonts) void loadInstalledFonts().then(paintRows);
+    });
+    search.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); (rows.querySelector('button') ?? addBtn).click(); }
+      else if (e.key === 'Escape') { e.preventDefault(); closeMenus(); }
+    });
+    addBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (addBtn.dataset.name) { addFont(addBtn.dataset.name); return; }
+      // "Add a font": every font of this computer, to search and pick from.
+      showInstalled = true;
+      void loadInstalledFonts().then(() => {
+        paintRows();
+        // They come under the app's own fonts: brought to the top of the list,
+        // or the press would seem to have done nothing.
+        const head = rows.querySelector('.tb-menu__label');
+        if (head) rows.scrollTop = head.offsetTop - rows.offsetTop;
+        search.focus({ preventScroll: true });
+      });
+    });
+    // Fresh each time it opens: the whole list, nothing typed.
+    fontBtn?.addEventListener('click', () => {
+      search.value = '';
+      showInstalled = false;
+      paintRows();
+    });
+    paintRows();
   }
   buildFontMenu();
 
@@ -1333,8 +1881,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     paintSizeTarget(false);
   }
   /** The common sizes, behind the caret. Typing a number still works. */
-  // 5 to 9 too (0.9.3): at real size a note's 12px is 9 pt on paper, and smaller is asked for.
-  const SIZES = [5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 24, 28, 32, 48, 72];
+  const SIZES = FONT_SIZES;
   (function buildSizeMenu() {
     const menu = document.getElementById('menu-size');
     if (!menu) return;
@@ -1357,6 +1904,34 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       menu.appendChild(btn);
     }
   }());
+
+  /**
+   * One step up or down the size list, from the size the words have now
+   * (Ctrl + / Ctrl −, 0.9.4). Selected words change; with only a caret the
+   * line the caret is in does, as it does from the size box.
+   */
+  function stepFontSize(dir) {
+    const range = selectionInEditor();
+    if (!range || !sizeInput) return;
+    let at = range.startContainer;
+    if (!range.collapsed) {
+      // The first words of the selection: its start is often the line itself.
+      const walker = document.createTreeWalker(range.commonAncestorContainer, NodeFilter.SHOW_TEXT);
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        if (n.nodeValue.trim() && range.intersectsNode(n)) { at = n; break; }
+      }
+    }
+    const el = at.nodeType === Node.ELEMENT_NODE ? at : at.parentElement;
+    if (!el || el.closest('.code-src, .blk-code')) return;
+    const now = Math.round(parseFloat(getComputedStyle(el).fontSize)) || 14;
+    const next = dir > 0
+      ? (SIZES.find((s) => s > now) ?? now)
+      : ([...SIZES].reverse().find((s) => s < now) ?? now);
+    if (next === now) return;
+    sizeInput.value = String(next);
+    // The keys size these words; the note's writing size is the size box's to set.
+    applyFontSize(next, { remember: false });
+  }
 
   /**
    * Keep the selection VISIBLE while the size box has focus.
@@ -1396,7 +1971,12 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     const host = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
     if (!host || host.closest('.code-src, .blk-code, .shape-layer, .image-caption, .inline-code, .note-mention, .note-tag, .inline-eq')) return null;
     const block = blockAncestor(host);
-    if (!block || block === editorEl || block.textContent.replace(/\u200b/g, '').length) return null;
+    if (!block) return null;
+    // The first line of a note with nothing in it yet is the note itself \u2014 no
+    // line stands there until Enter is pressed. A new note that starts with a
+    // font (Settings, 0.9.4) is written in it from its first letter.
+    const bare = block === editorEl && [...editorEl.childNodes].every((n) => n.nodeName === 'BR' || (n.nodeType === Node.TEXT_NODE && !n.nodeValue.replace(/\u200b/g, '')));
+    if ((block === editorEl && !bare) || block.textContent.replace(/\u200b/g, '').length) return null;
     if (hasExplicitFont(host, editorEl)) return null;
     const heading = block.matches('h1, h2, h3, h4, h5, h6');
     return { family: font.family || null, size: heading ? null : font.size || null };
@@ -1415,13 +1995,27 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     const span = document.createElement('span');
     if (font.family) span.style.fontFamily = font.family;
     if (font.size) span.style.fontSize = `${font.size}px`;
-    span.textContent = e.data;
+    // Bold, italic or strike switched on before the first letter (Ctrl+B, then
+    // type) is Chromium's typing state, which a letter put in by hand never
+    // sees: in a note with a writing font the words came out plain — "I press
+    // Ctrl+B and start writing; it is not bold" (the owner, 0.9.4).
+    const letter = document.createTextNode(e.data);
+    let inner = span;
+    for (const [command, tag] of [['bold', 'b'], ['italic', 'i'], ['strikeThrough', 's']]) {
+      let on = false;
+      try { on = document.queryCommandState(command); } catch { /* not asked of this caret */ }
+      if (!on) continue;
+      const mark = document.createElement(tag);
+      inner.appendChild(mark);
+      inner = mark;
+    }
+    inner.appendChild(letter);
     const block = blockAncestor(range.startContainer);
     const placeholder = block.childNodes.length === 1 && block.firstChild.nodeName === 'BR' ? block.firstChild : null;
     range.insertNode(span);
     placeholder?.remove();
     const caret = document.createRange();
-    caret.setStart(span.firstChild, span.firstChild.nodeValue.length);
+    caret.setStart(letter, letter.nodeValue.length);
     caret.collapse(true);
     window.getSelection().removeAllRanges();
     window.getSelection().addRange(caret);
@@ -1439,8 +2033,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     // On a new line of a note with a writing font, the bar shows what will be typed.
     const writing = writingFontAt(range);
     if (fontName) {
-      const fam = firstFamily(writing?.family || cs.fontFamily);
-      fontName.textContent = fontLabelFor(fam) ?? fam ?? 'Font';
+      fontName.textContent = shownFont(writing?.family || cs.fontFamily).label || 'Font';
     }
     if (document.activeElement !== sizeInput) {
       const px = writing?.size || Math.round(parseFloat(cs.fontSize));
@@ -1538,11 +2131,12 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   editorEl.addEventListener('beforeinput', (e) => {
     // Editing a nested text host intersects its ancestor overlay too, but is
     // not a request to delete that overlay.
-    if (e.target.closest('.shape-text, .code-src, .image-caption')) return;
+    if (e.target.closest('.shape-text, .code-src, .image-caption, .blk-table')) return;
     if (!e.inputType?.startsWith('delete')) {
       editorEl.querySelectorAll('hr.blk-hr.armed').forEach((h) => h.classList.remove('armed'));
       return;
     }
+    standInLine();
     const insideText = (() => {
       if (e.inputType !== 'deleteContentBackward') return false;
       const caret = window.getSelection();
@@ -1560,6 +2154,10 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     // of a line ("R" under a picture could not be deleted — the picture was
     // selected instead), and an empty line under a picture could not go.
     const back = e.inputType === 'deleteContentBackward';
+    if ((back || e.inputType === 'deleteContentForward') && dropEmptyLine(back)) {
+      e.preventDefault();
+      return;
+    }
     const edge = back ? neighbourAtEdge(true) : e.inputType === 'deleteContentForward' ? neighbourAtEdge(false) : null;
     if (edge?.matches?.('.note-image') && !edge.closest('.shape-layer, .image-layer')) {
       e.preventDefault();
@@ -1613,7 +2211,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
 
     // A shape layer is not text. Nothing typed, and no delete, removes one —
     // the shape bar's own ✕ is the way, and it is undoable.
-    if (touching('.shape-layer, .image-layer, .link-block').length) {
+    if (touching('.shape-layer, .image-layer, .link-block, .blk-table').length) {
       e.preventDefault();
       return;
     }
@@ -1703,7 +2301,21 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
         return;
       }
 
-      if (isEmptyBlock(block) && block.previousElementSibling === hr) {
+      // Nothing under that empty line — it is the last of the note, of a column,
+      // of a toggle: the line stays, for it is the only place the caret has
+      // there, and the divider is offered at once; the next press takes it.
+      // The line used to go and the caret was put "after the divider", on no
+      // line at all: in a column it stood there, pressed against the divider,
+      // and what was typed went nowhere a line was (the owner's Ideas note,
+      // 0.9.4: "a bug again, the caret under the divider").
+      const lastLine = isEmptyBlock(block) && block.previousElementSibling === hr && !block.nextElementSibling;
+      if (lastLine && !hr.classList.contains('armed')) {
+        editorEl.querySelectorAll('hr.blk-hr.armed').forEach((h) => h.classList.remove('armed'));
+        hr.classList.add('armed');
+        return;
+      }
+
+      if (!lastLine && isEmptyBlock(block) && block.previousElementSibling === hr) {
         history?.push();
         const after = block.nextElementSibling;
         block.remove();
@@ -1724,11 +2336,11 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
             ? new CustomEvent('nebula-pick-divider', { detail: hr })
             : new CustomEvent('nebula-select-image', { detail: after }));
         } else {
-          const r = document.createRange();
-          r.setStartAfter(hr);
-          r.collapse(true);
-          caret.removeAllRanges();
-          caret.addRange(r);
+          // A card, a code block, a table or another divider comes up: no
+          // caret stands in any of them, so — as over a picture — the divider
+          // is picked, and the next Backspace takes it. A caret was left
+          // between the two, on no line.
+          editorEl.dispatchEvent(new CustomEvent('nebula-pick-divider', { detail: hr }));
         }
         dirty();
         return;
@@ -1806,7 +2418,8 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     const mod = e.ctrlKey || e.metaKey;
     // Shape text owns normal editing keys. App undo/save shortcuts below still
     // apply, but paragraph/list/divider handlers must not escape this host.
-    if (e.target.closest('.shape-text, .image-caption') && !mod) return;
+    // A table's cell too (table.js): its Tab, Enter and arrows are its own.
+    if (e.target.closest('.shape-text, .image-caption, .blk-table') && !mod) return;
 
     /**
      * The caret stays in the note.
@@ -1833,6 +2446,11 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     }
 
     if (e.key === 'Tab') { e.preventDefault(); indent(e.shiftKey ? -1 : 1); return; }
+
+    // Enter or Backspace a toggle has already dealt with (toggles.js): a
+    // toggle in a list item is an item too, and the list rules below would
+    // act on the same key a second time — lift the item out, leave the list.
+    if (toggleHandled(e)) return;
 
     // Getting out of an inline format. Enter at the end of one starts the next
     // line plain; Backspace at the start of one takes the format off. Without
@@ -1939,6 +2557,14 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     // inserted a native <u> — a different mechanism from the button's
     // `u-single`, which is why the style menu's "None" could not undo it.
     if (k === 'u') { e.preventDefault(); ACTIONS.underline(); return; }
+    // Ctrl + and Ctrl − make the words bigger and smaller (the owner, 0.9.4:
+    // "Ctrl + − does nothing; it should grow and shrink the font"). "=" is the
+    // same key without Shift on a US keyboard.
+    if (!e.altKey && (k === '+' || k === '=' || k === '-' || k === '_')) {
+      e.preventDefault();
+      stepFontSize(k === '-' || k === '_' ? -1 : 1);
+      return;
+    }
     if (k === 'e') { e.preventDefault(); ACTIONS.code(); }
     else if (k === 'q') { e.preventDefault(); ACTIONS.eq(); }
     else if (k === 't') { e.preventDefault(); ACTIONS.color(); }

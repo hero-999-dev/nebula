@@ -2,13 +2,16 @@
 
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
+import { insertTable } from './table.js';
+import { pickTableSize } from './table-size.js';
 import { icon } from './icons.js';
 import { t } from './i18n.js';
 import { makeToggle } from './toggles.js';
 import { blockFromNode, convertBlock, insertDivider, ensureLineBox } from './blocks.js';
 
 export const SLASH_ITEMS = [
-  { id: 'text', ic: 'text', label: 'Text' },
+  // "Paragraph", as the outline dropdown calls it: /paragraph finds it, and /text still does (its id).
+  { id: 'text', ic: 'text', label: 'Paragraph' },
   { id: 'h1', ic: 'h1', label: 'Heading 1' },
   { id: 'h2', ic: 'h2', label: 'Heading 2' },
   { id: 'h3', ic: 'h3', label: 'Heading 3' },
@@ -16,10 +19,18 @@ export const SLASH_ITEMS = [
   { id: 'numbered', ic: 'numbers', label: 'Numbered list' },
   { id: 'todo', ic: 'todo', label: 'To-do' },
   { id: 'toggle', ic: 'toggle', label: 'Toggle list' },
+  // Headings that fold (0.9.4). After the plain ones, so "/h1" still finds Heading 1 first.
+  { id: 'toggle-h1', ic: 'toggle', label: 'Toggle heading 1' },
+  { id: 'toggle-h2', ic: 'toggle', label: 'Toggle heading 2' },
+  { id: 'toggle-h3', ic: 'toggle', label: 'Toggle heading 3' },
   { id: 'quote', ic: 'quote', label: 'Quote' },
   { id: 'code', ic: 'codeblock', label: 'Code block' },
   { id: 'divider', ic: 'divider', label: 'Divider' },
+  // Cells to write in, colour, merge and fill (0.9.4, table.js).
+  { id: 'table', ic: 'table', label: 'Table' },
   { id: 'shape', ic: 'shapes', label: 'Shape' },
+  // A video file from the computer (0.9.4): copied into the note and played there.
+  { id: 'video', ic: 'video', label: 'Video' },
   { id: 'embed', ic: 'link', label: 'Embed' },
   { id: 'bookmark', ic: 'bookmark', label: 'Bookmark' },
   { id: 'url', ic: 'link', label: 'URL' },
@@ -97,6 +108,10 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
     removeSlashText();
     hide();
     editorEl.focus();
+    if (id === 'video') {
+      void links?.pickVideo?.();
+      return;
+    }
     if (links && ['embed', 'bookmark', 'url', 'mention'].includes(id)) {
       links.open(id);
       dirty();
@@ -145,7 +160,7 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
     // note, 0.9.1). An empty line in a font is empty spans, so it counts too.
     // A line of a toggle's body is a line of its own too (0.9.3): /todo and
     // /code there went out of the toggle.
-    const own = blank(line) && (line.parentElement === editorEl || line.parentElement?.classList.contains('toggle-body')) ? line : null;
+    const own = blank(line) && (line.parentElement === editorEl || line.parentElement?.matches('.toggle-body, .blk-col')) ? line : null;
     const caretIn = (el) => {
       const r = document.createRange();
       r.setStart(el, 0);
@@ -174,10 +189,14 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
           dropBlankLine();
         }
         break;
-      case 'toggle': {
-        // The line the command was typed on becomes the toggle's title.
+      case 'toggle':
+      case 'toggle-h1':
+      case 'toggle-h2':
+      case 'toggle-h3': {
+        // The line the command was typed on becomes the toggle's title — a
+        // heading of that size for the three heading toggles.
         const at = line && line !== editorEl && !line.closest('.shape-layer, .blk-code') ? line : null;
-        const toggle = at ? makeToggle(at) : null;
+        const toggle = at ? makeToggle(at, { heading: id === 'toggle' ? undefined : id.slice(-2) }) : null;
         if (toggle) {
           const title = toggle.firstElementChild;
           const r = document.createRange();
@@ -202,6 +221,17 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
         insertCodeBlock(editorEl, 'javascript', history, { instead: own });
         if (!own) dropBlankLine();
         break;
+      case 'table': {
+        // Its size is asked for where the caret is (table-size.js); the empty line waits for it.
+        const s = window.getSelection();
+        let rect = s?.rangeCount ? s.getRangeAt(0).getBoundingClientRect() : null;
+        if (!rect || (!rect.width && !rect.height && !rect.top)) rect = (own ?? editorEl).getBoundingClientRect();
+        void pickTableSize(rect).then((size) => {
+          if (!size) return;
+          insertTable(editorEl, history, { instead: own?.isConnected && editorEl.contains(own) ? own : null, ...size });
+        });
+        break;
+      }
       // Through the controller, so it arrives selected like the toolbar's does.
     case 'shape': shapes ? shapes.addShape('rect') : addShape(editorEl, 'rect', history); break;
     }
@@ -213,7 +243,7 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
     if (!s || !s.rangeCount || !s.isCollapsed) return hide();
     const node = s.anchorNode;
     if (!node || node.nodeType !== Node.TEXT_NODE || !editorEl.contains(node)) return hide();
-    if (node.parentElement?.closest('.code-src, .shape, .image-caption')) return hide();
+    if (node.parentElement?.closest('.code-src, .shape, .image-caption, .blk-table')) return hide();
     const hit = detectSlash(node.textContent.slice(0, s.anchorOffset));
     if (!hit) return hide();
     ctx = { node, start: hit.start, end: s.anchorOffset };

@@ -64,8 +64,9 @@ export function unwrap(wrapper) {
 /** The block this node lives in, as a direct child of the editor. */
 function blockOf(node, root) {
   let el = node?.nodeType === 1 ? node : node?.parentElement;
-  while (el && el.parentElement && el.parentElement !== root) el = el.parentElement;
-  return el && el.parentElement === root ? el : null;
+  const flow = (p) => p === root || !!p?.classList?.contains('blk-col');
+  while (el && el.parentElement && !flow(el.parentElement)) el = el.parentElement;
+  return el && flow(el.parentElement) ? el : null;
 }
 
 /**

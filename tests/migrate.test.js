@@ -340,7 +340,8 @@ describe('migrateNote cleans on-screen state an older version saved (0.9.1)', ()
   });
 
   it('is at the version that added these steps', () => {
-    expect(MARKUP_VERSION).toBe('0.9.3');
+    // 0.9.4 added dropFrozenInk (tests/v094.test.js).
+    expect(MARKUP_VERSION).toBe('0.9.4');
   });
 });
 

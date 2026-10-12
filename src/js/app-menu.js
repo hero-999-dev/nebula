@@ -1,5 +1,5 @@
 /**
- * File · Edit · View · Window · Help, drawn by the app.
+ * File · Edit · View · Window · Help — and Settings beside it (0.9.4) — drawn by the app.
  *
  * They are ours rather than Electron's `Menu` for one reason: they have to sit
  * beside the logo in the title strip, and a native menu bar cannot go there.
@@ -13,14 +13,16 @@ import { t } from './i18n.js';
 
 /**
  * @param {object} ctx everything a command might need to act on
- * @returns {Array<{title: string, items: Array}>} an item is
- *   `{ id, label, hint?, run() }`, or `{ separator: true }`
+ * @returns {Array<{title: string, items: Array, direct?: boolean}>} an item is
+ *   `{ id, label, hint?, run(), when?() }`, or `{ separator: true }`. `when`
+ *   answering false leaves the item out — of the menu as it opens, and of the
+ *   palette. A `direct` menu has one item and no list: pressing its title runs it.
  */
 export function buildMenus(ctx) {
   const {
     actions = {}, store, openNote, newNote, find, palette, shortcuts,
     about, checkUpdates, guide, toggleSide, toggleBar, toggleAi, history, blocks,
-    whatsNew,
+    whatsNew, settings, aiShown, lockSet, lockNow,
   } = ctx;
   const shell = typeof window !== 'undefined' ? window.nebula : null;
 
@@ -45,6 +47,8 @@ export function buildMenus(ctx) {
         { separator: true },
         { id: 'file.folder', label: 'Open notes folder', run: () => shell?.reveal?.('storage') },
         { separator: true },
+        // Only where a lock is on (Settings → Lock on opening, 0.9.4): shut the app now.
+        { id: 'file.lock', label: 'Lock Nebula', when: () => !!lockSet?.(), run: () => lockNow?.() },
         { id: 'file.quit', label: 'Quit Nebula', run: () => shell?.quit?.() },
       ],
     },
@@ -68,13 +72,16 @@ export function buildMenus(ctx) {
         // These act on the window, never on a focused <webview> guest — which
         // is why the stock View menu appeared to do nothing with the AI panel
         // open. The level is remembered across launches.
-        { id: 'view.zoomin', label: 'Zoom in', hint: 'Ctrl +', run: () => shell?.view?.zoom('in') },
-        { id: 'view.zoomout', label: 'Zoom out', hint: 'Ctrl -', run: () => shell?.view?.zoom('out') },
-        { id: 'view.zoomreset', label: 'Actual size', hint: 'Ctrl 0', run: () => shell?.view?.zoom('reset') },
+        // No keys beside them: Ctrl + and Ctrl − size the words now (0.9.4), and
+        // no key ever reached these — the app has no native menu to carry one.
+        { id: 'view.zoomin', label: 'Zoom in', run: () => shell?.view?.zoom('in') },
+        { id: 'view.zoomout', label: 'Zoom out', run: () => shell?.view?.zoom('out') },
+        { id: 'view.zoomreset', label: 'Actual size', run: () => shell?.view?.zoom('reset') },
         { separator: true },
         { id: 'view.side', label: 'Toggle note list', run: () => toggleSide?.() },
         { id: 'view.bar', label: 'Toggle editing bar', run: () => toggleBar?.() },
-        { id: 'view.ai', label: 'Toggle AI panel', run: () => toggleAi?.() },
+        // Not there while the AI panel is put away in Settings (0.9.4).
+        { id: 'view.ai', label: 'Toggle AI panel', when: () => aiShown?.() ?? true, run: () => toggleAi?.() },
         { separator: true },
         { id: 'view.fullscreen', label: 'Full screen', hint: 'F11', run: () => shell?.window?.fullscreen() },
         { id: 'view.snapshot', label: 'Window snapshot', hint: 'F12', run: () => window.nebula?.window?.snapshot?.() },
@@ -105,6 +112,14 @@ export function buildMenus(ctx) {
         { id: 'help.about', label: 'About Nebula', run: () => about?.() },
       ],
     },
+    // Settings, beside Help (the owner, 0.9.4): no list under it — it opens the sheet.
+    {
+      title: 'Settings',
+      direct: true,
+      items: [
+        { id: 'settings.open', label: 'Settings', run: () => settings?.open() },
+      ],
+    },
   ];
 }
 
@@ -113,7 +128,7 @@ export function commandsOf(menus) {
   const out = [];
   for (const menu of menus) {
     for (const item of menu.items) {
-      if (item.separator) continue;
+      if (item.separator || item.when?.() === false) continue;
       // Found by its English name and by the name it is shown under (i18n.js, 0.9.3).
       out.push({ ...item, menu: menu.title, search: `${menu.title} ${item.label} ${t(menu.title)} ${t(item.label)}`.toLocaleLowerCase() });
     }
@@ -149,11 +164,22 @@ export function initAppMenu(ctx) {
     title.type = 'button';
     title.className = 'am-title';
     title.textContent = menu.title;
+    if (menu.direct) {
+      // One thing to do: the title does it.
+      title.dataset.cmd = menu.items[0].id;
+      title.addEventListener('click', () => { close(); menu.items[0].run(); });
+      title.addEventListener('mouseenter', () => { if (open) close(); });
+      wrap.append(title);
+      bar.appendChild(wrap);
+      continue;
+    }
     title.setAttribute('aria-expanded', 'false');
 
     const list = document.createElement('div');
     list.className = 'am-menu';
     list.hidden = true;
+    /** Items that are there only sometimes: asked each time the menu opens. */
+    const conditional = [];
 
     for (const item of menu.items) {
       if (item.separator) {
@@ -176,12 +202,14 @@ export function initAppMenu(ctx) {
       }
       btn.addEventListener('click', () => { close(); item.run(); });
       list.appendChild(btn);
+      if (item.when) conditional.push([btn, item.when]);
     }
 
     title.addEventListener('click', () => {
       const wasOpen = open === menu.title;
       close();
       if (wasOpen) return;
+      for (const [btn, when] of conditional) btn.hidden = when() === false;
       list.hidden = false;
       title.setAttribute('aria-expanded', 'true');
       open = menu.title;

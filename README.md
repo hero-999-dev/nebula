@@ -1,10 +1,11 @@
 # Nebula
 
 Calm notes with a real editor. An Electron desktop app for **Windows and macOS**
-that keeps every note as a plain JSON file in your own profile. Installed Windows
-builds offer in-app updates; macOS and portable builds offer a download link.
+that keeps every note in your own profile, as a folder of its own: a plain JSON
+file with the note's pictures and videos beside it. Installed Windows builds
+offer in-app updates; macOS and portable builds offer a download link.
 
-**Version v0.9.3** ·
+**Version v0.9.4** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 
@@ -31,7 +32,9 @@ So this README describes a small app on purpose. What is here is finished.
 - **A two-row toolbar**: undo/redo · bulleted, numbered and to-do lists ·
   outline format (paragraph, H1–H3, quote, code) · indent ± (also Tab and
   Shift+Tab) · save (`Ctrl+S`) · print (`Ctrl+P`) · cut/copy/paste · shapes ‖
-  a **font menu** whose fifteen faces are each shown in their own type · size,
+  a **font menu** whose fifteen faces are each shown in their own type, with a
+  search, **+ Add a font** for any font on the computer, a pin beside each font
+  and the font used last · size,
   any number you type · text colour (`Ctrl+T`) · highlight (`Ctrl+H`) ·
   **B I U** with five underline styles · strikethrough · inline code
   (`Ctrl+E`) · **equations** typeset with KaTeX (`Ctrl+Q`) · four alignments.
@@ -45,19 +48,28 @@ So this README describes a small app on purpose. What is here is finished.
 - **The note list folds away** behind the three lines beside "Nebula" - the rail
   still carries the notes, New note and the themes.
 - **Four themes**: Main (violet), Dark, Light, and White - a plain sheet, for
-  seeing a note as it will print on A4.
+  seeing a note as it will print on A4 - and **a theme of your own**: the
+  palette button beside them opens a colour editor (background, sidebar, lines,
+  accent, text) with named profiles; Matcha and Contrast are ready ones.
 - **Its own undo stack.** Ctrl+Z covers everything the app does, shapes and
   list repair included - not just what the browser happens to know about.
 - **Pin, archive and trash** from the ⋯ on any note; the trash is a way back, so
   even the guide can be deleted and re-added from Help.
 - **File / Edit / View / Window / Help** beside the logo, plus a **Ctrl+K
-  command palette** built from those same menus.
+  command palette** built from those same menus, and **Settings** beside Help:
+  the font, text size and page a new note starts with, hiding the AI panel or
+  the black holes, a lock on opening, and the colours of Nebula's own logo.
 - **Export a note** as Markdown, as one self-contained HTML file, or as a real
   PDF written by the browser's own engine - not a picture of the window. Import
   a `.md` or `.html` file back as a new note.
-- **Right-click a selection** for a compact mini toolbar.
-- **`/` opens a block menu** — headings, lists, to-do, quote, code, divider,
-  shapes, Embed, Bookmark, URL and Mention.
+- **Right-click in a note** for one menu, the same everywhere: the formatting
+  buttons, Cut, Copy, **Paste as Nebula format** (the note's font, size and
+  colours) and **Paste original format** (the same, in the size the words were
+  copied in), Select all. Spelling suggestions and a table's rows and columns
+  join it where they apply.
+- **`/` opens a block menu** — headings, lists, to-do, toggles and toggle
+  headings, quote, code, divider, table, video, shapes, Embed, Bookmark, URL
+  and Mention.
 - **Paste a web link** and choose **Paste as → Embed / Bookmark / URL / Mention**.
   Embed loads a sandboxed preview; sites that block embedding can still be opened
   through the visible link. Bookmark is an offline link card (no fetched thumbnail);
@@ -65,8 +77,23 @@ So this README describes a small app on purpose. What is here is finished.
 - **Paste or drop PNG, JPEG, GIF or WebP images.** Drag to move, use the corner
   grip to resize proportionally, and the image bar to send behind/bring forward
   or delete. Escape deselects. Once a behind-text image is selected, click again
-  to edit the text; Alt-drag selects the image instead. Images are stored inside
-  the note, so large images also increase note/backup size.
+  to edit the text; Alt-drag selects the image instead. A picture in the text
+  stands at the left, in the middle or at the right of its line, shares a line
+  with other pictures, or stands inside a line of words. Pictures and dropped
+  video files are files in the note's own folder, written once: typing saves
+  only the words.
+- **Tables** (`/table` or the bar's button): columns numbered x1, x2…, rows y1,
+  y2…; cells selected with the mouse are coloured, merged and filled on by
+  pulling a small square; rows and columns are added, resized and deleted.
+- **A divider pulled sideways splits the page** into columns; the upright
+  divider resizes them, and deleting it makes one flow again.
+- **Black holes**: notes kept encrypted (AES-256-GCM), titles and pictures
+  included, opened with a 6-digit PIN or a passkey (Windows Hello / Touch ID),
+  locked again after ten minutes, with a recovery key shown once.
+- **A lock on opening** (Settings): a 6-digit PIN, a passkey beside it if
+  wanted. It keeps the app shut; a black hole is what encrypts.
+- **Open with Nebula**: a Word, OpenDocument or Rich Text file opens as a new
+  note from the file manager; the file itself is not changed.
 - **Code blocks** are markdown-style with a language picker and syntax colours
   for JS, TS, Python, Java, C, C++, C#, Dart (Flutter), Ruby, HTML, CSS, JSON,
   SQL, Bash and Markdown — every one of them with a sample in the guide.
@@ -77,14 +104,16 @@ So this README describes a small app on purpose. What is here is finished.
   MathGPT, Copilot, plus any site you add), resizable, with a
   side-scrolling tab strip. Each service keeps its own persistent session and a
   tab switch never reloads it, so a login survives. It touches no note data, by
-  design.
+  design. A tab can be let to sleep when unused (right-click the tab) to give
+  its memory back; a right-click also clears a tab's session data.
 - **Lists you can leave.** Enter or Backspace on an empty item ends the list
   rather than adding another one or merging into the line above, and the to-do
   button toggles a line both ways.
 - **One starter note, the same in every build.** `Welcome to Nebula Guide` is
-  the whole product on one page: eight sections, each with something to try, and
-  a working code sample for all fifteen languages. A vault that predates it is
-  given a copy — added, never overwriting anything already there.
+  the whole product on one page: eleven sections, each with something to try, and
+  a working code sample for all fifteen languages. It follows the app's language
+  (English, Deutsch, Polski, Türkçe) while nobody has written in it. A vault that
+  predates it is given a copy — added, never overwriting anything already there.
 
 The app icon is drawn from vector geometry at every size it ships — 16 through
 256 in a real multi-size `.ico` — so the title bar and the taskbar are as sharp

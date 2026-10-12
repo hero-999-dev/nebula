@@ -47,6 +47,7 @@
         <button type="button" data-note-act="autoorder"></button>
         <button type="button" data-note-act="labels">Edit labels</button>
         <button type="button" data-note-act="folder">Move to folder</button>
+        <button type="button" data-note-act="hole" hidden>Move into a black hole</button>
         <button type="button" data-note-act="archive"></button>
         <button type="button" data-note-act="trash">Move to trash</button>
       </div>
@@ -56,24 +57,35 @@
              does not move out from under the pointer, and two buttons side by
              side under it — Archive left, Trash right. -->
         <div class="drawer-body" id="drawer-body" hidden></div>
+        <!-- A theme of one's own (0.9.4): opens upward here, over Archive and
+             Trash, from the palette button at the right of the themes below.
+             Filled by theme-editor.js. -->
+        <div class="theme-editor" id="theme-editor" role="group" aria-label="Your own theme" hidden></div>
         <div class="drawer-tabs">
           <button type="button" class="btn drawer-tab" data-drawer="archive" aria-expanded="false">
-            Archive<span class="drawer-count" id="archive-count">0</span>
+            Archive
           </button>
           <button type="button" class="btn drawer-tab" data-drawer="trash" aria-expanded="false">
-            Trash<span class="drawer-count" id="trash-count">0</span>
+            Trash
           </button>
         </div>
         <!-- New folder (0.9.3) beside it: the folder icon and a plus. -->
         <div class="new-row">
           <button class="btn primary" id="btn-new" type="button">New note</button>
           <button class="btn new-folder" id="btn-new-folder" type="button" title="New folder" aria-label="New folder"><span data-icon="folder"></span><span class="nf-plus" aria-hidden="true">+</span></button>
+          <!-- New black hole (0.9.4), beside New folder: notes kept encrypted. -->
+          <button class="btn new-folder new-hole" id="btn-new-hole" type="button" title="New black hole" aria-label="New black hole"><span class="hole-disc" aria-hidden="true"></span><span class="nf-plus" aria-hidden="true">+</span></button>
         </div>
-        <div class="theme-pick" id="theme-pick" role="group" aria-label="Theme">
-          <button type="button" data-theme="main" title="Main — violet">Main</button>
-          <button type="button" data-theme="dark" title="Dark">Dark</button>
-          <button type="button" data-theme="light" title="Light">Light</button>
-          <button type="button" data-theme="white" title="White — how the note looks on A4">White</button>
+        <!-- The four themes, and at their right — like New folder beside New
+             note — the reader's own (0.9.4): the palette opens its editor. -->
+        <div class="theme-row">
+          <div class="theme-pick" id="theme-pick" role="group" aria-label="Theme">
+            <button type="button" data-theme="main" title="Main — violet">Main</button>
+            <button type="button" data-theme="dark" title="Dark">Dark</button>
+            <button type="button" data-theme="light" title="Light">Light</button>
+            <button type="button" data-theme="white" title="White — how the note looks on A4">White</button>
+          </div>
+          <button class="btn theme-custom" id="btn-theme-custom" type="button" title="Your own theme" aria-label="Your own theme" aria-expanded="false" aria-controls="theme-editor"><span data-icon="palette"></span></button>
         </div>
         <div class="side-meta">
           <span class="app-version" id="app-version" title="About Nebula"></span>
@@ -88,7 +100,6 @@
               <button type="button" data-lang="tr" title="Türkçe">Türkçe</button>
             </div>
           </div>
-          <button class="btn ghost btn-mini" id="btn-check-updates" type="button" title="Check for updates">Check for updates</button>
         </div>
       </div>
     </aside>
@@ -113,7 +124,9 @@
         </div>
       </header>
 
-      <div class="edit-shell" id="edit-shell">
+      <!-- bar-top from the start: dock.js sets the remembered side, but until the
+           script runs the bar must not stand beside the page (0.9.4). -->
+      <div class="edit-shell bar-top" id="edit-shell">
         <div class="toolbar" id="toolbar">
           <div class="tb-row">
             <button type="button" class="tb" data-act="undo" title="Undo (Ctrl+Z)"><span data-icon="undo"></span></button>
@@ -133,6 +146,9 @@
             <button type="button" class="tb" data-act="toggle" title="Toggle list"><span data-icon="toggle"></span></button>
             <button type="button" class="tb" data-act="outdent" title="Decrease indent (Shift+Tab)"><span data-icon="outdent"></span></button>
             <button type="button" class="tb" data-act="indent" title="Increase indent (Tab)"><span data-icon="indent"></span></button>
+            <!-- Auto order page (0.9.3): what a page line falls across goes to the next page. Beside the
+                 indents since 0.9.4: at the end of the second row it was the first thing a narrow window pushed off. -->
+            <button type="button" class="tb tb-order" id="btn-order-page" title="Auto order page — move what a page line falls across to the next page" aria-label="Auto order page"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2.5h7l3 3v12H5z"/><path d="M7.5 9.5h5M7.5 13h5"/></svg></button>
             <span class="tb-sep"></span>
             <button type="button" class="tb" data-act="save" title="Save now (Ctrl+S)"><span data-icon="save"></span></button>
             <button type="button" class="tb" data-act="print" title="Print (Ctrl+P)"><span data-icon="print"></span></button>
@@ -169,8 +185,8 @@
                 <button type="button" data-arrow-add="curve"><span class="sh-mark" aria-hidden="true"><svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 14.5C3.5 6 9 3.5 15 4.5"/><path d="M11.5 2l3.6 2.6-2.6 3.4"/></svg></span><span class="label">Curved arrow</span></button>
               </div>
             </span>
-            <button type="button" class="tb" data-act="codeblock" title="Code block (with language)"><span data-icon="codeblock"></span></button>
             <button type="button" class="tb" data-act="divider" title="Divider"><span data-icon="divider"></span></button>
+            <button type="button" class="tb" data-act="table" title="Table"><span data-icon="table"></span></button>
           </div>
 
           <div class="tb-row">
@@ -221,6 +237,8 @@
             </span>
             <button type="button" class="tb" data-act="strike" title="Strikethrough (Ctrl+Shift+S)"><span data-icon="strike"></span></button>
             <button type="button" class="tb" data-act="code" title="Inline code (Ctrl+E)"><span data-icon="code"></span></button>
+            <!-- The code block stands beside the code in a line (the owner, 0.9.4); it was up among the shapes. -->
+            <button type="button" class="tb" data-act="codeblock" title="Code block (with language)"><span data-icon="codeblock"></span></button>
             <button type="button" class="tb" data-act="link" title="Link the selected words (or paste a URL over them)"><span data-icon="link"></span></button>
             <button type="button" class="tb" data-act="eq" title="Equation (Ctrl+Q)"><span data-icon="equation"></span></button>
             <span class="tb-sep"></span>
@@ -235,8 +253,6 @@
               <select class="tb-select tb-zoom-select" id="zoom-select" title="Page zoom" aria-label="Page zoom"></select>
               <button type="button" class="tb" data-zoom="in" title="Zoom the page in" aria-label="Zoom the page in">+</button>
             </span>
-            <!-- Auto order page (0.9.3): what a page line falls across goes to the next page. -->
-            <button type="button" class="tb tb-order" id="btn-order-page" title="Auto order page — move what a page line falls across to the next page" aria-label="Auto order page"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2.5h7l3 3v12H5z"/><path d="M7.5 9.5h5M7.5 13h5"/></svg></button>
           </div>
         </div>
 
@@ -277,8 +293,8 @@
     <button type="button" data-act="underline" title="Underline"><span data-icon="underline"></span></button>
     <button type="button" data-act="strike" title="Strikethrough"><span data-icon="strike"></span></button>
     <span class="mb-sep"></span>
-    <button type="button" data-act="color" title="Text color"><span class="hl-letter">A</span></button>
-    <button type="button" data-act="hilite" title="Highlight"><span class="hl-letter">H</span></button>
+    <button type="button" class="mb-color" data-act="color" title="Text color"><span class="hl-letter">A</span><i class="tb-bar" data-bar="color"></i></button>
+    <button type="button" class="mb-color" data-act="hilite" title="Highlight"><span class="hl-letter">H</span><i class="tb-bar" data-bar="hilite"></i></button>
     <button type="button" data-act="code" title="Inline code"><span data-icon="code"></span></button>
     <button type="button" data-act="link" title="Link"><span data-icon="link"></span></button>
   </div>
@@ -340,6 +356,23 @@
       <div id="about-body"></div>
       <div class="dlg-actions" id="about-actions">
         <button class="btn ghost" id="about-close" type="button">Close</button>
+        <!-- Here from the start (0.9.4). It used to be written into the sidebar's
+             last row and moved here by the script: until the script had run it
+             squeezed the languages beside it to "E… D… P… T…" (the owner's
+             snapshot of the app loading). -->
+        <button class="btn ghost btn-mini" id="btn-check-updates" type="button" title="Check for updates">Check for updates</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings (0.9.4), from the title beside Help: what a new note starts with,
+       what is put away, and the lock on opening. Filled by settings-panel.js. -->
+  <div class="overlay" id="ov-settings" hidden>
+    <div class="modal modal-wide settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <p class="dlg-title" id="settings-title">Settings</p>
+      <div id="settings-body"></div>
+      <div class="dlg-actions">
+        <button class="btn ghost" id="settings-close" type="button">Close</button>
       </div>
     </div>
   </div>

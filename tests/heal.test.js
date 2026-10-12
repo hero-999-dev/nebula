@@ -25,6 +25,11 @@ const parse = (html) => {
 
 const MUSEUM = [
   {
+    when: 'up to 0.9.3: a paste froze the theme\'s ink into the words — pasted in Light, black for good, unreadable in Main and Dark (the owner\'s Ideas note)',
+    html: '<p>here dressed <b style="color: rgb(17, 17, 17);">words</b> and <span style="color: rgb(237, 231, 247); scrollbar-color: auto;">more</span></p>',
+    gone: '[style*="color"]',
+  },
+  {
     when: '0.9.3 test builds: a loose <br> between a divider and a picture, where the caret stood (the owner\'s Ideas note)',
     html: '<h1>Ideas &amp; Bugs</h1><hr class="blk-hr"><br><figure class="note-image note-image--inline" contenteditable="false" data-block-type="image"><img src="data:,"></figure><div>text</div>',
     gone: 'hr + br, hr + p',

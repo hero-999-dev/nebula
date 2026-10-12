@@ -290,6 +290,9 @@ body {
 .note-item:focus-within .nr-more,
 .nr-more[aria-expanded="true"] { opacity: 1; }
 .nr-more:hover { background: var(--paper-sunken); border-color: var(--rule); color: var(--ink); }
+/* On the folded rail the ⋯ sat on top of the note's initial; it is gone there,
+   and a right-click on the row opens the same menu (0.9.4). */
+#app.side-collapsed .nr-more { display: none; }
 .nr-pin {
   display: inline-grid;
   place-items: center;
@@ -391,6 +394,7 @@ body {
   cursor: pointer;
 }
 .drawer-actions button:hover { color: var(--ink); border-color: var(--clay); }
+.drawer-actions button.is-sure { color: var(--c-red, #c0392b); border-color: var(--c-red, #c0392b); font-weight: 600; }
 .drawer-empty { padding: 8px 10px; font-size: 12px; color: var(--ink-faint); }
 #app.side-collapsed .drawer-body { display: none; }
 #app.side-collapsed .drawer-tabs { flex-direction: column; }
@@ -526,8 +530,9 @@ body {
   flex: 1;
   min-width: 0;
   font: inherit;
-  font-size: 11.5px;
-  padding: 5px 2px;
+  /* 11px since there are five of them (Matcha, 0.9.4): each still fits its name. */
+  font-size: 11px;
+  padding: 5px 1px;
   border: 0;
   border-radius: 7px;
   background: transparent;
@@ -679,6 +684,12 @@ body {
   line-height: 1.65;
   outline: none;
   min-height: 200px;
+  /* The caret is the theme's ink on every line. Left to itself it takes the
+     colour of the words it stands in: on a line pasted from a dark page it was
+     that page's pale grey, all but gone on a light ground — "after pasting the
+     caret changed its colour on one line; on another it is the original" (the
+     owner, 0.9.4). */
+  caret-color: var(--ink);
 }
 .editor:empty::before {
   content: attr(data-placeholder);
@@ -894,6 +905,22 @@ body {
 
 /* ---------------------------------------------------------- what's new card */
 /* An update that arrives silently gives no reason to look for what it fixed. */
+/* A sheet longer than the window scrolls inside itself, its title and button in
+   place (0.9.4): What's new ran off the bottom of the screen and its last
+   entries and "Got it" could not be reached. Ids, because editor.css sets
+   .overlay and .modal after this file. */
+#ov-whats-new, #ov-shortcuts, #ov-blocks, #ov-about { padding-top: 7vh; }
+#ov-whats-new .modal, #ov-shortcuts .modal, #ov-blocks .modal, #ov-about .modal {
+  display: flex;
+  flex-direction: column;
+  max-height: 86vh;
+}
+#whats-new-body, #shortcuts-body, #blocks-body, #about-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
 .wn-headline {
   margin: 0 0 12px;
   color: var(--ink-soft);
@@ -1026,6 +1053,24 @@ body {
 .note-item.drop-after::after { bottom: -1px; }
 .folder-item.drop-into .folder-row,
 .folder-empty.drop-into { background: var(--clay-soft); border-color: var(--clay); color: var(--ink); }
+/* "+ Add a note" above the hint of an empty folder (0.9.4). */
+.folder-add {
+  display: block;
+  width: 100%;
+  margin: 2px 0 4px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.folder-add:hover { background: var(--paper-raised); border-color: var(--rule); color: var(--clay); }
+.folder-add.drop-into { background: var(--clay-soft); border-color: var(--clay); color: var(--ink); }
+#app.side-collapsed .folder-add { display: none; }
 .note-list.drop-end { box-shadow: inset 0 -2px 0 var(--clay); }
 
 .folder-menu { min-width: 190px; max-width: 260px; }
@@ -1061,3 +1106,323 @@ body {
 }
 .folder-block.drop-before::before { top: -1px; }
 .folder-block.drop-after::after { bottom: -1px; }
+
+/* ---------- a theme of one's own (0.9.4, theme-editor.js) ----------
+   The palette button stands at the right of the four themes, the way New
+   folder stands beside New note; its editor opens upward over Archive and
+   Trash, in the drawer's own place and dress. */
+.theme-row { display: flex; gap: 6px; }
+.theme-row .theme-pick { flex: 1; min-width: 0; }
+.btn.theme-custom { display: inline-flex; align-items: center; padding: 4px 9px; color: var(--ink-soft); }
+.btn.theme-custom:hover { color: var(--ink); }
+.btn.theme-custom svg { width: 16px; height: 16px; }
+.btn.theme-custom.on,
+.btn.theme-custom[aria-expanded="true"] { border-color: var(--clay); color: var(--clay); }
+.btn.theme-custom.on { background: var(--clay); color: var(--paper-sunken); }
+:root[data-theme="light"] .btn.theme-custom.on,
+:root[data-theme="white"] .btn.theme-custom.on { color: #fff; }
+#app.side-collapsed .theme-row { flex-direction: column; }
+#app.side-collapsed .btn.theme-custom { justify-content: center; padding: 6px 0; }
+#app.side-collapsed .btn.theme-custom::before { content: none; }
+#app.side-collapsed .theme-editor { display: none; }
+
+.theme-editor {
+  /* What the window has left once the sidebar's fixed parts are counted: the
+     foot under it must stay on screen, so the panel scrolls inside itself. */
+  flex-shrink: 0;
+  max-height: max(190px, calc(100vh - 400px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin-bottom: 1px;
+  padding: 8px;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: var(--paper-sunken);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.te-head { display: flex; align-items: center; justify-content: space-between; }
+.te-title { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.te-close {
+  width: 22px; height: 22px; padding: 0;
+  border: 1px solid transparent; border-radius: 6px;
+  background: transparent; color: var(--ink-faint);
+  font: inherit; font-size: 11px; cursor: pointer;
+}
+.te-close:hover { color: var(--ink); border-color: var(--rule); background: var(--paper-raised); }
+/* On top: the profile's name, and saving it. */
+.te-save { display: flex; flex-direction: column; gap: 5px; }
+.te-name, .te-hex {
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  background: var(--paper-raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+}
+.te-name:focus, .te-hex:focus { border-color: var(--clay); }
+.te-save-btn { font-size: 12.5px; padding: 6px 8px; }
+.te-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-faint); margin-top: 2px; }
+.te-profiles { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.te-chip {
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--rule); border-radius: 999px;
+  background: var(--paper-raised); color: var(--ink-soft);
+  font: inherit; font-size: 11.5px;
+  overflow: hidden;
+}
+button.te-chip { padding: 3px 10px; cursor: pointer; }
+.te-chip.on { border-color: var(--clay); color: var(--ink); box-shadow: inset 0 0 0 1px var(--clay); }
+.te-chip__name {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 8px 3px 6px;
+  border: 0; background: transparent; color: inherit;
+  font: inherit; cursor: pointer;
+}
+/* The profile in two dots' worth: its accent on its ground. */
+.te-chip__name::before {
+  content: "";
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--dot, var(--clay));
+  box-shadow: 0 0 0 2px var(--dot-bg, var(--paper)), 0 0 0 3px var(--rule);
+  margin: 0 2px 0 3px;
+}
+.te-chip__name:hover, button.te-chip:hover { color: var(--ink); }
+.te-chip__x {
+  border: 0; border-left: 1px solid var(--rule);
+  background: transparent; color: var(--ink-faint);
+  font: inherit; font-size: 13px; line-height: 1; padding: 3px 7px 4px 6px; cursor: pointer;
+}
+.te-chip__x:hover, .te-chip--danger { color: var(--madder); }
+.te-ask { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--ink-soft); }
+/* The five slots: what it paints, and its colour in a box; a press chooses it. */
+.te-slots { display: flex; flex-direction: column; gap: 4px; }
+.te-slot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 5px 6px 5px 9px;
+  border: 1px solid var(--rule); border-radius: 7px;
+  background: transparent; color: var(--ink);
+  font: inherit; font-size: 12px; text-align: left; cursor: pointer;
+}
+.te-slot.on { border-color: var(--ink); background: var(--paper-raised); box-shadow: inset 0 0 0 1px var(--ink); }
+.te-slot__box { flex-shrink: 0; width: 24px; height: 24px; border-radius: 5px; border: 1.5px solid var(--ink); }
+/* The long bar of the chosen colour, its code on it: a press opens every colour. */
+.te-bar-row { display: flex; gap: 5px; align-items: stretch; }
+.te-bar {
+  position: relative; flex: 1; min-width: 0; height: 34px;
+  display: grid; place-items: center;
+  border: 2px solid var(--ink); border-radius: 7px;
+  cursor: pointer; overflow: hidden;
+}
+.te-bar input[type="color"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.te-bar__code { font-family: var(--mono); font-size: 12.5px; font-weight: 600; letter-spacing: .04em; pointer-events: none; }
+.te-hex { width: 78px; flex-shrink: 0; font-family: var(--mono); font-size: 11.5px; text-transform: uppercase; }
+.te-hint { margin: 0; font-size: 10.5px; line-height: 1.35; color: var(--ink-faint); }
+.te-warn { margin: 0; font-size: 11px; line-height: 1.35; color: var(--madder); }
+.te-swatches { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.te-swatch { aspect-ratio: 1; min-width: 0; padding: 0; border: 1px solid var(--ink-faint); border-radius: 4px; cursor: pointer; }
+.te-swatch:hover { border-color: var(--ink); }
+.te-swatch.on { border: 2px solid var(--ink); box-shadow: 0 0 0 1px var(--paper-sunken) inset; }
+
+/* ---------- black holes (0.9.4, black-holes.js): notes kept encrypted ---------- */
+.hole-disc {
+  flex: none;
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, #000 0 38%, var(--clay) 46% 58%, transparent 66%);
+  box-shadow: 0 0 0 1px var(--rule);
+}
+.btn.new-hole .hole-disc { width: 15px; height: 15px; }
+.holes { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--rule); }
+.holes-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 2px 8px 4px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.holes-head:hover { color: var(--ink-soft); }
+/* The folders' own caret: pointing down while the section is open, right while it is folded. */
+.holes-head[aria-expanded="true"] .fr-caret::before { transform: rotate(90deg); }
+.hole-item { display: flex; align-items: center; gap: 2px; }
+.hole-row { flex: 1; min-width: 0; }
+.hole-row[aria-expanded="false"] .fr-name { color: var(--ink-soft); }
+/* The lock at the left of a black hole, before its name: an icon the size of the row's own. */
+.hole-lock {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.hole-lock .ic { width: 14px; height: 14px; }
+.hole-lock[data-state="open"] { color: var(--clay); }
+.hole-lock:hover { background: var(--paper-raised); color: var(--ink); }
+.hole-block.drop-into > .hole-item { background: var(--clay-soft); border-radius: 8px; }
+.hole-menu .is-locked { opacity: .55; }
+.hole-menu .fm-ic .hole-disc { vertical-align: -2px; }
+#app.side-collapsed .holes-head,
+#app.side-collapsed .hole-lock { display: none; }
+#app.side-collapsed .hole-row .hole-disc { width: 16px; height: 16px; }
+
+/* The dialogs: a new black hole, its recovery key, its PIN. */
+.hole-modal { width: min(380px, 94vw); }
+.hole-modal .hole-note { margin: 0 0 10px; font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); }
+.hole-modal input {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper-sunken);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+}
+.hole-modal input:focus { outline: none; border-color: var(--clay); }
+.hole-modal input.hole-pin { text-align: center; font-size: 20px; letter-spacing: .5em; padding-left: .5em; font-family: var(--mono, monospace); }
+.hole-modal input.hole-recovery { font-family: var(--mono, monospace); font-size: 12px; text-transform: uppercase; }
+.hole-pins { display: flex; flex-direction: column; }
+.hole-modal .hole-pins input.hole-pin { margin-bottom: 2px; }
+.hole-modal .hole-hint { margin: 0 0 8px; font-size: 11.5px; color: var(--ink-faint); }
+/* The hint kept with a black hole, under the PIN it is a reminder of. */
+.hole-modal .hole-reminder { font-size: 12.5px; color: var(--ink-soft); }
+.hole-pins[hidden], .hole-modal input[hidden] { display: none; }
+.hole-choice { display: flex; margin: 0 0 8px; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.hole-choice button { flex: 1; padding: 6px 8px; border: 0; background: var(--paper-raised); color: var(--ink-soft); font: inherit; font-size: 12.5px; cursor: pointer; }
+.hole-choice button + button { border-left: 1px solid var(--rule); }
+.hole-choice button.on { background: var(--clay); color: var(--paper-sunken); font-weight: 600; }
+:root[data-theme="light"] .hole-choice button.on, :root[data-theme="white"] .hole-choice button.on { color: #fff; }
+:root[data-profile] .hole-choice button.on { color: var(--on-clay) !important; }
+.hole-choice button:disabled { opacity: .45; cursor: default; }
+.held-modal { width: min(460px, 94vw); }
+.held-modal .held-note { margin: 0 0 12px; font-size: 12.5px; line-height: 1.5; color: var(--ink-soft); }
+.held-list { display: flex; flex-direction: column; gap: 8px; max-height: 46vh; overflow: auto; margin-bottom: 12px; }
+.held-modal .held-warning { color: var(--ink); }
+.held-row { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+.held-what { flex: 1; min-width: 0; }
+.held-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.held-count { font-size: 12px; color: var(--ink-faint); }
+.held-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.held-actions .held-back { color: var(--ink); border-color: var(--clay); font-weight: 600; }
+.held-actions button:disabled { opacity: .5; cursor: default; }
+.held-actions button { padding: 4px 10px; font: inherit; font-size: 12.5px; color: var(--ink-soft); background: transparent; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.held-actions button:hover { color: var(--ink); border-color: var(--clay); }
+.held-actions .held-delete { color: var(--c-red, #c0392b); }
+.hole-error { min-height: 1.3em; margin: 0 0 6px; font-size: 12.5px; color: var(--c-red, #c0392b); }
+.hole-key {
+  margin: 0 0 12px;
+  padding: 10px;
+  border: 1px dashed var(--rule);
+  border-radius: 8px;
+  background: var(--paper-sunken);
+  font-family: var(--mono, monospace);
+  font-size: 13px;
+  line-height: 1.7;
+  text-align: center;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+.hole-link { display: inline-block; margin: 0 0 8px; padding: 0; border: 0; background: none; color: var(--clay); font: inherit; font-size: 12.5px; text-decoration: underline; cursor: pointer; }
+
+/* ---------- Settings (0.9.4, settings-panel.js) ----------
+   The sheet from the title beside Help: what a new note starts with, what is
+   put away, and the lock on opening. Ids, because editor.css sets .overlay and
+   .modal after this file. */
+#ov-settings { padding-top: 7vh; }
+#ov-settings .modal { display: flex; flex-direction: column; max-height: 86vh; }
+#settings-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 4px; }
+.set-group + .set-group { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+.set-head { margin: 0 0 9px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); }
+.set-row { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; font-size: 13px; }
+.set-label { flex: 0 0 132px; color: var(--ink-soft); }
+.set-select {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 26px 0 9px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background-color: var(--paper-sunken);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  /* The bar's own dropdown mark (editor.css .tb-select). */
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%),
+                    linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
+  background-position: calc(100% - 13px) calc(50% + 1px), calc(100% - 9px) calc(50% + 1px);
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+.set-select:focus { border-color: var(--clay); }
+.set-check { display: flex; align-items: center; gap: 9px; margin: 0 0 2px; font-size: 13px; cursor: pointer; }
+.set-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--clay); cursor: pointer; }
+.set-hint { margin: 0 0 10px; font-size: 11.5px; line-height: 1.5; color: var(--ink-faint); }
+.set-check + .set-hint { margin-left: 24px; }
+.set-group > .set-hint:last-child, .set-lock > .set-hint:last-child { margin-bottom: 0; }
+.set-state { margin: 0 0 8px; font-size: 13px; }
+.set-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+.set-buttons .btn { font-size: 12.5px; padding: 6px 11px; }
+.set-buttons .btn:disabled { opacity: .45; cursor: default; }
+.set-status:empty { display: none; }
+.set-status.bad { color: var(--c-red, #c0392b); }
+
+/* The lock on opening (app-lock.js): a screen over the whole window, under the
+   title strip — which stays, so the window can still be moved and closed. */
+.app-lock { position: fixed; inset: 38px 0 0 0; z-index: 400; display: grid; place-items: center; background: var(--paper); }
+.app-lock__card { text-align: center; }
+.app-lock__card .dlg-title { font-size: 15px; }
+.app-lock__mark { display: grid; place-items: center; width: 40px; height: 40px; margin: 2px auto 8px; border-radius: 50%; background: var(--paper-sunken); color: var(--clay); }
+.app-lock__mark .ic { width: 20px; height: 20px; }
+.app-lock__card .dlg-actions { justify-content: center; }
+.app-lock__card .hole-note { text-align: left; }
+/* The passkey beside the PIN: a button of its own — on the lock screen, and in
+   the dialogs that ask for the lock's answer — and a box to tick when a lock is set. */
+.app-lock__passkey { display: block; margin: 0 auto 10px; font-size: 12.5px; padding: 6px 12px; }
+.app-lock__passkey:disabled { opacity: .5; cursor: default; }
+.hole-modal .set-check { margin: 2px 0 8px; }
+.hole-modal .set-check input { width: 15px; height: 15px; margin: 0; padding: 0; }
+.hole-modal .set-check.off { opacity: .5; cursor: default; }
+
+/* The logo's editor, at the foot of the Settings sheet (0.9.4, logo-editor.js):
+   the logo at the left, and at its right the theme editor's own pieces (.te-*). */
+.logo-editor { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 18px; align-items: start; margin-bottom: 8px; }
+.logo-side { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 2px; }
+.logo-big { width: 112px; height: 112px; display: block; }
+.logo-smalls { display: flex; align-items: flex-end; gap: 12px; }
+.logo-mid { width: 32px; height: 32px; }
+.logo-tiny { width: 16px; height: 16px; }
+.logo-tools { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.logo-tools .te-label { margin-top: 0; }
+.logo-tools .te-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.logo-tools .te-swatches { grid-template-columns: repeat(14, 1fr); }
+/* The logo's own themes: a + after the last of them, and under the editor a button for a shortcut. */
+.logo-themes .logo-add { min-width: 26px; padding: 3px 9px; font-weight: 600; color: var(--clay); }
+.logo-shortcut { font-size: 12.5px; padding: 6px 11px; margin-top: 2px; }
+.logo-shortcut:disabled { opacity: .5; cursor: default; }

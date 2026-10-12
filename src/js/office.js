@@ -21,6 +21,7 @@
  */
 import JSZip from 'jszip';
 import { parseNote } from './export.js';
+import { splitsOf, cleanSplits } from './columns.js';
 
 const PX_PER_MM = 96 / 25.4;
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -51,6 +52,8 @@ function readRuns(node, fmt = {}, out = []) {
   const el = node;
   const tag = el.tagName.toLowerCase();
   if (tag === 'br') { out.push({ ...fmt, br: true }); return out; }
+  // A picture standing in a line of words (0.9.4) stays in its line.
+  if (el.classList.contains('note-image--inword')) { const pic = imageBlock(el); if (pic) out.push({ ...fmt, pic }); return out; }
   if (tag === 'img') return out;                                  // pictures are blocks of their own
   if (el.classList.contains('inline-eq')) { out.push({ ...fmt, text: `$${el.dataset.tex ?? el.textContent}$` }); return out; }
   const f = { ...fmt };
@@ -86,7 +89,19 @@ function imageBlock(figure) {
   // A video put on the page (export-video.js): its still links to it, and Word can play it.
   const href = img.closest('a[href]')?.getAttribute('href') || '';
   const video = figure.dataset?.video || '';
-  return { type: 'image', src, width, ratio, caption, alt: img.getAttribute('alt') || '', href, video };
+  // Where it stands in the note (0.9.4): a picture in the text keeps its side,
+  // and its line when it shares one; a picture floating on the page has no
+  // place in a flow and is set in the middle, as before.
+  const cls = figure.classList;
+  const inText = !!cls?.contains('note-image--inline');
+  const align = !inText || cls.contains('note-image--center') ? 'center' : cls.contains('note-image--right') ? 'right' : 'left';
+  return { type: 'image', src, width, ratio, caption, alt: img.getAttribute('alt') || '', href, video, align, row: inText && cls.contains('note-image--row') };
+}
+
+/** The share of the line each column of a block takes, in percent. */
+function columnShares(cols, count) {
+  const at = [0, ...cleanSplits(splitsOf(cols), count), 100];
+  return Array.from({ length: count }, (_, i) => at[i + 1] - at[i]);
 }
 
 /**
@@ -95,9 +110,18 @@ function imageBlock(figure) {
  */
 export function readBlocks(html) {
   const doc = parseNote(html);
-  const blocks = [];
+  let blocks = [];
   const para = (runs, extra = {}) => {
-    if (runs.some((r) => r.br || (r.text && r.text.trim()))) blocks.push({ type: 'para', runs: trimRuns(runs), ...extra });
+    if (runs.some((r) => r.br || r.pic || (r.text && r.text.trim()))) blocks.push({ type: 'para', runs: trimRuns(runs), ...extra });
+  };
+  /** What a column holds, read as a flow of its own. */
+  const inner = (el) => {
+    const outer = blocks;
+    blocks = [];
+    walk(el);
+    const got = blocks;
+    blocks = outer;
+    return got;
   };
   function list(el, level) {
     const ordered = el.tagName === 'OL';
@@ -148,6 +172,14 @@ export function readBlocks(html) {
       blocks.push({ type: 'todo', checked: el.classList.contains('done'), runs: trimRuns(readRuns(el)) });
       return;
     }
+    // Columns (0.9.4): each column is a flow of its own, with its share of the line.
+    if (el.classList.contains('blk-cols')) {
+      const columns = [...el.children].filter((c) => c.classList.contains('blk-col'));
+      if (columns.length < 2) { walk(el, extra); return; }
+      const shares = columnShares(el, columns.length);
+      blocks.push({ type: 'columns', cols: columns.map((col, i) => ({ share: shares[i], blocks: inner(col) })) });
+      return;
+    }
     if (tag === 'hr') { blocks.push({ type: 'hr' }); return; }
     if (tag === 'figure' || tag === 'img') {
       const im = imageBlock(el);
@@ -173,14 +205,42 @@ export function readBlocks(html) {
   return blocks;
 }
 
+/** Blocks for a format with no columns: one column after the other, a rule between them. */
+export function flatBlocks(blocks) {
+  const out = [];
+  for (const b of blocks) {
+    if (b.type !== 'columns') { out.push(b); continue; }
+    b.cols.forEach((col, i) => { if (i) out.push({ type: 'hr' }); out.push(...flatBlocks(col.blocks)); });
+  }
+  return out;
+}
+
+/**
+ * Blocks as a writer sets them: the pictures sharing a line in the note are
+ * one block (`images`), so they share a line in the document too.
+ */
+function inLines(blocks) {
+  const out = [];
+  for (const b of blocks) {
+    const last = out.at(-1);
+    if (b.type === 'image' && b.row && last?.type === 'images' && last.row) last.items.push(b);
+    else if (b.type === 'image') out.push({ type: 'images', items: [b], row: !!b.row, align: b.row ? 'left' : b.align });
+    else out.push(b);
+  }
+  return out;
+}
+
+/** A note that opens with its own title as a heading does not say it twice. */
+const isTitle = (b, title) => b?.type === 'heading' && b.level === 1 && b.runs.map((r) => r.text || '').join('').trim() === String(title).trim();
+
 function trimRuns(runs) {
-  const out = runs.filter((r) => r.br || r.text);
+  const out = runs.filter((r) => r.br || r.pic || r.text);
   while (out.length && out[0].text !== undefined && !out[0].text.trim() && !out[0].br) out.shift();
   if (out[0]?.text) out[0] = { ...out[0], text: out[0].text.replace(/^\s+/, '') };
   while (out.length && out.at(-1).br) out.pop();
   const last = out.length - 1;
   if (out[last]?.text) out[last] = { ...out[last], text: out[last].text.replace(/\s+$/, '') };
-  return out.filter((r) => r.br || r.text);
+  return out.filter((r) => r.br || r.pic || r.text);
 }
 
 /* ------------------------------------------------------------------ pictures */
@@ -245,6 +305,7 @@ const TWIP_PER_MM = 1440 / 25.4;
 
 function docxRun(r, rels) {
   if (r.br) return '<w:r><w:br/></w:r>';
+  if (r.pic) return docxDrawing(r.pic, rels, rels.line) ?? '';
   const props = [];
   if (r.code) props.push('<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:cs="Consolas"/>');
   else if (r.font) props.push(`<w:rFonts w:ascii="${esc(r.font)}" w:hAnsi="${esc(r.font)}" w:cs="${esc(r.font)}"/>`);
@@ -267,11 +328,13 @@ function docxParagraph(style, runs, rels, extra = '') {
   return `<w:p>${pPr ? `<w:pPr>${pPr}</w:pPr>` : ''}${runs.map((r) => docxRun(r, rels)).join('')}</w:p>`;
 }
 
-function docxImage(block, rels, page, n) {
+/** A picture as a run of its line: Word's inline drawing. Null when the note only names the picture. */
+function docxDrawing(block, rels, lineWidth) {
   const pic = pictureOf(block.src);
-  if (!pic) return docxParagraph(null, [{ text: block.alt || block.src.slice(0, 80), href: /^https?:/i.test(block.src) ? block.src : undefined }], rels);
-  const { w, h } = pictureSize(block, pic, page.line);
+  if (!pic) return null;
+  const { w, h } = pictureSize(block, pic, lineWidth);
   const id = rels.image(pic);
+  const n = rels.picture();
   const cx = Math.round(w * EMU_PER_PX);
   const cy = Math.round(h * EMU_PER_PX);
   const linked = /^https?:/i.test(block.href || '');
@@ -280,16 +343,58 @@ function docxImage(block, rels, page, n) {
   const player = /^https:\/\/(www\.youtube-nocookie\.com\/embed\/|player\.vimeo\.com\/video\/)/.test(block.video || '')
     ? `<a:extLst><a:ext uri="{C809E66F-F1BF-436E-b5F7-EEA9579F0CBA}"><wp15:webVideoPr xmlns:wp15="http://schemas.microsoft.com/office/word/2012/wordprocessingDrawing" embeddedHtml="${esc(`<iframe width="${Math.round(w)}" height="${Math.round(h)}" src="${block.video}" frameborder="0" allowfullscreen></iframe>`)}" h="${Math.round(h)}" w="${Math.round(w)}"/></a:ext></a:extLst>`
     : '';
-  const drawing = `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${n}" name="Picture ${n}">${click}</wp:docPr>`
+  return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${n}" name="Picture ${n}">${click}</wp:docPr>`
     + '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
     + `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${n}" name="${player ? `Video ${n}` : `image${n}.${pic.ext}`}">${click}</pic:cNvPr><pic:cNvPicPr/></pic:nvPicPr>`
     // Where Word itself puts an online video: on the picture's blip (checked against Word's own AddWebVideo).
     + `<pic:blipFill><a:blip r:embed="${id}">${player}</a:blip><a:stretch><a:fillRect/></a:stretch></pic:blipFill>`
     + `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>`
     + '</a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
-  let out = `<w:p><w:pPr><w:jc w:val="center"/></w:pPr>${drawing}</w:p>`;
-  if (block.caption) out += docxParagraph('Caption', [{ text: block.caption, i: true, href: linked ? block.href : undefined }], rels, '<w:jc w:val="center"/>');
+}
+
+/** The room a picture has on a line of `lineWidth` it shares with `count - 1` others (editor.css). */
+const rowShare = (lineWidth, count) => (count > 1 ? Math.max(16, (lineWidth - 1) / count - 12) : lineWidth);
+/** What is written under the pictures of a line: each caption, in order. */
+const captionRuns = (items) => items.filter((b) => b.caption).flatMap((b, i) => [
+  ...(i ? [{ text: ' · ', i: true }] : []),
+  { text: b.caption, i: true, href: /^https?:/i.test(b.href || '') ? b.href : undefined },
+]);
+
+/** The pictures of one line at the side they stand in the note, and their captions under them. */
+function docxImages(group, rels, lineWidth) {
+  const jc = `<w:jc w:val="${group.align}"/>`;
+  const each = rowShare(lineWidth, group.items.length);
+  const runs = group.items.map((b) => docxDrawing(b, rels, each)
+    ?? docxRun({ text: b.alt || b.src.slice(0, 80), href: /^https?:/i.test(b.src) ? b.src : undefined }, rels));
+  let out = `<w:p><w:pPr>${jc}</w:pPr>${runs.join('<w:r><w:t xml:space="preserve">  </w:t></w:r>')}</w:p>`;
+  const captions = captionRuns(group.items);
+  if (captions.length) out += docxParagraph('Caption', captions, rels, jc);
   return out;
+}
+
+/** The room between two columns, at each side of the rule: 14px, in twips. */
+const GUTTER_TWIPS = 210;
+
+/**
+ * Columns as a word processor has them in a flow: a table of one row, with no
+ * border but the rule between its cells.
+ * @param {(blocks: object[], width: number) => string} cell writes a column's blocks on a line that wide (px)
+ */
+function docxColumns(block, lineWidth, cell) {
+  const total = Math.round(lineWidth * 15);
+  const widths = block.cols.map((c) => Math.round((total * c.share) / 100));
+  const last = widths.length - 1;
+  const cells = block.cols.map((c, i) => {
+    const left = i ? GUTTER_TWIPS : 0;
+    const right = i < last ? GUTTER_TWIPS : 0;
+    // A cell ends with a paragraph, or Word calls the file damaged.
+    const inside = cell(c.blocks, (widths[i] - left - right) / 15) || '<w:p/>';
+    return `<w:tc><w:tcPr><w:tcW w:w="${widths[i]}" w:type="dxa"/><w:tcMar><w:top w:w="0" w:type="dxa"/><w:left w:w="${left}" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="${right}" w:type="dxa"/></w:tcMar></w:tcPr>${inside}</w:tc>`;
+  });
+  return `<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/>`
+    + `<w:tblBorders>${['top', 'left', 'bottom', 'right', 'insideH'].map((side) => `<w:${side} w:val="nil"/>`).join('')}<w:insideV w:val="single" w:sz="4" w:space="0" w:color="BBBBBB"/></w:tblBorders>`
+    + '<w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr>'
+    + `<w:tblGrid>${widths.map((w) => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid><w:tr>${cells.join('')}</w:tr></w:tbl>`;
 }
 
 const DOCX_STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -336,16 +441,19 @@ export async function toDocx(html, title = '', page = {}) {
   const zip = new JSZip();
   const relList = [];
   const images = [];
+  let pictureNo = 0;
   const rels = {
+    line: p.line,                       // the width of the line being written, for a picture standing in it
+    picture() { pictureNo += 1; return pictureNo; },
     link(href) { const id = `rIdL${relList.length + 1}`; relList.push(`<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${esc(href)}" TargetMode="External"/>`); return id; },
     image(pic) { const n = images.length + 1; const id = `rIdI${n}`; images.push({ id, pic, name: `image${n}.${pic.ext}` }); relList.push(`<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image${n}.${pic.ext}"/>`); return id; },
   };
   const body = [];
   if (title) body.push(docxParagraph('Title', [{ text: title }], rels));
   const orderedNum = new Map();       // a numbered list's element -> its own numId, so each starts at 1
-  let pictureNo = 0;
-  blocks.forEach((b, i) => {
-    if (i === 0 && b.type === 'heading' && b.level === 1 && b.runs.map((r) => r.text || '').join('').trim() === String(title).trim()) return;
+  const render = (list, body, line, top = false) => inLines(list).forEach((b, i) => {
+    if (top && i === 0 && isTitle(b, title)) return;
+    rels.line = line;
     if (b.type === 'heading') body.push(docxParagraph(`Heading${b.level}`, b.runs, rels));
     else if (b.type === 'para') body.push(docxParagraph(b.quote ? 'Quote' : null, b.runs, rels));
     else if (b.type === 'list') {
@@ -364,8 +472,16 @@ export async function toDocx(html, title = '', page = {}) {
         { text: b.href, size: 11, color: '777777', href: b.href },
       ], rels, box));
     }
-    else if (b.type === 'image') { pictureNo += 1; body.push(docxImage(b, rels, p, pictureNo)); }
+    else if (b.type === 'images') body.push(docxImages(b, rels, line));
+    else if (b.type === 'columns') {
+      // Two tables one after the other would be one table to Word.
+      if (body.at(-1)?.endsWith('</w:tbl>')) body.push('<w:p/>');
+      body.push(docxColumns(b, line, (inside, width) => { const cell = []; render(inside, cell, width); return cell.join(''); }));
+    }
   });
+  render(blocks, body, p.line, true);
+  // A document ends with a paragraph, not with a table.
+  if (body.at(-1)?.endsWith('</w:tbl>')) body.push('<w:p/>');
   const landscape = p.w > p.h;
   const sect = `<w:sectPr><w:pgSz w:w="${Math.round(p.w * TWIP_PER_MM)}" w:h="${Math.round(p.h * TWIP_PER_MM)}"${landscape ? ' w:orient="landscape"' : ''}/>`
     + `<w:pgMar w:top="${Math.round(p.margin * TWIP_PER_MM)}" w:right="${Math.round(p.margin * TWIP_PER_MM)}" w:bottom="${Math.round(p.margin * TWIP_PER_MM)}" w:left="${Math.round(p.margin * TWIP_PER_MM)}" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>`;
@@ -392,7 +508,7 @@ export async function toDocx(html, title = '', page = {}) {
 
 /* ------------------------------------------------------------------ .odt */
 
-const ODF_NS = 'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"';
+const ODF_NS = 'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:version="1.3"';
 
 /**
  * The note as an .odt.
@@ -421,8 +537,22 @@ export async function toOdt(html, title = '', page = {}) {
     }
     return spanStyles.get(key).name;
   };
+  let lineNow = p.line;         // the width of the line being written, for a picture standing in it
+  /** A picture as a character of its line. Null when the note only names the picture. */
+  const frame = (b, lineWidth) => {
+    const pic = pictureOf(b.src);
+    if (!pic) return null;
+    const { w, h } = pictureSize(b, pic, lineWidth);
+    const name = `Pictures/image${pictures.length + 1}.${pic.ext}`;
+    pictures.push({ name, pic });
+    const drawn = `<draw:frame draw:name="Picture ${pictures.length}" text:anchor-type="as-char" svg:width="${(w / PX_PER_MM / 10).toFixed(3)}cm" svg:height="${(h / PX_PER_MM / 10).toFixed(3)}cm"><draw:image xlink:href="${name}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame>`;
+    // A video's still links to the video.
+    return /^https?:/i.test(b.href || '') ? `<draw:a xlink:type="simple" xlink:href="${esc(b.href)}">${drawn}</draw:a>` : drawn;
+  };
+  const tableStyles = [];       // each columns block's own widths
   const runs = (list) => list.map((r) => {
     if (r.br) return '<text:line-break/>';
+    if (r.pic) return frame(r.pic, lineNow) ?? '';
     const text = xmlText(r.text).replace(/ {2,}/g, (m) => ` <text:s text:c="${m.length - 1}"/>`);
     const name = spanName(r);
     const span = name ? `<text:span text:style-name="${name}">${text}</text:span>` : text;
@@ -430,48 +560,64 @@ export async function toOdt(html, title = '', page = {}) {
   }).join('');
   const body = [];
   if (title) body.push(`<text:p text:style-name="Title">${xmlText(title)}</text:p>`);
-  let open = null;             // the list being written: { ordered, level, el }
-  const closeLists = () => { if (open) { body.push('</text:list-item></text:list>'.repeat(open.level + 1)); open = null; } };
-  blocks.forEach((b, i) => {
-    if (i === 0 && b.type === 'heading' && b.level === 1 && b.runs.map((r) => r.text || '').join('').trim() === String(title).trim()) return;
-    if (b.type !== 'list') closeLists();
-    if (b.type === 'heading') body.push(`<text:h text:style-name="Heading_20_${b.level}" text:outline-level="${b.level}">${runs(b.runs)}</text:h>`);
-    else if (b.type === 'para') body.push(`<text:p text:style-name="${b.quote ? 'Quotations' : 'Standard'}">${runs(b.runs)}</text:p>`);
-    else if (b.type === 'todo') body.push(`<text:p text:style-name="Standard">${b.checked ? '☑' : '☐'} ${runs(b.runs)}</text:p>`);
-    else if (b.type === 'code') body.push(...b.text.split('\n').map((line) => `<text:p text:style-name="Preformatted_20_Text">${xmlText(line).replace(/ {2,}/g, (m) => ` <text:s text:c="${m.length - 1}"/>`) || ''}</text:p>`));
-    else if (b.type === 'hr') body.push('<text:p text:style-name="Horizontal_20_Line"/>');
-    else if (b.type === 'bookmark') {
-      body.push(`<text:p text:style-name="Bookmark">${runs([
-        { text: 'BOOKMARK', size: 9, color: '888888' }, { br: true },
-        { text: b.title, b: true, href: b.href, color: '1A1A1A' }, { br: true },
-        { text: b.href, size: 11, color: '777777', href: b.href },
-      ])}</text:p>`);
-    }
-    else if (b.type === 'image') {
-      const pic = pictureOf(b.src);
-      if (!pic) { body.push(`<text:p text:style-name="Standard">${xmlText(b.alt || b.src.slice(0, 80))}</text:p>`); return; }
-      const { w, h } = pictureSize(b, pic, p.line);
-      const name = `Pictures/image${pictures.length + 1}.${pic.ext}`;
-      pictures.push({ name, pic });
-      const frame = `<draw:frame draw:name="Picture ${pictures.length}" text:anchor-type="as-char" svg:width="${(w / PX_PER_MM / 10).toFixed(3)}cm" svg:height="${(h / PX_PER_MM / 10).toFixed(3)}cm"><draw:image xlink:href="${name}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/></draw:frame>`;
-      // A video's still links to the video.
-      const linked = /^https?:/i.test(b.href || '');
-      body.push(`<text:p text:style-name="Centered">${linked ? `<draw:a xlink:type="simple" xlink:href="${esc(b.href)}">${frame}</draw:a>` : frame}</text:p>`);
-      if (b.caption) body.push(`<text:p text:style-name="Caption">${linked ? `<text:a xlink:type="simple" xlink:href="${esc(b.href)}">${xmlText(b.caption)}</text:a>` : xmlText(b.caption)}</text:p>`);
-    } else if (b.type === 'list') {
-      // Lists nest: deeper opens a list inside the item; shallower closes back up.
-      if (open && (open.el !== b.listId && b.level === 0)) closeLists();
-      if (!open) { body.push(`<text:list text:style-name="${b.ordered ? 'LNum' : 'LBullet'}"><text:list-item>`); open = { level: 0, el: b.listId }; }
-      else if (b.level > open.level) { for (let l = open.level; l < b.level; l += 1) body.push(`<text:list><text:list-item>`); open.level = b.level; }
-      else {
-        while (open.level > b.level) { body.push('</text:list-item></text:list>'); open.level -= 1; }
-        body.push('</text:list-item><text:list-item>');
+  const render = (list, body, line, top = false) => {
+    let open = null;             // the list being written: { ordered, level, el }
+    const closeLists = () => { if (open) { body.push('</text:list-item></text:list>'.repeat(open.level + 1)); open = null; } };
+    inLines(list).forEach((b, i) => {
+      if (top && i === 0 && isTitle(b, title)) return;
+      lineNow = line;
+      if (b.type !== 'list') closeLists();
+      if (b.type === 'heading') body.push(`<text:h text:style-name="Heading_20_${b.level}" text:outline-level="${b.level}">${runs(b.runs)}</text:h>`);
+      else if (b.type === 'para') body.push(`<text:p text:style-name="${b.quote ? 'Quotations' : 'Standard'}">${runs(b.runs)}</text:p>`);
+      else if (b.type === 'todo') body.push(`<text:p text:style-name="Standard">${b.checked ? '☑' : '☐'} ${runs(b.runs)}</text:p>`);
+      else if (b.type === 'code') body.push(...b.text.split('\n').map((line) => `<text:p text:style-name="Preformatted_20_Text">${xmlText(line).replace(/ {2,}/g, (m) => ` <text:s text:c="${m.length - 1}"/>`) || ''}</text:p>`));
+      else if (b.type === 'hr') body.push('<text:p text:style-name="Horizontal_20_Line"/>');
+      else if (b.type === 'bookmark') {
+        body.push(`<text:p text:style-name="Bookmark">${runs([
+          { text: 'BOOKMARK', size: 9, color: '888888' }, { br: true },
+          { text: b.title, b: true, href: b.href, color: '1A1A1A' }, { br: true },
+          { text: b.href, size: 11, color: '777777', href: b.href },
+        ])}</text:p>`);
       }
-      body.push(`<text:p text:style-name="Standard">${runs(b.runs)}</text:p>`);
-    }
-  });
-  closeLists();
-  const auto = [...spanStyles.values()].map((s) => `<style:style style:name="${s.name}" style:family="text"><style:text-properties ${s.props}/></style:style>`).join('');
+      else if (b.type === 'images') {
+        // The pictures of one line, at the side they stand in the note.
+        const each = rowShare(line, b.items.length);
+        const frames = b.items.map((im) => frame(im, each) ?? xmlText(im.alt || im.src.slice(0, 80)));
+        body.push(`<text:p text:style-name="${{ left: 'Standard', center: 'Centered', right: 'Flush_20_Right' }[b.align]}">${frames.join(' ')}</text:p>`);
+        const captions = captionRuns(b.items).map((c) => (c.href ? `<text:a xlink:type="simple" xlink:href="${esc(c.href)}">${xmlText(c.text)}</text:a>` : xmlText(c.text)));
+        if (captions.length) body.push(`<text:p text:style-name="${{ left: 'Caption_20_Left', center: 'Caption', right: 'Caption_20_Right' }[b.align]}">${captions.join('')}</text:p>`);
+      } else if (b.type === 'columns') {
+        // Columns: a table of one row, with no border but the rule between its cells.
+        const name = `Cols${tableStyles.length + 1}`;
+        const total = line / PX_PER_MM / 10;
+        const last = b.cols.length - 1;
+        tableStyles.push(`<style:style style:name="${name}" style:family="table"><style:table-properties style:width="${total.toFixed(3)}cm" table:align="left"/></style:style>`
+          + b.cols.map((c, n) => `<style:style style:name="${name}.${n + 1}" style:family="table-column"><style:table-column-properties style:column-width="${((total * c.share) / 100).toFixed(3)}cm"/></style:style>`).join(''));
+        const cells = b.cols.map((c, n) => {
+          const cell = [];
+          render(c.blocks, cell, (line * c.share) / 100 - (n ? 14 : 0) - (n < last ? 14 : 0));
+          return `<table:table-cell table:style-name="${n === 0 ? 'ColFirst' : n === last ? 'ColLast' : 'ColMid'}" office:value-type="string">${cell.join('') || '<text:p text:style-name="Standard"/>'}</table:table-cell>`;
+        });
+        body.push(`<table:table table:name="${name}" table:style-name="${name}">${b.cols.map((c, n) => `<table:table-column table:style-name="${name}.${n + 1}"/>`).join('')}<table:table-row>${cells.join('')}</table:table-row></table:table>`);
+      } else if (b.type === 'list') {
+        // Lists nest: deeper opens a list inside the item; shallower closes back up.
+        if (open && (open.el !== b.listId && b.level === 0)) closeLists();
+        if (!open) { body.push(`<text:list text:style-name="${b.ordered ? 'LNum' : 'LBullet'}"><text:list-item>`); open = { level: 0, el: b.listId }; }
+        else if (b.level > open.level) { for (let l = open.level; l < b.level; l += 1) body.push(`<text:list><text:list-item>`); open.level = b.level; }
+        else {
+          while (open.level > b.level) { body.push('</text:list-item></text:list>'); open.level -= 1; }
+          body.push('</text:list-item><text:list-item>');
+        }
+        body.push(`<text:p text:style-name="Standard">${runs(b.runs)}</text:p>`);
+      }
+    });
+    closeLists();
+  };
+  render(blocks, body, p.line, true);
+  // A column's own cell: nothing around it but the room at the rule, and the rule at its left.
+  const cellStyle = (name, left, right) => `<style:style style:name="${name}" style:family="table-cell"><style:table-cell-properties fo:padding-top="0cm" fo:padding-bottom="0cm" fo:padding-left="${left ? '0.37' : '0'}cm" fo:padding-right="${right ? '0.37' : '0'}cm" fo:border-top="none" fo:border-bottom="none" fo:border-right="none" fo:border-left="${left ? '0.5pt solid #BBBBBB' : 'none'}"/></style:style>`;
+  const auto = [...spanStyles.values()].map((s) => `<style:style style:name="${s.name}" style:family="text"><style:text-properties ${s.props}/></style:style>`).join('')
+    + (tableStyles.length ? tableStyles.join('') + cellStyle('ColFirst', false, true) + cellStyle('ColMid', true, true) + cellStyle('ColLast', true, false) : '');
   const listStyle = (name, ordered) => `<text:list-style style:name="${name}">${Array.from({ length: 10 }, (_, l) => (ordered
     ? `<text:list-level-style-number text:level="${l + 1}" style:num-suffix="." style:num-format="${['1', 'a', 'i'][l % 3]}"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" fo:text-indent="-0.635cm" fo:margin-left="${(1.27 + l * 0.635).toFixed(3)}cm"/></style:list-level-properties></text:list-level-style-number>`
     : `<text:list-level-style-bullet text:level="${l + 1}" text:bullet-char="${['•', '◦', '▪'][l % 3]}"><style:list-level-properties text:list-level-position-and-space-mode="label-alignment"><style:list-level-label-alignment text:label-followed-by="listtab" fo:text-indent="-0.635cm" fo:margin-left="${(1.27 + l * 0.635).toFixed(3)}cm"/></style:list-level-properties></text:list-level-style-bullet>`)).join('')}</text:list-style>`;
@@ -493,8 +639,11 @@ export async function toOdt(html, title = '', page = {}) {
 <style:style style:name="Preformatted_20_Text" style:display-name="Preformatted Text" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:margin-bottom="0cm" fo:background-color="#F4F4F2" fo:line-height="100%"/><style:text-properties style:font-name="Consolas" fo:font-size="9pt"/></style:style>
 <style:style style:name="Horizontal_20_Line" style:display-name="Horizontal Line" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:padding="0cm" fo:border-bottom="0.5pt solid #BBBBBB" fo:margin-bottom="0.3cm"/></style:style>
 <style:style style:name="Centered" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:text-align="center"/></style:style>
+<style:style style:name="Flush_20_Right" style:display-name="Flush Right" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:text-align="end"/></style:style>
 <style:style style:name="Bookmark" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:margin-top="0.2cm" fo:margin-bottom="0.3cm" fo:padding="0.2cm" fo:border="0.5pt solid #CCCCCC" fo:background-color="#F7F7F5"/></style:style>
 <style:style style:name="Caption" style:family="paragraph" style:parent-style-name="Standard"><style:paragraph-properties fo:text-align="center"/><style:text-properties fo:font-style="italic" fo:font-size="9pt" fo:color="#555555"/></style:style>
+<style:style style:name="Caption_20_Left" style:display-name="Caption Left" style:family="paragraph" style:parent-style-name="Caption"><style:paragraph-properties fo:text-align="start"/></style:style>
+<style:style style:name="Caption_20_Right" style:display-name="Caption Right" style:family="paragraph" style:parent-style-name="Caption"><style:paragraph-properties fo:text-align="end"/></style:style>
 </office:styles>
 <office:automatic-styles><style:page-layout style:name="PageLayout"><style:page-layout-properties fo:page-width="${cm(p.w)}" fo:page-height="${cm(p.h)}" style:print-orientation="${p.w > p.h ? 'landscape' : 'portrait'}" fo:margin-top="${cm(p.margin)}" fo:margin-bottom="${cm(p.margin)}" fo:margin-left="${cm(p.margin)}" fo:margin-right="${cm(p.margin)}"/></style:page-layout></office:automatic-styles>
 <office:master-styles><style:master-page style:name="Standard" style:page-layout-name="PageLayout"/></office:master-styles>
@@ -541,8 +690,23 @@ export function toDoc(html, title = '', page = {}) {
   // \cf1 links, \cf2 quotes, \cbpat3 the code blocks' grey; a run's own colours after them.
   const colors = ['0563C1', '555555', 'F4F4F2'];
   const colorIndex = (hex) => { let i = colors.indexOf(hex); if (i < 0) { colors.push(hex); i = colors.length - 1; } return i + 1; };
+  let inCell = false;           // a paragraph in a column says that it is in one (\intbl)
+  let lineNow = p.line;         // the width of the line being written, for a picture standing in it
+  const pard = () => (inCell ? '\\pard\\intbl' : '\\pard');
+  /** A picture as it stands in a line. Null for what Rich Text cannot carry. */
+  const pict = (b, lineWidth) => {
+    const pic = pictureOf(b.src);
+    if (!pic || pic.kind === 'gif') return null;
+    const { w, h } = pictureSize(b, pic, lineWidth);
+    const hex = Array.from(pic.bytes, (x) => x.toString(16).padStart(2, '0')).join('').replace(/.{1,128}/g, '$&\n');
+    const drawn = `{\\pict\\${pic.kind === 'png' ? 'pngblip' : 'jpegblip'}\\picw${pic.w || Math.round(w)}\\pich${pic.h || Math.round(h)}\\picwgoal${Math.round(w * 15)}\\pichgoal${Math.round(h * 15)}\n${hex}}`;
+    // A video's still links to the video.
+    return /^https?:/i.test(b.href || '') ? `{\\field{\\*\\fldinst HYPERLINK "${rtfEscape(b.href).replace(/"/g, '')}"}{\\fldrslt ${drawn}}}` : drawn;
+  };
+  const named = (b) => `{${rtfEscape(b.alt || '[picture]')}}`;
   const run = (r) => {
     if (r.br) return '\\line ';
+    if (r.pic) return pict(r.pic, lineNow) ?? named(r.pic);
     let fmt = '';
     if (r.code) fmt += '\\f1';
     if (r.b) fmt += '\\b';
@@ -556,12 +720,13 @@ export function toDoc(html, title = '', page = {}) {
     if (r.href && /^(https?|mailto):/i.test(r.href)) return `{\\field{\\*\\fldinst HYPERLINK "${rtfEscape(r.href).replace(/"/g, '')}"}{\\fldrslt ${text}}}`;
     return text;
   };
-  const para = (fmt, runs) => `{\\pard\\sa120\\sl276\\slmult1${fmt} ${runs.map(run).join('')}\\par}\n`;
-  const out = [];
-  if (title) out.push(para('\\fs44\\b\\sa240', [{ text: title }]));
+  const para = (fmt, runs) => `{${pard()}\\sa120\\sl276\\slmult1${fmt} ${runs.map(run).join('')}\\par}\n`;
+  const body = [];
+  if (title) body.push(para('\\fs44\\b\\sa240', [{ text: title }]));
   const counters = new Map();
-  blocks.forEach((b, i) => {
-    if (i === 0 && b.type === 'heading' && b.level === 1 && b.runs.map((r) => r.text || '').join('').trim() === String(title).trim()) return;
+  const render = (list, out, line, top = false) => inLines(list).forEach((b, i) => {
+    if (top && i === 0 && isTitle(b, title)) return;
+    lineNow = line;
     if (b.type === 'heading') out.push(para(`\\keepn\\sb240\\b\\fs${[0, 36, 30, 25][b.level]}`, b.runs));
     else if (b.type === 'para') out.push(para(b.quote ? '\\li360\\i\\cf2' : '', b.runs));
     else if (b.type === 'todo') out.push(para('', [{ text: b.checked ? '☑ ' : '☐ ' }, ...b.runs]));
@@ -570,34 +735,54 @@ export function toDoc(html, title = '', page = {}) {
       counters.set(b.listId, n);
       const indent = 720 + b.level * 360;
       out.push(para(`\\li${indent}\\fi-360`, [{ text: b.ordered ? `${n}.\t` : `${['•', '◦', '▪'][b.level % 3]}\t` }, ...b.runs]));
-    } else if (b.type === 'code') out.push(`{\\pard\\sa0\\li120\\cbpat3\\f1\\fs18 ${b.text.split('\n').map(rtfEscape).join('\\line ')}\\par}\n`);
-    else if (b.type === 'hr') out.push('{\\pard\\brdrb\\brdrs\\brdrw10\\brsp20 \\par}\n');
+    } else if (b.type === 'code') out.push(`{${pard()}\\sa0\\li120\\cbpat3\\f1\\fs18 ${b.text.split('\n').map(rtfEscape).join('\\line ')}\\par}\n`);
+    else if (b.type === 'hr') out.push(`{${pard()}\\brdrb\\brdrs\\brdrw10\\brsp20 \\par}\n`);
     else if (b.type === 'bookmark') {
       // The card: a box (\cbpat3, the code's grey) with the title over the address.
-      out.push(`{\\pard\\sb120\\sa160\\li120\\ri120\\box\\brdrs\\brdrw10\\brdrcf2\\brsp80\\cbpat3 ${[
+      out.push(`{${pard()}\\sb120\\sa160\\li120\\ri120\\box\\brdrs\\brdrw10\\brdrcf2\\brsp80\\cbpat3 ${[
         { text: 'BOOKMARK', size: 9 }, { br: true },
         { text: b.title, b: true, href: b.href }, { br: true },
         { text: b.href, size: 11, href: b.href },
       ].map(run).join('')}\\par}\n`);
     }
-    else if (b.type === 'image') {
-      const pic = pictureOf(b.src);
-      if (!pic || pic.kind === 'gif') { out.push(para('', [{ text: b.alt || '[picture]' }])); return; }
-      const { w, h } = pictureSize(b, pic, p.line);
-      const hex = Array.from(pic.bytes, (x) => x.toString(16).padStart(2, '0')).join('').replace(/.{1,128}/g, '$&\n');
-      const pict = `{\\pict\\${pic.kind === 'png' ? 'pngblip' : 'jpegblip'}\\picw${pic.w || Math.round(w)}\\pich${pic.h || Math.round(h)}\\picwgoal${Math.round(w * 15)}\\pichgoal${Math.round(h * 15)}\n${hex}}`;
-      // A video's still links to the video.
-      const linked = /^https?:/i.test(b.href || '');
-      out.push(`{\\pard\\qc${linked ? `{\\field{\\*\\fldinst HYPERLINK "${rtfEscape(b.href).replace(/"/g, '')}"}{\\fldrslt ${pict}}}` : pict}\\par}\n`);
-      if (b.caption) out.push(para('\\qc\\i\\fs18', [{ text: b.caption, href: linked ? b.href : undefined }]));
+    else if (b.type === 'images') {
+      // The pictures of one line, at the side they stand in the note.
+      const each = rowShare(line, b.items.length);
+      const side = { left: '\\ql', center: '\\qc', right: '\\qr' }[b.align];
+      out.push(`{${pard()}${side}${b.items.map((im) => pict(im, each) ?? named(im)).join(' ')}\\par}\n`);
+      const captions = captionRuns(b.items).map(({ text, href }) => ({ text, href }));
+      if (captions.length) out.push(para(`${side}\\i\\fs18`, captions));
+    } else if (b.type === 'columns') {
+      // Columns: a table of one row. The rule between two columns is the right
+      // border of every cell but the last.
+      const total = Math.round(line * 15);
+      const last = b.cols.length - 1;
+      const rule = `\\clbrdrr\\brdrs\\brdrw10\\brdrcf${colorIndex('BBBBBB')}`;
+      let edge = 0;
+      const defs = b.cols.map((c, n) => {
+        edge += (total * c.share) / 100;
+        return `${n < last ? rule : ''}\\cellx${Math.round(n < last ? edge : total + GUTTER_TWIPS)}`;
+      }).join('');
+      const outside = inCell;
+      inCell = true;
+      const cells = b.cols.map((c, n) => {
+        const cell = [];
+        render(c.blocks, cell, (line * c.share) / 100 - (n ? 14 : 0) - (n < last ? 14 : 0));
+        if (!cell.length) return `{${pard()} \\cell}\n`;
+        // A cell ends where its last paragraph does.
+        cell[cell.length - 1] = cell.at(-1).replace(/\\par\}\n$/, '\\cell}\n');
+        return cell.join('');
+      }).join('');
+      inCell = outside;
+      out.push(`{\\trowd\\trgaph${GUTTER_TWIPS}\\trleft-${GUTTER_TWIPS}${defs}\n${cells}\\row}\n`);
     }
   });
+  render(blocks, body, p.line, true);
   const twip = (mm) => Math.round(mm * TWIP_PER_MM);
   const table = `{\\colortbl;${colors.map((c) => `\\red${parseInt(c.slice(0, 2), 16)}\\green${parseInt(c.slice(2, 4), 16)}\\blue${parseInt(c.slice(4, 6), 16)};`).join('')}}`;
-  const body = out.join('');
   return `{\\rtf1\\ansi\\ansicpg1252\\deff0\\uc1{\\fonttbl{\\f0\\froman Georgia;}{\\f1\\fmodern Consolas;}}${table}`
     + `\\paperw${twip(p.w)}\\paperh${twip(p.h)}\\margl${twip(p.margin)}\\margr${twip(p.margin)}\\margt${twip(p.margin)}\\margb${twip(p.margin)}${p.w > p.h ? '\\landscape' : ''}`
-    + `\\f0\\fs21\n${body}}`;
+    + `\\f0\\fs21\n${body.join('')}}`;
 }
 
 /* ------------------------------------------------------------------ in */
@@ -848,8 +1033,15 @@ export function docKind(bytes) {
 export function previewDocument(html, title = '', page = {}) {
   const blocks = readBlocks(html);
   const p = sheet(page);
+  let lineNow = p.line;         // the width of the line being written, for a picture standing in it
+  const image = (b, lineWidth) => {
+    const size = pictureSize(b, pictureOf(b.src) ?? { w: 0, h: 0 }, lineWidth);
+    const img = `<img src="${esc(b.src)}" style="width:${Math.round(size.w)}px;height:${Math.round(size.h)}px" alt="">`;
+    return b.href ? `<a href="${esc(b.href)}">${img}</a>` : img;
+  };
   const runs = (list) => list.map((r) => {
     if (r.br) return '<br>';
+    if (r.pic) return image(r.pic, lineNow);
     let t = esc(r.text);
     if (r.code) t = `<code>${t}</code>`;
     if (r.b) t = `<b>${t}</b>`;
@@ -860,11 +1052,12 @@ export function previewDocument(html, title = '', page = {}) {
     if (style) t = `<span style="${style}">${t}</span>`;
     return r.href ? `<a href="${esc(r.href)}">${t}</a>` : t;
   }).join('');
-  const out = [];
-  if (title) out.push(`<p class="title">${esc(title)}</p>`);
+  const body = [];
+  if (title) body.push(`<p class="title">${esc(title)}</p>`);
   const counters = new Map();
-  blocks.forEach((b, i) => {
-    if (i === 0 && b.type === 'heading' && b.level === 1 && b.runs.map((r) => r.text || '').join('').trim() === String(title).trim()) return;
+  const render = (list, out, line, top = false) => inLines(list).forEach((b, i) => {
+    if (top && i === 0 && isTitle(b, title)) return;
+    lineNow = line;
     if (b.type === 'heading') out.push(`<h${b.level}>${runs(b.runs)}</h${b.level}>`);
     else if (b.type === 'para') out.push(`<p${b.quote ? ' class="quote"' : ''}>${runs(b.runs) || '<br>'}</p>`);
     else if (b.type === 'todo') out.push(`<p>${b.checked ? '☑' : '☐'} ${runs(b.runs)}</p>`);
@@ -875,14 +1068,21 @@ export function previewDocument(html, title = '', page = {}) {
     } else if (b.type === 'code') out.push(`<pre>${esc(b.text)}</pre>`);
     else if (b.type === 'hr') out.push('<hr>');
     else if (b.type === 'bookmark') out.push(`<div class="bm"><small>BOOKMARK</small><a href="${esc(b.href)}"><b>${esc(b.title)}</b></a><a class="u" href="${esc(b.href)}">${esc(b.href)}</a></div>`);
-    else if (b.type === 'image') {
-      const pic = pictureOf(b.src);
-      const size = pictureSize(b, pic ?? { w: 0, h: 0 }, p.line);
-      const img = `<img src="${esc(b.src)}" style="width:${Math.round(size.w)}px;height:${Math.round(size.h)}px" alt="">`;
-      out.push(`<p class="center">${b.href ? `<a href="${esc(b.href)}">${img}</a>` : img}</p>`);
-      if (b.caption) out.push(`<p class="caption">${esc(b.caption)}</p>`);
+    else if (b.type === 'images') {
+      const each = rowShare(line, b.items.length);
+      out.push(`<p class="${b.align}">${b.items.map((im) => image(im, each)).join(' ')}</p>`);
+      const captions = b.items.filter((im) => im.caption).map((im) => esc(im.caption));
+      if (captions.length) out.push(`<p class="caption ${b.align}">${captions.join(' · ')}</p>`);
+    } else if (b.type === 'columns') {
+      const last = b.cols.length - 1;
+      out.push(`<table class="cols"><tr>${b.cols.map((c, n) => {
+        const cell = [];
+        render(c.blocks, cell, (line * c.share) / 100 - (n ? 14 : 0) - (n < last ? 14 : 0));
+        return `<td style="width:${c.share}%">${cell.join('')}</td>`;
+      }).join('')}</tr></table>`);
     }
   });
+  render(blocks, body, p.line, true);
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
   @page { size: ${p.w}mm ${p.h}mm; margin: ${p.margin}mm; }
   html, body { margin: 0; background: #fff; color: #111; }
@@ -896,14 +1096,17 @@ export function previewDocument(html, title = '', page = {}) {
   pre { font: 9pt/1.2 Consolas, monospace; background: #F4F4F2; padding: 2pt 6pt; margin: 0 0 6pt; white-space: pre-wrap; }
   code { font-family: Consolas, monospace; }
   hr { border: 0; border-bottom: 0.5pt solid #BBB; margin: 6pt 0 10pt; }
-  .center { text-align: center; } img { max-width: 100%; }
-  .caption { text-align: center; font-style: italic; font-size: 9pt; color: #555; }
+  .center { text-align: center; } .right { text-align: right; } img { max-width: 100%; vertical-align: bottom; }
+  .caption { font-style: italic; font-size: 9pt; color: #555; }
+  table.cols { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 0 0 6pt; }
+  table.cols td { vertical-align: top; padding: 0 14px; } table.cols td:first-child { padding-left: 0; } table.cols td:last-child { padding-right: 0; }
+  table.cols td + td { border-left: 0.5pt solid #BBB; }
   .bm { border: 0.5pt solid #CCC; background: #F7F7F5; padding: 5pt 7pt; margin: 6pt 2pt 8pt; break-inside: avoid; }
   .bm small { display: block; font-size: 6.75pt; color: #888; letter-spacing: .04em; }
   .bm a { display: block; color: #1A1A1A; text-decoration: underline; } .bm a.u { color: #777; font-size: 8.25pt; }
   a { color: #0563C1; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-</style></head><body>${out.join('')}</body></html>`;
+</style></head><body>${body.join('')}</body></html>`;
 }
 
 /* ------------------------------------------------------------------ Evernote (.enex) */
@@ -950,10 +1153,20 @@ function enexDate(d = new Date()) {
  * Mac"). ENML: the XHTML Evernote keeps, pictures as resources by their MD5.
  */
 export function toEnex(html, title = '', { created = Date.now(), updated = Date.now() } = {}) {
-  const blocks = readBlocks(html);
+  // Evernote's notes have no columns: one column after the other.
+  const blocks = flatBlocks(readBlocks(html));
   const resources = [];
+  const media = (b) => {
+    const pic = pictureOf(b.src);
+    if (!pic) return null;
+    const hash = md5Hex(pic.bytes);
+    resources.push({ pic, hash });
+    const tag = `<en-media type="${pic.mime}" hash="${hash}"/>`;
+    return /^https?:/i.test(b.href || '') ? `<a href="${esc(b.href)}">${tag}</a>` : tag;
+  };
   const runs = (list) => list.map((r) => {
     if (r.br) return '<br/>';
+    if (r.pic) return media(r.pic) ?? xmlText(r.pic.alt || '');
     let t = xmlText(r.text);
     if (r.code) t = `<code>${t}</code>`;
     if (r.b) t = `<b>${t}</b>`;
@@ -975,12 +1188,9 @@ export function toEnex(html, title = '', { created = Date.now(), updated = Date.
     else if (b.type === 'hr') body.push('<hr/>');
     else if (b.type === 'bookmark') body.push(`<div style="border:1px solid #cccccc;background-color:#f7f7f5;padding:6px 9px;margin:6px 0"><div style="font-size:9px;color:#888888">BOOKMARK</div><div><a href="${esc(b.href)}"><b>${xmlText(b.title)}</b></a></div><div><a href="${esc(b.href)}" style="color:#777777">${xmlText(b.href)}</a></div></div>`);
     else if (b.type === 'image') {
-      const pic = pictureOf(b.src);
-      if (!pic) { body.push(`<div>${xmlText(b.alt || '')}</div>`); return; }
-      const hash = md5Hex(pic.bytes);
-      resources.push({ pic, hash });
-      const media = `<en-media type="${pic.mime}" hash="${hash}"/>`;
-      body.push(`<div>${/^https?:/i.test(b.href || '') ? `<a href="${esc(b.href)}">${media}</a>` : media}</div>`);
+      const drawn = media(b);
+      if (!drawn) { body.push(`<div>${xmlText(b.alt || '')}</div>`); return; }
+      body.push(`<div>${drawn}</div>`);
       if (b.caption) body.push(`<div><i>${xmlText(b.caption)}</i></div>`);
     } else if (b.type === 'list') {
       const tag = b.ordered ? 'ol' : 'ul';

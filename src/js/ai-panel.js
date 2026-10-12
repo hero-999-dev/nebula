@@ -6,7 +6,7 @@
 
 import { loadJson, saveJson, generateId } from './storage.js';
 
-import { AI_SERVICES, firefoxUserAgentFor, isGoogleService, mergeServices, siteUrl } from './ai-services.js';
+import { AI_SERVICES, firefoxUserAgentFor, isGoogleService, mergeServices, siteUrl, shouldSleep, sleepAfterMs } from './ai-services.js';
 import { t } from './i18n.js';
 export { AI_SERVICES };
 
@@ -32,6 +32,15 @@ const OVERRIDE_KEY = 'nebula:ai-overrides';
 const HIDDEN_KEY = 'nebula:ai-hidden';
 const WIDTH_KEY = 'nebula:ai-width';
 const ACTIVE_KEY = 'nebula:ai-active';
+/**
+ * Tabs the reader said may sleep by themselves. A tab stays awake unless it is
+ * here (the owner, on the first build: "keep awake is the default; whoever
+ * wants it otherwise changes it") — the first build had it the other way
+ * round, with a list of the tabs to keep awake ('nebula:ai-awake', not read any more).
+ */
+const MAY_SLEEP_KEY = 'nebula:ai-may-sleep';
+/** Minutes a tab may go unseen before it sleeps (0: never). Nothing stored: twenty. */
+const SLEEP_KEY = 'nebula:ai-sleep-minutes';
 
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
@@ -47,6 +56,14 @@ export function initAiPanel({ askText } = {}) {
   let overrides = loadJson(OVERRIDE_KEY, {});
   let hidden = loadJson(HIDDEN_KEY, []);
   const all = () => mergeServices(AI_SERVICES, custom, overrides, hidden);
+  // Sleeping tabs (0.9.4, ai-services.js): when each view was last on screen,
+  // the address each sleeping one will load again, and what is known of the
+  // keys pressed in each since its address last changed.
+  const seen = new Map();
+  const asleep = new Map();
+  const typing = new Map();
+  const maySleep = new Set(loadJson(MAY_SLEEP_KEY, []));
+  const sleepAfter = sleepAfterMs(localStorage.getItem(SLEEP_KEY));
   // A tab that is no longer there (Perplexity, taken out in 0.9.3) opens Claude.
   let active = localStorage.getItem(ACTIVE_KEY) || 'claude';
   if (!all()[active]) active = 'claude';
@@ -61,7 +78,9 @@ export function initAiPanel({ askText } = {}) {
         const isCustom = custom.some((c) => c.id === id);
         const x = isCustom ? `<span class="ai-tab__x" data-remove="${id}" title="Remove">×</span>` : '';
         const dot = s.dot ? `<span class="ai-dot" style="background:${s.dot}"></span>` : '<span class="ai-dot"></span>';
-        return `<button class="ai-tab${id === active ? ' active' : ''}" data-ai="${id}" type="button" title="${esc(s.url)}">${dot}${esc(s.name)}${x}</button>`;
+        const sleeping = asleep.has(id);
+        const title = sleeping ? `${t('Asleep — it loads again when you open it')} · ${s.url}` : s.url;
+        return `<button class="ai-tab${id === active ? ' active' : ''}${sleeping ? ' asleep' : ''}" data-ai="${id}" type="button" title="${esc(title)}">${dot}${esc(s.name)}${x}</button>`;
       })
       .join('');
   }
@@ -94,6 +113,9 @@ export function initAiPanel({ askText } = {}) {
     if (!service) return;
     active = id;
     localStorage.setItem(ACTIVE_KEY, id);
+    // A sleeping tab that is about to be shown wakes: on the address it slept on.
+    const wakeTo = isElectron && isVisible() && asleep.has(id) ? asleep.get(id) : null;
+    if (wakeTo !== null) asleep.delete(id);
     renderTabs();
     // NOT `hidden`. A <webview> with display:none is detached from its guest and
     // reloads when it comes back, which logs you out of the site you had just
@@ -108,7 +130,7 @@ export function initAiPanel({ askText } = {}) {
       if (!wv) {
         wv = document.createElement('webview');
         wv.className = 'ai-view';
-        wv.setAttribute('src', service.url);
+        wv.setAttribute('src', wakeTo || service.url);
         // persist: is what keeps a login across restarts; one partition per
         // service so signing into one is not signing into another.
         wv.setAttribute('partition', `persist:ai-${id}`);
@@ -127,6 +149,10 @@ export function initAiPanel({ askText } = {}) {
         wv.addEventListener('crashed', () => showError(id, 'the page crashed'));
         wv.addEventListener('render-process-gone', () => showError(id, 'the page stopped'));
         wv.addEventListener('did-finish-load', () => { if (active === id) body.querySelector('.ai-error')?.classList.remove('on'); });
+        // A new address: whatever was typed belongs to the page that is gone.
+        wv.addEventListener('did-navigate', () => typing.delete(id));
+        wv.addEventListener('did-navigate-in-page', (ev) => { if (ev.isMainFrame !== false) typing.delete(id); });
+        seen.set(id, Date.now());
         body.appendChild(wv);
         views.set(id, wv);
       }
@@ -170,6 +196,9 @@ export function initAiPanel({ askText } = {}) {
     }
     views.get(id)?.remove();
     views.delete(id);
+    asleep.delete(id);
+    typing.delete(id);
+    seen.delete(id);
     body.querySelector(`.ai-fallback[data-ai="${id}"]`)?.remove();
     const left = Object.keys(all());
     if (active === id) {
@@ -183,11 +212,50 @@ export function initAiPanel({ askText } = {}) {
     if (c) { Object.assign(c, patch); saveJson(CUSTOM_KEY, custom); }
     else if (AI_SERVICES[id]) { overrides = { ...overrides, [id]: { ...(overrides[id] || {}), ...patch } }; saveJson(OVERRIDE_KEY, overrides); }
     if (patch.url) {
+      if (asleep.has(id)) asleep.set(id, '');   // it wakes on the new address
       const wv = views.get(id);
       if (wv) { try { wv.loadURL(patch.url); } catch { wv.setAttribute('src', patch.url); } }
     }
     renderTabs();
   }
+
+  /* ---- Sleeping (0.9.4) ---- */
+  /** The view goes, and the memory with it; the tab stays, and remembers where it was. */
+  function sleep(id) {
+    const wv = views.get(id);
+    if (!wv) return false;
+    let at = '';
+    try { at = wv.getURL(); } catch { /* not attached yet: it wakes on its own address */ }
+    asleep.set(id, /^https?:\/\//i.test(at) ? at : '');
+    wv.remove();
+    views.delete(id);
+    typing.delete(id);
+    seen.delete(id);
+    renderTabs();
+    return true;
+  }
+  /** Looked at now and then: a view unseen for long enough sleeps, unless loading it again could lose something. */
+  function tick(now = Date.now()) {
+    const looking = isVisible() && !document.hidden;
+    for (const [id, wv] of [...views]) {
+      const onScreen = looking && id === active;
+      if (onScreen) { seen.set(id, now); continue; }
+      let tab;
+      try { tab = { url: wv.getURL(), audible: wv.isCurrentlyAudible(), loading: wv.isLoading() }; } catch { continue; }   // not attached yet
+      const keys = typing.get(id);
+      if (shouldSleep({ ...tab, now, lastSeen: seen.get(id) ?? now, keepAwake: !maySleep.has(id), typed: !!keys, lastKeyEnter: !!keys?.enter }, sleepAfter)) sleep(id);
+    }
+  }
+  if (isElectron && Number.isFinite(sleepAfter)) setInterval(tick, Math.max(250, Math.min(60_000, sleepAfter / 2)));
+  // The main process says when a key was pressed in a tab, and whether it was
+  // Enter — never which key (electron/main.js).
+  window.nebula?.ai?.onTyped?.(({ wc, enter }) => {
+    for (const [id, wv] of views) {
+      let its = -1;
+      try { its = wv.getWebContentsId(); } catch { /* not attached yet */ }
+      if (its === wc) { typing.set(id, { enter: !!enter }); return; }
+    }
+  });
 
   /* ---- Right-click on a tab (0.9.3): its header, its address, delete ---- */
   const siteMenu = document.createElement('div');
@@ -206,6 +274,40 @@ export function initAiPanel({ askText } = {}) {
     b.addEventListener('click', () => { closeSiteMenu(); void run(); });
     siteMenu.append(b);
   }
+  /**
+   * An item that asks before it acts (0.9.4: "Delete should ask are you
+   * sure"): a press replaces the menu with the question, the answer in the
+   * item's own word, and Cancel.
+   */
+  function askItem(label, question, yesLabel, run, cls = '') {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'menuitem');
+    if (cls) b.className = cls;
+    b.textContent = label;
+    b.addEventListener('click', () => {
+      siteMenu.replaceChildren();
+      const what = document.createElement('p');
+      what.className = 'fm-confirm';
+      what.textContent = question;
+      const yes = document.createElement('button');
+      yes.type = 'button';
+      yes.className = 'ai-site-menu__delete ai-site-menu__yes';
+      yes.textContent = yesLabel;
+      yes.addEventListener('click', () => { closeSiteMenu(); void run(); });
+      const no = document.createElement('button');
+      no.type = 'button';
+      no.textContent = t('Cancel');
+      no.addEventListener('click', closeSiteMenu);
+      siteMenu.append(what, yes, no);
+      // The question may be taller than the menu was: keep it inside the window.
+      const h = siteMenu.offsetHeight;
+      const top = parseFloat(siteMenu.style.top) || 0;
+      if (top + h > window.innerHeight - 6) siteMenu.style.top = `${Math.max(6, window.innerHeight - h - 6)}px`;
+      no.focus({ preventScroll: true });
+    });
+    siteMenu.append(b);
+  }
   tabsEl.addEventListener('contextmenu', (e) => {
     const id = e.target.closest('[data-ai]')?.dataset.ai;
     if (!id) return;
@@ -221,7 +323,28 @@ export function initAiPanel({ askText } = {}) {
       const url = siteUrl(await askText?.(t('Website address:'), site.url));
       if (url) changeSite(id, { url });
     });
-    menuItem(t('Delete website'), () => removeSite(id), 'ai-site-menu__delete');
+    // Sleep (0.9.4): now, by hand — and whether this tab may sleep by itself at all.
+    if (isElectron) {
+      if (views.has(id) && !(id === active && isVisible())) menuItem(t('Put to sleep'), () => { sleep(id); });
+      menuItem(maySleep.has(id) ? t('Keep awake') : t('Let it sleep when unused'), () => {
+        if (maySleep.has(id)) maySleep.delete(id); else maySleep.add(id);
+        saveJson(MAY_SLEEP_KEY, [...maySleep]);
+      });
+    }
+    // Clear session data (0.9.4), above Delete: this tab's sign-in, cookies and
+    // cache go, and the page loads again signed out. Asked first, like Delete.
+    if (window.nebula?.ai?.clearSession) {
+      askItem(t('Clear session data'),
+        t(`Clear the session data of ${site.name}? You will be signed out of it here.`), t('Clear'),
+        async () => {
+          const ok = await window.nebula.ai.clearSession(id);
+          const wv = views.get(id);
+          if (ok && asleep.has(id)) asleep.set(id, '');   // signed out: it wakes on its own address
+          if (ok && wv) { try { wv.loadURL(all()[id]?.url ?? site.url); } catch { /* not attached yet */ } }
+          window.dispatchEvent(new CustomEvent('nebula-toast', { detail: ok ? 'Session data cleared' : 'The session data could not be cleared' }));
+        });
+    }
+    askItem(t('Delete website'), t(`Delete ${site.name} from the panel?`), t('Delete'), () => removeSite(id), 'ai-site-menu__delete');
     if (hidden.length) {
       menuItem(t('Restore removed sites'), () => {
         hidden = [];

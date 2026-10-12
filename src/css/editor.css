@@ -29,9 +29,16 @@
 .pad button.on { background: var(--clay); border-color: var(--clay); color: #fff; }
 :root:not([data-theme="light"]):not([data-theme="white"]) .pad button.on { color: var(--paper-sunken); }
 
+/* The AI panel put away in Settings (0.9.4): five buttons — the last stands
+   at the right, as tall as the two rows, where AI and it stood one over the other. */
+.pad.pad--no-ai [data-pad="hide"] { grid-column: 3; grid-row: 1 / span 2; }
+
 /* ---------- the page width beside Saved (0.9.3, page-mode.js) ----------
    The pad's boxes, four to a row: NW A3 A4 A5 over NN B3 B4 B5. */
 .pad.page-modes { grid-template-columns: repeat(4, 26px); margin-left: 6px; }
+/* A thin line between the page sizes and the bar's pad, and the two closer
+   together (the owner, 0.9.4): 8px, the line, 8px — where 22px stood empty. */
+.pad.page-modes + .pad { margin-left: -4px; padding-left: 8px; border-left: 1px solid var(--rule); }
 .pad.page-modes button { font: inherit; font-size: 10.5px; font-weight: 600; letter-spacing: .02em; }
 
 /* A page that is not Nebula Wide: the line is as long as the mode's column
@@ -71,6 +78,12 @@
   background-attachment: local, local;
 }
 #editor { --page-break-line: color-mix(in srgb, var(--ink-faint) 38%, transparent); }
+/* Nebula Wide: the writing ends as far from the frame at the right as it
+   begins at the left. The scroll bar stood between the two there, so a
+   divider — and a table that fills its line — ended its width short: "on the
+   right side the divider falls short" (the owner's Ideas note, 0.9.4). Its
+   room is kept whether the note scrolls or not, and taken out of the padding. */
+#editor:not([data-paper]) { scrollbar-gutter: stable; padding-right: max(18px, calc(28px - var(--sb, 10px))); }
 .page-mode-hint {
   position: fixed;
   z-index: 90;
@@ -134,8 +147,19 @@
   border-top: none;
   border-left: 1px solid var(--rule);
 }
+/* The line between the two columns is drawn by both of them, one over the
+   other, so it is as long as the longer column. Drawn by the second alone it
+   ended where that one ended: "the divider line at the right does not reach
+   the two icons at the bottom" (the owner, 0.9.4). */
+.edit-shell.bar-left .tb-row:not(:last-child),
+.edit-shell.bar-right .tb-row:not(:last-child) {
+  border-right: 1px solid var(--rule);
+  margin-right: -1px;
+}
+/* As wide as the column (the owner, 0.9.4: "at the right, make the divider line
+   longer") — 20px of line in a column of 46 read as a dash, not as a division. */
 .edit-shell.bar-left .tb-sep,
-.edit-shell.bar-right .tb-sep { width: 20px; height: 1px; margin: 3px 0; }
+.edit-shell.bar-right .tb-sep { width: auto; align-self: stretch; height: 1px; margin: 3px 0; }
 .edit-shell.bar-left .tb-combo,
 .edit-shell.bar-right .tb-combo { width: 46px; }
 .edit-shell.bar-left .tb-input,
@@ -167,8 +191,10 @@
    Nebula Wide clearly not to be pressed (the owner). */
 .tb.tb-order.on { background: var(--clay-soft); color: var(--clay); box-shadow: inset 0 0 0 1px var(--clay); }
 .tb.tb-order:disabled { opacity: .28; cursor: default; pointer-events: none; }
-.tb-zoom .tb { font-size: 16px; line-height: 1; }
-.tb-zoom .tb-zoom-select { width: auto; min-width: 68px; max-width: 170px; text-align: center; }
+/* Narrow (0.9.4): "page zoom is too wide" — with the window at the side of the screen it was what the
+   second row could not hold. The signs are slim, the ratio as wide as its words. */
+.tb-zoom .tb { font-size: 16px; line-height: 1; min-width: 20px; width: 20px; padding: 0; }
+.tb-zoom .tb-zoom-select { width: auto; min-width: 50px; max-width: 86px; padding-left: 3px; padding-right: 3px; font-size: 11.5px; text-align: center; }
 .edit-shell.bar-left .tb-zoom, .edit-shell.bar-right .tb-zoom { flex-direction: column; }
 /* Every dropdown mark in the bar is the same triangle at the same size: the
    ▾ glyph ones (underline, colours, shapes, font) and the CSS-drawn ones on
@@ -326,6 +352,54 @@
    17px swatch column and every font read as a single letter. */
 .tb-menu--font { min-width: 236px; }
 .tb-menu--font button { grid-template-columns: 1fr; font-size: 15px; padding: 6px 10px; }
+/* Its search, its own scrolling list, and "Add a font" (0.9.4): the field and
+   the button stay put while the names scroll between them. */
+.tb-menu.tb-menu--font { display: flex; flex-direction: column; overflow: hidden; max-height: min(760px, calc(100vh - 16px)); }
+.tb-menu.tb-menu--font[hidden] { display: none; }
+.tb-menu__search {
+  margin: 2px 4px 5px;
+  padding: 5px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+}
+.tb-menu__search:focus { border-color: var(--clay); }
+.tb-menu__rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.tb-menu--font .tb-menu__rows button { grid-template-columns: 1fr auto auto; gap: 4px; }
+.tb-menu__x { color: var(--ink-faint); font-size: 15px; line-height: 1; padding: 0 3px; border-radius: 4px; font-family: var(--sans); }
+.tb-menu__x:hover { color: var(--madder); background: var(--paper-raised); }
+/* A pin beside each font (0.9.4): pinned ones stand first in the list. It
+   comes up when the pointer is on the font ("when I take the mouse to a font,
+   the pin at its side" — the owner); a pinned one is always drawn. */
+.tb-menu__pin { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 4px; color: var(--ink-faint); opacity: 0; }
+.tb-menu__pin .ic { width: 14px; height: 14px; }
+.tb-menu__rows button:hover .tb-menu__pin, .tb-menu__rows button:focus-visible .tb-menu__pin { opacity: .7; }
+.tb-menu__pin:hover { opacity: 1 !important; color: var(--clay); background: var(--paper-raised); }
+.tb-menu__pin[aria-pressed="true"] { opacity: 1; color: var(--clay); }
+.tb-menu__pin[aria-pressed="true"] .ic { fill: currentColor; }
+.tb-menu__rule { height: 1px; margin: 4px 8px; background: var(--rule); }
+/* The font used last, over "+ Add a font" (0.9.4): its row, with a + (into the
+   list) and a pin that come up under the pointer, as the list's pins do. */
+.tb-menu__last { margin-top: 4px; padding-top: 2px; border-top: 1px solid var(--rule); flex: none; }
+.tb-menu--font .tb-menu__last button { grid-template-columns: 1fr auto auto; gap: 4px; }
+.tb-menu__plus { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 4px; color: var(--ink-faint); font-family: var(--sans); font-size: 16px; line-height: 1; opacity: 0; }
+.tb-menu__last button:hover .tb-menu__pin, .tb-menu__last button:hover .tb-menu__plus,
+.tb-menu__last button:focus-visible .tb-menu__pin, .tb-menu__last button:focus-visible .tb-menu__plus { opacity: .7; }
+.tb-menu__plus:hover { opacity: 1 !important; color: var(--clay); background: var(--paper-raised); }
+.tb-menu__none { padding: 7px 10px; font-size: 12.5px; color: var(--ink-faint); }
+.tb-menu--font .tb-menu__add {
+  margin-top: 4px;
+  border-top: 1px solid var(--rule);
+  border-radius: 0 0 7px 7px;
+  font-size: 12.5px;
+  color: var(--clay);
+  padding: 7px 10px;
+}
+.tb-menu--font .tb-menu__add[hidden] { display: none; }
 .tb-menu .swatch {
   width: 17px; height: 17px;
   border-radius: 4px;
@@ -391,6 +465,41 @@
 /* A divider is picked with a click (0.9.3); a 1.4px line is too thin to hit,
    so the band around it takes the click too. */
 .editor hr.blk-hr::after { content: ""; position: absolute; left: 0; right: 0; top: -9px; height: 17px; }
+/* A divider pulled sideways splits the page (0.9.4, columns.js): two columns
+   with the divider upright between them. --split is where the divider stands,
+   as a share of the line; the left column is that wide, less half the
+   divider's own room, and the right one takes the rest. Neither can be pushed
+   wider than its share by what is in it. With three or four columns, each
+   column between two dividers has its own share (--w), less a divider's whole
+   room, so every divider stands at its place on the line; the last column
+   takes the rest. */
+.editor .blk-cols { display: flex; align-items: stretch; margin: 6px 0; }
+.editor .blk-col { flex: 1 1 0; min-width: 0; }
+.editor .blk-col:not(:first-child):not(:last-child) { flex: 0 0 calc(var(--w, 33%) - 29.4px); }
+.editor .blk-col:first-child { flex: 0 0 calc(var(--split, 50%) - 15px); }
+.editor .blk-col > :first-child { margin-top: 0; }
+.editor .blk-col > :last-child { margin-bottom: 0; }
+.editor hr.blk-vr {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 0;
+  height: auto;
+  margin: 0 14px;
+  border: none;
+  border-left: 1.4px solid var(--rule);
+  position: relative;
+  overflow: visible;
+  cursor: col-resize;
+}
+/* As thin as the flat one, so the band beside it takes the click too. */
+.editor hr.blk-vr::after { content: ""; position: absolute; top: 0; bottom: 0; left: -9px; width: 17px; }
+.editor hr.blk-vr.armed { border-color: var(--clay) !important; box-shadow: 0 0 0 2px var(--clay-soft); }
+/* A picture in a column, selected: the caret beside it is not drawn, as on the note itself. */
+#editor:has(.blk-col > .note-image.sel) { caret-color: transparent; }
+/* While a divider is dragged the page does not select words under the pointer. */
+body.divider-dragging { user-select: none; cursor: grabbing; }
+body.divider-dragging .editor hr { cursor: grabbing; }
+body.divider-dragging .link-frame { pointer-events: none; }
 /* One marker column that both kinds START in.
    `::marker` is right-aligned against the text in `outside` position, so a "•"
    and a "1." shared their right edge and began at different x — which is what
@@ -457,6 +566,16 @@
   color: var(--ink-faint);
   pointer-events: none;
 }
+/* A heading that folds (0.9.4): the arrow at the middle of the heading's own
+   first line (half its line height), and the space above it kept modest —
+   inside a toggle a heading does not open a new part of the page. */
+.editor .blk-toggle > h1:first-child:not(.toggle-body)::before { top: calc(0.625em - 5px); }
+.editor .blk-toggle > h2:first-child:not(.toggle-body)::before { top: calc(0.65em - 5px); }
+.editor .blk-toggle > h3:first-child:not(.toggle-body)::before { top: calc(0.675em - 5px); }
+.editor .blk-toggle > :is(h1, h2, h3):first-child { margin-top: 6px; margin-bottom: 4px; }
+/* A toggle in a list item (0.9.4): the bullet or number, then the arrow. */
+.editor li > .blk-toggle { margin: 0; }
+.editor li > .blk-toggle > p:first-child { margin-bottom: 0; }
 .editor .blk-toggle > .toggle-body { padding-left: 26px; }
 .editor .blk-toggle:not([data-open="true"]) > .toggle-body { display: none; }
 .editor [data-ind="1"] { margin-left: 26px; }
@@ -723,6 +842,53 @@
 }
 .note-image--inline:active { cursor: default; }
 .note-image--inline img { height: auto; }
+/* Where it stands on its line (0.9.4, image-place.js): left by default, in the
+   middle or at the right by its margins. Three classes, so the print block's
+   `margin: 8px 0` further down does not push it back to the left. */
+.note-image.note-image--inline.note-image--center { margin-left: auto; margin-right: auto; }
+.note-image.note-image--inline.note-image--right { margin-left: auto; margin-right: 0; }
+/* Pictures that share a line: side by side, and they always fit — each is at
+   most its share of the line (--row is how many share it, written by
+   image-place.js), so a narrow window shrinks them and cuts nothing off (the
+   owner: "it must not spill over when the window is at the side of the
+   screen"). The pixel taken off first keeps a rounded third from wrapping. */
+.note-image.note-image--inline.note-image--row {
+  display: inline-block;
+  vertical-align: top;
+  /* Its share of the line — or, where the others are narrow, the room they
+     leave (`--beside`: their widths and gaps, image-place.js). Together never
+     more than the line: one that takes the room leaves the others their width. */
+  max-width: max(calc((100% - 1px) / var(--row, 2) - 12px), calc(100% - 13px - var(--beside, 100%)));
+  margin: 10px 12px 14px 0;
+}
+/* A picture standing in a line of words (0.9.4): a character of the line,
+   sitting on it like a tall letter. No shadow: in a line it reads as a smudge
+   over the words under it. */
+.note-image.note-image--inline.note-image--inword {
+  display: inline-block;
+  vertical-align: bottom;
+  margin: 2px 3px;
+  box-shadow: none;
+  line-height: 0;
+}
+/* The mark of a drag (drop-mark.js): where the dragged thing will land. */
+.drop-mark {
+  position: fixed;
+  z-index: 95;
+  border-radius: 2px;
+  background: var(--clay);
+  box-shadow: 0 0 0 1px var(--paper-raised);
+  pointer-events: none;
+}
+.drop-shade {
+  position: fixed;
+  z-index: 94;
+  border-radius: 4px;
+  background: var(--clay-soft);
+  opacity: .45;
+  pointer-events: none;
+}
+.drop-mark[hidden], .drop-shade[hidden] { display: none; }
 /* Two classes on the figure: the floating caption rule further down has the same
    specificity and would otherwise win by source order and hang it over the text. */
 .note-image.note-image--inline .image-caption { position: static; margin-top: 6px; }
@@ -730,7 +896,7 @@
 /* A picture in the text is the selection while it is outlined; the caret the
    browser keeps beside it stands on no line, and blinked next to the divider
    above it (the owner, 0.9.3). A picked divider draws none either. */
-#editor:has(> .note-image.sel) { caret-color: transparent; }
+#editor:has(> .note-image.sel), #editor:has(.note-image--inword.sel) { caret-color: transparent; }
 .note-image img {
   display: block;
   width: 100%;
@@ -799,6 +965,11 @@
 .image-bar button:hover { border-color: var(--clay); color: var(--clay); }
 .image-bar button.on { border-color: var(--clay); background: var(--clay-soft); color: var(--ink); }
 .image-bar__sep { width: 1px; align-self: stretch; margin: 2px 2px; background: var(--rule); }
+.image-bar [hidden] { display: none; }
+.image-bar button .ic { width: 13px; height: 13px; vertical-align: -2px; }
+.image-bar button:disabled { opacity: .4; cursor: default; }
+.image-bar button:disabled:hover { border-color: var(--rule); color: var(--ink-soft); }
+.image-bar [data-image="beside"] { letter-spacing: -1px; }
 
 /* ---------- pasted links ---------- */
 .link-block {
@@ -871,6 +1042,191 @@
 .crop-bar button { font: inherit; font-size: 13px; padding: 2px 8px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); color: var(--ink); cursor: pointer; }
 .crop-bar .crop-ok { border-color: var(--clay); color: var(--clay); font-weight: 700; }
 .image-dragging .link-frame { pointer-events: none; }
+/* A card, a video or a code block is taken by its title line (block-drag.js). */
+.editor:not([data-readonly="true"]) .link-embed .link-card,
+.editor:not([data-readonly="true"]) .link-file .link-card,
+.editor:not([data-readonly="true"]) .code-head { cursor: grab; }
+body.block-dragging { user-select: none; }
+body.block-dragging, body.block-dragging * { cursor: grabbing !important; }
+body.block-dragging .link-frame { pointer-events: none; }
+
+/* ---------- tables (0.9.4, table.js) ----------
+   The note holds the table and its cells; the numbering, the grips, the two +,
+   the fill square and the choices carry .tbl-ui and are the screen's. The
+   block is a grid of its own: the table and the + for a row under it — and,
+   in a column with another at its right, the + for a column beside it. */
+.blk-table {
+  position: relative;
+  display: grid;
+  grid-template-columns: max-content;
+  grid-template-rows: max-content 18px;
+  width: max-content;
+  margin: 10px 0 6px;
+  font-family: inherit;
+}
+.blk-table > table {
+  grid-area: 1 / 1;
+  /* The columns' own widths make the table's: fixed, and no wider than they add up to. */
+  table-layout: fixed;
+  width: 0;
+  border-collapse: collapse;
+  margin: 0;
+}
+.blk-table td {
+  height: 30px;
+  padding: 5px 8px;
+  border: 1px solid var(--rule);
+  vertical-align: top;
+  text-align: left;
+  overflow-wrap: anywhere;
+  outline: none;
+  cursor: text;
+}
+/* A highlight on a cell is the cell's back, edge to edge: not a marker's stroke over words. */
+.blk-table td[class*="h-"] { margin: 0; padding: 5px 8px; border-radius: 0; }
+/* A row with a height of its own (table-grid.js tellHeight): the height is the row's, and where it is
+   lower than a line of words with the room over and under it, that room gives way first — down to the
+   words themselves. A row as high as that or higher is drawn as any other. */
+.blk-table tr[style*="--row"] > td {
+  height: auto;
+  padding-top: clamp(0px, (var(--row) - 1lh - 1px) / 2, 5px);
+  padding-bottom: clamp(0px, (var(--row) - 1lh - 1px) / 2, 5px);
+}
+.blk-table th {
+  padding: 0;
+  border: 1px solid var(--rule);
+  background: var(--paper-sunken);
+  color: var(--ink-faint);
+  font: 500 10.5px/1 var(--sans);
+  text-align: center;
+  vertical-align: middle;
+  user-select: none;
+  cursor: default;
+}
+.blk-table th.tbl-x { position: relative; height: 18px; }
+.blk-table th.tbl-x::before, .blk-table th.tbl-y::before { content: attr(data-n); }
+.blk-table col.tbl-ycol { width: 30px; }
+.blk-table th.tbl-x:hover, .blk-table th.tbl-y:hover { color: var(--ink); background: var(--paper-raised); }
+/* The line at a column's right, pulled to make it wider or narrower. */
+.blk-table .tbl-colgrip { position: absolute; top: 0; right: -5px; z-index: 2; width: 9px; height: 100%; cursor: col-resize; }
+.blk-table .tbl-colgrip:hover, body.tbl-resizing .blk-table .tbl-colgrip:hover { background: linear-gradient(90deg, transparent 3px, var(--clay) 3px, var(--clay) 6px, transparent 6px); }
+body.tbl-resizing, body.tbl-resizing * { cursor: col-resize !important; user-select: none; }
+/* The line under a row, pulled to make it higher or lower. */
+.blk-table th.tbl-y { position: relative; }
+.blk-table .tbl-rowgrip { position: absolute; left: 0; bottom: -5px; z-index: 2; width: 100%; height: 9px; cursor: row-resize; }
+.blk-table .tbl-rowgrip:hover, body.tbl-resizing-row .blk-table .tbl-rowgrip:hover { background: linear-gradient(180deg, transparent 3px, var(--clay) 3px, var(--clay) 6px, transparent 6px); }
+body.tbl-resizing-row, body.tbl-resizing-row * { cursor: row-resize !important; }
+.editor:not([data-readonly="true"]) .blk-table .tbl-corner { cursor: grab; }
+.blk-table .tbl-corner::before { content: "⠿"; font-size: 11px; opacity: .55; }
+.blk-table .tbl-corner:hover::before { opacity: 1; }
+
+/* Cells selected as cells: tinted over whatever colour they have; the one the caret waits in is framed. */
+.blk-table td.sel { background-image: linear-gradient(color-mix(in srgb, var(--clay) 20%, transparent), color-mix(in srgb, var(--clay) 20%, transparent)); }
+.blk-table td.act { outline: 2px solid var(--clay); outline-offset: -2px; }
+.blk-table td.fill { outline: 1.5px dashed var(--clay); outline-offset: -2px; }
+body.tbl-ranging .blk-table td { user-select: none; }
+body.tbl-ranging .blk-table td::selection, body.tbl-ranging .blk-table td *::selection { background: transparent; }
+body.tbl-ranging .tbl-chip, body.tbl-ranging .tbl-fill, body.tbl-filling .tbl-chip, body.tbl-filling .tbl-fill { pointer-events: none; }
+body.tbl-filling, body.tbl-filling * { cursor: crosshair !important; user-select: none; }
+
+/* One more column, one more row. */
+.blk-table .tbl-add {
+  display: flex; align-items: center; justify-content: center;
+  margin: 0; padding: 0;
+  border: 1px dashed var(--rule); border-radius: 4px;
+  background: transparent; color: var(--ink-faint);
+  font: 500 13px/1 var(--sans);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .12s;
+}
+.blk-table:hover .tbl-add, .blk-table:focus-within .tbl-add { opacity: 1; }
+.blk-table .tbl-add::before { content: "+"; }
+.blk-table .tbl-chip button::before { content: attr(data-label); }
+.blk-table .tbl-add:hover { border-color: var(--clay); color: var(--clay); background: var(--paper-raised); }
+/* Beside the cells, not beside the numbering. The + for a column hangs out at the table's right, in the
+   page's margin: the table itself reaches the edge of its place, where the page's dividers end (table.js
+   roomFor). Hung out like this it takes no room, and the page does not scroll sideways for it. */
+.blk-table .tbl-add-col { position: absolute; top: 19px; bottom: 18px; left: calc(100% + 3px); width: 15px; }
+.blk-table .tbl-add-row { grid-area: 2 / 1; margin: 3px 0 0 31px; }
+/* In a column with another at its right there is no margin to hang into: there the + has room of its own. */
+.blk-col:not(:last-child) .blk-table { grid-template-columns: max-content 18px; }
+.blk-col:not(:last-child) .blk-table .tbl-add-col { position: static; grid-area: 1 / 2; width: auto; margin: 19px 0 0 3px; }
+
+/* The square at the selection's lower left: pulled, it carries the cells on. */
+.blk-table .tbl-fill {
+  position: absolute; z-index: 3;
+  width: 9px; height: 9px; margin: -5px 0 0 -5px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--paper);
+  background: var(--clay);
+  cursor: crosshair;
+}
+/* What can be done with the selection, at its lower right. */
+.blk-table .tbl-chip {
+  position: absolute; z-index: 4;
+  display: flex; gap: 2px;
+  padding: 3px;
+  transform: translateX(-100%);
+  border: 1px solid var(--rule); border-radius: 8px;
+  background: var(--paper-raised);
+  box-shadow: 0 6px 18px var(--shadow);
+  white-space: nowrap;
+  user-select: none;
+}
+/* Each block of the note is a layer of its own (the shapes' rule), and the block after is drawn over
+   whatever reaches out of one: with cells selected down to its last row, the table's choices hang
+   under it — over the next line, which took the click meant for them. The block that holds them rises. */
+.editor > *:not(.shape-layer):not(.image-layer):has(.tbl-chip) { z-index: 5; }
+.blk-table .tbl-chip button {
+  padding: 3px 9px;
+  border: 0; border-radius: 5px;
+  background: none; color: var(--ink);
+  font: 500 12px/1.4 var(--sans);
+  cursor: pointer;
+}
+.blk-table .tbl-chip button:hover { background: var(--clay-soft); }
+.blk-table .tbl-chip button[data-tbl^="del-"] { color: var(--c-red); }
+.editor[data-readonly="true"] .blk-table .tbl-add,
+.editor[data-readonly="true"] .blk-table .tbl-colgrip,
+.editor[data-readonly="true"] .blk-table .tbl-rowgrip { display: none; }
+/* The width of the column being pulled, over the line that is pulled — a row's height, beside its line. */
+.blk-table .tbl-tip {
+  position: absolute; z-index: 6;
+  transform: translate(-50%, -100%);
+  margin-top: -4px;
+  padding: 2px 7px;
+  border: 1px solid var(--rule); border-radius: 6px;
+  background: var(--paper-raised); color: var(--ink);
+  font: 600 11px/1.4 var(--sans);
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 12px var(--shadow);
+}
+.blk-table .tbl-tip::before { content: attr(data-label); }
+.blk-table .tbl-tip.tbl-tip-row { transform: translate(0, -50%); margin: 0 0 0 6px; }
+.editor > *:not(.shape-layer):not(.image-layer):has(.tbl-tip) { z-index: 5; }
+
+/* The size of a new table (table-size.js): squares to point at, two numbers to type. */
+.tbl-size { min-width: 0; max-height: none; overflow: visible; padding: 10px; z-index: 95; }
+/* The squares take the width the two numbers under them need, where that is more than their own. */
+.tbl-size__grid { display: grid; grid-template-columns: repeat(var(--cols, 12), minmax(16px, 1fr)); gap: 3px; cursor: pointer; }
+.tbl-size__grid span { aspect-ratio: 1; box-sizing: border-box; border: 1px solid var(--rule); border-radius: 3px; background: var(--paper); }
+.tbl-size__grid span.on { border-color: var(--clay); background: var(--clay-soft); }
+.tbl-size__fields { display: flex; align-items: center; gap: 8px; margin-top: 9px; font: 500 12px/1 var(--sans); color: var(--ink-soft); }
+.tbl-size__fields label { display: flex; align-items: center; gap: 5px; }
+.tbl-size__fields input {
+  width: 46px; padding: 4px 5px;
+  border: 1px solid var(--rule); border-radius: 6px;
+  background: var(--paper); color: var(--ink);
+  font: 500 12px/1 var(--sans);
+}
+.float-menu.tbl-size button.tbl-size__go {
+  width: auto; margin-left: auto; padding: 5px 10px;
+  border: 1px solid var(--rule);
+  font: 600 12px/1 var(--sans);
+}
+
 /* A video player, not a page: its own shape, black while it loads. */
 .link-embed--video .link-frame { height: auto; aspect-ratio: 16 / 9; background: #000; }
 .link-embed-hint { grid-column: 1 / -1; padding: 8px 12px; color: var(--ink); }
@@ -1193,6 +1549,10 @@
   cursor: pointer;
 }
 .mini-bar button:hover { background: var(--paper-sunken); }
+/* A and H carry their colour under the letter, as on the editing bar; the
+   right-click menu's first row is a copy of these buttons. */
+.mini-bar button.mb-color, .ctx-menu .ctx-format button[data-act="color"], .ctx-menu .ctx-format button[data-act="hilite"] { position: relative; padding-bottom: 5px; }
+.mini-bar .tb-bar, .ctx-menu .ctx-format .tb-bar { left: 6px; right: 6px; bottom: 3px; }
 .mb-sep { width: 1px; height: 17px; background: var(--rule); margin: 0 3px; }
 
 /* ---------- slash menu ---------- */
@@ -1226,7 +1586,20 @@
 .float-menu button:hover, .float-menu button.sel { background: var(--paper-sunken); }
 .float-menu .fm-ic { display: grid; place-items: center; width: 22px; color: var(--clay); }
 /* The right-click menu (0.9.3): a spelling suggestion is set bold, as in Word. */
-.ctx-menu { min-width: 190px; z-index: 90; }
+/* One menu everywhere (0.9.4): in a table it is long, and it is shown whole wherever the window has the height. */
+.ctx-menu { min-width: 190px; max-height: min(640px, calc(100vh - 12px)); z-index: 90; }
+/* Over selected words (0.9.4): the formatting bar's buttons as the first row. */
+.ctx-menu .ctx-format { display: flex; align-items: center; gap: 2px; padding: 1px 2px; }
+.ctx-menu .ctx-format button {
+  display: grid;
+  place-items: center;
+  width: auto;
+  min-width: 28px;
+  height: 27px;
+  padding: 0;
+  gap: 0;
+  border-radius: 5px;
+}
 /* @ and # in a note (0.9.3). */
 .mention-menu { min-width: 220px; }
 .mention-menu .mention-none { padding: 7px 10px; color: var(--ink-faint); font-size: 13px; }
@@ -1309,6 +1682,10 @@ body.resizing webview { pointer-events: none; }
 .ai-tab.active { background: var(--clay); border-color: var(--clay); color: #fff; }
 :root:not([data-theme="light"]):not([data-theme="white"]) .ai-tab.active { color: var(--paper-sunken); }
 .ai-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); flex-shrink: 0; }
+/* A tab that is asleep (0.9.4): its page is not loaded, and loads again when it
+   is opened. Paler, its dot a ring. */
+.ai-tab.asleep { opacity: .62; }
+.ai-tab.asleep .ai-dot { background: transparent !important; box-shadow: inset 0 0 0 1.5px var(--ink-faint); }
 .ai-tab__x { margin-left: 2px; opacity: 0.6; font-size: 13px; }
 .ai-tab__x:hover { opacity: 1; }
 .ai-add { padding: 5px 9px; flex-shrink: 0; }
@@ -1333,6 +1710,10 @@ body.resizing webview { pointer-events: none; }
 .ai-head .ai-reload .ic { width: 14px; height: 14px; }
 .ai-site-menu { min-width: 190px; }
 .ai-site-menu .ai-site-menu__delete { color: var(--c-red, #c0392b); }
+/* The question a tab's menu asks before it clears or deletes (0.9.4). */
+.ai-site-menu { max-width: 270px; }
+.ai-site-menu .fm-confirm { margin: 4px 8px 6px; font-size: 12.5px; line-height: 1.45; color: var(--ink-soft); }
+.ai-site-menu .ai-site-menu__yes { font-weight: 600; }
 .ai-x { padding: 4px 6px; flex-shrink: 0; }
 .ai-x .ic { width: 14px; height: 14px; }
 
@@ -1544,7 +1925,9 @@ body.resizing webview { pointer-events: none; }
   .image-layer { position: relative !important; inset: auto !important; }
   .note-image--inline, .image-layer .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; margin: 8px 0; }
   .note-image .image-caption { position: static; margin-top: 4px; }
-  .image-h, .link-del { display: none !important; }
+  .image-h, .link-del, .tbl-ui { display: none !important; }
+  .blk-table { display: block; break-inside: avoid; }
+  .blk-table td { border-color: #bbb !important; }
 }
 
 /* ---------- note colours ----------
@@ -1653,6 +2036,21 @@ body.resizing webview { pointer-events: none; }
   background: var(--clay-soft);
   color: var(--ink);
 }
+/* The label picked in "Filter by label", where it stands in the open note (0.9.4). */
+::highlight(nebula-label-hit) {
+  background: var(--clay-soft);
+  color: var(--ink);
+}
+::highlight(nebula-label-hit-current) {
+  background: var(--clay);
+  color: var(--paper-sunken);
+}
+:root[data-theme="light"] ::highlight(nebula-label-hit-current),
+:root[data-theme="white"] ::highlight(nebula-label-hit-current) { color: #fff; }
+/* Its bar: the find bar's look and place; under the find bar when both are open. */
+.label-bar .label-bar__name { font-family: var(--serif); font-size: 13px; font-weight: 600; color: var(--clay); padding: 0 4px; }
+.find-bar:not([hidden]) ~ .label-bar { top: 52px; }
+.note-labels .note-label.hit { outline: 2px solid var(--clay); outline-offset: 1px; }
 ::highlight(nebula-find-current) {
   background: var(--clay);
   color: var(--paper-sunken);
@@ -1774,6 +2172,61 @@ body.resizing { cursor: col-resize; user-select: none; }
 .link-embed--video .link-card__title { font-size: 12px; color: var(--ink-soft); }
 .link-embed--video .link-card__url { display: none; }
 .link-embed--video .link-del { grid-row: 2; align-self: center; background: var(--paper-raised); margin: 0; width: 32px; height: 100%; border-radius: 0; }
+/* A video file of the note's own (0.9.4, file-video.js): the same card as an
+   embedded video — the player first, its name on one quiet line under it — and
+   as tall as the video is, since a file may be upright. */
+.link-block.link-file {
+  width: min(640px, 100%);
+  grid-template-columns: 1fr auto;
+  background: #000;
+  border-color: transparent;
+}
+.link-file .link-frame { grid-row: 1; grid-column: 1 / -1; display: block; width: 100%; height: auto; max-height: 80vh; background: #000; }
+.link-file .link-card {
+  grid-row: 3;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--paper-raised);
+  cursor: default;
+}
+.link-file .link-card__kind { display: none; }
+.link-file .link-card__title { font-size: 12px; color: var(--ink-soft); overflow-wrap: anywhere; }
+.link-file .link-del { grid-row: 3; align-self: center; background: var(--paper-raised); margin: 0; width: 32px; height: 100%; border-radius: 0; }
+/* The player's own bar (0.9.4, file-video.js), between the picture and the
+   file's name: round buttons and the clock at the right, as on the owner's
+   study pages. It is drawn on the screen and never saved with the note. */
+.link-file .video-bar {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--paper-raised);
+  border-bottom: 1px solid var(--rule);
+  user-select: none;
+}
+.link-file .video-bar button {
+  padding: 3px 11px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+}
+.link-file .video-bar button:hover { border-color: var(--clay); color: var(--clay); }
+.link-file .video-now { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.link-file .video-miss { flex-basis: 100%; font-size: 12.5px; color: var(--ink-soft); }
+/* A video the player cannot play has no picture to size the card by. */
+.link-file.cannot-play .link-frame { min-height: 96px; }
+.link-file.cannot-play .video-bar [data-video]:not([data-video="outside"]), .link-file.cannot-play .video-now { display: none; }
 
 /* Labels share the title row, ahead of the save indicator. */
 .note-labels {

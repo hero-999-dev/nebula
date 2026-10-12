@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.9.3",
-  "lastUpdated": "2026-10-02",
-  "currentPhase": "v0.9.3 - released 2026-10-04: paper sizes beside Saved (NW and NN the old way, A3-B5 at real size with page lines), page zoom with Fit, Auto order page (button and per-note), the export preview (PDF, Word, OpenDocument, Rich Text, NW landscape/portrait), export and import .docx/.odt/.doc/.rtf/.enex, videos in exports with their picture (plays in Word) or as bookmarks, shapes in PDFs, folders and a dragged note order, AI tab right-click, MathGPT, four languages, spelling suggestions, toggle lists, @ mentions and #labels, a writing font per note, faster saves.",
-  "next": "The owner tests Nebula Test.exe (opening, page modes). On push: Electron check first, then npm test, build, smoke, rebuild, old-notes, release.",
+  "version": "0.9.4",
+  "lastUpdated": "2026-10-12",
+  "currentPhase": "v0.9.4 - released 2026-10-12: a folder for each note (pictures and videos as files beside the note's JSON), black holes (notes encrypted with AES-256-GCM behind a 6-digit PIN, an optional passkey and a recovery key), a lock on opening, Settings beside Help (a new note's font, size and page; hiding the AI panel or the black holes; the logo's colours), tables, columns made by pulling a divider sideways, pictures left/centre/right, in a row or in a line of words, toggle headings and toggles in lists, one right-click menu with two ways to paste, a font search with added and pinned fonts, a theme of one's own with named profiles, the guide and What's new in four languages, AI tabs that sleep, Open with Nebula for Word/OpenDocument/Rich Text files, Electron 44.7.",
+  "next": "0.9.4 is released (2026-10-12). Wait for the owner's notes in Nebula Test's vault (\"Ideas For Nebula and Testing For Nebula\", \"Buraya bak\"): read them again at the start of every part, make the changes, give a test build (npm run pack:test), and release only when told \"push\". | Open questions the owner put aside (2026-10-05): \"in the side screen the lower part must not overflow\" - which part?; the toggle under an embed (\"the caret shows but it does not take it back\"); \"making the same label in different texts is a bug\". | Not done, say if asked: a real table in Word/OpenDocument/Rich Text (rows go out as lines with | between cells); a table wider than the page; more than the owner's two paste ways (\"Paste only text\" was taken away 'for now'); whether the logo's colours reach a real taskbar pin was never seen from a test. | For the next release: the guide's English text and its three translations move together (node scripts/guide-blocks.js --check, --signatures); tests/e2e/settings.mjs, table.mjs and table-edges.mjs are not part of smoke and are run by hand; the suites read note files through tests/e2e/profiles.mjs (noteFilesIn/readNotesIn/noteFileOf) since a note is a folder.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -28,11 +28,11 @@
     "recreate": "Prompt.md",
     "testLog": "tests.md",
     "changelog": "Log.md",
-    "releasePolicy": "Standing instruction (2026-09-07): release finished work with npm run push without being asked, and never ask which platforms to build - the repo is public, so Actions is free on both Windows and macOS runners. npm run push also refreshes Nebula Test.exe in the project root."
+    "releasePolicy": "Standing instruction (2026-09-27, replaces 2026-09-07): release ONLY when the owner says \"push\". Until then: make the changes, unit tests for what was touched, npm run pack:test, report. On \"push\": Electron check (npm run check:browsers), all tests, fixes, then npm run push - GitHub, nebula-web, the flash, every MD file. Never ask which platforms to build: the repo is public, Actions is free on both runners."
   },
   "quality": {
-    "unitTests": 382,
-    "smokeChecks": 231,
+    "unitTests": 1121,
+    "smokeChecks": 916,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
@@ -88,6 +88,12 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "version": "0.9.4",
+      "date": "2026-10-12",
+      "by": "Claude",
+      "what": "The owner's Ideas note, in parts over eight days, each tried in Nebula Test before the next: note folders, black holes, the lock on opening, Settings, tables, columns, picture places, toggle headings, the one right-click menu, fonts, a theme of one's own, the guide in four languages, sleeping AI tabs, Open with Nebula. At the push: Electron 44.5.1 -> 44.7.0; smoke, old-notes and the long-note trials brought up to notes kept as folders (they had not run since); a toggle frame without its title, a pasted box of paragraphs coming out empty and a picture that would not grow beside a narrow one were found and fixed in the last rounds."
+    },
     {
       "version": "0.9.2",
       "date": "2026-09-28",
