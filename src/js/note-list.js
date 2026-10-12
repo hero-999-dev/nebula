@@ -76,9 +76,10 @@ export function ownRun(seqKey, pinned) {
 /**
  * @param {{listEl: HTMLElement, store: import('./notes.js').NoteStore,
  *   folders: import('./folders.js').FolderStore,
- *   noteItem: (note: object) => HTMLElement, onChanged: () => void}} deps
+ *   noteItem: (note: object) => HTMLElement, onChanged: () => void,
+ *   newNote?: (folderId: string) => void, noteMenu?: (id: string, x: number, y: number) => void}} deps
  */
-export function initNoteList({ listEl, store, folders, noteItem, onChanged }) {
+export function initNoteList({ listEl, store, folders, noteItem, onChanged, newNote, noteMenu, takeOut }) {
   // ---- drawing ---------------------------------------------------------
 
   function item(note, seq) {
@@ -102,9 +103,8 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged }) {
     row.draggable = true;
     row.setAttribute('aria-expanded', String(open));
     row.title = folder.name;
-    row.innerHTML = `<span class="fr-caret" aria-hidden="true"></span>${icon('folder', 'ic fr-icon')}<span class="fr-name" data-no-i18n></span><span class="fr-count" data-no-i18n></span>`;
+    row.innerHTML = `<span class="fr-caret" aria-hidden="true"></span>${icon('folder', 'ic fr-icon')}<span class="fr-name" data-no-i18n></span>`;
     row.querySelector('.fr-name').textContent = folder.name;
-    row.querySelector('.fr-count').textContent = String(count);
     row.dataset.initial = folder.name.trim().charAt(0).toUpperCase() || 'F';
     row.addEventListener('click', () => { folders.toggle(folder.id); onChanged(); });
     row.addEventListener('dblclick', (e) => { e.preventDefault(); void rename(folder.id); });
@@ -133,6 +133,18 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged }) {
       body.className = 'folder-notes';
       body.setAttribute('role', 'group');
       body.setAttribute('aria-label', folder.name);
+      // A new note straight into the folder (0.9.4): at the top of every open
+      // folder — above the hint of an empty one, above the notes of a full one
+      // ("full folders should have + Add a note at the top too", the owner).
+      if (newNote) {
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'folder-add';
+        add.dataset.folder = folder.id;
+        add.textContent = `+ ${t('Add a note')}`;
+        add.addEventListener('click', () => newNote(folder.id));
+        body.append(add);
+      }
       if (!inside.length) {
         const empty = document.createElement('div');
         empty.className = 'folder-empty';
@@ -191,7 +203,8 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged }) {
       }
       return { el: listEl, where: 'end' };
     }
-    const empty = t0.closest?.('.folder-empty');
+    // The hint of an empty folder, or "+ Add a note": a note let go there goes in.
+    const empty = t0.closest?.('.folder-empty, .folder-add');
     if (empty && listEl.contains(empty)) return { el: empty, where: 'into' };
     const head = t0.closest?.('.folder-item');
     if (head && listEl.contains(head)) {
@@ -215,7 +228,8 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged }) {
   listEl.addEventListener('dragstart', (e) => {
     const folderRow = e.target.closest?.('.folder-row');
     const noteRow = e.target.closest?.('.note-row');
-    const el = folderRow ? folderRow.closest('.folder-block') : noteRow?.closest('.note-item[data-seq]');
+    // A note of an open black hole is dragged too: let go among the notes, it is taken out (0.9.4).
+    const el = folderRow ? folderRow.closest('.folder-block') : (noteRow?.closest('.note-item[data-seq]') ?? noteRow?.closest('.hole-notes .note-item[data-id]'));
     if (!el) return;
     dragging = { kind: folderRow ? 'folder' : 'note', id: el.dataset.id };
     e.dataTransfer.setData(DRAG_TYPE, `${dragging.kind}:${dragging.id}`);
@@ -273,6 +287,12 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged }) {
     const note = what.kind === 'note' ? store.get(what.id) : null;
     if (what.kind === 'note' && !note) return;
     if (what.kind === 'folder' && !folders.has(what.id)) return;
+    // Out of its black hole first — which asks for the black hole's answer
+    // (black-holes.js) — and only then to the place it was let go at.
+    if (note?.hole) {
+      void takeOut?.(note.id).then((out) => { if (out && !store.get(note.id)?.hole) drop(what, at); });
+      return;
+    }
     let seq;
     let list;
     if (at.where === 'into') {
@@ -332,6 +352,19 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged }) {
     b.addEventListener('click', run);
     return b;
   }
+
+  // A right-click on a row opens its ⋯ menu where the pointer is (0.9.4). On
+  // the folded rail it is the only way to it: the ⋯ is hidden there, where it
+  // sat on top of the note's initial.
+  listEl.addEventListener('contextmenu', (e) => {
+    const folderRow = e.target.closest?.('.folder-item');
+    const noteRow = folderRow ? null : e.target.closest?.('.note-item[data-id]');
+    if (!folderRow && !noteRow) return;
+    e.preventDefault();
+    const at = { getBoundingClientRect: () => ({ left: e.clientX, right: e.clientX, top: e.clientY, bottom: e.clientY }) };
+    if (folderRow) folderMenu(folderRow.dataset.folder, at);
+    else noteMenu?.(noteRow.dataset.id, e.clientX, e.clientY);
+  });
 
   function place(anchor) {
     menu.hidden = false;

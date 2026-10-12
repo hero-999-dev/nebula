@@ -3,10 +3,39 @@ import { serializeNote } from './note-markup.js';
 
 const AUTOSAVE_MS = 400;
 
+/**
+ * The files a note's markup names — its pictures and videos, each a
+ * `nebula-media://…` address (electron/note-media.js).
+ *
+ * What a note no longer names is deleted at the next start, from its folder
+ * and from every backup; so a note must never be written without a file by
+ * a fault. Two things are held to, and neither can be tripped by an edit:
+ *
+ *  - what is saved names every file the editor shows — the stored markup is
+ *    the editor's own, less what is only on screen, and nothing on screen
+ *    only is a picture;
+ *  - what the app itself makes of a note on the way in (a repair, a repaint)
+ *    names every file the note named before — only a person takes a picture
+ *    out of a note.
+ *
+ * A note that fails either is not written: what is on the disk stays, the
+ * banner says why, and opening the note again starts afresh.
+ */
+const NAMED = /nebula-media:\/\/[\w\-./~%]+/g;
+export const namedIn = (html) => [...new Set(String(html ?? '').match(NAMED) ?? [])];
+const lostFrom = (html, names) => names.filter((name) => !html.includes(name));
+
 export function bindEditor(el, store, onSaveState) {
   let timer = null;
   let lastHtml = '';
   let noteId = null;
+  /** Why this note is not written, once it is not: said again at every try, until it is opened again. */
+  let refused = null;
+  const refuse = (message) => {
+    refused = new Error(message);
+    onSaveState?.('error', refused);
+    return false;
+  };
 
   function flush() {
     clearTimeout(timer);
@@ -15,9 +44,16 @@ export function bindEditor(el, store, onSaveState) {
     // already changed the store's active note.
     const note = store.get(noteId);
     if (!note) return;
+    if (refused) { onSaveState?.('error', refused); return false; }
     // What the note is, not what is on screen: no selection, no shape being
     // typed in, no pending-format caret (note-markup.js).
     const html = serializeNote(el);
+    // Every picture and video the editor shows is in what is written.
+    const shown = el.innerHTML;
+    if (html !== shown) {
+      const lost = lostFrom(html, namedIn(shown));
+      if (lost.length) return refuse(`The note would have been saved without ${lost.length} of the pictures or videos it shows, so nothing was written. Open the note again.`);
+    }
     // Nothing to write, but the indicator was told "saving" when the input came
     // in: say it is saved, or it stays on "Saving…" (0.8.7; an input event with
     // nothing changed is routine — selecting an image, clicking an arrow).
@@ -43,6 +79,7 @@ export function bindEditor(el, store, onSaveState) {
       clearTimeout(timer);
       timer = null;
       noteId = note?.id ?? null;
+      refused = null;
       const html = note?.content ?? '';
       lastHtml = html;
       el.innerHTML = html;
@@ -57,12 +94,21 @@ export function bindEditor(el, store, onSaveState) {
      * top of the list as "just now" — and never saved at all if nothing flushed.
      */
     adopt() {
+      if (refused) return null;
       const html = serializeNote(el);
+      // Whatever the app made of the note on the way in, it took no picture out of it.
+      const lost = lostFrom(html, namedIn(lastHtml));
+      if (lost.length) {
+        refuse(`This note did not open whole — ${lost.length} of its pictures or videos are missing here — so nothing is written over it. Open the note again.`);
+        return null;
+      }
       const changed = html !== lastHtml;
       lastHtml = html;
       return changed ? html : null;
     },
     get pending() { return timer !== null; },
+    /** Why this note is not being written, or null. */
+    get refused() { return refused; },
     flush,
   };
 }

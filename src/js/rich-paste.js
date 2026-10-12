@@ -10,7 +10,10 @@
 import { editorZoom } from './page-zoom.js';
 import { bindLinkPreview } from './link-preview.js';
 import { resizeImageBox, ensureImageHandles } from './image-resize.js';
-import { cleanPastedHtml, cleanNebulaHtml, fromNebula } from './paste-clean.js';
+import { injectIcons } from './icons.js';
+import { isVideoFile, isMediaUrl, makeVideoBlock, refreshVideoBlocks, initVideoPlayers } from './file-video.js';
+import { createPictureDrag, alignOf, setAlign, inRow, leaveRow, putBeside, pictureBefore, tidyRows, inWord, putInLine, leaveLine } from './image-place.js';
+import { cleanPastedHtml, cleanNebulaHtml, fromNebula, undressInserted, dressInNoteFont } from './paste-clean.js';
 
 const LINK_KINDS = ['embed', 'bookmark', 'url', 'mention'];
 
@@ -93,7 +96,11 @@ function currentRange(editor) {
 
 function restoreRange(editor, range) {
   if (!range || !editor.contains(range.commonAncestorContainer)) return false;
-  editor.focus();
+  // Without scrolling: focus coming back from a field outside the note (the
+  // "Paste as" address) put a caret at the top of the note first, and the page
+  // jumped up there — "I paste a web page and the screen goes to the top, I
+  // have to scroll down again" (the owner, 0.9.4).
+  editor.focus({ preventScroll: true });
   const selection = window.getSelection();
   selection.removeAllRanges();
   selection.addRange(range);
@@ -281,7 +288,7 @@ function makeLinkBlock(url, kind) {
   return card;
 }
 
-export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
+export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, noteId, noteHole } = {}) {
   if (!editor) return null;
   let pendingRange = null;
   let selectedImage = null;
@@ -396,8 +403,10 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     const card = makeLinkBlock(url, kind);
     range.deleteContents();
     let block = directBlock(editor, range.startContainer);
-    while (block && block.parentElement !== editor) block = block.parentElement;
-    if (block && block.parentElement === editor) {
+    // One level under the note, or under the column it stands in (0.9.4).
+    const flow = (el) => el === editor || !!el?.classList.contains('blk-col');
+    while (block && !flow(block.parentElement)) block = block.parentElement;
+    if (block && flow(block.parentElement)) {
       const tail = document.createRange();
       tail.selectNodeContents(block);
       tail.setStart(range.startContainer, range.startOffset);
@@ -578,15 +587,25 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     bar.innerHTML = '<button type="button" data-image="back" title="Behind the text (floats)">▾</button>'
       + '<button type="button" data-image="front" title="Above the text (floats, on top)">▴</button>'
       + '<button type="button" data-image="inline" title="In the text (moves with the words)">≡</button>'
+      // Where a picture in the text stands on its line (0.9.4): shown for those only.
+      + '<span class="image-bar__sep" data-in-text></span>'
+      + '<button type="button" data-image="left" data-in-text title="Picture at the left"><span data-icon="alignLeft"></span></button>'
+      + '<button type="button" data-image="center" data-in-text title="Picture in the middle"><span data-icon="alignCenter"></span></button>'
+      + '<button type="button" data-image="right" data-in-text title="Picture at the right"><span data-icon="alignRight"></span></button>'
+      + '<button type="button" data-image="beside" data-in-text title="Beside the picture before it">▯▯</button>'
+      // In a line of words, as a character of it (0.9.4): a word processor's "in line with text".
+      + '<button type="button" data-image="inword" data-in-text title="In a line of words">a▫a</button>'
       + '<span class="image-bar__sep"></span>'
       + '<button type="button" data-image="caption" title="Add or edit a caption">Aa</button>'
       + '<button type="button" data-image="crop" title="Crop the picture">✂</button>'
       + '<button type="button" data-image="del" title="Delete image">✕</button>';
+    injectIcons(bar);
     document.body.appendChild(bar);
     return bar;
   }
 
   const imageBar = ensureImageBar();
+  const pictureDrag = createPictureDrag(editor);
   // ✂ on the bar (image-crop.js); the cropped picture comes back selected.
   const crop = initImageCrop(editor, { history, onDone: (figure) => { selectImage(figure); onGeometry?.(); } });
 
@@ -648,6 +667,32 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     sel.addRange(r);
   }
 
+  /** The bar's second group: where a picture in the text stands, the current place lit. */
+  function lightPlace() {
+    const image = selectedImage;
+    const inText = !!image && placementOf(image) === 'inline';
+    for (const el of imageBar.querySelectorAll('[data-in-text]')) { el.hidden = !inText; if (!inText) el.classList.remove('on'); }
+    // A picture in a line of words has no caption: it is a character of the line.
+    const word = inText && inWord(image);
+    imageBar.querySelector('[data-image="caption"]').disabled = word;
+    if (!inText) return;
+    const row = inRow(image);
+    for (const name of ['left', 'center', 'right']) {
+      imageBar.querySelector(`[data-image="${name}"]`).classList.toggle('on', !word && !row && alignOf(image) === name);
+    }
+    const beside = imageBar.querySelector('[data-image="beside"]');
+    beside.classList.toggle('on', row);
+    beside.disabled = word || (!row && !pictureBefore(image));
+    imageBar.querySelector('[data-image="inword"]').classList.toggle('on', word);
+  }
+
+  /** A picture out of the note; the line of words it stood in alone is an empty line again. */
+  function takeOut(image) {
+    const line = inWord(image) ? image.parentElement : null;
+    image.remove();
+    if (line && !line.textContent.replace(/\u200b/g, '') && !line.firstElementChild) line.innerHTML = '<br>';
+  }
+
   function selectImage(image) {
     const was = selectedImage;
     editor.querySelectorAll('.note-image.sel').forEach((node) => node.classList.remove('sel'));
@@ -661,6 +706,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
       for (const b of imageBar.querySelectorAll('[data-image="back"], [data-image="front"], [data-image="inline"]')) {
         b.classList.toggle('on', b.dataset.image === place);
       }
+      lightPlace();
       // A picture just selected is one the owner wants to see — one pasted at
       // the end of a long note is still below the view — so it comes into view
       // with its bar. Only scrolling away from it afterwards hides the bar.
@@ -709,6 +755,9 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
       if (img) img.draggable = false;
       captionOf(image); // a saved caption is editable again
     }
+    // A row whose other picture was deleted, cut or undone away is no row.
+    tidyRows(editor);
+    refreshVideoBlocks(editor);
     if (selectedImage && !selectedImage.isConnected) selectImage(null);
   }
 
@@ -746,7 +795,9 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
       const child = range && range.startContainer === editor ? editor.childNodes[range.startOffset - 1] : null;
       return child?.nodeType === Node.ELEMENT_NODE && !child.matches('.shape-layer, .image-layer') ? child : null;
     }
-    while (el.parentElement && el.parentElement !== editor) el = el.parentElement;
+    // In a column the picture stays in the column (0.9.4).
+    while (el.parentElement && el.parentElement !== editor && !el.parentElement.classList.contains('blk-col')) el = el.parentElement;
+    if (el.matches('.blk-col, .blk-cols')) return null;
     return el.matches('.shape-layer, .image-layer') ? null : el;
   }
 
@@ -770,18 +821,24 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
   /** In the text -> floating, staying exactly where it is on screen; and back. */
   function setImageFloating(image, floating) {
     const inline = image.classList.contains('note-image--inline');
-    if (floating === !inline) return;
+    if (floating === !inline) return image;
     const rect = image.getBoundingClientRect();
     if (floating) {
+      // Out of its line of words first: only a figure floats.
+      if (inWord(image)) image = leaveLine(image);
       const layer = ensureLayer(editor);
       const origin = layer.getBoundingClientRect();
       const pictureHeight = image.querySelector('img')?.getBoundingClientRect().height || rect.height;
       const z = editorZoom(editor);
-      image.classList.remove('note-image--inline');
+      const flow = image.parentElement;
+      image.classList.remove('note-image--inline', 'note-image--center', 'note-image--right', 'note-image--row');
+      image.style.removeProperty('--row');
+      image.style.removeProperty('--beside');
       image.style.left = `${Math.round((rect.left - origin.left) / z)}px`;
       image.style.top = `${Math.round((rect.top - origin.top) / z)}px`;
       image.style.height = `${Math.round(pictureHeight / z)}px`;
       layer.appendChild(image);
+      tidyRows(flow);
     } else {
       // Into the text after the last line that starts above the image's top edge.
       let after = null;
@@ -801,6 +858,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
         if (first) first.before(image); else editor.append(image);
       }
     }
+    return image;
   }
 
   async function insertImageBlob(blob, at) {
@@ -844,7 +902,12 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
       startY: event.clientY,
       left: parseFloat(image.style.left) || 0,
       top: parseFloat(image.style.top) || 0,
-      width: parseFloat(image.style.width) || image.offsetWidth,
+      // A picture in the text is resized from the width it is drawn at, which a
+      // narrow page, a column or a row may have made less than the width it was
+      // given: starting from the given one, the first part of every pull did
+      // nothing ("a bug in making pictures bigger and smaller", the owner, 0.9.4).
+      width: (image.classList.contains('note-image--inline') && parseFloat(getComputedStyle(image).width))
+        || parseFloat(image.style.width) || image.offsetWidth,
       height: parseFloat(image.style.height) || image.offsetHeight,
       ratio: Number(image.dataset.ratio) || image.offsetWidth / Math.max(1, image.offsetHeight),
     };
@@ -859,15 +922,33 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     if (Math.abs(event.clientX - drag.downX) > 2 || Math.abs(event.clientY - drag.downY) > 2) drag.moved = true;
     if (!drag.moved) return;
     const inText = drag.image.classList.contains('note-image--inline');
-    if (inText && drag.kind === 'move') return; // it sits in the text; ⇄ on the bar sets it free
+    if (inText && drag.kind === 'move') {
+      // It sits in the text: the drag says where in the text (image-place.js),
+      // and nothing moves but its alignment until the button is let go.
+      editor.classList.add('image-dragging');
+      drag.target = pictureDrag.over(drag.image, event.clientX, event.clientY, event.clientX - drag.downX);
+      lightPlace();
+      positionImageBar();
+      return;
+    }
     if (!inText) drag.layer.style.minHeight = `${drag.extent}px`;
     editor.classList.add('image-dragging');
     if (drag.kind === 'move') {
       drag.image.style.left = `${Math.max(0, drag.left + dx)}px`;
       drag.image.style.top = `${Math.max(0, drag.top + dy)}px`;
     } else {
-      const box = resizeImageBox(drag, dx, dy, drag.corner, inText);
+      // In the middle of its line it grows to both sides, so the corner keeps
+      // up with the pointer only at twice the pull.
+      const centred = inText && !inRow(drag.image) && alignOf(drag.image) === 'center';
+      const box = resizeImageBox(drag, centred ? dx * 2 : dx, dy, drag.corner, inText);
       drag.image.style.width = Math.round(box.width) + 'px';
+      if (inText) {
+        // Never given more than can be drawn: the rest would have to be pulled back before it got smaller.
+        const drawn = parseFloat(getComputedStyle(drag.image).width);
+        if (drawn && drawn < Math.round(box.width) - 0.5) drag.image.style.width = `${Math.floor(drawn)}px`;
+        // The pictures beside it are told what it takes now: the room is theirs or its.
+        if (inRow(drag.image)) tidyRows(drag.image.parentElement);
+      }
       if (!inText) {
         drag.image.style.height = Math.round(box.height) + 'px';
         drag.image.style.left = Math.round(box.left) + 'px';
@@ -885,9 +966,32 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
       if (!drag.layer.getAttribute('style')) drag.layer.removeAttribute('style');
     }
     editor.classList.remove('image-dragging');
+    const inText = drag.kind === 'move' && drag.image.classList.contains('note-image--inline');
+    if (inText) {
+      // Let go: the picture goes where the mark stood. Nothing changed, nothing saved.
+      const image = drag.image;
+      const changed = pictureDrag.drop(image, drag.cancelled ? null : drag.target);
+      drag = null;
+      if (changed) {
+        if (image.isConnected) selectImage(image);
+        onGeometry?.();
+        dirty();
+      } else lightPlace();
+      return;
+    }
     if (drag.moved) { onGeometry?.(); dirty(); }
     drag = null;
   }
+  // Esc while a picture in the text is dragged: it stays where it was.
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || !drag || drag.kind !== 'move' || !drag.image.classList.contains('note-image--inline')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    pictureDrag.cancel(drag.image);
+    drag.cancelled = true;
+    drag.target = null;
+    finishDrag();
+  }, true);
   editor.addEventListener('nebula-canvas-select', (e) => { if (e.detail !== 'image' && selectedImage) selectImage(null); });
   /**
    * A picture onto the clipboard as a picture (0.9.3). "I cannot copy pictures
@@ -899,6 +1003,13 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     const img = figure?.querySelector('img');
     if (!img) return false;
     const src = img.getAttribute('src') || '';
+    // A picture shown from its file (0.9.4): the main process reads the file itself.
+    if (isMediaUrl(src) && window.nebula?.clipboard?.image) {
+      let done = false;
+      try { done = await window.nebula.clipboard.image({ url: src, html: `<img src="${src.replace(/"/g, '&quot;')}" alt="">` }); } catch { done = false; }
+      window.dispatchEvent(new CustomEvent('nebula-toast', { detail: done ? 'Picture copied' : 'The picture could not be copied' }));
+      return done;
+    }
     let dataUrl = src;
     if (!/^data:image\/png[;,]/i.test(src)) {
       try {
@@ -928,7 +1039,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     if (!figure?.isConnected) return;
     history?.push();
     if (selectedImage === figure) selectImage(null);
-    figure.remove();
+    takeOut(figure);
     dirty();
   }
 
@@ -937,7 +1048,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
   editor.addEventListener('dblclick', (event) => {
     if (editor.dataset.readonly === 'true') return;
     const figure = event.target.closest?.('.note-image');
-    if (!figure || event.target.closest('.image-caption')) return;
+    if (!figure || inWord(figure) || event.target.closest('.image-caption')) return;
     event.preventDefault();
     editCaption(figure);
   });
@@ -962,7 +1073,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
       y: event.clientY,
       width: card.getBoundingClientRect().width / editorZoom(editor),
       height: (frame?.getBoundingClientRect().height || 300 * editorZoom(editor)) / editorZoom(editor),
-      video: card.classList.contains('link-embed--video'),
+      video: card.classList.contains('link-embed--video') || card.classList.contains('link-file'),   // a video keeps its shape: only its width changes
       max: editor.clientWidth - 24,
       edge: grip.dataset.edge,
     };
@@ -1091,8 +1202,33 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
   imageBar.addEventListener('click', (event) => {
     const act = event.target.closest('[data-image]')?.dataset.image;
     if (!selectedImage || !act) return;
-    if (act === 'caption') { editCaption(selectedImage); return; }
+    if (act === 'caption') { if (!inWord(selectedImage)) editCaption(selectedImage); return; }
     if (act === 'crop') { const figure = selectedImage; selectImage(null); crop.start(figure); return; }
+    if (act === 'left' || act === 'center' || act === 'right' || act === 'beside') {
+      let figure = selectedImage;
+      if (placementOf(figure) !== 'inline' || (act === 'beside' && inWord(figure))) return;
+      history?.push();
+      // Out of its line of words, onto a line of its own, where it has a side.
+      if (inWord(figure)) { figure = leaveLine(figure); refreshImages(); }
+      if (act !== 'beside') setAlign(figure, act);
+      else if (inRow(figure)) leaveRow(figure);
+      else if (pictureBefore(figure)) putBeside(figure, pictureBefore(figure), 'after');
+      selectImage(figure);
+      onGeometry?.();
+      dirty();
+      return;
+    }
+    if (act === 'inword') {
+      // Into the line of words beside it, or out of it again.
+      if (placementOf(selectedImage) !== 'inline') return;
+      history?.push();
+      const next = inWord(selectedImage) ? leaveLine(selectedImage) : putInLine(selectedImage);
+      refreshImages();
+      selectImage(next);
+      onGeometry?.();
+      dirty();
+      return;
+    }
     if (act === 'inline') {
       history?.push();
       setImageFloating(selectedImage, false);
@@ -1104,11 +1240,11 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     // Behind/above text: an image in the text is set free where it stands first.
     if ((act === 'back' || act === 'front') && selectedImage.classList.contains('note-image--inline')) {
       history?.push();
-      setImageFloating(selectedImage, true);
+      selectedImage = setImageFloating(selectedImage, true);
     }
     if (act === 'del') {
       history?.push();
-      selectedImage.remove();
+      takeOut(selectedImage);
       selectImage(null);
       dirty();
       return;
@@ -1153,7 +1289,22 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     // Shift+Enter one over it, and Alt+↑ / Alt+↓ move it past the line above
     // or below — a picture has no caret of its own to type around it with.
     const inTextPicture = selectedImage?.classList.contains('note-image--inline') && editor.dataset.readonly !== 'true'
-      && !event.target.closest?.('input, textarea, .code-src, .shape-text, .image-caption');
+      && !event.target.closest?.('input, textarea, .code-src, .shape-text, .image-caption, .blk-table');
+    // In a line of words it is a character: Enter lets go of it with the caret
+    // right after it (Shift: right before), and the line goes on being typed.
+    if (inTextPicture && inWord(selectedImage) && event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      const picture = selectedImage;
+      selectImage(null);
+      const r = document.createRange();
+      if (event.shiftKey) r.setStartBefore(picture); else r.setStartAfter(picture);
+      r.collapse(true);
+      editor.focus({ preventScroll: true });
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(r);
+      return;
+    }
     if (inTextPicture && event.key === 'Enter' && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
       event.stopPropagation();
@@ -1171,6 +1322,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
       event.preventDefault();
       event.stopPropagation();
       const figure = selectedImage;
+      if (inWord(figure)) return;                 // it moves with its line, not past lines
       const skip = (el) => el && el.matches('.shape-layer, .image-layer');
       let other = event.key === 'ArrowUp' ? figure.previousElementSibling : figure.nextElementSibling;
       if (skip(other)) other = null;
@@ -1185,7 +1337,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     // Ctrl+C and Ctrl+X with a picture selected copy the picture itself (0.9.3).
     const key = event.key.toLowerCase();
     if ((event.ctrlKey || event.metaKey) && (key === 'c' || key === 'x') && !event.shiftKey && !event.altKey
-      && selectedImage && !event.target.closest?.('input, textarea, .code-src, .shape-text, .image-caption')) {
+      && selectedImage && !event.target.closest?.('input, textarea, .code-src, .shape-text, .image-caption, .blk-table')) {
       event.preventDefault();
       event.stopPropagation();
       const figure = selectedImage;
@@ -1193,7 +1345,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
       return;
     }
     if ((event.key === 'Delete' || event.key === 'Backspace') && selectedImage
-      && !event.target.closest('input, textarea, .code-src, .shape-text, .image-caption')) {
+      && !event.target.closest('input, textarea, .code-src, .shape-text, .image-caption, .blk-table')) {
       event.preventDefault();
       event.stopPropagation();
       history?.push();
@@ -1202,6 +1354,20 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
       // left it, and the next word typed landed at the end of the note
       // (long-note trials, 0.8.9).
       const inText = selectedImage.classList.contains('note-image--inline');
+      if (inWord(selectedImage)) {
+        // A character of its line: the caret stays where it stood.
+        const picture = selectedImage;
+        const r = document.createRange();
+        r.setStartBefore(picture);
+        r.collapse(true);
+        selectImage(null);
+        takeOut(picture);
+        editor.focus({ preventScroll: true });
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(r);
+        dirty();
+        return;
+      }
       const above = inText ? selectedImage.previousElementSibling : null;
       selectedImage.remove();
       selectImage(null);
@@ -1230,7 +1396,20 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     else window.open(url, '_blank', 'noopener');
   });
 
+  /**
+   * How the next paste is taken (0.9.4, the right-click menu's two ways — there
+   * were three; the owner: "take the option Paste only text away, for now"):
+   *   nebula    as Ctrl+V: the words and their structure in the note's own dress
+   *   original  the same, and the SIZE the words were copied in (paste-clean.js);
+   *             the font, the colour and the ground are the note's
+   * Set by paste() just before the main process makes the paste, and used once.
+   */
+  let pasteMode = 'nebula';
+  let pasteModeTimer = 0;
+
   editor.addEventListener('paste', (event) => {
+    const mode = pasteMode;
+    pasteMode = 'nebula';
     if (event.target.closest('.code-src, .shape-text, .link-block, .note-image')) return;
     const items = [...(event.clipboardData?.items || [])];
     const imageItem = items.find((item) => isImageMime(item.type));
@@ -1260,19 +1439,111 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     const html = event.clipboardData?.getData('text/html') || '';
     if (!html) return;
     const ours = fromNebula(html);
-    const clean = ours ? cleanNebulaHtml(html) : cleanPastedHtml(html);
+    // "Paste original format" keeps the size the words were copied in, beside
+    // what every paste keeps (bold, italic, underline, lists, links).
+    let clean = ours ? cleanNebulaHtml(html) : cleanPastedHtml(html, { keepSize: mode === 'original' });
     if (!clean || (ours && !/style=|data-font-family/.test(html))) return;
+    // In a note with a writing font the pasted lines are written in it, as
+    // typed ones are (0.9.4); a font that came along from another note stays.
+    const font = noteFont?.();
+    if (font && (font.family || font.size)) {
+      const at = currentRange(editor);
+      const line = at?.collapsed ? lineOf(at.startContainer) : null;
+      const onEmptyLine = !!line && line !== editor && !line.textContent.replace(/​/g, '').trim();
+      clean = dressInNoteFont(clean, font, { loose: onEmptyLine });
+    }
     event.preventDefault();
     history?.push();
+    // insertHTML writes the theme's ink onto what it inserts; it comes off again.
+    const had = new Set(editor.querySelectorAll('[style*="color"]'));
     document.execCommand('insertHTML', false, clean);
+    undressInserted(editor, had);
     dirty();
+  });
+
+  /**
+   * Words copied with pictures among them (0.9.4): the note shows a picture
+   * from its file, under an address only Nebula knows. For another program
+   * the copy holds the pictures themselves; the words go as they are.
+   */
+  editor.addEventListener('copy', (event) => {
+    const range = currentRange(editor);
+    if (!range || range.collapsed || !event.clipboardData || !window.nebula?.media?.inlineSync) return;
+    if (event.target.closest?.('.code-src, .shape-text')) return;
+    const holder = document.createElement('div');
+    holder.append(range.cloneContents());
+    if (!holder.querySelector('img[src^="nebula-media://note/"]')) return;
+    let html = holder.innerHTML;
+    try { html = window.nebula.media.inlineSync(html); } catch { return; }
+    event.clipboardData.setData('text/html', html);
+    event.clipboardData.setData('text/plain', window.getSelection().toString());
+    event.preventDefault();
   });
 
   editor.addEventListener('dragover', (event) => {
     const types = [...(event.dataTransfer?.types || [])];
     if (types.includes('Files') || types.includes('text/uri-list') || types.includes('text/plain')) event.preventDefault();
   });
+  /**
+   * A video file dropped on the note (0.9.4): the main process copies it into
+   * the note's own folder, and the note shows it from there (file-video.js).
+   * It stands after the line it was dropped on.
+   */
+  const say = (text) => window.dispatchEvent(new CustomEvent('nebula-toast', { detail: text }));
+  async function insertVideoFile(file, range) {
+    const id = noteId?.();
+    // A file dropped on the note, or the path of one chosen from the computer (/video).
+    const source = typeof file === 'string' ? file : (window.nebula?.media?.pathOf?.(file) || '');
+    if (!id || !source) { say('The video could not be added'); return null; }
+    const started = generation;
+    say('Copying the video into the note…');
+    let res = null;
+    // In a black hole the video is sealed beside its note; anywhere else it is a file in the note's folder.
+    const hole = noteHole?.() ?? null;
+    try { res = hole ? await window.nebula.holes.addVideo(hole, id, source) : await window.nebula.media.addVideo(id, source); } catch { res = null; }
+    // Another note is open by now: the copy is nobody's, and goes at the next start.
+    if (started !== generation || noteId?.() !== id) return null;
+    if (!res?.ok) { say('The video could not be added'); return null; }
+    history?.push();
+    const card = makeVideoBlock(res.url, res.name);
+    ensureEmbedHandles(card);
+    const block = topBlockOf(range?.startContainer && editor.contains(range.startContainer) ? range : currentRange(editor));
+    const empty = block && !block.textContent.trim() && !block.querySelector('img, hr, .link-block, .note-image, .blk-code, .inline-eq');
+    if (block && empty) block.replaceWith(card);
+    else if (block) block.after(card);
+    else editor.append(card);
+    let next = card.nextElementSibling;
+    if (!next || next.matches('.note-image, .link-block, hr, .blk-code')) {
+      next = document.createElement('p');
+      next.innerHTML = '<br>';
+      card.after(next);
+    }
+    placeCaretIn(next);
+    refreshVideoBlocks(editor);
+    onGeometry?.();
+    dirty();
+    say('Video added');
+    return card;
+  }
+
+  /** /video: a video file chosen from the computer goes in where the caret was. */
+  async function pickVideo() {
+    if (editor.dataset.readonly === 'true' || !window.nebula?.media?.pickVideo) return null;
+    const at = currentRange(editor);
+    let res = null;
+    try { res = await window.nebula.media.pickVideo(); } catch { res = null; }
+    if (!res?.ok || !res.path) return null;
+    return insertVideoFile(res.path, at);
+  }
+  initVideoPlayers(editor);
+
   editor.addEventListener('drop', (event) => {
+    const video = [...(event.dataTransfer?.files || [])].find(isVideoFile);
+    if (video && window.nebula?.media?.addVideo && editor.dataset.readonly !== 'true') {
+      event.preventDefault();
+      void insertVideoFile(video, document.caretRangeFromPoint?.(event.clientX, event.clientY) ?? null);
+      return;
+    }
     const file = [...(event.dataTransfer?.files || [])].find((item) => isImageMime(item.type));
     if (file) {
       event.preventDefault();
@@ -1288,9 +1559,40 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     }
   });
 
-  async function paste() {
-    const savedRange = currentRange(editor);
+  /**
+   * Paste from a button or a menu.
+   * @param {'nebula'|'original'|'text'} [mode]
+   * @param {Range|null} [at] where the caret was when the menu opened
+   */
+  async function paste(mode = 'nebula', at = null) {
+    const savedRange = at ?? currentRange(editor);
     const started = generation;
+    // In the app the main process makes a real paste at the caret, and the
+    // handler above takes it exactly as it takes Ctrl+V. Reading the clipboard
+    // from the page is refused there, so the menu's Paste did nothing (0.9.4).
+    if (window.nebula?.edit?.paste) {
+      if (!restoreRange(editor, savedRange)) editor.focus({ preventScroll: true });
+      // A caret in a code block, a shape's words, a caption or a table's cell:
+      // the paste goes to that field, which editor.focus() has just taken the
+      // focus from.
+      const start = savedRange?.startContainer;
+      const host = (start?.nodeType === Node.ELEMENT_NODE ? start : start?.parentElement)
+        ?.closest?.('.code-src, .shape-text, .image-caption, .blk-table td');
+      if (host && editor.contains(host)) {
+        host.focus({ preventScroll: true });
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(savedRange);
+      }
+      // A table's cell takes words whatever was asked for, and its paste never
+      // reaches the handler that would use the mode up: left set, the next
+      // Ctrl+V on a line was pasted in it (table.js).
+      pasteMode = host?.matches?.('td') ? 'nebula' : mode;
+      clearTimeout(pasteModeTimer);
+      pasteModeTimer = setTimeout(() => { pasteMode = 'nebula'; }, 1500);
+      try { await window.nebula.edit.paste('rich'); } catch { pasteMode = 'nebula'; }
+      return;
+    }
     editor.focus();
     try {
       if (navigator.clipboard?.read) {
@@ -1323,6 +1625,8 @@ export function initRichPaste(editor, { history, onGeometry, onHeal } = {}) {
     open,
     paste,
     refresh: refreshImages,
+    insertVideoFile,
+    pickVideo,
     reset: () => { generation += 1; drag = null; editor.classList.remove('image-dragging'); selectImage(null); hideLinkMenu(); crop.cancel(); embedDrag = null; },
     insertImageBlob,
     copyImage,

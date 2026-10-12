@@ -16,6 +16,7 @@
  * is remembered and shown in the export menu and the export preview.
  */
 import { embedSource } from './rich-paste.js';
+import { fileVideoLines } from './file-video.js';
 
 export const VIDEO_KEY = 'nebula:export-videos';
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -114,6 +115,8 @@ export function bookmarkCard(doc, url, title) {
 export async function prepareVideos(html, mode, { poster } = {}) {
   if (!/link-embed/.test(String(html ?? ''))) return html;
   const doc = new DOMParser().parseFromString(String(html), 'text/html');
+  // A video file of the note's own is no address anyone else can open: a line with its name (0.9.4).
+  fileVideoLines(doc);
   for (const card of [...doc.querySelectorAll('.link-embed:not(.link-embed--video)')]) {
     const url = card.querySelector('a[href]')?.getAttribute('href') || card.dataset.url || '';
     if (!url) { card.remove(); continue; }

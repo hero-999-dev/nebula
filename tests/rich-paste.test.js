@@ -253,14 +253,19 @@ describe('rich paste editing regressions', () => {
       const figure = await rich.insertImageBlob(png());
       const bar = document.getElementById('image-bar');
       const lit = () => [...bar.querySelectorAll('button.on')].map((b) => b.dataset.image);
-      expect([...bar.querySelectorAll('[data-image]')].map((b) => b.dataset.image)).toEqual(['back', 'front', 'inline', 'caption', 'crop', 'del']);
+      // 0.9.4: a picture in the text also says where it stands on its line.
+      expect([...bar.querySelectorAll('[data-image]')].map((b) => b.dataset.image))
+        .toEqual(['back', 'front', 'inline', 'left', 'center', 'right', 'beside', 'inword', 'caption', 'crop', 'del']);
       expect(bar.querySelector('[data-image="flow"]')).toBeNull();
-      expect(lit()).toEqual(['inline']);
+      expect(lit()).toEqual(['inline', 'left']);
+      const place = () => [...bar.querySelectorAll('[data-in-text]')].map((el) => el.hidden);
+      expect(place().every((hidden) => !hidden)).toBe(true);
 
       bar.querySelector('[data-image="front"]').click();
       expect(figure.parentElement.matches('.shape-layer:not(.shape-layer--behind)')).toBe(true);
       expect(figure.style.left).not.toBe('');
       expect(lit()).toEqual(['front']);
+      expect(place().every((hidden) => hidden)).toBe(true);     // a floating picture has no line to stand on
 
       bar.querySelector('[data-image="back"]').click();
       expect(figure.parentElement.classList.contains('shape-layer--behind')).toBe(true);
@@ -270,7 +275,12 @@ describe('rich paste editing regressions', () => {
       expect(figure.classList.contains('note-image--inline')).toBe(true);
       expect(figure.parentElement).toBe(editor);
       expect(figure.style.left).toBe('');
-      expect(lit()).toEqual(['inline']);
+      expect(lit()).toEqual(['inline', 'left']);
+
+      bar.querySelector('[data-image="right"]').click();
+      expect(figure.classList.contains('note-image--right')).toBe(true);
+      expect(lit()).toEqual(['inline', 'right']);
+      expect(bar.querySelector('[data-image="beside"]').disabled).toBe(true);   // no picture stands before it
     });
 
     it('shares one stacking order with the shapes: above the text means above every shape (0.8.8)', async () => {

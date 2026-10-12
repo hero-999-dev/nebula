@@ -32,6 +32,16 @@ export function liOwnText(li) {
 }
 
 /**
+ * Whether `el` is inside a toggle that lives in this list item (0.9.4): its
+ * title and the lines under it are the toggle's, and Enter and Backspace there
+ * do not leave the list or lift the item out of it.
+ */
+function inItemToggle(el, li) {
+  const toggle = el?.closest?.('.blk-toggle');
+  return !!toggle && li.contains(toggle);
+}
+
+/**
  * Move a nested list out to sit beside its parent list. If the item it came
  * from was not the last one, the items after it move into a fresh list of the
  * same kind so their order is preserved.
@@ -119,11 +129,12 @@ export function exitListOnEmptyItem(root, selection) {
   const el = start.nodeType === 1 ? start : start.parentElement;
   const li = el?.closest?.('li');
   if (!li || !root.contains(li)) return false;
+  if (inItemToggle(el, li)) return false;                // a toggle's own lines (toggles.js)
   if (liOwnText(li)) return false;                       // only an empty item
   if (Array.from(li.children).some(isList)) return false; // it holds a sub-list
 
   const list = li.parentElement;
-  if (!isList(list) || !(list.parentElement === root || list.parentElement?.classList.contains('toggle-body'))) return false;
+  if (!isList(list) || !(list.parentElement === root || list.parentElement?.matches('.toggle-body, .blk-col'))) return false;
 
   const doc = root.ownerDocument;
   const after = [];
@@ -189,6 +200,7 @@ export function liftListItemAtStart(root, selection) {
   const el = start.nodeType === 1 ? start : start.parentElement;
   const li = el?.closest?.('li');
   if (!li || !root.contains(li)) return false;
+  if (inItemToggle(el, li)) return false;    // a toggle's own lines (toggles.js)
   if (!liOwnText(li)) return false;          // the empty case belongs to exitList
 
   // Only at the true start of the item, not merely at the start of some node
@@ -203,7 +215,7 @@ export function liftListItemAtStart(root, selection) {
   if (before.cloneContents().querySelector('br, img, .inline-eq, .note-mention')) return false;
 
   const list = li.parentElement;
-  if (!isList(list) || !(list.parentElement === root || list.parentElement?.classList.contains('toggle-body'))) return false;
+  if (!isList(list) || !(list.parentElement === root || list.parentElement?.matches('.toggle-body, .blk-col'))) return false;
 
   const doc = root.ownerDocument;
   const p = doc.createElement('p');
@@ -291,6 +303,16 @@ function liftOutOfParagraphs(root) {
 export function normalizeLists(root) {
   if (!root) return false;
   let touched = false;
+  // The caret goes with its line. A list lifted out of the paragraph it fell
+  // into is moved, and a moved node drops the selection onto the note itself,
+  // beside the list and on no line: bullets made on the empty line between a
+  // divider and a picture left the caret there, and the next Backspace armed
+  // the divider — and the one after took it — while the caret blinked in the
+  // bullet (the owner's Ideas note, 0.9.4).
+  const selection = root.ownerDocument?.defaultView?.getSelection?.();
+  const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+  const held = range && range.startContainer !== root && root.contains(range.startContainer)
+    ? [range.startContainer, range.startOffset, range.endContainer, range.endOffset] : null;
   // Hoisting can expose a new merge, and merging can expose a new hoist, so
   // this repeats until it settles. Bounded: a malformed tree must not spin.
   for (let pass = 0; pass < 5; pass++) {
@@ -300,6 +322,15 @@ export function normalizeLists(root) {
     const c = dropEmptyLists(root);
     touched = touched || z || a || b || c;
     if (!z && !a && !b && !c) break;
+  }
+  if (touched && held && root.contains(held[0]) && root.contains(held[2])) {
+    try {
+      const back = root.ownerDocument.createRange();
+      back.setStart(held[0], held[1]);
+      back.setEnd(held[2], held[3]);
+      selection.removeAllRanges();
+      selection.addRange(back);
+    } catch { /* a boundary that is no longer there */ }
   }
   return touched;
 }

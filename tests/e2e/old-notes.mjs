@@ -39,17 +39,24 @@ const docs = [];
 const originals = [];
 for (const dir of vaults()) {
   if (!fs.existsSync(dir)) continue;
-  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+  // A note is a folder of its own since 0.9.4 (notes/<id>/<id>.json, its pictures and videos beside it);
+  // a vault an older version wrote still has notes/<id>.json. Both are tried.
+  const entries = fs.readdirSync(dir, { withFileTypes: true })
+    .map((e) => (e.isDirectory() ? { file: `${e.name}.json`, full: path.join(dir, e.name, `${e.name}.json`), mediaDir: path.join(dir, e.name), sourceId: e.name }
+      : { file: e.name, full: path.join(dir, e.name) }))
+    .filter((e) => e.file.endsWith('.json') && fs.existsSync(e.full));
+  for (const { file, full, mediaDir, sourceId } of entries) {
     // The rebuilt articles have a run of their own (npm run rebuild); the
     // guide is always in the trials already.
     if (file.startsWith('rebuild-')) continue;
-    const full = path.join(dir, file);
     let note;
     try { note = JSON.parse(fs.readFileSync(full, 'utf8')); } catch { continue; }
-    if (typeof note?.content !== 'string' || note.deletedAt || /^Welcome to Nebula Guide/.test(note.title ?? '')) continue;
+    // The guide under any of its four titles (0.9.4: it follows the app's language).
+    if (typeof note?.content !== 'string' || note.deletedAt
+      || /^(Welcome to Nebula Guide|Willkommen bei Nebula – Anleitung|Witaj w Nebul[ai] – przewodnik|Nebula’ya Hoş Geldiniz – Rehber)/.test(note.title ?? '')) continue;
     originals.push({ file: full, sha: hash(full) });
     // Named by vault and file, never by title: titles are the owner's words.
-    docs.push({ name: `${path.basename(path.dirname(path.dirname(dir)))}/${file.replace(/\.json$/, '')}`, title: note.title || 'Untitled', content: note.content });
+    docs.push({ name: `${path.basename(path.dirname(path.dirname(dir)))}/${file.replace(/\.json$/, '')}`, title: note.title || 'Untitled', content: note.content, mediaDir, sourceId });
   }
 }
 

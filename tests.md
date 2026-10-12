@@ -1,3 +1,340 @@
+## 2026-10-12 (07:54) — 0.9.4: the checks before the release
+
+- Electron 44.7.0: unit 1121 of 1121, build, smoke.
+- tests/e2e/smoke.mjs and the suites it runs (recovery, ideas-note, dense) read note files in either layout through tests/e2e/profiles.mjs; six menus, 21 blocks, no drawer counters. 916 checks, all passed in the last full run.
+- tests/e2e/v094.mjs: the toggle's title is measured once the embed above it has settled — 6 runs of 6.
+- tests/e2e/old-notes.mjs: reads note folders and takes pictures along; 42 of 42 on copies of Nebula Test's notes (two notes and the guide).
+- tests/e2e/dense.mjs: the comparison leaves out a `<br>` after the last words of a line; the "long paragraph" is one with words right under it where the note has one.
+- The local page rebuild: 100 % on both pages (0.9.3: 100 %), 41 long-note trials passed.
+- Not part of smoke, run by hand on Electron 44.7.0: settings 123 of 123, table 66 of 66, table-edges 151 of 151.
+
+## 2026-10-12 (06:58) — 0.9.4: two ways to paste, the toggle's frame, a row's room, the font the bar names (not released)
+
+- tests/paste-clean.test.js (26): the size kept on the words that had it, one span a line and a span a run; bold, italic, underline kept; no font, colour, ground or animation; a heading and code left alone; `pastedSizePx` (px, pt, rem, words, `<font size>`, 8 to 96, nothing for em and %); a box of paragraphs.
+- tests/v094.test.js (+5): `healToggles` — an empty frame, one that still holds words or a body, one in a list item, one inside a toggle, and whole toggles left alone.
+- tests/layout.test.js (+1): `--beside` for two and three in a row, while one is resized, and gone with the row.
+- tests/e2e/v094.mjs (111): the menu's two pastes; the original paste (size kept, font and colour the note's); the last used font after a pick, its pin, its + once it is off the list; the bar's name for a stack whose first font is not here; a toggle's frame — Backspace in it, a toggle emptied from title into body, a frame found at an edit.
+- tests/e2e/layout.mjs (128, +1): beside a narrow picture, one pulled out grows past half the line and stops at the line's end.
+- Also run: rich-paste 20, table 66, table-edges 151 (one scene fewer: the third paste), v093 138, settings 123.
+- Flaky: v094 "a click on the arrow still folds it", 2 runs of 5.
+- Unit 1121 of 1121.
+
+## 2026-10-12 (06:15) — 0.9.4: "+ Add a font" gone once pressed (not released)
+
+- tests/e2e/v094.mjs (110, +2): pressed, the button is not shown under the fonts it opened; a typed name that is in no list brings `+ Add “name”`; the menu opened anew has "+ Add a font" again.
+- Also run: settings 123 (its first run wrote nothing and ended; the second passed). Unit 1113 of 1113.
+
+## 2026-10-12 (06:07) — 0.9.4: a font that is not on this computer is refused again, in new words (not released)
+
+- tests/settings.test.js: the three tests of the kept stacks are gone with the feature; the new sentence is among the translated words.
+- tests/e2e/v094.mjs (108): the + and the pin of a font that is not here both answer "That font is not on this computer, so it cannot be added" and list nothing; a name typed into the search gets the same answer.
+- tests/e2e/settings.mjs (123, +1): what the 05:44 build listed is off the list and the pins at the next start, and its key is gone.
+- Unit 1113 of 1113.
+
+## 2026-10-12 (05:45) — 0.9.4: a font that is not on this computer, added with its stack (not released)
+
+- tests/settings.test.js (+3): `cleanFontStacks` (its own name only, nothing that ends a style), `customFontStack`/`fontRows`/`fontChoices` with a kept stack, the store read back and a damaged one read as none.
+- tests/e2e/v094.mjs (109, +3): the + of a font that is not here adds it with its stack and says a stand-in is shown; picked from the list it writes that stack; its × takes the stack away; a bare name typed into the search is still refused.
+- Also run: settings 122, rich-paste 20. Unit 1116 of 1116.
+
+## 2026-10-12 (05:30) — 0.9.4: the original paste is the font alone, the caret's colour, the font used last (not released)
+
+- tests/paste-clean.test.js (24, +7): the face kept on the words that had it; no colour, size, ground or animation; a line break outside the span; a face a line and a span a run; `<font face>`; code untouched; no font that could end a style; a box of paragraphs no longer comes out empty.
+- tests/settings.test.js (+3): the font used last — its name, its stack, kept on this computer, a damaged one read as none; the new words in three languages.
+- tests/e2e/v094.mjs (106, +9): the original paste (font kept, the note's colour and size, no ground); the caret's colour on a pale line; the last used font after a paste and after a pick, its + and its pin, hidden while searching, a font that is not on this computer.
+- Also run: rich-paste 20, settings 122, v093 138, layout 127, table 66. Failed once and passed after: v094's two toggle clicks (1 run of 4), layout's picture pulled to the left (1 run of 3).
+- Unit 1113 of 1113.
+
+## 2026-10-12 (05:05) — 0.9.4: the logo's shortcuts gone through gently (not released)
+
+- tests/app-logo.test.js (16, +1; the shortcut tests now wait): every shortcut file listed, two deep; never more than two read in one go, the process let go in between; a newer logo takes over.
+- tests/e2e/settings.mjs (122): the checks on a shortcut wait for it — it follows the window by a moment.
+- Measured by hand in the packaged test build (test-build/win-unpacked, a profile of its own, the real shortcut folders, none of whose shortcuts start that copy): a change answered in 12-15 ms, the longest wait for the main process after it about 100 ms; before, 1034 ms held in one piece.
+- e2e: settings 122/122, black-holes 69/69, v094 97/97 on this build; the other suites as they ran on the build before (the change is in the logo's shortcuts alone). Not run: smoke, old-notes, rebuild, dense, editing-edges, reported, guide.
+- Unit 1103/1103 (66 files).
+
+## 2026-10-12 (morning) — 0.9.4: themes of the logo's own (not released)
+
+- tests/logo.test.js (20, +5): logo themes — kept, each name once, never a fixed theme's or a profile's; saved again under their name; renamed; "Contrast 2" and counted on.
+- tests/app-logo.test.js (15, +3): a shortcut made on the desktop, one that is there given the logo, another program's left alone, a name a file may have.
+- tests/e2e/settings.mjs (122, +9): no "Nebula's own" outside the test build, Main lit; a ready theme put on makes no theme; a colour changed on it makes "Contrast 2" and the next change goes into the same; + with a name offered and a taken one refused; a change on a theme of one's own; a double-click renames; × asks and deletes; "Put a shortcut on the desktop"; the mark in the title strip in the app's theme; the test build's own logo first, and Main there as one to put on.
+- e2e: settings 122/122, black-holes 69/69, v094 97/97, v093 138/138, layout 127/127, note-folders 60/60, rich-paste 20/20, table 66/66, table-edges 152/152, ai-sleep 16/16. Not run: smoke, old-notes, rebuild, dense, editing-edges, reported, guide. Not tried: the packaged app against the real desktop, Start menu and taskbar — the shortcuts were a test's own, in a folder of its own.
+- Unit 1101/1101 (66 files).
+
+## 2026-10-12 (towards morning) — 0.9.4: Contrast, black holes' password, the logo's colours (not released)
+
+- tests/black-holes.test.js (40, +10): no black hole without a PIN; a passkey beside it at the start and later, either opening; none on a black hole without one; the PIN changed with the passkey kept; another computer; `prove` with the PIN, the passkey and the recovery key, open or shut, nothing changed; a wrong answer counted and waited for as at the door; deleted only with its answer, in the Trash and by the recovery key; one of the first builds taking a PIN.
+- tests/logo.test.js (15, new): Nebula's own is make-icon.ps1's palette; the drawing's geometry and colours; the edge left out under 32 px; a theme put on it, Contrast among them; the fixed themes held to tokens.css; Matcha and Contrast ready, deletable, the former name not kept twice.
+- tests/app-logo.test.js (12, new): the colours and the pictures checked; the .ico's entries; kept, replaced under another name, refused when not whole; the shortcuts that start this copy pointed at it and back, another program's left alone.
+- tests/e2e/black-holes.mjs (69, +11): the new dialog; taking a note out asks, by the menu and by dragging it among the notes; a passkey added and removed from the menu; the door waiting for a press; deleting asks, a wrong PIN deletes nothing.
+- tests/e2e/settings.mjs (113, +15): Matcha and Contrast, deleted and brought back; the logo's editor — Nebula's own, Contrast put on it, a slot's colour by code and by a ready colour, the icon file and a real shortcut following, kept across a start, back to Nebula's own.
+- e2e: settings 113/113, black-holes 69/69, v094 97/97 (+1; its three profile checks follow the ready profiles), v093 138/138, layout 127/127, note-folders 60/60, rich-paste 20/20, table 66/66, table-edges 152/152, ai-sleep 16/16. Not run: smoke, old-notes, rebuild, dense, editing-edges, reported, guide.
+- Unit 1093/1093 (66 files).
+
+## 2026-10-12 (later) — 0.9.4: the lock as a PIN with a passkey beside it; the caret under a divider (not released)
+
+- tests/app-lock.test.js (25, rewritten): a lock only with a PIN of six digits; off is not removed (the PIN, hint and recovery key kept; on again with nothing typed; Remove lock asked for its answer, on or off; by the recovery key too); a passkey beside the PIN (set only after its yes; either opens; asked only when asked for, a no not counted; gone from the computer; added later by the PIN, never by a passkey; taken away; turns off and removes as the PIN does); while the lock is shut nothing that asks no answer opens or changes it; the first test build's two shapes; the state told without the passkey lookup; the disk read once.
+- tests/settings.test.js (25): "Serif"; "Nebula’s own (Serif)"; "Nebula’s own (14)" and its translations, the 14 held to app.css; the new words; off and remove said in two words in every language.
+- tests/gap-caret.test.js (17, +9): beside a divider (under, over, a line made under the last one, a picture left alone, a card as before); the foot of a column.
+- tests/e2e/settings.mjs (98): besides what it held — the line between the bar's two columns down past the last icon; pins drawn only under the pointer; the caret on the new line under a divider, Backspace keeping the last line and offering the divider, the next one taking it, in a column and on the note; a click at the foot of a column, under a divider that ends a column and one that ends the note, on the ground beside a divider, and on the divider; three lines typed in a new note all in the chosen font, and its title; the lock set as a PIN (no PIN, no lock), turned off (the file kept, no question at the next start, no File → Lock Nebula), on again, removed; a passkey ticked beside the PIN, the lock screen waiting for a press, a no, the PIN all the same, the passkey taken away and added again, and answering for the lock.
+- e2e: settings 98/98, v094 96/96, v093 138/138, layout 127/127, black-holes 58/58, note-folders 60/60, rich-paste 20/20, table 66/66, table-edges 152/152, ai-sleep 16/16 (all but settings on the build before the last change to electron/app-lock.js, which settings and the unit tests ran after). Not run: smoke, old-notes, rebuild, dense, editing-edges, reported, guide.
+- Unit 1056/1056 (64 files).
+
+## 2026-10-12 (night) — 0.9.4: the Ideas note again — Settings, the lock on opening, font pins (not released)
+
+- tests/app-lock.test.js (16, new): no lock is no lock; a PIN of six digits and a hint that does not tell it; only hashes kept; the right PIN and no other; the wait after five wrong ones, across restarts; Lock now; not replaced without its answer; the recovery key, typed any way, takes the lock off; the passkey — set only where there is one and after its yes, a no not counted, gone from the computer; a damaged file is no lock; the state told without waiting for the passkey lookup; the disk read once however often it is asked.
+- tests/settings.test.js (22, new): the store (defaults, what is kept, a change said, a damaged one); what a new note starts with; the fonts Settings offers; pins (first in the order pinned, an added font, a font not in the list, a press and the next, kept on this computer); Settings in the menus (after Help, a title that runs, "Toggle AI panel" and "Lock Nebula" there only when they apply); the dock with the AI panel put away; every new word in Deutsch, Polski and Türkçe, the app's name never declined.
+- tests/app-menu.test.js, tests/v094.test.js: the six titles; a font row says whether it is pinned.
+- tests/e2e/settings.mjs (59, new): the bar's lines at the right and the left; the font menu showing all fifteen fonts without scrolling at each side; pins; Settings after Help and its sheet; a new note on the chosen page in the chosen font and size from its first letter, kept in its file, an older note untouched, back at Nebula's own; the AI panel put away (pad, View menu, palette) and back; the black holes put away (the open one locked first, its note out of the list and the window) and back; a PIN lock — two PINs that differ, the recovery key shown once, the profile holding no PIN, the app opened again asking before anything and the main process refusing the list, a note, a write and the black holes; a wrong PIN, the right one, File → Lock Nebula with what was typed saved first, a wrong key, the recovery key, the PIN to take it off; Türkçe; a passkey lock set, refused, answered and taken off.
+- e2e: settings 59/59 (new), v094 96/96, v093 138/138, black-holes 58/58, layout 127/127, table 66/66, table-edges 152/152, note-folders 60/60, ai-sleep 16/16, rich-paste 20/20. Not run: smoke, old-notes, rebuild, dense, editing-edges, reported, guide (it is run from smoke).
+- Unit 1036/1036 (64 files).
+
+## 2026-10-11 (night) — 0.9.4: the Ideas note, its Bug part (not released)
+
+- tests/lists.test.js (+1): the caret stays in its item when a list is lifted out of the line it fell into.
+- tests/e2e/v094.mjs (96, +9): the bar's bullets on the empty line between a divider and a picture leave the caret in the bullet; Backspace makes it a line again, the divider neither picked nor taken, the picture there; words typed after the bullets go into the bullet; on Nebula Wide a divider ends as far from the frame at the right as it begins at the left, in a note that scrolls and in one that does not; the bar's code block stands right after its inline code and the row fits the bar; an embed whose process is ended is loaded again, and that is no edit.
+- e2e: v094 96/96, table-edges 152/152, table 66/66, layout 127/127, v093 138/138, rich-paste 20/20, note-folders 60/60. Not run: smoke, old-notes, rebuild, dense, editing-edges, reported, guide.
+- Unit 998/998 (62 files).
+
+## 2026-10-11 (evening) — 0.9.4: the "urgent bugs" note, second round (not released)
+
+- tests/table.test.js (46, +1): a row is given no less than a column may be narrow (24 px), from a file too; its height told to the stylesheet where the table is drawn and never held by a note, a copy or a table drawn again; the page written out tells it as well; pulled all the way up a row is 24 px; a table that fills its place takes the room to the last pixel (the + takes none); the squares are 8 x 12.
+- tests/e2e/table-edges.mjs (152, +15): an empty row and one with a line of words pulled to 24 px, "6.4 mm", saved without `--row` and there when the note is opened again; a row with more lines pulled no lower than its words; a table of sixteen columns under a divider ends where the divider ends (within 1.5 px), its + in the margin, the page not scrolling sideways - after a column more, and after its last column is pulled out again; the squares 8 x 12, as wide as the numbers under them, the last one making a table of 8 x 12; Backspace on the empty line over a table, a video and a picture at the top of a column (the line goes, where the caret is, a step back); a column's only line and a first line with words stay; the first line of a note over each of the three; Delete over a picture leaves the picture; Delete on an empty line over a table and over a video.
+- e2e: table-edges 152/152 (+15), table 66/66, v093 138/138, v094, layout, rich-paste and note-folders without a failure (one run of table.mjs lost four pulls of the mouse while the owner was at the machine - the window lost the focus; run again alone, 66/66).
+- Unit 997/997 (+1).
+
+## 2026-10-10 (afternoon) — 0.9.4: a portable copy in Open with (not released)
+
+- tests/open-file.test.js (+3): what a portable copy writes for this user (its own names, every kind of document, nothing onto a kind of file itself, nothing of the installed app's); said once - a second start writes nothing, a copy that moved or one Windows listed without a name says it again, a failing reg.exe is "failed"; the description is the app's name alone.
+- By hand, on the build: FileDescription "Nebula Test"; the keys after one start; Windows' own list of recommended programs for .docx, .doc, .odt, .rtf holds "Nebula Test".
+- Unit 996/996.
+
+## 2026-10-10 (noon) — 0.9.4: a row's height (not released)
+
+- tests/table.test.js (45, +5): a row's height in pixels, capped, none at all; it stays with its row through rows put in and taken out (a merged cell across them too); drawn again, saved, copied and read from a file it is kept, and nothing else of a row's dress; the line pulled with the mouse (one step of history, the tip, the highest, all the way up takes it off); none in a locked note.
+- tests/e2e/table-edges.mjs (137, +6): the line under a row's number pulled — 50 px higher, "22.2 mm" beside it, the row-resize pointer; saved and there when the note is opened again; a step back and forward; a row put in above and one taken out; words that need more make the row higher and it is pulled no lower than them; no higher than 800 px.
+- Unit 993/993; table-edges 137/137, table 66/66, layout, v094.
+
+## 2026-10-10 (late night) — 0.9.4: the "Acil Buglar" note (not released)
+
+- tests/table.test.js (40, +4): a table drawn narrower where it would reach over the edge, the note and a copy keeping its own widths, wide again with room; a new table and a column more taking the room there is, never under 24 px, twenty-five columns of 24 drawn narrower still; a width read in millimetres; the size panel (squares, arrows, numbers, Enter, Escape, a second opening, a letter). The corner's click and the right-click lists follow the new behaviour.
+- tests/e2e/table-edges.mjs (131, +14): the size panel from the bar (arrows and Enter, a click on a square, Escape and a letter); twelve columns added past the page's edge — no sideways scroll, all columns alike; the window made narrower and wide again — drawn narrower, the saved note without `data-w`, then as it was; a column's line pulled shows "26.5 mm", goes down to 24 px ("6.3 mm"), and stops at the page's edge; the corner's click and right-click; a table in a column with the window made narrower; the one menu on a line, in a cell, and with cells selected (Copy copies the cells).
+- tests/e2e/table.mjs (66, +3): /table asks for the size first; the corner's click selects nothing; the right-click lists.
+- tests/e2e/v093.mjs, v094.mjs: the spelling menu and the bare menu are the one menu.
+- Unit 988/988; table-edges 131/131, table 66/66, v093 138/138, v094 87/87, layout 127/127, rich-paste 20/20, note-folders 60/60.
+
+## 2026-10-10 (night) — 0.9.4: a new table is 5×5; the table trials (not released)
+
+- tests/e2e/table-edges.mjs (117, new): what a hand does to a table that table.mjs does not, each followed by a look over every table of the note (`auditPage`). The bar's buttons with the caret in a cell and with cells selected (lists, to-do, toggle, indent, the outline menu, divider, code block, table, bold…, the four alignments); twenty things typed in a cell that mean something on a line ("# ", "- ", "[] ", "---", "```", "/", "@"…); Backspace, Delete, Ctrl+A (once, twice, three times), Shift+arrows, Home/End, three clicks; Tab, typing, Enter and Escape with cells selected; Backspace and Delete from the lines beside a table, Shift+↓ into it, a pull of the mouse into and out of it, Shift+click from outside, Ctrl+A and Delete and Ctrl+Z; a table copied with its lines and pasted in another note; cells pasted on a line; the three pastes of the right-click menu and the bar's Paste in a cell; a table from another page; merged cells with rows and columns put in and taken out through them, undone and redone; one table pulled onto another and onto itself, cells selected in two tables; a table in a toggle's body, alone in a note, in a column; a long word; 40 × 12 rows pasted and typing in them (20 letters well under 600 ms); a locked note; the saved note.
+- First run on the build before the fixes: 30 of 106 failed (Log.md, 2026-10-10 01:20). After them: 117/117.
+- tests/table.test.js (36, +8): a new table's size; 120 runs of 30 random changes with the grid checked after each; a copied table made plain; a table from elsewhere cleared; a file's widths and alignments; the alignment; Ctrl+A; Tab and the right-click with cells selected.
+- tests/e2e/table.mjs (63, +2): /table gives 5×5; two columns and two rows selected by their numbers with Shift and deleted together.
+- Unit 984/984; table-edges 117/117, table 63/63, rich-paste 20/20, layout 127/127, v093 138/138, v094 87/87.
+
+## 2026-10-09 (late night) — 0.9.4: rows and columns put in between by a right-click (not released)
+
+- tests/table.test.js (28): what a right-click offers on a cell, on a merged cell, on a row's and a column's number, and nothing on the corner or outside a table; a row put in above with the caret in the clicked cell's column; a column put in through a merged cell, which reaches over it; a row and a column deleted without a selection. The marks on the numbering and their checks are gone.
+- tests/e2e/table.mjs (61, +4 net): a real right-click in a cell shows the six choices over the pastes; Insert column left and Insert row below, the caret in the new one, the note holding plain rows and cells; a right-click on y2 and on x2 shows that row's and that column's choices alone; Delete row and Delete column; Ctrl+Z; a locked note offers none.
+- Unit 976/976; table 61/61, v093 138/138, v094 87/87.
+
+## 2026-10-09 (night) — 0.9.4: a row or a column put in between two (not released)
+
+- tests/table.test.js (28, +1): a row and a column put in between, the widths staying with their columns, a merged cell across the line reaching over the new one, past either end the first or the last; the marks drawn on the numbering; a click on one puts the row in and the caret into it.
+- tests/e2e/table.mjs (57, +5): with the pointer on x2 a + stands on the line before it, over the numbering, and not on the others; a click puts a column in between and what is typed goes into its first cell; the + before y2 puts a row in; the note holds plain rows and cells; three Ctrl+Z take back the row, the word and the column.
+- Unit 976/976; table 57/57, layout 127/127.
+
+## 2026-10-09 (evening) — 0.9.4: tables (not released)
+
+- tests/table.test.js (27, new): a new table's markup; the grid with merged cells, a block grown round them, a table cut short made whole; merge keeps what the cells held, unmerge gives the places back in the cell's colour; rows and columns added and deleted through merged cells, the widths with the columns; the fill's one direction, runs of numbers and of words ending in a number, a pattern repeated to a side and upwards; cells as rows of words, pasted rows growing the table; the numbering, grips and + drawn and not saved, drawn again the same; selected cells not saved as selected; a table from a file put right; migrate and heal leave a table alone; inserted after the caret's line or in place of an empty one; taken by its corner, a click beside it; the highlight on selected cells, the choices (merge, unmerge, + row, + column, delete table); Markdown and HTML.
+- tests/e2e/table.mjs (52, new), in the real app: /table and the bar's button; x1…/y1… over and beside the cells; Tab, Shift+Tab, Enter, the arrows across cells and out of the table, Tab making a row; the saved note holds a plain table; Ctrl+Z in a cell and the table drawn again; cells selected by a pull, the caret waiting, Merge at the lower right and the square at the lower left; the highlight on cells, on one cell with a caret, off again, and on words; merge, the saved merged cell, unmerge, undo and redo; Delete on selected cells; the square pulled down (1, 2 → 3, 4) and to a side (a copy); a column pulled wider, not under 44 px, undone; the two +; a column and a row by their numbers and deleted; Ctrl+C as rows of words, rows pasted one cell each, plain words pasted; the corner selects all, Delete table, undo; moved by its corner with the mark; a click beside it; saved and drawn again after another note; a locked note.
+- Found by the e2e and fixed: a click on the choices under a selection that reached the last row went to the line under the table (each block is a layer; the next is drawn over what reaches out of it); highlighting words in a cell cut the table (inline-family's block list had no td).
+- One run of table.mjs failed three checks at the column pull and passed when run again: the pull is let go when the window loses focus, and the computer was in use. Not a fault of the app's as far as seen; noted in case it comes again.
+- Unit 975/975; table 52/52, layout 127/127, v093 138/138, v094 87/87, note-folders 60/60, rich-paste 20/20, guide 8/8.
+
+## 2026-10-09 (later) — 0.9.4: a click where there is no line to stand on (not released)
+
+- tests/gap-caret.test.js (8, new): between two blocks that take no caret a line is made; with a line on one side the caret goes there; under the last block and over the first; beside a block, its upper half is over it and its lower half under it; pictures, dividers and lines are not answered for.
+- tests/e2e/layout.mjs (127, +11): a click between a code block and the card under it makes a line there and what is typed stands in it, Ctrl+Z takes it away; under the last card of a note; clicked again, no second line; beside a card; in a gap with a line at its side the caret is near the click; the code is still clicked as it was; a locked note gets no line.
+- Unit 948/948; layout 127/127, v093 138/138, v094 87/87, note-folders 60/60, rich-paste 20/20.
+
+## 2026-10-09 — 0.9.4: the name is never declined; cards, videos and code blocks dragged like pictures (not released)
+
+- tests/block-drag.test.js (11, new): what a press takes a block by — a card by its title line, a code block by its top line and not by its controls or its code, a video file by its picture above the strip of the player's controls (on a zoomed page too); where a gap puts it, a line to go on with at an end, nowhere where it stands already.
+- tests/guide-i18n.test.js (+2): no word that starts with "Nebul" is anything but "Nebula", in the three guides, the translated What's new and every interface string; a guide under the Polish title that declined the name is still the guide and gets this one.
+- tests/e2e/layout.mjs (116, +17): a code block held by its top line shows a flat mark and moves nothing until let go; Ctrl+Z; Esc; a pull from Copy takes nothing; a click on a card still opens its link, a pull opens nothing; a video by its picture into a column and by its title line out again, by its controls nowhere; an embedded page by its title line, still an embed; a locked note gives nothing.
+- Not tested: the pointer in /video's dialog — the tests' keys do not hide it.
+- Unit 940/940; layout 116/116, note-folders 60/60, v094 87/87, guide 8/8, rich-paste 20/20.
+
+## 2026-10-08 (noon) — 0.9.4: what the person deletes is gone; only a loss nothing in the app made is asked about (not released)
+
+- tests/note-media.test.js (47): a write through the app says what it took out and an undo takes that back; the list is kept, cleaned on reading, none for a vault never kept one, an empty one where it is there and cannot be read; however many the person took out they go at the next start from the folder and the backups, nothing held; a file nothing in the app took out stays in both and is named — even one — beside one the person did take out of the same note, asked again while unanswered, and the answer deletes that note's alone; a vault with no list sweeps as before.
+- tests/e2e/note-folders.mjs (60): five pictures taken out of a note in the app are written down as the person's and wait for the next start; at that start all five are gone and nothing is asked; the question still comes for a note whose file lost its pictures behind the app's back.
+- Unit 927/927; note-folders 60/60, black-holes 58/58, deleted 6/6, rich-paste 20/20, v094 87/87, guide 8/8.
+
+## 2026-10-08 (later) — 0.9.4: lost pictures put back into the note (not released)
+
+- tests/held-media.test.js (2, new): a picture is a picture in the text again (its address, its ratio, no wider than a pasted one), a video its player, a line to type on after them, every file named again; nothing that is no picture or video of a note, nothing of nothing.
+- tests/e2e/note-folders.mjs (58): the question's row has Put back in the note, Delete, Open the note; Put back writes both pictures into the note at its end and shows it, nothing deleted; the warning stands in the question and is said when it is done; the next start asks nothing; lost again, Delete takes them out of the folder and the backup.
+- tests/e2e/note-folders.mjs: `until` awaits its condition — given a promise it had answered "met" at once, and the checks of the question added the entry before passed without waiting. They pass now for what they say (58/58, twice).
+- Unit 925/925; note-folders 58/58, guide 8/8.
+
+## 2026-10-08 — 0.9.4: no note written without its pictures by a fault; a large loss asked about (not released)
+
+- tests/editor-guard.test.js (6, new): the files a note names; an edit is saved as ever, a picture taken out by the person among it; a note that would be written without a picture it shows is not written, stays refused, answers false, and starts afresh when opened again; a repair that keeps every file is written back; a note that did not open whole is not written back and nothing typed in it is written; a sealed video is held to as well.
+- tests/note-media.test.js (45): `looksLikeLoss` (more than three, or all of at least two; the one picture of a note is an edit); at a start such notes keep their files in the folder and the backup and are named, the others are swept, asked again while unanswered, the answer deletes one note's files and leaves the other waiting; the answer deletes only what was asked about.
+- tests/e2e/note-folders.mjs (55): a note written without both its pictures — nothing deleted at the start, the question with its row and buttons; Open the note opens it and deletes nothing; asked again at the next start; Delete takes them out of the folder and the backup.
+- tests/e2e/black-holes.mjs: the note-menu helper waits for the entry it presses.
+- Unit 923/923; note-folders 55/55, black-holes 58/58, deleted 6/6, rich-paste 20/20, layout 99/99, v094 87/87, v093 138/138, open-with 12/12, guide 8/8.
+
+## 2026-10-07 (last of the day) — 0.9.4: what a note no longer shows leaves the backups (not released)
+
+- tests/note-media.test.js (42): a video taken out of a note leaves the vault at the next start and then three copies (daily, pre-update, a person's own), the picture the note still shows stays, the copies' own words untouched, no place of the app's holds the bytes; a file the note still names stays in the backups though the vault lost it; an unreadable note is not judged; a note gone from the vault, a file that is no picture or video, no vault, no backups.
+- tests/black-holes.test.js (30): opening names the sealed video it swept; that name leaves two copies and the one a note still shows stays; no other file of a black hole can be asked out this way; nothing swept, nothing named.
+- tests/e2e/note-folders.mjs (51): a backup made while the note showed the video holds it; after the video is taken out and the app started again it has left that backup, the note's pictures still there.
+- Unit 914/914; note-folders 51/51, deleted 6/6, black-holes 58/58, guide 8/8.
+
+## 2026-10-07 (late night) — 0.9.4: a black hole goes to the Trash (not released)
+
+- tests/black-holes.test.js (30): into the Trash whole and locked (the day in hole.json, its sealed note untouched, nothing in the clear), not opened there by a right or a wrong PIN, nothing written into it, a second time changes nothing; restored as it was, hint and all, and opened again; an open passkey one is locked by going, and deleted for good from there.
+- tests/e2e/black-holes.mjs (58): the menu ends in Move to trash; an open black hole with a note goes without a question, leaves its section and the window; hole.json has the day, the note still sealed in the vault and the backup; a note's menu no longer offers it; one row in the Trash (name, "Black hole · 1 note", Restore, Delete); restored locked and opened with the very file; Delete asks once more ("Delete for good?") and nothing is gone yet; then gone from the Trash, the list, the disk and the backup.
+- Seen: the two runs started straight after the build failed ten checks from "moved in" on; three runs after that 58/58.
+- Unit 913/913; black-holes 58/58, note-folders 50/50, deleted 6/6, guide 8/8.
+
+## 2026-10-07 (night) — 0.9.4: one daily copy; a disk that cannot share a file (not released)
+
+- tests/note-media.test.js (41): with no second name to give (the link refused), a daily copy takes the picture and the video over from the copy before it — the very file, moved, the vault's own untouched; copies what that copy lacks or holds in another size, and everything when there is no copy before; where the disk shares, nothing is taken.
+- tests/e2e/note-folders.mjs (50): after the first start one dated copy, today's, and no `.making` in it.
+- Unit 911/911; note-folders 50/50, deleted 6/6, black-holes 51/51, guide 8/8.
+
+## 2026-10-07 (evening) — 0.9.4: backups kept the old way removed at the start (not released)
+
+- tests/note-media.test.js (38): the daily copies and those before an update or a repair go, a copy the new way stays with its shared picture, a second pass does nothing; nobody's to remove — a person's label, the copy put aside for the move, a copy whose only flat file is no note id, an empty copy, no backups folder; a copy the app was closed over lies under `going-`, is no copy of any kind meanwhile and is finished at the next pass; a shared picture is let go of without touching the vault's.
+- tests/e2e/note-folders.mjs (49): a daily copy and a pre-update copy written the old way are gone at the first start (nothing left on its way out); in their place today's copy the new way, the picture the vault's own file; a copy under a person's own name is left as it is.
+- tests/e2e/deleted.mjs (6): its backups are now one kept the new way and one under a person's label — a copy of the app's own kept the old way would be gone at the start.
+- Unit 908/908; note-folders 49/49, deleted 6/6, black-holes 51/51.
+
+## 2026-10-07 (last) — 0.9.4: labelled backups, the newest of each kind (not released)
+
+- tests/note-media.test.js (34): which labelled copies are not the newest of their kind (a repair's by version, 0.10.0 over 0.9.4; an update's by the time in its name; one of each kind stays; another kind of label is never pruned); the pruning itself on a folder, once, and on none.
+- Unit 904/904; note-folders 46/46, deleted 6/6, black-holes 51/51, open-with 12/12, guide 8/8.
+
+## 2026-10-07 (later) — 0.9.4: the owner's answers on the eleventh test build (not released)
+
+- tests/black-holes.test.js (28): a hint — cleaned, kept in the clear, shown for a locked black hole, changed only while open, refused when it tells the PIN, dropped by a new PIN it would tell, none for a passkey.
+- tests/note-media.test.js (33): a backup copies the notes' own files and shares pictures, videos and sealed videos (two names, one file; a note written again does not reach the backup); a video taken out of its note stays in the backups that had it; a note deleted for good leaves every place, and the last place overwrites the bytes; `missingMedia` and the copy put aside going only when nothing is missing.
+- tests/v094.test.js: four dashes (three stay dashes; a list, a heading, a column).
+- tests/e2e/black-holes.mjs (51): the hint's box and what it says; a hint that tells the PIN makes nothing; the hint under the PIN of a locked black hole and in hole.json; "Change hint" in the menu.
+- tests/e2e/note-folders.mjs (46): the copy put aside for the move is gone once the move is whole; a backup asked for shares a picture with the vault (same file, two names) and copies the note's own file.
+- tests/e2e/layout.mjs (99): three dashes, the fourth, undo, in a column.
+- Unit 903/903; layout 99/99, note-folders 46/46 (three runs), black-holes 51/51, open-with 12/12, deleted 6/6, ai-sleep 16/16, v094 87/87, v093 138/138, rich-paste 20/20, guide 8/8.
+- Not adapted and not run: smoke reads #archive-count and #trash-count, which are gone.
+
+## 2026-10-07 — 0.9.4: the owner's notes on the tenth test build (not released)
+
+- tests/black-holes.test.js (27): a PIN is six digits (four, five, seven refused); a black hole of the first build, with nothing written about its PIN's length, still opens with its four, refuses six, and is six from its next change.
+- tests/note-media.test.js (29): the note's file in the note's folder (`noteFile`, `noteIds` — folders, flat files, a name with a space; null when the folder cannot be read); `moveNotesIn` (moved once; where both are there the one written last wins); `tidyVault` on a flat vault leaves nothing flat and never sweeps a note's own file; a vault kept the new way is not taken for an empty one by the backup purge; a note read out of its own folder brings the pictures and videos lying beside it; `travelWhole` (inside the file, beside it, out of a black hole, what is not there counted) and `stageTravelled`; every kind of video file, and not .ts.
+- tests/file-video.test.js (11): every kind by its ending, the same list as the main process's; the player's bar drawn once and never saved; back, on, the speeds; a video that cannot be played says so, offers another program for a file of the note and not for a sealed one; the clock.
+- tests/layout.test.js (45): as many columns as fit (`leastShare`, the loop that cuts until none can be cut); a divider moved with a least share of its own; a column ending with a picture or a divider given a line; a 22nd column taken into the 20th.
+- tests/v094.test.js: five dashes — what counts as such a line; the fifth dash typed (a plain line, a list, a heading, a column).
+- tests/editor.test.js: /paragraph and /video in the slash filter.
+- tests/e2e/black-holes.mjs (48): six digits, the two boxes one under the other with their lines; "Passkey"; the row without a counter, the lock at its left; the section folded and unfolded.
+- tests/e2e/layout.mjs (99): the least width from the line's own width; the owner's column with a picture (a line under it, typed in; a picture pulled clear of its top goes above the line over it); four dashes and the fifth, undo, in a column; a fifth column; /paragraph.
+- tests/e2e/note-folders.mjs (45): no note file lies flat after a start, the vault says format 3; the player's bar and its buttons, nothing of it stored; an undo step keeps the same player; /video with a Matroska file (it plays) and with an AVI (tests/fixtures/clip.avi: "cannot be played here", "Open in another program"); exported as a Nebula note the videos lie in "<name> videos" beside the file, and imported again they are the new note's own.
+- tests/e2e/ai-sleep.mjs (16), v093.mjs (138): tabs told they may sleep; a tab's menu offers "Let it sleep when unused" first.
+- By hand: the passkey question asked for a window of its own — the system's dialog was the foreground window 250 ms later (a three-second probe, closed by itself). The test vault copied to a throwaway profile: five notes into five folders, the old black holes asking for four digits; the copy removed.
+- The first e2e run after a build is slower and may fail on drags; run again before believing a failure. Foreground `sleep` is not run by the shell these commands go through.
+- Unit 898/898; layout 99/99, note-folders 45/45, black-holes 48/48, open-with 12/12, deleted 6/6, ai-sleep 16/16, v094 87/87, v093 138/138, rich-paste 20/20, guide 8/8. Not adapted to notes in folders yet, and not run: smoke, old-notes, rebuild, dense, recovery, ideas-note, reported, canvas, editing-edges (they read `notes/<id>.json` from the disk).
+
+## 2026-10-06 (after part 9) — 0.9.4: what was left undone (not released)
+
+- tests/note-media.test.js (23): a note written for travel (pictures and videos in, a budget for videos, what is left out counted); videos staged from a note file into `incoming-…` and named by their address; the folder cleared at start.
+- tests/layout.test.js (44, was 26): where the dividers of a block stand and places that cannot be right (`splitsOf`, `cleanSplits`); a column cut in two where the pointer is, the wider part keeping what it held; four at most and none too narrow; the divider dragged out of a column leaving a line; one upright divider moved between its neighbours; the two columns at its sides joined; three and four columns healed, a fifth taken in; saving, migration and healing leave them alone. Columns in Word, OpenDocument and Rich Text (grid widths, three cells, the rule, every cell and the document ending in a paragraph, well-formed XML, balanced braces) and flat for Evernote. A picture's side read and written by all three, its caption with it; a row on one line, each no wider than its share. A picture in a line of words: into the line before it, an empty line's place, the line after, a line of its own; moved to a caret; no side, row or neighbour; out again; a picture of its line in every format.
+- tests/rich-paste.test.js: the bar's places now name "inword".
+- tests/e2e/layout.mjs (89, was 59): a divider in a column pulled sideways — mark, tint, Esc, three columns, each divider at its place, the caret in the new one; a fourth from a divider of the note; one divider moved alone and stopped by its neighbour; one taken away; undo; saved and opened again. A picture into a line of words from its bar; dragged to a caret in another line (mark, Esc, let go); resized; Enter and typing on; out by "in the middle" and in again; Delete and undo; saved inside its paragraph and opened again.
+- tests/e2e/note-folders.mjs (33): the window shows pictures from their files and the stored note names them; copy, crop, export and undo with the picture's file.
+- By hand: the three documents opened in LibreOffice (converted to PDF, a throwaway profile, files deleted). Not in Word: its automation would not start here.
+- Unit 884/884, layout 89/89, note-folders 33/33, black-holes 45/45, open-with 12/12, ai-sleep 16/16, v094 87/87, v093 138/138, rich-paste 20/20, guide 8/8, deleted 6/6. No full smoke, rebuild or old-notes yet.
+- Seen once: layout (12 checks) and note-folders (4) failed in a run started straight after a build, and passed alone before and after. Not found; if it comes back, the first place to look is the second drag after an Esc in the columns checks.
+
+## 2026-10-07 — 0.9.4, part 9: Open with Nebula; videos in black holes (not released)
+
+- tests/open-file.test.js (11, new, node): the files among a command line's arguments (the installed app, a development run, switches, several, relative ones, kinds Nebula does not read); a file read for the window (text, bytes for Word, a vault note with its folder beside it, what is not there); what the installers are told (Windows: offered for each kind with the violet icon and nothing that writes a kind's default, the script ASCII; macOS: Alternate); the icon in every form.
+- tests/e2e/open-with.mjs (12, new, in smoke): started with a .docx — a new note, open, named after the file, its words and bold, the other notes there, a .pdf making none, the file as it was, saved in the vault; a second copy started with an .rtf — the note arrives in the running app, the second copy goes away, the Rich Text as written; a second copy with no file; nothing opened twice at the next start.
+- tests/black-holes.test.js (26): a video sealed in pieces beside its note (nothing readable, the source untouched); the parts a player asks for (start, across two pieces, end, all, past the end); locked or a swapped piece refused; out whole with its note, gone with its note; swept at the next opening unless a note could not be read; only a video under a video's name; out of the backups with its note.
+- tests/file-video.test.js (7): the address of a sealed video; the videos a note names, plain and sealed.
+- tests/e2e/black-holes.mjs (45): a video dropped on a note in a black hole sealed and played; nothing of it in the clear; there and playing after a lock; taken out with its note as a plain file (the same bytes) and played; moved in again sealed; gone with its note from the black hole and the backup.
+- Unit 861/861, open-with 12/12, black-holes 45/45, note-folders 28/28, v094 87/87, layout 59/59, ai-sleep 16/16, v093 138/138, guide 8/8, deleted 6/6. No full smoke, rebuild or old-notes yet.
+
+## 2026-10-06 — 0.9.4, part 8: black holes (not released)
+
+- tests/black-holes.test.js (19, new, node, real temp folders; safeStorage and Hello played by the test): made with a name and four digits, a recovery key shown once, neither PIN nor key on the disk; a note sealed whole (no title, word or picture readable), back exactly with the right PIN, sealed afresh at every save, refused in another place, gone for good when deleted; wrong PINs counted, the waits after five and across a restart; the PIN changed; off this computer the PIN does not open it, the recovery key does with a new PIN; the PIN alone where the system keeps no key; Hello — made and opened only after a yes, no PIN, another computer, unavailable; the Hello script's answers; names; locking lets go of the key; backups purged of a note and of a black hole.
+- tests/black-holes-store.test.js (13, new): hole notes not in the list, the search or the next note; made in, moved in and out, in no folder there; leaving the store at a lock; the mirror sealing instead of writing, sealing before deleting the plain file and keeping it when sealing fails, the other way round on the way out, not rewriting an opened black hole, deleting nothing at a lock, deleting from the black hole; a move cut short finished at the next open; a file in the notes folder a plain note; the words of a refusal.
+- tests/e2e/black-holes.mjs (38, new, in smoke; NEBULA_HELLO=ok): the button beside New folder; the dialog (digits only, two PINs that differ); the recovery key once, Escape not putting it away; the folder on the disk with its key wrapped by PIN and system; a note written in it sealed and readable nowhere in the vault or the backups; a plain note with a picture moved in — gone in the clear from the vault, its folder and every backup, its picture nowhere as a picture; Lock (none of its notes on the page); a wrong PIN and the tries left; the fourth digit opening it; the notes read as written, the picture from inside the seal; locked after a restart, the same PIN; taken out again; a wrong recovery key, the right one with a new PIN, the old PIN no key; the menu; Windows Hello (no PIN fields, key the system's, opened by a yes); a note deleted from the Trash and a black hole deleted gone from the disk and the backup; locking itself when untouched.
+- Unit 843/843, black-holes 38/38, note-folders 28/28, v094 87/87, layout 59/59, ai-sleep 16/16, v093 138/138, guide 8/8, deleted 6/6. No full smoke, rebuild or old-notes yet.
+
+## 2026-10-06 — 0.9.4, part 7: a folder for each note (not released)
+
+- tests/note-media.test.js (18, new, node, real temp folders): a picture out of the text as a file named by what it is, once, and back exactly as it was; a note without pictures, a tiny picture and a made-up id left alone; a missing file's name kept; a picture's file gone at the save that takes it out, a video's only at a start; an empty folder removed, a deleted note's folder whole, an unknown file left; a note naming another note's file given its own copy; a start writing old notes the new way once and sweeping videos nobody shows, an unreadable note keeping everything; a video copied in under its own name, only a video, only into a note; the address of a note's file and nothing outside the vault; mime and byte ranges; backups purged of a deleted note's folder.
+- tests/file-video.test.js (7, new): a video file by its ending; shown only from a note's own folder; the card (player, name, ×); an address that is not a note's file never played; a line with its name in Markdown, the Word blocks, HTML and both video modes; untouched by the repair of old notes.
+- tests/e2e/note-folders.mjs (28, new, in smoke): a vault written the old way at its first start (the picture a file byte for byte, the note's file small, a plain note untouched, the vault put aside first, schemaVersion 2); the picture shown as before; typing saved without the picture's file written again; a picture pasted, taken out (file gone), Ctrl+Z (file back); a video file dropped — after its line, under its name, its copy the same bytes, played and sought from the folder, the note's file naming it; taken out (file stays), Ctrl+Z (plays), taken out again; the next start (the video's file gone, the pictures there, nothing rewritten); a note deleted from the Trash and its folder gone from the vault and from every backup, the others whole.
+- tests/e2e/deleted.mjs 6/6 with the folders in the purge.
+- Unit 811/811, note-folders 28/28, v094 87/87, layout 59/59, ai-sleep 16/16, v093 138/138, guide 8/8. No full smoke, rebuild or old-notes yet.
+
+## 2026-10-06 — 0.9.4, pictures again, part 6: sleeping AI tabs (not released)
+
+- tests/ai-sleep.test.js (12, new): an address that says temporary or incognito; one that names a saved chat (uuid, long id) and ones that do not; what a reload could lose (a temporary chat, what was typed with no saved chat named, words after the last Enter, sound, loading) and what it cannot; twenty minutes, never the tab on screen or one kept awake; the stored minutes, 0 for never.
+- tests/e2e/ai-sleep.mjs (16, new, in smoke): three local pages as tabs, the time four seconds — the unseen tab's page gone and its tab pale, the one on screen awake, one typed in awake with its words, a saved chat's address asleep, waking on the address it slept on, words after Enter keeping it awake, a temporary chat never asleep, the menu's Keep awake / Let it sleep / Put to sleep, the panel closed, the panel opened waking only the tab it shows, 0 minutes.
+- tests/layout.test.js (26): each picture of a row knows how many share the line, counted again where the count is missing.
+- tests/e2e/layout.mjs (59): a picture growing by as much as its corner is pulled, one in the middle to both sides, smaller the same way; a third picture beside two on one line, in a 700px window too; a pull past its share storing no more than is drawn, the next pull inward working from its first pixel; "beside" taking the third out and back.
+- tests/e2e/v094.mjs (87): the served page has nothing but the version beside the languages. tests/e2e/v093.mjs: the tab menu with Keep awake.
+- Unit 786/786, ai-sleep 16/16, layout 59/59, v094 87/87, v093 138/138, guide 8/8. No full smoke, rebuild or old-notes yet.
+
+## 2026-10-05 — 0.9.4, part 5: pictures on their line, columns (not released)
+
+- tests/layout.test.js (25, new): a picture's place (left by default, centre, right, only in the text), beside another before or after, leaving a row for a line under it, a row of one tidied; a split a whole share between 20 and 80, sticky at 50/33/67; the part a divider splits (to the divider above, below with the pointer lower, from the block under the pointer, the other side when its own is empty, stopping at columns); splitting (two columns, the divider upright, the wider side for what was there, the trailing empty line left under them, nothing to split), unsplitting back to the same markup; columns put right (well-made ones untouched, an emptied column, a lost column, words between the columns, a split out of range, nesting), untouched by the migration and safe for the vault heal, saved without the pick; Markdown and the Word blocks as one flow with a rule between.
+- tests/e2e/layout.mjs (51, new, in smoke): the bar's place group and its lit button; middle and right by the buttons; the snap while dragging sideways; Ctrl+Z; the upright mark beside another picture with nothing moved while held; the row, the bar's "beside", the words under the taller picture; a 700px window (side by side, inside the page, smaller); swapped by a drop on the other side; out of the row by the button and by a drag to a gap (flat mark as wide as the page); Esc; a floated picture leaving no row. A divider pulled up (flat mark, moves, Ctrl+Z); pulled sideways (upright mark in the middle from the divider above, the tint, nothing changed, Esc); let go (two columns, the divider upright and as tall as the columns, the picture inside its column, the caret in the empty one); typing, Enter and a list from the slash menu staying in their column; Backspace at a column's start and Delete at its end; a picture pasted in a column, a picture dragged into the other column; a selection across both columns deleted leaving whole columns or none, Ctrl+Z; the upright divider dragged to 30 % and stopped at 20 %, picked by a click, Delete unsplitting left-then-right, Ctrl+Z; the stored note (data-split, hr.blk-vr, nothing armed); opened again; the split starting at the block under the pointer and the wider side keeping the words; the part under a divider.
+- tests/rich-paste.test.js: the bar's ten buttons, the place group hidden for a floating picture, "beside" disabled with no picture before.
+- tests/seed-guide.test.js: the three new phrases.
+- Unit 773/773, layout 51/51, v094 86/86, v093 138/138, guide 8/8. No full smoke, rebuild or old-notes yet.
+
+## 2026-10-05 — 0.9.4, a theme of one's own (not released)
+
+- tests/theme-custom.test.js (15, new): a colour read however it is written; mixing, luminance and contrast as WCAG has them; the five picks, Matcha where one is missing; the tokens made from them, readable words on any accent, light ground from dark, words that cannot be read; profiles saved by name and again under the same name, a name needed and Matcha's refused, broken ones dropped, a profile known by its colours; four fixed themes; the picks worn as inline tokens over main or light and taken off by a fixed theme; a test build's "matcha" comes back as the custom theme.
+- tests/e2e/v094.mjs (86): four themes and the palette button at their right; the editor over Archive and Trash in its order (name and Save, profiles, five slots, bar, 28 colours), opening it changing nothing; Matcha worn at a press (#1A2420, #F1F6EE, #A6E3A1, contrast over 10 and 4.5); a ready colour on Accent and a typed code on Background changing the app at once; a pale ground on the light theme and the hard-to-read warning; no save without a name or under Matcha's; a saved profile beside Matcha, each a press away; delete asks first; a fixed theme leaving no picked token on the page; "Last edited"; Archive and the editor putting each other away.
+- tests/seed-guide.test.js: "Four themes", "Save this profile", Matcha. tests/e2e/smoke.mjs: four themes in the picker again.
+- Unit 748/748, v094 86/86, v093 138/138, guide 8/8. No full smoke, rebuild or old-notes yet.
+
+## 2026-10-05 — 0.9.4, labels again, fonts and Matcha (not released)
+
+- tests/paste-clean.test.js (17): a chosen font and size stay in a copy from a note, the app's own go, a heading's size and inline code's look are not frozen; pasted lines in the note's writing font (blocks, a heading's face only, loose words only on an empty line, a font that came along wins inside, code left alone).
+- tests/v094.test.js (20): a font name that cannot end a CSS value; the font menu's rows — the app's, the added, this computer's — narrowed by the search, and the name "Add" would add.
+- tests/e2e/v094.mjs (73): #abc shortened and written out again is #ace, a space ends it; the label bar's "1 of 2", ↓ to the next place in view and round again, ✕; Matcha in the middle of the row, all five names fitting, deep green ink with readable contrast on text and buttons; a Nebula copy keeps Consolas and drops the frozen colour; outside words in a Consolas note are Consolas, bold and list kept; the font search; "+ Add a font" lists this computer's fonts and a picked one joins the list with its ×.
+- tests/e2e/smoke.mjs: five themes in the picker.
+- Unit 733/733, v094 73/73. No full smoke, rebuild or old-notes yet.
+
+## 2026-10-04 — 0.9.4, the guide in four languages, privacy, AI session data, labels (not released)
+
+- tests/guide-i18n.test.js (11): each translation has an entry for every block, the same kind of block with the same elements inside in the same order; the translated page keeps the code samples, dividers and stage, and its signature is on record; a translation a block short is not used; the guide's four titles; the vault's guide switches language and back without being dated, a guide somebody wrote in and a note that only shares the title stay; Help → Guide page once, in the app's language; What's new translated item for item, English when there is none.
+- tests/v094.test.js (18): `#` and the start of a label open the list, "#1" and "C#" do not; labels that begin with the query first; a chip's label follows its word, a chip without its # is words; the chips of a picked label found whatever their case.
+- tests/seed-guide.test.js, tests/e2e/guide.mjs: Your privacy is section 9, the last two are 10 and 11.
+- tests/e2e/v094.mjs (60): the label list on `#`, narrowed, Tab picks, Enter makes the label as typed, an edited chip's label, the old word gone from Filter by label, the picked label painted and in view in a note opened from the list, a title's label ringed, the paint off with the filter; Deutsch turns the open guide German (title, page, shapes, locked, 16 code samples), Türkçe with another note open, a guide written in stays; an AI tab's Clear session data above Delete website, both ask, Cancel, a cookie really gone, the tab deleted once confirmed.
+- tests/e2e/v093.mjs: the AI tab menu's items and the two-step delete.
+- Unit 723/723, v094 60/60, v093 138/138, guide 8/8. No full smoke, rebuild or old-notes yet.
+
+## 2026-10-04 — 0.9.4, part 2 of the Ideas note: toggles (not released)
+
+- tests/v094.test.js (13): a heading that folds from the slash menu and from a heading line, "/h1" and "/toggle" still finding the plain ones first; a list item toggled in its list with its sub-list as the body; a toggle taken away without losing a word (in an item, and a heading); the list rules leaving a toggle's lines alone.
+- tests/e2e/v094.mjs (41): with only a caret Ctrl + grows the line and not the list; one menu over selected words (its row, its items, Bold, Copy, the words still selected); "+ Add a note" above the notes of a full folder; a click before a title's first letter, the arrow still folding; Enter at a title's start = a line above, after an embed; Ctrl+B then typing in a Consolas note; the toggle button on a heading; "/toggle-h1" with its arrow at the line's middle; a numbered item toggled, written under, left by Enter to the next item, and un-toggled by Backspace — one list throughout.
+- tests/v093.test.js, tests/editor.test.js: the list-item toggle and the "/head" filter updated to the new behaviour. tests/e2e/smoke.mjs: 19 rows in the Blocks sheet.
+- Unit 705/705, v094 41/41, v093 138/138. No full smoke, rebuild or old-notes yet.
+
+## 2026-10-04 — 0.9.4, part 1 of the Ideas note (not released)
+
+- tests/v094.test.js (9): `-->` / `<--` to arrows and nothing else; English spelling as en-US and en-GB together, one language for the others; the ignored words leave the dictionary again; a theme ink frozen into words goes and a source's own colour, a chosen font and a shape's style stay; after a paste only what the paste made is undressed; the View zoom items carry no key.
+- tests/heal.test.js: a new exhibit — the theme's ink frozen by a paste.
+- tests/e2e/v094.mjs (23, in smoke): What's new inside the window and scrolling; the line beside the pad; arrows typed and undone; Ctrl + / Ctrl − on selected words; a real right-click offers the three pastes and each does what it says (only text, Nebula format with no frozen colour, original format with the source's font); the bar's Paste button; the page stays put after "Paste as"; "+ Add a note" in an empty folder; the note menu on a right-click, on the folded rail too, and its commands act on that note.
+- Unit 701/701. No smoke, rebuild or old-notes yet (the owner tests the build first).
+
 ## 2026-10-04 — 0.9.3, twenty-eighth round
 
 - tests/export-video.test.js (12): without = a bookmark card; offline = the bookmark; a bookmark in .docx/.odt/.rtf/.enex/.html as its boxed card.

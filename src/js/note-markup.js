@@ -24,10 +24,22 @@ const CLASS_STATE = [
   ['.arrow-target', 'arrow-target'],
   ['hr.armed', 'armed'],
   ['.note-mention.is-missing', 'is-missing'],
+  // A video the player could not play, found out on this screen (file-video.js).
+  ['.link-file.cannot-play', 'cannot-play'],
+  // Cells selected, stood in, or about to be filled (table.js).
+  ['.blk-table td.sel', 'sel'],
+  ['.blk-table td.act', 'act'],
+  ['.blk-table td.fill', 'fill'],
 ];
 
-/** Elements that exist only while something is being done: the angle readout. */
-const TRANSIENT_NODES = '.shape-angle';
+/**
+ * Elements that exist only while something is being done or shown: the angle
+ * readout, and the bar under a video's player (0.9.4, file-video.js) — drawn
+ * whenever a note is shown, with the player's clock in it — and what is drawn
+ * round a table (table.js): its numbering, grips, the two +, the fill square
+ * and the choices for the selected cells.
+ */
+const TRANSIENT_NODES = '.shape-angle, .video-bar, .tbl-ui';
 // (The crop frame and an embed's grip: the frame is on the page, not in the
 // note; the grip is in the note, rebuilt on load like a shape's handles.)
 
@@ -38,7 +50,19 @@ const TRANSIENT_NODES = '.shape-angle';
  */
 const EDITABLE_SHAPE_TEXT = '.shape-text:not([contenteditable="false"])';
 
-const ANY_TRANSIENT = [...CLASS_STATE.map(([where]) => where), TRANSIENT_NODES, EDITABLE_SHAPE_TEXT].join(', ');
+/**
+ * A table's column drawn narrower than it is, so that the table stays on its
+ * page (table.js fitTable): the note holds the column's own width.
+ */
+const FITTED_COL = '.blk-table col[data-w]';
+
+/**
+ * A table's row with its height told to the stylesheet (table-grid.js
+ * tellHeight): the note holds the height alone.
+ */
+const TOLD_ROW = '.blk-table tr[style*="--row"]';
+
+const ANY_TRANSIENT = [...CLASS_STATE.map(([where]) => where), TRANSIENT_NODES, EDITABLE_SHAPE_TEXT, FITTED_COL, TOLD_ROW].join(', ');
 
 export function hasTransient(root) {
   return !!root?.querySelector(ANY_TRANSIENT);
@@ -63,6 +87,17 @@ export function stripTransient(root) {
   for (const el of root.querySelectorAll(TRANSIENT_NODES)) { el.remove(); touched += 1; }
   for (const el of root.querySelectorAll(EDITABLE_SHAPE_TEXT)) {
     el.setAttribute('contenteditable', 'false');
+    touched += 1;
+  }
+  for (const col of root.querySelectorAll(FITTED_COL)) {
+    const w = Number.parseFloat(col.dataset.w);
+    if (w > 0) col.style.width = `${w}px`;
+    col.removeAttribute('data-w');
+    touched += 1;
+  }
+  for (const tr of root.querySelectorAll(TOLD_ROW)) {
+    tr.style.removeProperty('--row');
+    if (!tr.getAttribute('style')) tr.removeAttribute('style');
     touched += 1;
   }
   return touched;

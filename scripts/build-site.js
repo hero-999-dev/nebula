@@ -55,7 +55,7 @@ const tabs = [];
 const overview = `
 <div class="hero">
   <h1>Nebula <span class="ver">v${esc(pkg.version)}</span></h1>
-  <p class="lede">${esc(pkg.description.replace(/^Nebula — /, ''))}</p>
+  <p class="lede">${esc(pkg.tagline)}</p>
   <p class="links">
     <a class="cta" href="https://github.com/hero-999-dev/nebula/releases/latest">Download</a>
     <a href="https://github.com/hero-999-dev/nebula">Source</a>

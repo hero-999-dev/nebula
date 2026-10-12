@@ -1,11 +1,13 @@
 import { initDiskStorage, flushDisk, getDiskStatus } from './disk-store.js';
 import { NoteStore, plainSnippet, relativeTime } from './notes.js';
-import { GUIDE_NOTE, GUIDE_VERSION, addGuide, guideUnedited } from './seed-notes.js';
+import { GUIDE_NOTE, GUIDE_VERSION, addGuide, guideUnedited, guideFor, syncGuideLanguage } from './seed-notes.js';
+import { guideTitles } from './guide-i18n.js';
 import { migrateNote, MARKUP_VERSION } from './migrate.js';
 import { healVault } from './heal.js';
 import { initWhatsNew } from './whats-new.js';
 import { bindEditor } from './editor.js';
-import { initTheme } from './theme.js';
+import { initTheme, wearStoredTheme } from './theme.js';
+import { initThemeEditor } from './theme-editor.js';
 import { on } from './bus.js';
 import { initDock } from './dock.js';
 import { initToolbar } from './toolbar.js';
@@ -24,11 +26,18 @@ import { initFind } from './find.js';
 import { initHistory } from './history.js';
 import { initRichPaste } from './rich-paste.js';
 import { initLabels } from './labels.js';
-import { initLabelFilter } from './label-filter.js';
+import { initLabelFilter, initLabelHits } from './label-filter.js';
 import { initDividerSelect } from './dividers.js';
-import { initI18n, initLanguagePicker, t } from './i18n.js';
+import { initColumns } from './columns.js';
+import { initBlockDrag } from './block-drag.js';
+import { initGapCaret } from './gap-caret.js';
+import { initTables } from './table.js';
+import { initBlackHoles } from './black-holes.js';
+import { askAboutHeldMedia } from './held-media.js';
+import { initI18n, initLanguagePicker, t, getLang } from './i18n.js';
 import { initContextMenu } from './context-menu.js';
 import { initToggles } from './toggles.js';
+import { initAutoArrows } from './auto-arrows.js';
 import { initMentions, refreshMentions, removeTagChips } from './mentions.js';
 import { initNoteActions } from './note-actions.js';
 import { FolderStore } from './folders.js';
@@ -39,6 +48,9 @@ import { initZoomControl, setRealScale, normalizeZoom, FIT, DEFAULT_ZOOM } from 
 import { initNoteList } from './note-list.js';
 import { initAppMenu } from './app-menu.js';
 import { initPalette, initShortcuts, initBlocks } from './palette.js';
+import { newNoteDefaults, readSettings } from './settings.js';
+import { initSettingsPanel } from './settings-panel.js';
+import { appLockGate, appLockIsOn } from './app-lock.js';
 
 const $ = (id) => document.getElementById(id);
 const AUTOSAVE_MS = 400;
@@ -61,13 +73,22 @@ function showStorageError(message) {
 }
 
 async function boot() {
+  // Where the editing bar stands, before the vault is read: reading it takes a
+  // moment, and until then the bar and the page stood side by side — "while the
+  // app loads it looks like this, then it joins into one page" (the owner, 0.9.4).
+  initDock();
+  injectIcons();
+  // The interface in the chosen language (i18n.js): translated as it reaches the page.
+  initI18n();
+  // The lock on opening (0.9.4, app-lock.js): where one is set, nothing is read
+  // and nothing is started until it has been answered — in the theme and the
+  // language of the app, which is why those two come first.
+  wearStoredTheme();
+  const gate = await appLockGate();
   const disk = await initDiskStorage();
   if (!disk.bridge) $('demo-banner').hidden = false;
   else if (!disk.ok) showStorageError(disk.error);
 
-  injectIcons();
-  // The interface in the chosen language (i18n.js): translated as it reaches the page.
-  initI18n();
   initLanguagePicker();
   initDialog();
 
@@ -83,9 +104,13 @@ async function boot() {
   const folders = await FolderStore.load();
   // When the guide is genuinely new to this vault, open it — otherwise the one
   // note the user was told to look at is the one they never see.
-  if (disk.ok && store.ensureGuide(GUIDE_NOTE, GUIDE_VERSION, { unedited: guideUnedited })) {
+  // The guide is in the language of the app (0.9.4, guide-i18n.js).
+  if (disk.ok && store.ensureGuide(guideFor(getLang()), GUIDE_VERSION, { unedited: guideUnedited, titles: guideTitles(GUIDE_NOTE) })) {
     store.setActive(store.notes[0].id);
   }
+  // A guide nobody wrote in follows the language — one seeded in English, or
+  // left in another language by an earlier choice.
+  if (disk.ok) syncGuideLanguage(store, getLang());
   const titleEl = $('title');
   const saveEl = $('savestate');
   const listEl = $('note-list');
@@ -182,7 +207,13 @@ async function boot() {
     if (ro) { shapes?.reset(); richPaste?.reset(); }
   }
   readonlyChip?.addEventListener('click', () => { if (store.activeId) store.setReadOnly(store.activeId, false); });
-  on('note-changed', ({ id } = {}) => { if (id === store.activeId) applyReadOnly(); });
+  // The title is written in the note's own writing font (0.9.4) — "I changed
+  // the main font in Settings and the title is still in the serif" (the owner).
+  // Only on screen: it is the note's name, in the list and in a file as before.
+  function paintTitleFont() {
+    titleEl.style.fontFamily = store.active()?.font?.family ?? '';
+  }
+  on('note-changed', ({ id } = {}) => { if (id === store.activeId) { applyReadOnly(); paintTitleFont(); } });
   const READING_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown', 'Escape', 'Shift', 'Control', 'Alt', 'Meta', 'F12']);
   const stop = (e) => { e.preventDefault(); e.stopImmediatePropagation(); };
   editorEl.addEventListener('beforeinput', (e) => { if (isReadOnly()) stop(e); }, true);
@@ -212,10 +243,12 @@ async function boot() {
     setSaveState('saved');
   }
 
-  initDock();
   // The app's own undo stack. Everything that edits the note by script
   // announces itself to this first; Chromium's stack cannot see any of it.
   let richPaste = null;
+  let columns = null;
+  let tables = null;
+  let toggles = null;
   const history = initHistory(editorEl, {
     // Only view: the menu's Undo/Redo must not change a locked note either.
     isLocked: isReadOnly,
@@ -226,7 +259,10 @@ async function boot() {
       paintAllEquations(editorEl);
       shapes?.reset();
       richPaste?.reset();
+      toggles?.heal();
       richPaste?.refresh();
+      columns?.refresh();
+      tables?.refresh();
       arrows?.reflow();
       editor.flush();
       renderList();
@@ -270,6 +306,12 @@ async function boot() {
   });
   richPaste = initRichPaste(editorEl, {
     history,
+    // Pasted lines are written in the note's writing font, as typed ones are (0.9.4).
+    noteFont: () => store.active()?.font ?? null,
+    // A dropped video is copied into the open note's own folder (0.9.4).
+    noteId: () => store.active()?.id ?? null,
+    // A video dropped on a note in a black hole is sealed there.
+    noteHole: () => store.active()?.hole ?? null,
     onGeometry: () => arrows?.reflow(),
     // A page title that arrived is a repair: stored without dating the note,
     // unless there is unsaved typing, whose save carries it anyway.
@@ -281,7 +323,16 @@ async function boot() {
   });
   initSlashMenu(editorEl, { history, shapes, links: richPaste });
   initDividerSelect(editorEl, { history, isLocked: isReadOnly });
-  initToggles(editorEl, { history, isLocked: isReadOnly });
+  // A divider pulled sideways splits the page into two columns (0.9.4).
+  columns = initColumns(editorEl, { history, isLocked: isReadOnly, onGeometry: () => arrows?.reflow() });
+  // A card, a video or a code block is moved as a picture is (0.9.4).
+  initBlockDrag(editorEl, { history, isLocked: isReadOnly, onGeometry: () => arrows?.reflow() });
+  // A click between, under or beside blocks that take no caret finds a line, or makes one (0.9.4).
+  initGapCaret(editorEl, { history, isLocked: isReadOnly, onGeometry: () => arrows?.reflow() });
+  // A table: cells to write in, colour, merge and fill; its numbering and grips are drawn here (0.9.4).
+  tables = initTables(editorEl, { history, isLocked: isReadOnly, onGeometry: () => arrows?.reflow() });
+  toggles = initToggles(editorEl, { history, isLocked: isReadOnly });
+  initAutoArrows(editorEl, { history, isLocked: isReadOnly });
   initMentions(editorEl, {
     store,
     history,
@@ -292,7 +343,11 @@ async function boot() {
   initContextMenu(editorEl, {
     history,
     images: richPaste,
+    // In a table: rows and columns put in beside the clicked cell (0.9.4).
+    tables,
     miniBarAt: (x, y) => toolbar?.miniBarAt?.(x, y),
+    // Over selected words the bar's buttons are the menu's first row (0.9.4).
+    format: { bar: $('mini-bar'), run: (act) => toolbar?.actions?.[act]?.() },
     isLocked: isReadOnly,
   });
   initCodeBlocks(editorEl, { history });
@@ -302,9 +357,28 @@ async function boot() {
     store,
     button: $('label-filter-btn'),
     panel: $('label-filter'),
-    onChange: () => renderList(),
+    onChange: () => { renderList(); showLabelHits(); },
     onDelete: (label) => deleteLabelEverywhere(label),
   });
+
+  /**
+   * With a label picked in "Filter by label", the open note shows where that
+   * label is: its #chips in the text are painted, and the label by the title
+   * is ringed (0.9.4). `scroll` brings the first one into view — when a note
+   * is opened from the filtered list.
+   */
+  const labelHits = initLabelHits(editorEl, { frame: $('editor-frame') });
+  function showLabelHits({ scroll = false } = {}) {
+    const label = labelFilter?.active()?.label ?? null;
+    // The bar steps from one place to the next when there are several.
+    labelHits.show(label, { opened: scroll });
+    const want = label ? `#${label}`.toLocaleLowerCase() : null;
+    for (const chip of document.querySelectorAll('#note-labels .note-label')) {
+      chip.classList.toggle('hit', !!want && chip.textContent.toLocaleLowerCase() === want);
+    }
+  }
+  // After the header's labels have been drawn again (labels.js listens too).
+  on('note-changed', () => { void Promise.resolve().then(() => showLabelHits()); });
 
   /** One note's row in the list: the row itself, and its ⋯ beside it. */
   function noteItem(note) {
@@ -312,6 +386,7 @@ async function boot() {
     // button inside a button is invalid and never receives the click.
     const item = document.createElement('div');
     item.className = 'note-item';
+    item.dataset.id = note.id;      // a right-click on the row finds its note (note-list.js)
 
     const row = document.createElement('button');
     row.type = 'button';
@@ -342,6 +417,8 @@ async function boot() {
   }
 
   let noteList = null;
+  // Black holes (0.9.4): notes kept encrypted, drawn under the notes.
+  let blackHoles = null;
   let pageModes = null;
   let zoomControl = null;
   const defaultZoom = () => (opensFitted(store.active()?.page ?? 'nw') ? FIT : DEFAULT_ZOOM);
@@ -354,7 +431,7 @@ async function boot() {
     listEl.classList.toggle('filtered', filtering);
     // Unfiltered, the list is drawn with its folders, and notes can be dragged
     // about in it (note-list.js). A filter shows one flat list of what matches.
-    const drawn = !filtering && noteList ? noteList.render(notes) : 0;
+    const drawn = (!filtering && noteList ? noteList.render(notes) : 0) + (!filtering && blackHoles ? blackHoles.render() : 0);
     if (!notes.length && !drawn) {
       // NOT an early return: the archive and trash counts have to be redrawn
       // too, and trashing the last note is exactly when they change. Returning
@@ -378,6 +455,7 @@ async function boot() {
     titleNoteId = note?.id ?? null;
     titleEl.value = note?.title ?? '';
     titleEl.disabled = !note;
+    paintTitleFont();
     zoomControl?.paint();        // how close the page is, and with it the page width measured at that zoom
     editor.load(note);
     // Before anything reads the markup: bring what the note SAVED up to what
@@ -393,7 +471,10 @@ async function boot() {
     paintAllEquations(editorEl);
     shapes?.reset();
     richPaste?.reset();
+    toggles?.heal();
     richPaste?.refresh();
+    columns?.refresh();
+    tables?.refresh();
     arrows?.reflow();
     // What the note became on the way in IS the note now: written back at once
     // as a repair, not an edit, so a fix reaches this note even if nobody types
@@ -406,6 +487,7 @@ async function boot() {
     renderList();
     paintOrder();
     autoOrder(400);              // pictures have their size by then
+    showLabelHits({ scroll: true });
   }
 
   /**
@@ -491,15 +573,22 @@ async function boot() {
     renderList();
   });
 
-  $('btn-new').addEventListener('click', () => {
+  /** A new note, in a folder when one is named ("+ Add a note" in an empty folder, 0.9.4) — or in an open black hole. */
+  function newNote(folderId = null, { hole = null } = {}) {
     flushTitle();
     editor.flush();
     // Named in the language in use; it is the note's title from then on.
-    store.createNote(t('Untitled'));
+    const note = store.createNote(t('Untitled'), hole ? { hole } : {});
+    if (folderId && note) store.setFolder(note.id, folderId);
+    // What Settings says a new note starts with (0.9.4): its font and size, and its page.
+    const start = note ? newNoteDefaults() : { font: null, page: null };
+    if (start.font) store.setFont(note.id, start.font);
+    if (start.page) store.setPage(note.id, start.page);
     openNote(store.activeId);
     titleEl.focus();
     titleEl.select();
-  });
+  }
+  $('btn-new').addEventListener('click', () => newNote());
 
   // Which OS, so the title strip can leave room for macOS's traffic lights.
   document.documentElement.dataset.platform = window.nebula?.platform ?? 'web';
@@ -508,12 +597,26 @@ async function boot() {
   const noteActions = initNoteActions({
     onLabels: (id, button) => labels?.open(id, button),
     onFolder: (id, button) => noteList?.moveMenu(id, button),
+    onHole: (id, button) => blackHoles?.noteHoleMenu(id, button),
+    holeLabel: (note) => blackHoles?.noteMenuLabel(note) ?? null,
+    trashedHoles: () => blackHoles?.trashed() ?? [],
+    onHoleRestore: (id) => blackHoles?.restore(id),
+    onHoleDelete: (id) => blackHoles?.destroy(id),
     store,
     onChanged: () => { renderList(); openNote(store.activeId); },
     openNote: (id) => openNote(id),
   });
 
-  noteList = initNoteList({ listEl, store, folders, noteItem, onChanged: () => renderList() });
+  noteList = initNoteList({
+    listEl, store, folders, noteItem,
+    onChanged: () => renderList(),
+    newNote: (folderId) => newNote(folderId),
+    noteMenu: (id, x, y) => noteActions?.openAt(id, x, y),
+    // A note of an open black hole dragged up among the notes: taken out, with the black hole's answer.
+    takeOut: (id) => blackHoles?.moveOut(id) ?? Promise.resolve(false),
+  });
+  // The filtered list is drawn here, not by note-list.js: its rows open their
+  // menu on a right-click too (the listener is the list's own).
   // The page width beside Saved (0.9.3): a setting of the note, allowed in Only view too.
   pageModes = initPageModes({
     group: $('page-modes'),
@@ -546,14 +649,44 @@ async function boot() {
   // How big a real millimetre is on this screen, asked once.
   void window.nebula?.display?.realScale?.().then((f) => { setRealScale(f); zoomControl?.paint(); arrows?.reflow(); }).catch(() => {});
   $('btn-new-folder')?.addEventListener('click', () => { void noteList.create(); });
+  blackHoles = initBlackHoles({
+    listEl, store, noteItem,
+    onChanged: () => renderList(),
+    openNote: (id) => openNote(id),
+    newNote: (hole) => newNote(null, { hole }),
+    saveNow: () => saveCurrent(),
+    addButton: $('btn-new-hole'),
+  });
 
-  initTheme($('theme-pick'));
+  const theme = initTheme($('theme-pick'), { customButton: $('btn-theme-custom') });
   const side = initSideToggle($('side-toggle'));
+  // A theme of one's own (0.9.4): the palette at the right of the themes opens
+  // its editor upward, over Archive and Trash — where their drawer opens too,
+  // so the two give way to each other.
+  const themeEditor = initThemeEditor({
+    panel: $('theme-editor'),
+    button: $('btn-theme-custom'),
+    theme,
+    beforeOpen: () => {
+      if (side?.isCollapsed()) side.toggle();
+      document.querySelector('.drawer-tab[aria-expanded="true"]')?.click();
+    },
+  });
+  for (const tab of document.querySelectorAll('.drawer-tab')) {
+    tab.addEventListener('click', () => { if (tab.getAttribute('aria-expanded') === 'true') themeEditor?.close(); });
+  }
 
   // File / Edit / View / Window / Help, beside the logo. The same definitions
   // are the only list the command palette reads.
   const shortcuts = initShortcuts();
   const blocks = initBlocks();
+  // Settings, beside Help (0.9.4): a new note's font, size and page; what is put away; the lock on opening.
+  const settings = initSettingsPanel({
+    overlay: $('ov-settings'),
+    body: $('settings-body'),
+    closeButton: $('settings-close'),
+    saveNow: () => saveCurrent(),
+  });
   let menu = null;
   const palette = initPalette(() => menu?.commands ?? []);
   // Built before the menu, which needs it for Help -> What's new. The version
@@ -577,10 +710,14 @@ async function boot() {
     toggleSide: () => side?.toggle(),
     toggleBar: () => document.querySelector('[data-pad="hide"]')?.click(),
     toggleAi: () => document.querySelector('[data-pad="ai"]')?.click(),
+    aiShown: () => !readSettings().hideAi,
+    settings,
+    lockSet: () => appLockIsOn(),
+    lockNow: () => settings?.lockNow(),
     about: () => $('app-version').click(),
     checkUpdates: () => checkForUpdates(),
     // Works even when the note was deleted — that is the whole point of it.
-    guide: () => { const id = addGuide(store); renderList(); openNote(id); },
+    guide: () => { const id = addGuide(store, getLang()); renderList(); openNote(id); },
   });
 
   // The native window buttons are painted by Windows, so their colours have to
@@ -626,7 +763,16 @@ async function boot() {
     else whatsNew.maybeOpen();
   }).catch(() => { /* a browser preview has no main process */ });
   on('note-changed', () => renderList());
-  on('lang-changed', () => renderList());
+  on('lang-changed', () => {
+    // The guide follows the language while nobody has written in it (0.9.4).
+    if (disk.ok) {
+      flushTitle();
+      editor.flush();
+      const changed = syncGuideLanguage(store, getLang());
+      if (changed.includes(store.activeId)) { openNote(store.activeId); return; }
+    }
+    renderList();
+  });
 
   /**
    * "⋯ -> Delete label" in the label search (0.9.3): the label leaves every
@@ -648,6 +794,8 @@ async function boot() {
   }
 
   openNote(store.activeId);
+  // Opened by the recovery key: the lock it stood for is removed, and that is said.
+  if (gate.cleared) window.dispatchEvent(new CustomEvent('nebula-toast', { detail: 'The lock was removed — set a new one in Settings' }));
 
   // Every other note, brought up to this version while the app is idle, after
   // the vault has been put aside (heal.js) — so a bug fixed here does not live
@@ -667,6 +815,21 @@ async function boot() {
     }, 1500);
   }
 
+  // Notes that lost many pictures at once since the last start: asked about before anything is deleted (held-media.js).
+  void askAboutHeldMedia({
+    noteOf: (id) => store.get(id),
+    openNote: (id) => openNote(id),
+    // Written at the end of the note as it is on the disk now — what is typed is saved first — and the note shown.
+    putBack: async (id, markup) => {
+      await saveCurrent();
+      const note = store.get(id);
+      if (!note) return false;
+      store.updateNote(id, { content: `${note.content ?? ''}${markup}` });
+      openNote(id);
+      return true;
+    },
+  });
+
   // Native close/quit/update waits for both debounce buffers AND the disk
   // acknowledgements. The old window could disappear inside the 400ms delay.
   window.nebula?.lifecycle?.onSave(async () => {
@@ -678,6 +841,19 @@ async function boot() {
     flushTitle();
     editor.flush();
   });
+
+  // "Open with Nebula" (0.9.4): the files the app was opened with — now, and
+  // whenever another is handed to the running app — come in as File → Import
+  // brings one: each a new note, the file itself untouched.
+  let takingFiles = Promise.resolve();
+  const takeHandedFiles = () => {
+    takingFiles = takingFiles.then(async () => {
+      const files = await window.nebula?.files?.take?.().catch(() => []);
+      for (const res of files ?? []) await toolbar?.actions?.importFile?.(res);
+    }).catch((err) => console.warn('[nebula] opening a handed file failed', err));
+  };
+  window.nebula?.files?.onOpen?.(takeHandedFiles);
+  takeHandedFiles();
 
   // Last, and guarded: this is the only part of the app that loads third-party
   // pages, and a throw in it used to abort the rest of boot() — leaving no

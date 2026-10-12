@@ -19,7 +19,7 @@ const ALLOWED_ATTRS = new Set(['href', 'src', 'alt', 'title', 'target', 'rel', '
 
 /** Classes the editor gives meaning to. An imported file may not invent others. */
 const ALLOWED_CLASSES = new Set([
-  'blk-code', 'blk-todo', 'blk-hr', 'done', 'inline-code', 'inline-eq',
+  'blk-code', 'blk-todo', 'blk-hr', 'blk-table', 'done', 'inline-code', 'inline-eq',
   'u-single', 'u-double', 'u-bold', 'u-wavy', 'u-dash',
   'c-gray', 'c-brown', 'c-orange', 'c-yellow', 'c-green', 'c-blue', 'c-purple', 'c-pink', 'c-red',
   'h-gray', 'h-brown', 'h-orange', 'h-yellow', 'h-green', 'h-blue', 'h-purple', 'h-pink', 'h-red',
@@ -49,6 +49,11 @@ export function sanitize(html) {
         if (/^\d+(?:\.\d+)?px$/.test(value) && parseFloat(value) <= 100000) geometry[key] = value;
       }
     }
+    // A table's own three: how wide a column is, how high a row was pulled and how a cell's words are
+    // lined up (table.js).
+    if (el.tagName === 'COL' && /^\d+(?:\.\d+)?px$/.test(el.style.width) && parseFloat(el.style.width) <= 4000) geometry.width = el.style.width;
+    if (el.tagName === 'TR' && /^\d+(?:\.\d+)?px$/.test(el.style.height) && parseFloat(el.style.height) <= 800) geometry.height = el.style.height;
+    if (el.tagName === 'TD' && /^(center|right|justify)$/.test(el.style.textAlign)) geometry.textAlign = el.style.textAlign;
     for (const attr of Array.from(el.attributes)) {
       const name = attr.name.toLowerCase();
       // on* handlers, style, and anything not on the list.

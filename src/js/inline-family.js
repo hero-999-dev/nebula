@@ -1,5 +1,7 @@
 /** Exact DOM boundaries for exclusive inline marks (underline/ink/highlight). */
-const BLOCKS = 'p,div,h1,h2,h3,h4,h5,h6,li,blockquote,pre';
+// A table's cell is the block its words are in (0.9.4): a mark's edges are lifted to the cell and no
+// further — to the table's own block they would cut the row and the table in two.
+const BLOCKS = 'p,div,h1,h2,h3,h4,h5,h6,li,blockquote,pre,td';
 const familySelector = (classes, extra) => [...classes.map((cls) => `.${cls}`), extra].filter(Boolean).join(',');
 
 const UNDERLINES = ['u-single', 'u-double', 'u-bold', 'u-wavy', 'u-dash'];
@@ -45,6 +47,8 @@ function demoteBlockMarks(block, root, classes) {
   const parents = [];
   for (let el = block; el && el !== root; el = el.parentElement) parents.unshift(el);
   for (const el of parents) {
+    // A highlight on a cell is the cell's back (table.js), not a mark its words wear.
+    if (el.tagName === 'TD') continue;
     const marks = classes.filter((cls) => el.classList.contains(cls));
     if (!marks.length) continue;
     el.classList.remove(...marks);

@@ -69,13 +69,26 @@ export function initImageCrop(editor, { history, onDone } = {}) {
     if (whole) { end(); return; }
     try {
       if (!img.complete) await img.decode();
-      const natural = { width: img.naturalWidth, height: img.naturalHeight };
+      // A picture shown from its file (0.9.4) cannot be drawn from: the page may
+      // not read back what came from another address. The picture itself is
+      // asked for, and the crop is made of that.
+      let from = img;
+      let address = img.getAttribute('src') || '';
+      if (/^nebula-media:\/\//.test(address) && window.nebula?.media?.dataUrl) {
+        const data = await window.nebula.media.dataUrl(address);
+        if (!data) throw new Error('the picture is not there');
+        from = new Image();
+        from.src = data;
+        await from.decode();
+        address = data;
+      }
+      const natural = { width: from.naturalWidth, height: from.naturalHeight };
       const { sx, sy, sw, sh } = cropRect(frameRect, area, natural);
       const canvas = document.createElement('canvas');
       canvas.width = sw;
       canvas.height = sh;
-      canvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-      const jpeg = /^data:image\/jpe?g/i.test(img.getAttribute('src') || '');
+      canvas.getContext('2d').drawImage(from, sx, sy, sw, sh, 0, 0, sw, sh);
+      const jpeg = /^data:image\/jpe?g/i.test(address);
       const src = jpeg ? canvas.toDataURL('image/jpeg', 0.92) : canvas.toDataURL('image/png');
       history?.push();
       // The picture keeps its scale on the page: it loses what was cut, and a

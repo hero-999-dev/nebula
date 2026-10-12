@@ -69,6 +69,53 @@ export function detectTag(textBeforeCaret) {
   return m ? { tag: m[1], start: textBeforeCaret.length - m[1].length - 2, end: textBeforeCaret.length - 1 } : null;
 }
 
+/**
+ * "#" or "#que" right before the caret, while it is still being typed (0.9.4:
+ * the label list opens the way the / menu does). A digit first is not a label
+ * ("#1"), so only nothing or a letter may follow the #. Pure — tested.
+ */
+export function detectTagQuery(textBeforeCaret) {
+  const m = String(textBeforeCaret).match(/(?:^|\s)#((?:\p{L}[\p{L}\p{N}_-]{0,39})?)$/u);
+  return m ? { query: m[1], start: textBeforeCaret.length - m[1].length - 1 } : null;
+}
+
+/**
+ * The labels to offer for what has been typed after "#": those that begin with
+ * it first, then those that hold it, each once whatever its case. Pure — tested.
+ */
+export function matchLabels(labels, query, { limit = 8 } = {}) {
+  const q = String(query || '').toLocaleLowerCase();
+  const seen = new Map();
+  for (const l of labels) if (l && !seen.has(l.toLocaleLowerCase())) seen.set(l.toLocaleLowerCase(), l);
+  const all = [...seen.values()].sort((a, b) => a.localeCompare(b));
+  const starts = all.filter((l) => l.toLocaleLowerCase().startsWith(q));
+  const holds = all.filter((l) => !l.toLocaleLowerCase().startsWith(q) && l.toLocaleLowerCase().includes(q));
+  return [...starts, ...holds].slice(0, limit);
+}
+
+/**
+ * A #chip is ordinary text, so its word can be edited — and its `data-tag`,
+ * which is what the label list reads, stayed what it was first written as:
+ * "#abc changed to #abd, then to #acb — abd is still among the labels" (the
+ * owner, 0.9.4). Each chip's tag follows its word; a chip whose # was deleted
+ * is words again. Returns how many chips changed. Pure DOM — tested.
+ */
+export function syncTagChips(root) {
+  let changed = 0;
+  for (const chip of [...root.querySelectorAll('span.note-tag')]) {
+    const m = chip.textContent.match(/^#([^\s#]+)/u);
+    if (!m) {
+      while (chip.firstChild) chip.before(chip.firstChild);
+      chip.remove();
+      changed += 1;
+    } else if (chip.dataset.tag !== m[1]) {
+      chip.dataset.tag = m[1];
+      changed += 1;
+    }
+  }
+  return changed;
+}
+
 /** Notes whose title holds every word of the query. Pure — tested. */
 export function matchNotes(notes, query, { exclude = null, limit = 8 } = {}) {
   const words = String(query || '').toLocaleLowerCase().split(/\s+/).filter(Boolean);
@@ -101,12 +148,16 @@ export function initMentions(editorEl, { store, history, openNote, showLabel, is
   let ctx = null;          // { node, start, end }
   let items = [];
   let index = 0;
+  /** What the list is offering: notes for "@", labels for "#" (0.9.4). */
+  let mode = 'mention';
 
   const hide = () => { menu.hidden = true; ctx = null; };
   const outOfProse = (node) => !!node.parentElement?.closest('.code-src, .shape, .image-caption, .blk-code, .note-mention, a');
 
   function paint() {
     menu.replaceChildren();
+    // A label list with nothing lit does not own Enter (toggles.js asks).
+    menu.toggleAttribute('data-idle', mode === 'tag' && index < 0);
     if (!items.length) {
       const none = document.createElement('div');
       none.className = 'mention-none';
@@ -114,17 +165,56 @@ export function initMentions(editorEl, { store, history, openNote, showLabel, is
       menu.append(none);
       return;
     }
-    items.forEach((note, i) => {
+    items.forEach((item, i) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = i === index ? 'sel' : '';
       b.setAttribute('role', 'option');
       b.dataset.noI18n = '';
-      b.textContent = `@${note.title || 'Untitled'}`;
+      b.textContent = mode === 'tag' ? `#${item}` : `@${item.title || 'Untitled'}`;
       b.addEventListener('mousedown', (e) => { e.preventDefault(); choose(i); });
       menu.append(b);
     });
     menu.querySelector('button.sel')?.scrollIntoView({ block: 'nearest' });
+  }
+
+  /** Every label in use — by a title or in a text — in any note that is not in the trash. */
+  function labelsInUse() {
+    const out = [];
+    for (const n of store.notes) {
+      if (n.deletedAt) continue;
+      for (const l of Array.isArray(n.labels) ? n.labels : []) if (typeof l === 'string') out.push(l.replace(/^#+/, '').trim());
+      out.push(...contentTags(n.content));
+    }
+    // And the ones in the open note that have not been saved yet.
+    for (const chip of editorEl.querySelectorAll('span.note-tag[data-tag]')) out.push(chip.dataset.tag);
+    return out;
+  }
+
+  /** A label picked from the list: "#que" becomes that label's chip, a space after it. */
+  function chooseLabel(label) {
+    history?.push();
+    const r = document.createRange();
+    r.setStart(ctx.node, ctx.start);
+    r.setEnd(ctx.node, ctx.end);
+    r.deleteContents();
+    const chip = document.createElement('span');
+    chip.className = 'note-tag';
+    chip.dataset.tag = label;
+    chip.textContent = `#${label}`;
+    // A space that holds its place, as a typed one at the end of a line does:
+    // after an ordinary one the caret counts as standing in the chip, and the
+    // next letter typed went into the label.
+    const space = document.createTextNode(' ');
+    r.insertNode(space);
+    r.insertNode(chip);
+    const caret = document.createRange();
+    caret.setStart(space, 1);
+    caret.collapse(true);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(caret);
+    hide();
+    dirty();
   }
 
   function position() {
@@ -138,6 +228,7 @@ export function initMentions(editorEl, { store, history, openNote, showLabel, is
   function choose(i) {
     const note = items[i];
     if (!note || !ctx?.node?.isConnected) { hide(); return; }
+    if (mode === 'tag') { chooseLabel(note); return; }
     history?.push();
     const r = document.createRange();
     r.setStart(ctx.node, ctx.start);
@@ -202,7 +293,19 @@ export function initMentions(editorEl, { store, history, openNote, showLabel, is
     const r = sel.getRangeAt(0);
     const host = r.startContainer.nodeType === Node.ELEMENT_NODE ? r.startContainer : r.startContainer.parentElement;
     const chip = host?.closest?.('span.note-tag');
-    if (!chip || !editorEl.contains(chip)) return null;
+    if (!chip) {
+      // Right behind a chip, with the caret counted in what follows it: the
+      // same place to the eye as the chip's end.
+      const c = r.startContainer;
+      const prev = c.nodeType === Node.TEXT_NODE
+        ? (r.startOffset === 0 ? c.previousSibling : null)
+        : c.childNodes[r.startOffset - 1];
+      if (prev?.nodeType === Node.ELEMENT_NODE && prev.matches('span.note-tag') && editorEl.contains(prev)) {
+        return { chip: prev, start: false, end: true, sel };
+      }
+      return null;
+    }
+    if (!editorEl.contains(chip)) return null;
     const before = document.createRange();
     before.selectNodeContents(chip);
     before.setEnd(r.startContainer, r.startOffset);
@@ -211,12 +314,31 @@ export function initMentions(editorEl, { store, history, openNote, showLabel, is
     return { chip, start: at === 0, end: at >= len, sel };
   }
 
-  // Letters typed at a chip's edge are not part of it: a word written after
-  // #errands is a word, not #errandsword (and not a chip the next line copies).
+  // What is typed at a chip's edge. Before its # it is never part of it. At
+  // its END, a space or a mark ends the label — a word written after "#errands "
+  // is a word — but letters and digits typed straight on are the label's own:
+  // until 0.9.4 they were put outside it, so a label could be shortened and
+  // never lengthened again ("I changed #abc to #ace; only #ac was left, the e
+  // was not part of it" — the owner). The chip's tag follows (syncTagChips).
   editorEl.addEventListener('beforeinput', (e) => {
     if (e.inputType !== 'insertText' || !e.data || e.isComposing || isLocked()) return;
     const edge = chipEdge();
     if (!edge || (!edge.start && !edge.end)) return;
+    if (edge.end && !edge.start && /^[\p{L}\p{N}_-]+$/u.test(e.data)) {
+      // Into the chip's own text, whatever node the caret was counted in.
+      e.preventDefault();
+      history?.typed?.();
+      let last = edge.chip.lastChild;
+      if (last?.nodeType !== Node.TEXT_NODE) { last = document.createTextNode(''); edge.chip.appendChild(last); }
+      last.appendData(e.data);
+      const r = document.createRange();
+      r.setStart(last, last.nodeValue.length);
+      r.collapse(true);
+      edge.sel.removeAllRanges();
+      edge.sel.addRange(r);
+      dirty();
+      return;
+    }
     e.preventDefault();
     history?.typed?.();
     const text = document.createTextNode(e.data);
@@ -266,8 +388,26 @@ export function initMentions(editorEl, { store, history, openNote, showLabel, is
     if (!node || node.nodeType !== Node.TEXT_NODE || !editorEl.contains(node) || outOfProse(node)) return hide();
     const before = node.nodeValue.slice(0, sel.anchorOffset);
     if (e.inputType === 'insertText' && /\s$/.test(before) && tagBeforeCaret(node, sel.anchorOffset)) return hide();
+    // "#" and the start of a label: the labels already in use, to pick from
+    // (0.9.4, the owner: "like the / menu — if the label exists, let me choose
+    // it"). Nothing is lit unless what was typed IS a label, so Enter and Space
+    // still make the label exactly as typed; ↓ or Tab step into the list.
+    const tag = node.parentElement?.closest('span.note-tag') ? null : detectTagQuery(before);
+    if (tag) {
+      const found = matchLabels(labelsInUse(), tag.query);
+      if (!found.length) return hide();
+      mode = 'tag';
+      ctx = { node, start: tag.start, end: sel.anchorOffset };
+      items = found;
+      index = found.findIndex((l) => l.toLocaleLowerCase() === tag.query.toLocaleLowerCase());
+      paint();
+      menu.hidden = false;
+      position();
+      return;
+    }
     const hit = detectMention(before);
     if (!hit) return hide();
+    mode = 'mention';
     ctx = { node, start: hit.start, end: sel.anchorOffset };
     items = matchNotes(store.sorted(), hit.query, { exclude: store.activeId });
     index = 0;
@@ -276,9 +416,18 @@ export function initMentions(editorEl, { store, history, openNote, showLabel, is
     position();
   });
 
+  // A chip's label follows its word as the word is edited (syncTagChips).
+  editorEl.addEventListener('input', () => {
+    if (isLocked() || !editorEl.querySelector('span.note-tag')) return;
+    syncTagChips(editorEl);
+  });
+
   editorEl.addEventListener('keydown', (e) => {
-    // Enter after "#word" is a tag too, like the space.
-    if (e.key === 'Enter' && menu.hidden && !e.shiftKey && !isLocked()) {
+    // Enter after "#word" is a tag too, like the space — also with the label
+    // list open and nothing lit in it: the label is made exactly as typed.
+    const idleLabels = !menu.hidden && mode === 'tag' && index < 0;
+    if (e.key === 'Enter' && (menu.hidden || idleLabels) && !e.shiftKey && !isLocked()) {
+      if (idleLabels) hide();
       const sel = window.getSelection();
       const node = sel?.anchorNode;
       if (sel?.isCollapsed && node?.nodeType === Node.TEXT_NODE && !outOfProse(node)) {
@@ -299,13 +448,19 @@ export function initMentions(editorEl, { store, history, openNote, showLabel, is
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       e.stopImmediatePropagation();
-      if (items.length) index = (index + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length;
+      if (items.length) {
+        // From "nothing lit" (a label list), ↓ lights the first and ↑ the last.
+        index = index < 0 ? (e.key === 'ArrowDown' ? 0 : items.length - 1)
+          : (index + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length;
+      }
       paint();
     } else if (e.key === 'Enter' || e.key === 'Tab') {
       if (!items.length) { hide(); return; }
+      // (A label list with nothing lit never gets here on Enter — see above;
+      // Tab takes the first label offered.)
       e.preventDefault();
       e.stopImmediatePropagation();
-      choose(index);
+      choose(Math.max(0, index));
     } else if (e.key === 'Escape') {
       e.preventDefault();
       hide();

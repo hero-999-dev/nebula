@@ -43,7 +43,7 @@ export function initDividerSelect(editorEl, { history, isLocked = () => false } 
   }
 
   /** A line of text next to the divider, made if there is none. */
-  const TEXTLESS = '.shape-layer, .image-layer, .link-block, .blk-code, hr, .note-image';
+  const TEXTLESS = '.shape-layer, .image-layer, .link-block, .blk-code, .blk-table, hr, .note-image';
   function lineAfter(hr) {
     const next = hr.nextElementSibling;
     if (next && !next.matches(TEXTLESS)) return next;

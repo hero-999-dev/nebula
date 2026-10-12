@@ -104,11 +104,17 @@ touches the folder above. Even **uninstalling** leaves it alone
 1. **The vault is separate from the app.** Updating and uninstalling both leave
    it where it is.
 2. **A copy is taken before a Windows in-app installation.** `backups/pre-update-<version>-<time>`
-   is written the moment before the installer runs. Daily backups rotate; this
-   one does not — it stays until you delete it. Manual Mac/portable upgrades
+   is written the moment before the installer runs. The newest one is kept.
+   From 0.9.4 a copy made by an older version — every picture written into its
+   note's text — is removed at the first start once the notes are seen to be
+   whole in their new folders, this one among them. Manual Mac/portable upgrades
    require your own pre-upgrade copy; daily snapshots are a separate safeguard.
-3. **A daily copy.** First launch each day copies the whole vault to
-   `backups/YYYY-MM-DD`. The newest 7 are kept.
+3. **A daily copy.** First launch each day copies the vault to
+   `backups/YYYY-MM-DD`, and only the newest is kept (from 0.9.4; seven before).
+   It copies the notes' own files and shares their pictures and videos with the
+   vault instead of copying them. On a disk that cannot share a file (exFAT, a
+   network folder) the copy holds them itself — once: each day's copy takes
+   them over from the one before it.
 4. **Nebula will not seed sample notes over a vault it cannot read.** If the
    folder is unreadable — permissions, a locked profile, a disk problem — the
    app says so in a red bar, disables writing to disk entirely, and offers to
@@ -141,5 +147,9 @@ Do not reset the profile or delete note files to dismiss a save error.
    `storage`.
 5. Start Nebula.
 
-Individual notes are plain JSON — you can also copy a single file out of a
-backup into `storage/notes/`.
+A note is one folder — `notes/<id>/` with its `<id>.json`, its pictures and its
+videos (0.9.4). To bring back one note as it was, copy its folder out of the
+backup into `storage/notes/` while Nebula is closed; or leave Nebula open and
+open the note's `.json` from the backup with **Import** — it comes in as a new
+note, its pictures taken from the folder it lies in. A note deleted from the
+Trash is in no backup: deleted is deleted.

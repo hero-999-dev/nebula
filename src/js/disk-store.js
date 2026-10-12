@@ -3,6 +3,27 @@ import { setSaveHook } from './storage.js';
 const NOTES_KEY = 'nebula:notes';
 
 let api = null;
+/**
+ * Where each note is kept (0.9.4): the vault's notes folder, or — a note marked
+ * `hole` — sealed in that black hole (electron/black-holes.js). A note that
+ * changes place is written to the new one first and then deleted from the
+ * old: moved into a black hole, its plain file leaves the vault and every
+ * backup, as a deleted note's does.
+ */
+const VAULT = 'vault';
+const placeOf = (note) => (note?.hole ? `hole:${note.hole}` : VAULT);
+const placed = new Map();
+let holesApi = null;
+async function put(bridge, id, json, where) {
+  if (where === VAULT) return bridge.write(`notes/${id}.json`, json);
+  if (!holesApi) return { ok: false, error: 'No black holes here' };
+  return holesApi.write(where.slice(5), id, json);
+}
+async function take(bridge, id, where) {
+  if (where === VAULT) return bridge.remove(`notes/${id}.json`);
+  if (!holesApi) return { ok: false, error: 'No black holes here' };
+  return holesApi.remove(where.slice(5), id);
+}
 const lastWritten = new Map();
 const desired = new Map();
 const failures = new Map();
@@ -25,19 +46,25 @@ function publishStatus() {
   window.dispatchEvent(new CustomEvent('nebula-storage-status', { detail: getDiskStatus() }));
 }
 
-function enqueue(id, json) {
+function enqueue(id, json, where = VAULT) {
   const prev = queues.get(id);
   if (prev?.json === json) return prev.promise;
-  if (!prev && !failures.has(id) && (lastWritten.get(id) ?? null) === json) return Promise.resolve();
+  // Nothing to do — unless it is a deletion of a note that is on the disk somewhere.
+  if (!prev && !failures.has(id) && (lastWritten.get(id) ?? null) === json && !(json === null && placed.has(id))) return Promise.resolve();
 
   const targetApi = api;
   const currentGeneration = generation;
   const entry = { json, promise: null };
   entry.promise = (prev?.promise ?? Promise.resolve()).then(async () => {
     const rel = `notes/${id}.json`;
-    const result = json === null ? await targetApi.remove(rel) : await targetApi.write(rel, json);
+    const was = placed.get(id) ?? null;
+    const to = json === null ? null : where;
+    // Written where it belongs first; only then deleted from where it was.
+    let result = to ? await put(targetApi, id, json, to) : { ok: true };
+    if (result?.ok && was && was !== to) result = await take(targetApi, id, was);
     if (!result?.ok) throw new Error(result?.error ?? `Could not ${json === null ? 'remove' : 'save'} ${rel}`);
     if (generation !== currentGeneration) return;
+    if (to) placed.set(id, to); else placed.delete(id);
     // Acknowledging before this result used to suppress every later retry.
     if (json === null) lastWritten.delete(id);
     else lastWritten.set(id, json);
@@ -74,10 +101,10 @@ function mirrorNotes(notes, changed) {
     if (only && !only.has(note.id) && (desired.has(note.id) || lastWritten.has(note.id))) continue;
     const json = JSON.stringify(note, null, 2);
     desired.set(note.id, json);
-    jobs.push(enqueue(note.id, json));
+    jobs.push(enqueue(note.id, json, placeOf(note)));
   }
   // notes that no longer exist lose their file (was deleting the wrong path)
-  for (const id of new Set([...lastWritten.keys(), ...desired.keys()])) {
+  for (const id of new Set([...lastWritten.keys(), ...desired.keys(), ...placed.keys()])) {
     if (ids.has(id)) continue;
     desired.set(id, null);
     jobs.push(enqueue(id, null));
@@ -130,6 +157,8 @@ export async function initDiskStorage() {
   generation += 1;
   localCopyDropped = false;
   api = window.nebula?.storage ?? null;
+  holesApi = window.nebula?.holes ?? null;
+  placed.clear();
   lastWritten.clear();
   desired.clear();
   failures.clear();
@@ -177,8 +206,12 @@ export async function initDiskStorage() {
       try {
         const note = JSON.parse(res.data);
         if (note?.id) {
+          // A file in the notes folder is a plain note, whatever it says of itself.
+          const marked = 'hole' in note;
+          delete note.hole;
           notes.push(note);
-          lastWritten.set(note.id, JSON.stringify(note, null, 2));
+          placed.set(note.id, VAULT);
+          if (!marked) lastWritten.set(note.id, JSON.stringify(note, null, 2));
         } else readError = `Invalid note file: ${file}`;
       } catch {
         readError = `Unreadable note file: ${file}`;
@@ -236,6 +269,46 @@ export async function writeVaultFile(rel, text) {
     const res = await api.write(rel, text);
     return !!res?.ok;
   } catch { return false; }
+}
+
+/**
+ * A black hole was opened (0.9.4): its notes, as the main process handed them
+ * over, are known to be on the disk already — sealed, in that black hole.
+ * @param {string} holeId @param {string[]} jsons each note as it was written
+ * @returns {object[]} the notes, each marked with its black hole
+ */
+export function adoptHoleNotes(holeId, jsons) {
+  const notes = [];
+  for (const json of Array.isArray(jsons) ? jsons : []) {
+    let note;
+    try { note = JSON.parse(json); } catch { continue; }
+    if (!note?.id) continue;
+    note.hole = holeId;
+    notes.push(note);
+    // A note that is also a plain file (a move that was cut short) keeps its
+    // place on record, so the next save takes the plain file away.
+    if (placed.get(note.id) === VAULT) continue;
+    const now = JSON.stringify(note, null, 2);
+    placed.set(note.id, `hole:${holeId}`);
+    lastWritten.set(note.id, now);
+    desired.set(note.id, now);
+  }
+  return notes;
+}
+
+/**
+ * A black hole was locked: its notes leave the note store, and the mirror
+ * forgets them — or it would take their absence for a deletion. Called after
+ * everything pending has been written (flushDisk).
+ */
+export function forgetNotes(ids) {
+  for (const id of ids ?? []) {
+    lastWritten.delete(id);
+    desired.delete(id);
+    failures.delete(id);
+    placed.delete(id);
+  }
+  publishStatus();
 }
 
 export function hasDiskStorage() {

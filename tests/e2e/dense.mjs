@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { sweepStaleProfiles } from './profiles.mjs';
+import { sweepStaleProfiles, readNotesIn } from './profiles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
@@ -48,6 +48,28 @@ function signatureSource() {
     };
     // Adjacent text nodes are one run of text: typing and deleting splits them without changing the note.
     const copy = rootEl.cloneNode(true); copy.normalize();
+    // A <br> after the last words of a line draws nothing, and Enter then Backspace at the end of
+    // that line take it away — the words and the line are what they were. The owner's pasted
+    // paragraphs end in one (`<span>words</span><br>`, 0.9.4), and ten trials failed on a note that
+    // looked the same before and after. It is not part of what the note says. A <br> that is all a
+    // line has, or that follows another <br> (an empty line that IS drawn), stays.
+    const LINE = 'p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th, div:not([class])';
+    for (const br of [...copy.querySelectorAll('br')]) {
+      if (br.closest('.code-src, .shape-text, pre')) continue;
+      const line = br.closest(LINE);
+      if (!line) continue;
+      let up = br;
+      while (up !== line && !up.nextSibling) up = up.parentNode;
+      if (up !== line) continue;                       // something comes after it in the line
+      let back = br;
+      while (back !== line && !back.previousSibling) back = back.parentNode;
+      if (back === line) continue;                     // it is all the line has
+      let before = back.previousSibling;
+      while (before.lastChild) before = before.lastChild;
+      if (before.parentElement?.closest(LINE) !== line) continue;
+      const words = before.nodeType === 3 ? before.data.replace(/​/g, '').length > 0 : before.nodeName !== 'BR';
+      if (words) br.remove();
+    }
     copy.childNodes.forEach(walk);
     return out.join('');
   };
@@ -74,11 +96,17 @@ function findSites() {
     return false;
   };
   const prose = (el) => el.matches('p') && el.textContent.trim().length > 60 && !el.querySelector('img, .link-block, .blk-code, .inline-eq') && plainWords(el);
+  const gapBelow = (el) => { const next = el.nextElementSibling; return !!next && next.matches('p, div:not([class])') && !next.textContent.trim() && !next.querySelector('img, hr'); };
   const pick = (list) => list.filter(plainWords).sort((a, b) => b.textContent.length - a.textContent.length)[0];
   const mark = (el, name) => { if (el) el.dataset.denseSite = name; return el ? name : null; };
   document.querySelectorAll('[data-dense-site]').forEach((el) => delete el.dataset.denseSite);
   const sites = [
-    mark(pick(top.filter(prose)), 'long paragraph'),
+    // A paragraph with words right under it, where the note has one. Under a paragraph that empty lines
+    // follow, the app's own rules use those lines: Backspace under a divider takes the empty lines below it
+    // before the divider ("the empty white row underneath is still there", the owner), and an emptied code
+    // block leaves the caret on the empty line that was there — so "made, then deleted with keys" cannot
+    // give the note back there, and two trials failed on a note of the owner's that was as it should be.
+    mark(pick(top.filter((el) => prose(el) && !gapBelow(el))) ?? pick(top.filter(prose)), 'long paragraph'),
     mark(pick([...ed.querySelectorAll(':scope > ul > li, :scope > ol > li')].filter((li) => li.textContent.trim().length > 30 && !li.querySelector('ul, ol, img'))), 'list item'),
     mark(pick([...ed.querySelectorAll(':scope > blockquote')].filter((q) => q.textContent.trim().length > 30)), 'quote'),
     mark(top.filter(prose).find((p) => p.nextElementSibling?.matches('h1, h2, h3') && !p.dataset.denseSite), 'paragraph before a heading'),
@@ -98,7 +126,20 @@ export async function runDenseChecks(check, { docs = [] } = {}) {
     d.id = `n-dense-${i}`;
     // Notes are opened by title: two articles of a series share one.
     if (all.findIndex((o) => o.title === d.title) !== i) d.title = `${d.title} (${d.name})`;
-    fs.writeFileSync(path.join(notesDir, `${d.id}.json`), JSON.stringify({ id: d.id, title: d.title, content: d.content, createdAt: now - i, updatedAt: now - i }));
+    const note = { id: d.id, title: d.title, content: d.content, createdAt: now - i, updatedAt: now - i };
+    if (d.mediaDir && d.sourceId) {
+      // A note with a folder of its own (0.9.4): its pictures and videos come along, under the copy's name.
+      const folder = path.join(notesDir, d.id);
+      fs.mkdirSync(folder, { recursive: true });
+      for (const name of fs.readdirSync(d.mediaDir)) {
+        if (name === `${d.sourceId}.json` || !fs.statSync(path.join(d.mediaDir, name)).isFile()) continue;
+        fs.copyFileSync(path.join(d.mediaDir, name), path.join(folder, name));
+      }
+      note.content = d.content.split(`nebula-media://note/${d.sourceId}/`).join(`nebula-media://note/${d.id}/`);
+      fs.writeFileSync(path.join(folder, `${d.id}.json`), JSON.stringify(note));
+    } else {
+      fs.writeFileSync(path.join(notesDir, `${d.id}.json`), JSON.stringify(note));
+    }
   });
 
   let app;
@@ -414,7 +455,7 @@ export async function runDenseChecks(check, { docs = [] } = {}) {
       // What was saved is the note that was opened.
       await win.keyboard.press('Control+s');
       await win.waitForFunction(() => document.getElementById('savestate').textContent === 'Saved', null, { polling: 50, timeout: 8000 }).catch(() => {});
-      const saved = fs.readdirSync(notesDir).filter((f) => f.endsWith('.json')).map((f) => { try { return JSON.parse(fs.readFileSync(path.join(notesDir, f), 'utf8')); } catch { return null; } }).find((n) => n?.id === doc.id)?.content ?? '';
+      const saved = readNotesIn(notesDir).find((n) => n?.id === doc.id)?.content ?? '';
       const same = await win.evaluate(({ saved, baseHtml }) => {
         const a = document.createElement('div'); a.innerHTML = saved;
         const b = document.createElement('div'); b.innerHTML = baseHtml;

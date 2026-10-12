@@ -120,6 +120,26 @@
 }
 
 
+/* A theme of the reader's own (0.9.4) has no block here: its five picked
+   colours and the tokens made from them are written inline on <html> by
+   theme.js, over the fixed theme of the same tone ("main" for a dark ground,
+   "light" for a light one), which lends it the note colours above and every
+   rule written for light or dark themes. Matcha, a fixed theme for a day, is
+   its ready profile now (theme-custom.js).
+
+   What stands ON the accent is the one thing a fixed theme hard-codes (white
+   on a light theme, the darkest tone on a dark one) and a picked accent
+   cannot: a pale accent on a light ground needs dark words. --on-clay is
+   worked out from the picks, and takes over wherever the accent is a ground.
+   !important, because the rules it replaces are keyed on the theme's name and
+   outrank anything that is not. */
+:root[data-profile] :is(.btn.primary, .pad button.on, .theme-pick button.on, .theme-custom.on, .lang-pick__row button.on,
+  .label-chip.on, .ai-tab.active, .pdf-orient button.on, .tb-menu__seg button.on) {
+  color: var(--on-clay) !important;
+}
+:root[data-profile] ::highlight(nebula-find-current),
+:root[data-profile] ::highlight(nebula-label-hit-current) { color: var(--on-clay) !important; }
+
 /* Plain white. Not a variant of `light`: that one is warm paper, and the point
    of this theme is to see the note as it will print — white sheet, black ink,
    no tint anywhere. The colour palette below it is the light one, which is the

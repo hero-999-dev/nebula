@@ -8,6 +8,7 @@
  * of those passed jsdom; each is driven here the way a person would hit it.
  */
 import { _electron as electron } from 'playwright-core';
+import { noteFileOf } from './profiles.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -93,7 +94,7 @@ export async function runIdeasChecks(check) {
     await win.waitForFunction(() => !document.querySelector('#editor .shape-angle'), null, { polling: 50, timeout: 2000 }).catch(() => {});
     check('the angle readout is gone after release', !(await win.evaluate(() => !!document.querySelector('#editor .shape-angle'))));
     await win.waitForTimeout(1500); // autosave
-    const saved = fs.readFileSync(path.join(notes, 'i-shape.json'), 'utf8');
+    const saved = fs.readFileSync(noteFileOf(notes, 'i-shape'), 'utf8');
     check('the angle readout is not saved into the note', saved.includes('data-rot') && !saved.includes('shape-angle'));
 
     /* Arrows: attach, follow, delete while the editor has focus. */

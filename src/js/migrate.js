@@ -20,9 +20,11 @@ import { normalizeUnderlineInk } from './inline-family.js';
 import { liftNestedDividers } from './blocks.js';
 import { stripTransient } from './note-markup.js';
 import { pruneAnchors } from './arrows.js';
+import { dropFrozenInk } from './paste-clean.js';
+import { healColumns } from './columns.js';
 
 /** Bumped whenever a step is added, so the log line means something. */
-export const MARKUP_VERSION = '0.9.3';
+export const MARKUP_VERSION = '0.9.4';
 
 /**
  * @param {Element} root the editor
@@ -50,6 +52,10 @@ export function migrateNote(root, { fitShape } = {}) {
   normalizeUnderlineInk(root);
   dropWrapperIndents(root);
   repairTagChips(root);
+  // 0.9.4 — the theme's ink that a paste froze into the words (paste-clean.js).
+  dropFrozenInk(root);
+  // 0.9.4 — columns as this version writes them: two, the divider between, a line in each.
+  healColumns(root);
   return {
     shapes: migrateShapes(root, fitShape),
     code: migrateCodeBlocks(root),
@@ -70,7 +76,7 @@ export function migrateNote(root, { fitShape } = {}) {
  * picture"). Only a <br> with nothing but other loose <br>s and blank text
  * between two such blocks goes. Idempotent.
  */
-const NOT_A_LINE = 'hr, .note-image, .blk-code, .link-block';
+const NOT_A_LINE = 'hr, .note-image, .blk-code, .link-block, .blk-table';
 export function dropGapBreaks(root) {
   let touched = 0;
   const loose = (n) => n && ((n.nodeType === 3 && !n.nodeValue.trim()) || (n.nodeType === 1 && n.tagName === 'BR'));
@@ -353,8 +359,9 @@ export function rebuildShapeChrome(shape) {
 export function migrateBlankLines(root) {
   let touched = 0;
   for (const el of root.querySelectorAll('p, div, h1, h2, h3, h4, li, blockquote')) {
-    if (el.closest('.blk-code, .shape-layer, .image-layer, .code-head')) continue;
+    if (el.closest('.blk-code, .shape-layer, .image-layer, .code-head, .blk-table')) continue;   // a table is no line (table.js)
     if (el.classList.contains('shape-text')) continue;
+    if (el.matches('.blk-cols, .blk-col')) continue;      // columns hold lines; they are not one (columns.js)
     if (el.textContent.length) continue;                 // it has words
     if (el.querySelector('br') && el.children.length === 1) continue;   // already blank
     if (el.querySelector('img, hr, .blk-code, .inline-eq, .shape-layer, .image-layer, .note-image')) continue;

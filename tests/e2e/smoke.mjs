@@ -10,6 +10,12 @@
  */
 import { runV090Checks } from './v090.mjs';
 import { runV093Checks } from './v093.mjs';
+import { runV094Checks } from './v094.mjs';
+import { runLayoutChecks } from './layout.mjs';
+import { runAiSleepChecks } from './ai-sleep.mjs';
+import { runNoteFolderChecks } from './note-folders.mjs';
+import { runBlackHoleChecks } from './black-holes.mjs';
+import { runOpenWithChecks } from './open-with.mjs';
 import { _electron as electron } from 'playwright-core';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -116,9 +122,13 @@ const newProfile = () => fs.mkdtempSync(path.join(os.tmpdir(), 'nebula-smoke-'))
 const launch = (profile) =>
   electron.launch({ args: [mainJs], env: { ...process.env, NEBULA_USER_DATA: profile } });
 
+// A note is a folder of its own since 0.9.4: notes/<id>/<id>.json, its pictures beside it.
 const noteFiles = (profile) => {
   const dir = path.join(profile, 'storage', 'notes');
-  return fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.json')) : [];
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .filter((e) => (e.isDirectory() ? fs.existsSync(path.join(dir, e.name, `${e.name}.json`)) : e.name.endsWith('.json')))
+    .map((e) => (e.isDirectory() ? `${e.name}/${e.name}.json` : e.name));
 };
 
 let failure = null;
@@ -367,8 +377,8 @@ try {
       // Only the menu buttons are text in the strip; no "Nebula Test" caption.
       caption: document.getElementById('titlebar').firstElementChild?.textContent.trim(),
     }));
-    check('the title strip carries the logo and the five menus',
-      strip.menus.join(',') === 'File,Edit,View,Window,Help' && strip.logo, strip.menus.join(','));
+    check('the title strip carries the logo, the five menus and Settings',
+      strip.menus.join(',') === 'File,Edit,View,Window,Help,Settings' && strip.logo, strip.menus.join(','));
     check('and no window title is written into it', strip.caption === '', JSON.stringify(strip.caption));
 
     const menuItem = (menu, starts) => win.evaluate(({ menu, starts }) => {
@@ -417,12 +427,15 @@ try {
     // The / menu had no reference anywhere — you had to already know it existed.
     await menuItem('Help', 'Blocks');
     await win.waitForTimeout(250);
-    check('Help -> Blocks lists every block the / menu offers, from the same source',
-      await win.evaluate(() => {
-        const rows = document.querySelectorAll('#blocks-body .blocks-table tr');
-        const icons = document.querySelectorAll('#blocks-body .bl-ic svg');
-        return !document.getElementById('ov-blocks').hidden && rows.length === 16 && icons.length === 16;   // 16 since the toggle list (0.9.3)
+    {
+      const blocks = await win.evaluate(() => ({
+        shown: !document.getElementById('ov-blocks').hidden,
+        rows: document.querySelectorAll('#blocks-body .blocks-table tr').length,
+        icons: document.querySelectorAll('#blocks-body .bl-ic svg').length,
       }));
+      // 16 since the toggle list (0.9.3), 19 with the three toggle headings, 21 with the table and the columns (0.9.4).
+      check('Help -> Blocks lists every block the / menu offers, from the same source', blocks.shown && blocks.rows === 21 && blocks.icons === 21, JSON.stringify(blocks));
+    }
     await win.keyboard.press('Escape');
   }
 
@@ -1524,9 +1537,9 @@ try {
     await openMenu(1);
     await press(win, '#note-menu [data-note-act="archive"]');
     await win.waitForTimeout(300);
-    check('archiving takes a note off the list and counts it',
-      !(await titles()).includes('Second note')
-        && await win.evaluate(() => document.getElementById('archive-count').textContent) === '1',
+    // No counters beside Archive and Trash since 0.9.4 (the owner): the drawer is where the note is seen.
+    check('archiving takes a note off the list',
+      !(await titles()).includes('Second note') && await win.evaluate(() => !document.getElementById('archive-count')),
       (await titles()).join(' | '));
 
     await openMenu(0);
@@ -1534,9 +1547,8 @@ try {
     await win.waitForTimeout(300);
     {
       const left = await titles();
-      const count = await win.evaluate(() => document.getElementById('trash-count').textContent);
       check('the last note can go to the trash — the trash is the way back',
-        left.length === 0 && count === '1', `${left.length} left, trash ${count}`);
+        left.length === 0 && await win.evaluate(() => !document.getElementById('trash-count')), `${left.length} left`);
     }
 
     // Archive and Trash sit side by side under one panel, in the New note
@@ -2183,8 +2195,9 @@ try {
     });
     await win.keyboard.type(' /head');
     await win.waitForTimeout(300);
+    // "/head" finds the three toggle headings too since 0.9.4; the three headings are the ones asked about.
     const icons = await win.evaluate(() =>
-      [...document.querySelectorAll('#slash-menu button .fm-ic svg')].map((s) => s.outerHTML));
+      [...document.querySelectorAll('#slash-menu button')].filter((b) => /^Heading [123]$/.test(b.lastElementChild?.textContent.trim() ?? '')).map((b) => b.querySelector('.fm-ic svg')?.outerHTML));
     check('the three headings in the / menu have three different marks',
       icons.length === 3 && new Set(icons).size === 3, `${icons.length} rows, ${new Set(icons).size} distinct`);
     await win.keyboard.press('Escape');
@@ -2335,7 +2348,9 @@ try {
     // Its words, title and dates. The vault repair 1.5 s after start may stamp
     // the markup version on it (heal.js) — a repair, not a change; on a loaded
     // machine it landed before this read and failed a release's smoke (0.9.3).
-    const after = JSON.parse(fs.readFileSync(path.join(notesDir, 'n_mine.json'), 'utf8'));
+    // 0.9.4 gives the note a folder of its own on the way in: the same note, in notes/n_mine/n_mine.json.
+    const mineNow = [path.join(notesDir, 'n_mine', 'n_mine.json'), path.join(notesDir, 'n_mine.json')].find((f) => fs.existsSync(f));
+    const after = JSON.parse(fs.readFileSync(mineNow, 'utf8'));
     delete after.markupVersion;
     check('the note that was already there is untouched', JSON.stringify(after) === JSON.stringify(mine), JSON.stringify(after));
   }
@@ -2385,6 +2400,12 @@ try {
   await runDenseChecks(check, { docs: [OLD_NOTE] });
   await runV090Checks(check);
   await runV093Checks(check);
+  await runV094Checks(check);
+  await runLayoutChecks(check);
+  await runAiSleepChecks(check);
+  await runNoteFolderChecks(check);
+  await runBlackHoleChecks(check);
+  await runOpenWithChecks(check);
   await runDeletedChecks(check);
 } catch (err) {
   failure = err;

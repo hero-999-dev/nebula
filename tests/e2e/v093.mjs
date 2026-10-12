@@ -201,9 +201,11 @@ export async function runV093Checks(check) {
     await app.evaluate(({ BrowserWindow }, p) => BrowserWindow.getAllWindows()[0].webContents.send('ui:context-menu',
       { x: p.x, y: p.y, misspelledWord: 'txet', suggestions: ['text', 'test'], isEditable: true, mediaType: 'none', selectionText: '' }), word);
     await win.waitForFunction(() => !document.getElementById('ctx-menu')?.hidden, null, { polling: 50, timeout: 5000 }).catch(() => {});
-    check('a misspelt word gets its suggestions and "Add to dictionary"', await win.evaluate(() =>
-      [...document.querySelectorAll('#ctx-menu button')].map((b) => b.textContent).join('|') === 'text|test|Add to dictionary'),
-      await win.evaluate(() => [document.getElementById('ctx-menu')?.hidden, [...document.querySelectorAll('#ctx-menu button')].map((b) => b.textContent).join('|')].join(' ')));
+    // One menu everywhere (0.9.4): the suggestions stand in the main menu, under the formatting row.
+    check('a misspelt word gets its suggestions, "Add to dictionary" and "Ignore", in the one menu', await win.evaluate(() =>
+      [...document.querySelectorAll('#ctx-menu > button')].map((b) => b.textContent).join('|') === 'text|test|Add to dictionary|Ignore|Cut|Copy|Paste as Nebula format|Paste original format|Select all'
+      && document.querySelectorAll('#ctx-menu .ctx-format button').length > 0),
+      await win.evaluate(() => [document.getElementById('ctx-menu')?.hidden, [...document.querySelectorAll('#ctx-menu > button')].map((b) => b.textContent).join('|')].join(' ')));
     await win.keyboard.press('Escape');
     await win.evaluate((p) => document.elementFromPoint(p.x, p.y).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: p.x, clientY: p.y })), pic);
     await app.evaluate(({ BrowserWindow }, p) => BrowserWindow.getAllWindows()[0].webContents.send('ui:context-menu',
@@ -357,7 +359,7 @@ export async function runV093Checks(check) {
     await win.keyboard.press('Control+z');
     check('one undo takes the words back', await win.evaluate(() => !document.getElementById('w')?.textContent.includes('code')));
     await win.waitForTimeout(600);
-    const blocksNote = JSON.parse(fs.readFileSync(path.join(notes, 'blocks.json'), 'utf8'));
+    const blocksNote = JSON.parse(fs.readFileSync(path.join(notes, 'blocks', 'blocks.json'), 'utf8'));
     check('the writing font is kept with the note', /Consolas/.test(blocksNote.font?.family || ''), JSON.stringify(blocksNote.font));
 
     // ---- A save in a vault with a big note does not freeze the window ----
@@ -372,7 +374,7 @@ export async function runV093Checks(check) {
     await win.waitForTimeout(300);
     const longest = await win.evaluate(() => window.__longest);
     check('an autosave beside a 5 MB note takes no long pause', longest < 150, `${Math.round(longest)} ms`);
-    const bigFile = JSON.parse(fs.readFileSync(path.join(notes, 'big.json'), 'utf8'));
+    const bigFile = JSON.parse(fs.readFileSync(path.join(notes, 'big', 'big.json'), 'utf8'));
     check('the big note on disk was not rewritten or changed', bigFile.updatedAt === 0 && bigFile.content.length > 4_000_000);
 
     // ---- The owner's second round -----------------------------------------
@@ -595,7 +597,7 @@ export async function runV093Checks(check) {
     const column = () => win.evaluate(() => Math.round(document.querySelector('#editor p, #editor div, #editor li')?.getBoundingClientRect().width ?? 0));
     await win.waitForTimeout(700);    // the last edit's save has landed
     const pageNote = await win.evaluate(() => document.querySelector('#title').value);
-    const datedBefore = JSON.parse(fs.readFileSync(path.join(notes, `${pageNote}.json`), 'utf8')).updatedAt;
+    const datedBefore = JSON.parse(fs.readFileSync(path.join(notes, pageNote, `${pageNote}.json`), 'utf8')).updatedAt;
     // 100 % is real size: the line measured on screen, over the page's zoom, is the paper's in CSS pixels.
     const pageZoom = () => win.evaluate(() => Number.parseFloat(document.getElementById('editor').style.zoom || '1'));
     await win.click('#page-modes [data-page="a5"]');
@@ -626,11 +628,11 @@ export async function runV093Checks(check) {
     }));
     check('A5 and A4 make the line as long as on that paper (463 / 698 px)', Math.abs(a5 - 463) <= 2 && Math.abs(a4 - 698) <= 2, `${a5} ${a4}`);
     await win.waitForTimeout(600);
-    const stored = JSON.parse(fs.readFileSync(path.join(notes, `${pageNote}.json`), 'utf8'));
+    const stored = JSON.parse(fs.readFileSync(path.join(notes, pageNote, `${pageNote}.json`), 'utf8'));
     check('the page width is kept on the note, without dating it', stored.page === 'a4' && stored.updatedAt === datedBefore, `${stored.page} ${stored.updatedAt} ${datedBefore}`);
     check('the print sheet follows the paper', (await win.evaluate(() => document.getElementById('page-print-size')?.textContent || '')).includes('210mm 297mm'));
     // A4 at 100 % (its own default) stores nothing, so A5 below opens at its default.
-    check('choosing the page’s own default zoom stores none', await (async () => { await win.waitForTimeout(600); return !('zoom' in JSON.parse(fs.readFileSync(path.join(notes, `${pageNote}.json`), 'utf8'))); })());
+    check('choosing the page’s own default zoom stores none', await (async () => { await win.waitForTimeout(600); return !('zoom' in JSON.parse(fs.readFileSync(path.join(notes, pageNote, `${pageNote}.json`), 'utf8'))); })());
     await win.click('#page-modes [data-page="nw"]');
     await win.waitForTimeout(150);
     check('NW is A4 turned sideways: a 1027 px line (or the room there is), pages 698 px tall', await win.evaluate(() => {
@@ -895,7 +897,7 @@ export async function runV093Checks(check) {
     check('... and opens it', (await listed()).includes('picture'));
     await win.waitForTimeout(600);
     const vault = JSON.parse(fs.readFileSync(path.join(profile, 'storage', 'folders.json'), 'utf8'));
-    const shop = JSON.parse(fs.readFileSync(path.join(notes, 'picture.json'), 'utf8'));
+    const shop = JSON.parse(fs.readFileSync(path.join(notes, 'picture', 'picture.json'), 'utf8'));
     check('the folder is kept in the vault, and the note says it is in it', vault.folders?.[0]?.name === 'Work' && shop.folder === vault.folders[0].id);
     await win.hover('#note-list .folder-item');
     await win.click('#note-list .fr-more');
@@ -921,7 +923,9 @@ export async function runV093Checks(check) {
       return win.evaluate(() => [...document.querySelectorAll('#ai-site-menu button')].map((b) => b.textContent));
     };
     const items = await tabMenu('mathgpt');
-    check('a tab\'s right-click offers its header, its address and delete', items.join('|') === 'Change header|Change website|Delete website', items.join('|'));
+    // Clear session data joined them in 0.9.4, above Delete (tests/e2e/v094.mjs).
+    // 0.9.4 adds whether the tab may sleep (tests/e2e/ai-sleep.mjs).
+    check('a tab\'s right-click offers its header, its address, its sleep, its session and delete', items.join('|') === 'Change header|Change website|Let it sleep when unused|Clear session data|Delete website', items.join('|'));
     await win.click('#ai-site-menu button >> nth=0');
     await win.waitForSelector('#ov-dialog:not([hidden])');
     await win.fill('#dlg-input', 'Maths');
@@ -929,7 +933,10 @@ export async function runV093Checks(check) {
     await win.waitForTimeout(150);
     check('Change header renames the tab', await win.evaluate(() => document.querySelector('[data-ai="mathgpt"]')?.textContent.trim() === 'Maths'));
     await tabMenu('mathgpt');
-    await win.click('#ai-site-menu .ai-site-menu__delete');
+    // Delete asks first since 0.9.4: the item, then the Delete that means it.
+    await win.evaluate(() => [...document.querySelectorAll('#ai-site-menu button')].find((b) => b.textContent === 'Delete website').click());
+    await win.waitForSelector('#ai-site-menu .ai-site-menu__yes');
+    await win.click('#ai-site-menu .ai-site-menu__yes');
     await win.waitForTimeout(150);
     check('Delete website takes the tab away', await win.evaluate(() => !document.querySelector('[data-ai="mathgpt"]')));
     const again = await tabMenu('claude');
