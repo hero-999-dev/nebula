@@ -534,6 +534,13 @@ Double-click files in the repo root: `Nebula Test.exe` (test build),
 
 ---
 
+### 0.9.5: what to know before touching it
+
+- **A mark never leaves its block** (`src/js/inline-family.js` BLOCKS). Underline, colour and highlight are applied by lifting two bookmarks to the block the words are in, splitting every wrapper on the way. Anything that holds words and is not in that list is split too: a picture's caption was not, and a highlight cut the picture in two. A new kind of block that holds words goes into the list.
+- **A caption takes plain words** (`rich-paste.js`, the paste handler's first branch): a text node, not `insertText`, which writes the look of the words it replaces into the new ones.
+- **The taskbar button is not the window's icon** (`electron/app-logo.js` `taskbarDetails`, `main.js` `tellTaskbar`). Windows draws it from the Start-menu shortcut that carries the window's app ID; only a window whose ID no shortcut carries is drawn from its relaunch icon, and that icon is remembered per ID. Hence `<app id>.logo.<hash>` while a logo of the user's is on, and the app's own ID otherwise. A pin that starts this copy wins: the window keeps the pin's ID.
+- **Open:** on the owner's computer the installed copy's own Start-menu shortcut draws a blank sheet (see Log.md, 0.9.5). Not explained.
+
 ### 0.9.4: what to know before touching it
 
 - **A note is a folder.** `storage/notes/<id>/<id>.json`, pictures and videos

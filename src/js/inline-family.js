@@ -1,7 +1,10 @@
 /** Exact DOM boundaries for exclusive inline marks (underline/ink/highlight). */
 // A table's cell is the block its words are in (0.9.4): a mark's edges are lifted to the cell and no
 // further — to the table's own block they would cut the row and the table in two.
-const BLOCKS = 'p,div,h1,h2,h3,h4,h5,h6,li,blockquote,pre,td';
+// A picture's caption is one too (0.9.5): without it the edges were lifted past the caption and the
+// picture to the block around them, which cut the picture in two — "when I try to change the
+// highlight it closes altogether, the caption disappears" (the owner's Ideas note).
+const BLOCKS = 'p,div,h1,h2,h3,h4,h5,h6,li,blockquote,pre,td,figcaption';
 const familySelector = (classes, extra) => [...classes.map((cls) => `.${cls}`), extra].filter(Boolean).join(',');
 
 const UNDERLINES = ['u-single', 'u-double', 'u-bold', 'u-wavy', 'u-dash'];
@@ -89,11 +92,26 @@ function splitBoundary(marker, block) {
   }
 }
 
+/** Take a look written into the elements themselves (`style="color: …"`, `<font color>`) off a piece of the note. */
+function dropFixed(fragment, fixed) {
+  const props = fixed === 'background' ? ['background-color', 'background'] : [fixed];
+  for (const el of fragment.querySelectorAll('[style], font')) {
+    for (const prop of props) el.style.removeProperty(prop);
+    if (!el.getAttribute('style')) el.removeAttribute('style');
+    if (fixed === 'color' && el.tagName === 'FONT') el.removeAttribute('color');
+    if (el.tagName === 'SPAN' && !el.attributes.length) el.replaceWith(...el.childNodes);
+  }
+}
+
 /**
  * Change disjoint, block-local ranges without searching for their text again.
  * Matching ancestors are split, so unselected words and unrelated marks survive.
+ *
+ * `fixed` (0.9.5) names a look the selected words may carry written into them
+ * — 'color' or 'background', as words pasted from another page do — which
+ * comes off them: a class on the span around them could not show through it.
  */
-export function applyInlineFamily(root, parts, classes, cls = '', extra = '') {
+export function applyInlineFamily(root, parts, classes, cls = '', extra = '', fixed = '') {
   const doc = root.ownerDocument;
   const bookmarks = [];
   const selector = familySelector(classes, extra);
@@ -113,6 +131,7 @@ export function applyInlineFamily(root, parts, classes, cls = '', extra = '') {
     const fragment = doc.createDocumentFragment();
     while (start.nextSibling !== end) fragment.appendChild(start.nextSibling);
     for (const el of [...fragment.querySelectorAll(selector)].reverse()) stripMark(el, classes, extra);
+    if (fixed) dropFixed(fragment, fixed);
     if (cls) {
       const span = doc.createElement('span');
       span.className = cls;

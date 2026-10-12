@@ -5,7 +5,7 @@ that keeps every note in your own profile, as a folder of its own: a plain JSON
 file with the note's pictures and videos beside it. Installed Windows builds
 offer in-app updates; macOS and portable builds offer a download link.
 
-**Version v0.9.4** ·
+**Version v0.9.5** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 

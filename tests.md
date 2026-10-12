@@ -1,3 +1,12 @@
+## 2026-10-12 (14:52) — 0.9.5: a caption's marks, and the taskbar's logo
+
+- tests/inline-family.test.js (+3): a mark on a caption leaves the picture whole, in a column and on the page; a pasted background comes off the words that get a highlight and off no others; "No colour" takes it off, and a colour of ours takes off a pasted one.
+- tests/app-logo.test.js (+4): a logo's app ID; what a window tells the taskbar with a logo, without one, and where the app is pinned; the pin that starts this copy is found among the pins.
+- tests/e2e/v095.mjs (new, 8 checks, in the smoke suite): the owner's note as it is kept — two columns, a picture whose caption was pasted from a dark page. A highlight leaves picture and caption where they are and shows; another takes its place; the same on the page itself and for a text colour; Ctrl+Z; words pasted into a caption come as one line of plain words. Before the fix the first highlight left the picture without a caption (the run stopped on it).
+- tests/e2e/settings.mjs (+2, 125): the window tells the taskbar of a logo under an app ID of that logo's own, and of another logo under another.
+- Seen on this computer's taskbar, not kept as a test (it needs the real taskbar): the app run from source with a logo set in Settings — the button wore it at once, wore the next one when it was changed, wore it from the first moment after a restart, and went back to the app's own ID with the logo taken off.
+- Not tried: a taskbar pin; a Mac; the installed copy itself.
+
 ## 2026-10-12 (08:27) — 0.9.4: two tests that held on Windows only
 
 - tests/open-file.test.js: the paths of "the files among a command line's arguments" are made with path.resolve and path.join from the temp folder, so they are absolute on macOS and Linux too. On GitHub: 2 failed of 1105 on Linux and on the Mac before; nothing else failed there.

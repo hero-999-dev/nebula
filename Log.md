@@ -9,6 +9,36 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-10-12 15:09] v0.9.5 - by release-script
+
+A caption stays with its picture, and the taskbar wears the logo
+
+* (no commits since the last release)
+
+---
+
+## [2026-10-12 14:52] v0.9.5 - by Claude (the owner: "clean the bugs in Ideas for Nebula and update right away; only see that the asked bugs are gone")
+
+Two bugs, both from the note's pictures and their captions.
+
+1. "I copied into the caption from another format; when I try to change the background, the highlight, it closes altogether, the caption disappears."
+   - Cause: a mark is applied by lifting its two edges to the block the words are in, splitting every wrapper on the way. The list of blocks had no `figcaption`, so the edges went past the caption and the picture to the column (or the page) and the picture was cut in two. `inline-family.js` BLOCKS has it now.
+   - A paste into a caption was left to the browser, which is why the caption held the colour, size and background of the page it was copied from. It is put in as a text node now: one line, the caption's own look.
+   - A highlight is a class on a span around the words; a background written into the words themselves showed through it. Giving a highlight (or "No background") takes such a background off the selected words, and a text colour takes off a colour written into them (`applyInlineFamily(…, fixed)`). Only the selected words: the rest of a pasted run keeps what it had.
+
+2. "The logo: on the desktop it works; down on the taskbar it does not" (three snapshots: a blank sheet on the taskbar and in its menu).
+   - Measured on this computer, with throwaway shortcuts and programs that were removed again: a window whose app ID has a Start-menu shortcut is drawn on the taskbar from THAT SHORTCUT's icon; the window's own icon and `setAppDetails`' icon change nothing, and changing the shortcut's icon does not reach a running button. A window whose ID no shortcut carries is drawn from its relaunch icon — once: a second icon under the same ID went on being drawn as the first.
+   - The installed copy here is installed for all users: its Start-menu shortcut is in ProgramData, which the app cannot write. So its taskbar never wore the logo.
+   - Now: while a logo of the user's is on, the window says `appId: <app id>.logo.<the logo's hash>` with the logo's icon file, the program and the name (`app-logo.js` `taskbarDetails`, `main.js` `tellTaskbar`, before the window is shown and at every change). Where the app is pinned the window keeps the pin's ID. Without a logo nothing is said, as before.
+   - NOT explained, and left open in memory.json `next`: the installed copy's own Start-menu shortcut draws a blank sheet on this computer, so with Nebula's own logo the button is still blank here. Ruled out: the released 0.9.4 program file (taken out of the published installer into a temp folder: its icon is whole), the Open-with registration 0.9.4's installer writes (the same keys on a throwaway program change nothing), a stale icon cache as far as `ie4uinit -show` reaches. The next step is a look at the installed copy, which agents do not touch.
+
+Gates: the owner asked for no long tests. Unit and the smoke suite ran, as every release's; the page rebuild and the trials on Nebula Test's notes were left out (`--no-rebuild --no-old-notes`).
+
+## [2026-10-12 08:40] v0.9.4 - by Claude (released: the build on the moved tag passed)
+
+After the tag was moved to commit 6ea90c6: Tests passed on Linux; Release built Windows and macOS and published "Nebula v0.9.4" (not a draft) with the installer, the portable exe, the DMG, the ZIP and both manifests; `latest.yml` on the release page says 0.9.4. The docs page was published again with this log. The flash drive was not plugged in, so it was not mirrored. Written after the release; it goes out with the next commit.
+
 ## [2026-10-12 08:27] v0.9.4 - by Claude (the first build of the tag stopped on the Mac; the tag was moved to the fix)
 
 `npm run push` passed every gate on this computer and pushed v0.9.4. On GitHub the Mac job of the Release workflow, and the Tests workflow on Linux, stopped at two unit tests of "Open with Nebula" (tests/open-file.test.js, written earlier in 0.9.4 and never run off Windows): they named files "C:/Users/me/..." with backslashes, which is an absolute path on Windows only. The publish job needs both builds, so no release was made and no installed copy was offered anything.
