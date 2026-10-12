@@ -1410,6 +1410,32 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
   editor.addEventListener('paste', (event) => {
     const mode = pasteMode;
     pasteMode = 'nebula';
+    // A caption is one line of words in the caption's own look (0.9.5). Left to
+    // the browser, words copied from another page came in that page's colour,
+    // size and background — and stayed so: "I copied into the caption from
+    // another format" (the owner's Ideas note).
+    const caption = event.target.closest?.('.image-caption');
+    if (caption) {
+      event.preventDefault();
+      const words = (event.clipboardData?.getData('text/plain') || '').replace(/\s*[\r\n]+\s*/g, ' ');
+      const selection = window.getSelection();
+      const at = selection?.rangeCount ? selection.getRangeAt(0) : null;
+      if (!words.trim() || !at || !caption.contains(at.commonAncestorContainer)) return;
+      history?.push();
+      // Put in as a text node: insertText wrote the look of the words it
+      // replaced (their highlight, the theme's ink) into the new ones.
+      at.deleteContents();
+      const text = document.createTextNode(words);
+      at.insertNode(text);
+      for (const el of caption.querySelectorAll('span, font, b, i, u, s, em, strong')) if (!el.textContent) el.remove();
+      at.setStartAfter(text);
+      at.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(at);
+      caption.normalize();
+      dirty();
+      return;
+    }
     if (event.target.closest('.code-src, .shape-text, .link-block, .note-image')) return;
     const items = [...(event.clipboardData?.items || [])];
     const imageItem = items.find((item) => isImageMime(item.type));

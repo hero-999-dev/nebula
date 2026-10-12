@@ -13,7 +13,7 @@ import { installContextMenu, registerEditingHandlers, writeImageToClipboard, for
 import { purgeNoteFromBackups, purgeDeletedFromBackups, purgeHoleNoteFromBackups, purgeHoleFromBackups, purgeHoleFilesFromBackups, purgeUnnamedFromBackups, shredTree, pruneLabelled, oldWayCopies, dropOldWayCopies } from './backup-purge.js';
 import { BlackHoles, WINDOWS_HELLO_SCRIPT, readHelloAnswer } from './black-holes.js';
 import { AppLock } from './app-lock.js';
-import { readLogo, writeLogo, clearLogo, pointShortcuts, makeShortcut } from './app-logo.js';
+import { readLogo, writeLogo, clearLogo, pointShortcuts, makeShortcut, pinnedAppId, taskbarDetails } from './app-logo.js';
 import { filesFromArgv, readNoteFile } from './open-file.js';
 import { offerOpenWith } from './open-with.js';
 import {
@@ -94,8 +94,9 @@ const APP_TITLE = META.productName ?? 'Nebula';
 // Start Menu and Desktop shortcuts, so setting it here is what makes the running
 // app share their identity — and their icon. The test build declares its own, so
 // it gets a separate button rather than merging with the installed app.
+const APP_ID = META.nebulaAppId ?? 'com.nebula.app';
 if (process.platform === 'win32') {
-  app.setAppUserModelId(META.nebulaAppId ?? 'com.nebula.app');
+  app.setAppUserModelId(APP_ID);
 }
 
 // Three ways to launch, three separate vaults — see electron/user-data.js.
@@ -610,6 +611,29 @@ function pointLogoShortcuts(ico, { after = 600 } = {}) {
       .catch((err) => console.warn('[nebula] the shortcuts could not be given the logo:', err.message));
   }, after);
 }
+/**
+ * The taskbar button (0.9.5, app-logo.js `taskbarDetails`): Windows draws it
+ * from what the window's app ID stands for, and for an installed copy that is
+ * the Start-menu shortcut — so a window wearing a logo of the user's says so
+ * under an ID of its own. Where the app is pinned, the window keeps the pin's.
+ */
+function tellTaskbar(win, logo) {
+  if (!logoShortcutsHere() || !win || win.isDestroyed()) return;
+  try {
+    const forced = process.env.NEBULA_SHORTCUT_DIRS;
+    const dir = forced
+      ? path.join(forced.split(path.delimiter)[0], 'TaskBar')
+      : path.join(app.getPath('appData'), 'Microsoft', 'Internet Explorer', 'Quick Launch', 'User Pinned', 'TaskBar');
+    const details = taskbarDetails({ base: APP_ID, logo, pinned: pinnedAppId({ dir, target: logoTarget(), shell }), target: logoTarget(), name: APP_TITLE });
+    // A window that was never told anything else has the app's ID as it is: nothing to say.
+    if (!taskbarSays && details.appId === APP_ID) return;
+    win.setAppDetails(details);
+    taskbarSays = details;
+  } catch (err) { console.warn('[nebula] the taskbar could not be told of the logo:', err.message); }
+}
+/** What the taskbar was told last — for the checks. */
+let taskbarSays = null;
+
 /** Put a logo on: `null` is the app's own again. */
 function wearLogo(logo) {
   const win = mainWindow;
@@ -617,6 +641,7 @@ function wearLogo(logo) {
     if (process.platform === 'darwin') app.dock?.setIcon(logo ? logo.png : path.join(__dirname, '../build/icon.png'));
     else if (win && !win.isDestroyed()) win.setIcon(logo ? (process.platform === 'win32' ? logo.ico : logo.png) : path.join(__dirname, windowIconPath()));
   } catch (err) { console.warn('[nebula] the window could not be given the logo:', err.message); }
+  tellTaskbar(win, logo);
   pointLogoShortcuts(logo?.ico ?? null);
 }
 
@@ -666,6 +691,9 @@ function createWindow() {
   win.webContents.on('will-attach-webview', (_e, webPreferences) => {
     webPreferences.disableBlinkFeatures = [webPreferences.disableBlinkFeatures, NO_WEBAUTH].filter(Boolean).join(',');
   });
+
+  // Before it is shown: the taskbar button is the logo's from its first moment.
+  tellTaskbar(win, readLogo(logoDir()));
 
   const restored = savedBounds();
   if (restored) win.setBounds(restored);
@@ -1372,6 +1400,7 @@ app.whenReady().then(async () => {
   logoCall('get', () => ({
     ok: true,
     colors: readLogo(logoDir())?.colors ?? null,
+    taskbar: taskbarSays?.appId ?? null,
     own: CHANNEL === 'test' || process.env.NEBULA_LOGO_OWN === 'test' ? 'test' : 'main',
     shortcuts: logoShortcutsHere(),
   }));

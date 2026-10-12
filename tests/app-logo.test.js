@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { ICON_SIZES, cleanLogoColors, pngOfSize, icoOf, readLogo, writeLogo, clearLogo, listShortcuts, pointShortcuts, makeShortcut } from '../electron/app-logo.js';
+import { ICON_SIZES, cleanLogoColors, pngOfSize, icoOf, readLogo, writeLogo, clearLogo, listShortcuts, pointShortcuts, makeShortcut, logoAppId, pinnedAppId, taskbarDetails } from '../electron/app-logo.js';
 
 /** A real PNG of one colour, `size` a side. */
 function png(size, value = 0x7c) {
@@ -252,5 +252,54 @@ describe('a shortcut made for the logo', () => {
     expect(makeShortcut({ dir: '', name: 'Nebula', target: EXE, icon: EXE, shell })).toEqual({ ok: false, error: 'where' });
     const failing = { readShortcutLink: shell.readShortcutLink, writeShortcutLink: () => { throw new Error('denied'); } };
     expect(makeShortcut({ dir: path.join(dir, 'x'), name: 'Nebula', target: EXE, icon: EXE, shell: failing })).toMatchObject({ ok: false, error: 'denied' });
+  });
+});
+
+/**
+ * The owner's Ideas note (0.9.5): "the logo — on the desktop it works; down on
+ * the taskbar it does not". Windows draws a taskbar button from the Start-menu
+ * shortcut that carries the window's app ID, and an installed copy cannot
+ * always write that shortcut: a window wearing a logo takes an ID of its own.
+ */
+describe('the taskbar', () => {
+  const EXE = 'C:\\Apps\\Nebula\\Nebula.exe';
+  const ICO = (hash) => path.join('profile', 'logo', `icon-${hash}.ico`);
+
+  it('a logo has an app ID of its own, and another logo another', () => {
+    expect(logoAppId('com.nebula.app', ICO('0123456789ab'))).toBe('com.nebula.app.logo.0123456789ab');
+    expect(logoAppId('com.nebula.app', ICO('ABCDEF012345'))).toBe('com.nebula.app.logo.abcdef012345');
+    expect(logoAppId('com.nebula.app', ICO('0123456789ab'))).not.toBe(logoAppId('com.nebula.app', ICO('ba9876543210')));
+    expect(logoAppId('com.nebula.app', EXE)).toBe('com.nebula.app');   // no logo file: the app's own
+    expect(logoAppId('com.nebula.app', null)).toBe('com.nebula.app');
+  });
+
+  it('a window with a logo says which icon and which program stand for it; without one it is the app as it was', () => {
+    const logo = { ico: ICO('0123456789ab') };
+    expect(taskbarDetails({ base: 'com.nebula.app', logo, target: EXE, name: 'Nebula' })).toEqual({
+      appId: 'com.nebula.app.logo.0123456789ab', appIconPath: logo.ico, appIconIndex: 0, relaunchCommand: `"${EXE}"`, relaunchDisplayName: 'Nebula',
+    });
+    expect(taskbarDetails({ base: 'com.nebula.app', logo: null, target: EXE, name: 'Nebula' })).toEqual({ appId: 'com.nebula.app' });
+  });
+
+  it('where the app is pinned the window keeps the pin\'s ID, so that it opens on the pin', () => {
+    const logo = { ico: ICO('0123456789ab') };
+    expect(taskbarDetails({ base: 'com.nebula.app', logo, pinned: 'com.nebula.app', target: EXE, name: 'Nebula' })).toEqual({ appId: 'com.nebula.app' });
+    expect(taskbarDetails({ base: 'com.nebula.app', logo, pinned: '', target: EXE, name: 'Nebula' })).toEqual({ appId: 'com.nebula.app' });
+    expect(taskbarDetails({ base: 'com.nebula.app', logo: null, pinned: 'com.nebula.app.logo.ba9876543210', target: EXE, name: 'Nebula' })).toEqual({ appId: 'com.nebula.app.logo.ba9876543210' });
+  });
+
+  it('the pin that starts this copy is found among the pins, and no other', () => {
+    const held = new Map();
+    const pin = (name, link) => { fs.writeFileSync(path.join(dir, name), ''); if (link) held.set(path.join(dir, name), link); };
+    const shell = { readShortcutLink: (file) => { if (!held.has(file)) throw new Error('not a shortcut'); return held.get(file); } };
+    expect(pinnedAppId({ dir: path.join(dir, 'nowhere'), target: EXE, shell })).toBeNull();
+    pin('Browser.lnk', { target: 'C:\\Other\\Browser.exe', appUserModelId: 'browser' });
+    pin('Broken.lnk', null);
+    pin('notes.txt', { target: EXE, appUserModelId: 'not a shortcut' });
+    expect(pinnedAppId({ dir, target: EXE, shell })).toBeNull();
+    pin('Nebula.lnk', { target: EXE.toUpperCase(), appUserModelId: 'com.nebula.app' });
+    expect(pinnedAppId({ dir, target: EXE, shell })).toBe('com.nebula.app');
+    held.set(path.join(dir, 'Nebula.lnk'), { target: EXE });
+    expect(pinnedAppId({ dir, target: EXE, shell })).toBe('');
   });
 });

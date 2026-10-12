@@ -446,6 +446,10 @@ export async function runSettingsChecks(check) {
       && entries.every((e) => ico.subarray(e.at, e.at + 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) && ico.readUInt32BE(e.at + 16) === e.size)
       && fs.readFileSync(path.join(logoDir, 'icon.png')).readUInt32BE(16) === 256, `${JSON.stringify(logoKept())} ${icoFiles()} ${JSON.stringify(entries)}`);
     check('the shortcut that starts this program wears it: its icon is that file', await until(async () => (await linkIcon()).icon.toLowerCase() === path.join(logoDir, firstIco ?? 'x').toLowerCase()), JSON.stringify(await linkIcon()));
+    // 0.9.5: the taskbar draws a button from the window's app ID, and an installed copy's own ID stands for its Start-menu shortcut.
+    const taskbarId = async () => (await win.evaluate(() => window.nebula.logo.get())).taskbar;
+    const firstId = await taskbarId();
+    check('the window tells the taskbar of it under an app ID that is this logo’s own', firstId === `com.nebula.app.logo.${(firstIco ?? '').slice(5, 17)}`, `${firstId} ${firstIco}`);
     const stripMark = await win.evaluate(() => { const m = document.getElementById('tb-logo'); const probe = document.createElement('i'); probe.style.color = 'var(--clay)'; document.body.append(probe); const clay = getComputedStyle(probe).color; probe.remove(); return { color: getComputedStyle(m).color, clay, picture: !!m.querySelector('img'), svg: !!m.querySelector('svg') }; });
     check('the mark at the top left of the app is not this logo: it stays in the app’s theme', stripMark.svg && !stripMark.picture && stripMark.color === stripMark.clay && stripMark.color !== 'rgb(43, 43, 43)', JSON.stringify(stripMark));
 
@@ -458,6 +462,7 @@ export async function runSettingsChecks(check) {
       && await win.evaluate(() => document.querySelector('#logo-editor .te-slot[data-slot="star"]').classList.contains('on') && document.querySelector('#logo-editor .te-bar__code').textContent === '#FF0000'), `${red.colors} ${red.chips} ${red.kept}`);
     check('another logo is another file — the desktop remembers a picture by its name — and the one before is gone; the shortcut follows', icoFiles().length === 1 && icoFiles()[0] !== firstIco
       && await until(async () => (await linkIcon()).icon.toLowerCase() === path.join(logoDir, icoFiles()[0]).toLowerCase()), `${icoFiles()} ${JSON.stringify(await linkIcon())}`);
+    check('and another app ID for the taskbar, which remembers a picture by that', await taskbarId() === `com.nebula.app.logo.${icoFiles()[0].slice(5, 17)}` && await taskbarId() !== firstId, `${await taskbarId()} ${icoFiles()}`);
     await win.click('#logo-editor .te-swatch[data-hex="#58A6FF"]');
     await until(() => logoKept()?.colors?.star === '#58A6FF');
     const blue = await logoNow();

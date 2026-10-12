@@ -188,6 +188,60 @@ export async function pointShortcuts({ dirs, target, icon, shell, depth = 2, sta
 }
 
 /**
+ * The taskbar (0.9.5).
+ *
+ * Windows draws a taskbar button from what the window's app ID stands for, not
+ * from the window: where a Start-menu shortcut carries that ID — every
+ * installed copy has one — the button wears that shortcut's icon, and the
+ * window's own is not looked at. A copy installed for all users cannot write
+ * that shortcut, so its taskbar never wore the logo ("on the desktop it works;
+ * down on the taskbar it does not" — the owner's Ideas note; measured on
+ * Windows 11: a window's icon, and its relaunch icon, change nothing while a
+ * shortcut carries its ID).
+ *
+ * So while a logo of the user's is on, the window takes an ID no shortcut
+ * carries, and says which icon and which program stand for it. The ID has the
+ * logo's own name in it: the taskbar remembers the icon it drew for an ID, and
+ * a second logo under the first one's ID went on being drawn as the first.
+ */
+export function logoAppId(base, ico) {
+  const hash = /icon-([0-9a-f]{12})\.ico$/i.exec(String(ico ?? ''));
+  return hash ? `${base}.logo.${hash[1].toLowerCase()}` : base;
+}
+
+/**
+ * The app ID of the taskbar pin that starts this copy: '' for a pin without
+ * one, null where nothing is pinned.
+ * @param {{dir: string, target: string, shell: {readShortcutLink: Function}}} how `dir` is the folder Windows keeps the pins in
+ */
+export function pinnedAppId({ dir, target, shell }) {
+  const want = path.normalize(String(target)).toLowerCase();
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { return null; }
+  for (const name of names) {
+    if (!/\.lnk$/i.test(name)) continue;
+    try {
+      const link = shell.readShortcutLink(path.join(dir, name));
+      if (path.normalize(String(link?.target ?? '')).toLowerCase() === want) return String(link.appUserModelId ?? '');
+    } catch { /* not a shortcut this can read */ }
+  }
+  return null;
+}
+
+/**
+ * What a window tells the taskbar about itself (Electron's `setAppDetails`).
+ * A pin that starts this copy goes first: the window keeps the pin's ID, so
+ * that it opens on the pin and not beside it — the pin's own icon is the
+ * shortcut's, which `pointShortcuts` looks after.
+ * @param {{base: string, logo: {ico: string}|null, pinned: string|null, target: string, name: string}} how
+ */
+export function taskbarDetails({ base, logo, pinned = null, target, name }) {
+  if (pinned !== null) return { appId: pinned || base };
+  if (!logo?.ico) return { appId: base };
+  return { appId: logoAppId(base, logo.ico), appIconPath: logo.ico, appIconIndex: 0, relaunchCommand: `"${target}"`, relaunchDisplayName: name };
+}
+
+/**
  * A shortcut to this copy of the app, wearing the logo — for a desktop that
  * has the program file itself on it, whose own icon cannot be changed.
  * Where a shortcut of that name is there already it is pointed at the logo if

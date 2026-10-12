@@ -88,3 +88,54 @@ describe('exclusive inline formatting', () => {
     expect(clone.querySelector('br')).not.toBeNull();
   });
 });
+
+/**
+ * The owner's Ideas note (0.9.5): "I copied into the caption from another
+ * format; when I try to change the background, the highlight, it closes
+ * altogether, the caption disappears". The mark's edges were lifted past the
+ * caption to the block around the picture, which cut the picture in two.
+ */
+describe('a mark on a picture\'s caption', () => {
+  const hilites = ['h-yellow', 'h-blue'];
+  const figure = (caption) => '<div class="blk-col"><p>before</p>'
+    + '<figure class="note-image note-image--inline" contenteditable="false" style="width: 120px;"><img src="x.png" alt="x">'
+    + `<figcaption class="image-caption" contenteditable="true">${caption}</figcaption></figure><p>after</p></div>`;
+
+  it('leaves the picture whole, in a column and on the page itself', () => {
+    for (const html of [figure('words under it'), figure('words under it').replace(/^<div class="blk-col">|<\/div>$/g, '')]) {
+      const root = editor(html);
+      applyInlineFamily(root, [select(root.querySelector('figcaption').firstChild, 0, 5)], hilites, 'h-yellow', '', 'background');
+      expect(root.querySelectorAll('figure').length).toBe(1);
+      expect(root.querySelectorAll('figure > img').length).toBe(1);
+      expect(root.querySelectorAll('figcaption').length).toBe(1);
+      expect(root.querySelector('figcaption').innerHTML).toBe('<span class="h-yellow">words</span> under it');
+      expect(root.querySelector('figure').getAttribute('style')).toBe('width: 120px;');
+      expect(window.getSelection().toString()).toBe('words');
+    }
+  });
+
+  it('takes a pasted background off the words that get one of ours, and off no others', () => {
+    const pasted = '<span style="color: rgb(182, 172, 203); font-size: 12px; background-color: rgb(32, 26, 56);">copied from a dark page</span>';
+    const root = editor(figure(pasted));
+    applyInlineFamily(root, [select(root.querySelector('figcaption span').firstChild, 0, 6)], hilites, 'h-blue', '', 'background');
+    const caption = root.querySelector('figcaption');
+    expect(root.querySelectorAll('figure').length).toBe(1);
+    expect(caption.textContent).toBe('copied from a dark page');
+    const marked = caption.querySelector('.h-blue');
+    expect(marked.textContent).toBe('copied');
+    expect(marked.querySelector('[style*="background"]')).toBeNull();
+    expect(marked.querySelector('span').style.color).toBe('rgb(182, 172, 203)');        // its ink was not asked about
+    expect(caption.lastElementChild.style.backgroundColor).toBe('rgb(32, 26, 56)');     // the words not selected
+  });
+
+  it('"No colour" takes it off too, and a colour of ours takes off a pasted one', () => {
+    let root = editor('<p><span style="background: yellow;">loud</span> words</p>');
+    applyInlineFamily(root, [select(root.querySelector('span').firstChild, 0, 4)], hilites, '', '', 'background');
+    expect(root.innerHTML).toBe('<p>loud words</p>');
+    root = editor('<p><font color="#000000"><span style="color: rgb(0, 0, 0); font-size: 20px;">black</span></font></p>');
+    applyInlineFamily(root, [select(root.querySelector('span').firstChild, 0, 5)], colors, 'c-red', '', 'color');
+    expect(root.querySelector('.c-red').textContent).toBe('black');
+    expect(root.querySelector('[style*="color"], font[color]')).toBeNull();
+    expect(root.querySelector('span[style]').style.fontSize).toBe('20px');
+  });
+});

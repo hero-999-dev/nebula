@@ -11,6 +11,7 @@
 import { runV090Checks } from './v090.mjs';
 import { runV093Checks } from './v093.mjs';
 import { runV094Checks } from './v094.mjs';
+import { runV095Checks } from './v095.mjs';
 import { runLayoutChecks } from './layout.mjs';
 import { runAiSleepChecks } from './ai-sleep.mjs';
 import { runNoteFolderChecks } from './note-folders.mjs';
@@ -2401,6 +2402,7 @@ try {
   await runV090Checks(check);
   await runV093Checks(check);
   await runV094Checks(check);
+  await runV095Checks(check);
   await runLayoutChecks(check);
   await runAiSleepChecks(check);
   await runNoteFolderChecks(check);

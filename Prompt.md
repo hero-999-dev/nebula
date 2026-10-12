@@ -120,7 +120,9 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.9.4)
+## Current implementation state (v0.9.5)
+
+**0.9.5:** fixes. A mark (underline, colour, highlight) stops at a picture's caption as at any block (`inline-family.js` BLOCKS) — it cut the picture in two; a paste into a caption is plain words; a colour or background written into pasted words comes off the selected ones when one of ours is given. On Windows a window wearing a logo of the user's takes the app ID `<app id>.logo.<hash>` (`app-logo.js` `taskbarDetails`): the taskbar draws a button from the Start-menu shortcut of the window's app ID, never from the window's icon.
 
 **0.9.4:** a note is a folder (`storage/notes/<id>/<id>.json` with its pictures and videos as files; `nebula-media://`); black holes — notes encrypted with AES-256-GCM behind a 6-digit PIN, an optional passkey and a recovery key; a lock on opening (a gate, not encryption); Settings beside Help (a new note's font, size and page, hiding the AI panel or the black holes, the logo's colours); tables with numbered columns and rows, cell colour, merge and fill; a divider pulled sideways makes columns; a picture in the text at the left, centre or right, in a row or in a line of words; toggle headings and toggles in lists; one right-click menu with two ways to paste (Nebula format, and original format = the same plus the source's size); a font search, added and pinned fonts and the font used last; a theme of one's own with named profiles; the guide and What's new in four languages; AI tabs that sleep; Open with Nebula for Word, OpenDocument and Rich Text files.
 

@@ -427,13 +427,13 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
    * One class from `classes`, replacing whichever one was already there — never
    * nesting them. An empty `cls` just clears the family.
    */
-  function applyExclusive(classes, cls, extra = '') {
+  function applyExclusive(classes, cls, extra = '', fixed = '') {
     const range = selectionInEditor();
     if (!range || range.collapsed) return;
     const parts = blockRanges(range);
     if (!parts.length) return;
     history?.push();
-    applyInlineFamily(editorEl, parts, classes, cls, extra);
+    applyInlineFamily(editorEl, parts, classes, cls, extra, fixed);
     dirty();
   }
 
@@ -445,14 +445,14 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
    * exactly what was reported. The font picker grew this fallback in 0.4.4 and
    * the colours never did.
    */
-  function applyToBlockOrSelection(classes, cls) {
+  function applyToBlockOrSelection(classes, cls, fixed = '') {
     const range = selectionInEditor();
     // Selection only. This used to fall back to the whole block when nothing
     // was selected, which is how "I did not select anywhere, I press change
     // colour and everything changes" happened — the same complaint the font
     // picker had, and the same answer.
     if (!range || range.collapsed) return;
-    applyExclusive(classes, cls);
+    applyExclusive(classes, cls, '', fixed);
   }
 
   /**
@@ -815,7 +815,8 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   const applyTextColor = (cls) => withSelection(() => {
     if (clearAtCaret(colorClasses(TEXT_COLORS))) return;
     if (!cls) clearFixedInk();
-    applyToBlockOrSelection(colorClasses(TEXT_COLORS), alreadyApplied(cls) ? '' : cls);
+    // A colour written into the selected words themselves comes off (0.9.5): ours could not show through it.
+    applyToBlockOrSelection(colorClasses(TEXT_COLORS), alreadyApplied(cls) ? '' : cls, 'color');
   });
 
   /**
@@ -852,7 +853,8 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     // In a table the colour is the back of the selected cells (table.js).
     if (hiliteCells(editorEl, cls, colorClasses(HILITE_COLORS))) return;
     if (clearAtCaret(colorClasses(HILITE_COLORS))) return;
-    applyToBlockOrSelection(colorClasses(HILITE_COLORS), alreadyApplied(cls) ? '' : cls);
+    // Words pasted with a background of their own showed it through whichever highlight was picked (0.9.5).
+    applyToBlockOrSelection(colorClasses(HILITE_COLORS), alreadyApplied(cls) ? '' : cls, 'background');
   });
 
   /** What a colour class actually paints in the theme that is on right now. */

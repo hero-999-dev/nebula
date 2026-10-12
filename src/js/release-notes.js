@@ -13,6 +13,13 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.9.5': {
+    headline: 'A caption stays with its picture, and the taskbar wears your logo.',
+    items: [
+      { title: 'Captions', text: 'A highlight or a colour given to the words of a picture’s caption no longer takes the caption, and the picture, apart. Words pasted into a caption come as plain words in the caption’s own look, and a background that came with words pasted earlier gives way to the highlight you pick.' },
+      { title: 'Your logo on the taskbar', text: 'On Windows an installed Nebula wore your logo on the desktop and not on the taskbar. The taskbar button wears it now, and changes when the logo does.' },
+    ],
+  },
   '0.9.4': {
     headline: 'Two ways to paste, toggle headings, the guide in your language, and your privacy written down.',
     items: [
@@ -556,6 +563,29 @@ export const RELEASE_NOTES = {
  * a version or a language that is not here is shown in English.
  */
 export const RELEASE_NOTES_I18N = {
+  '0.9.5': {
+    de: {
+      headline: 'Eine Bildunterschrift bleibt bei ihrem Bild, und die Taskleiste trägt dein Logo.',
+      items: [
+        { title: 'Bildunterschriften', text: 'Eine Hervorhebung oder eine Farbe für die Wörter einer Bildunterschrift nimmt die Unterschrift und das Bild nicht mehr auseinander. In eine Bildunterschrift eingefügte Wörter kommen als reine Wörter im Aussehen der Unterschrift, und ein Hintergrund, den früher eingefügte Wörter mitgebracht haben, weicht der Hervorhebung, die du wählst.' },
+        { title: 'Dein Logo in der Taskleiste', text: 'Unter Windows trug ein installiertes Nebula dein Logo auf dem Desktop, aber nicht in der Taskleiste. Der Knopf in der Taskleiste trägt es jetzt und ändert sich mit dem Logo.' },
+      ],
+    },
+    pl: {
+      headline: 'Podpis zostaje przy swoim obrazie, a pasek zadań nosi twoje logo.',
+      items: [
+        { title: 'Podpisy', text: 'Wyróżnienie albo kolor nadany słowom podpisu pod obrazem nie rozrywa już podpisu ani obrazu. Słowa wklejone do podpisu przychodzą jako zwykłe słowa w wyglądzie podpisu, a tło, które przyszło ze słowami wklejonymi wcześniej, ustępuje wyróżnieniu, które wybierzesz.' },
+        { title: 'Twoje logo na pasku zadań', text: 'W systemie Windows zainstalowana aplikacja Nebula nosiła twoje logo na pulpicie, ale nie na pasku zadań. Przycisk na pasku zadań nosi je teraz i zmienia się razem z logo.' },
+      ],
+    },
+    tr: {
+      headline: 'Alt yazı resminin yanında kalıyor, görev çubuğu da logonuzu taşıyor.',
+      items: [
+        { title: 'Alt yazılar', text: 'Bir resmin alt yazısındaki sözcüklere verilen vurgu ya da renk artık alt yazıyı ve resmi parçalamıyor. Alt yazıya yapıştırılan sözcükler, alt yazının kendi görünümünde düz sözcükler olarak gelir; daha önce yapıştırılan sözcüklerle gelen arka plan da seçtiğiniz vurguya yerini bırakır.' },
+        { title: 'Logonuz görev çubuğunda', text: 'Windows’ta kurulu Nebula logonuzu masaüstünde taşıyor, görev çubuğunda taşımıyordu. Görev çubuğu düğmesi artık onu taşıyor ve logo değişince o da değişiyor.' },
+      ],
+    },
+  },
   '0.9.4': {
     de: {
       headline: 'Zwei Arten einzufügen, Aufklapp-Überschriften, die Anleitung in deiner Sprache und deine Privatsphäre, aufgeschrieben.',
