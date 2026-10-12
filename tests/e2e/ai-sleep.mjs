@@ -53,10 +53,10 @@ export async function runAiSleepChecks(check) {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1300, 800));
 
     /** The pages the panel holds, by the last part of their address. */
-    const guests = () => app.evaluate(async ({ webContents }) => Object.fromEntries(await Promise.all(webContents.getAllWebContents().filter((w) => w.getType() === 'webview')
+    const guests = () => app.evaluate(async ({ webContents }) => Object.fromEntries(await Promise.all(webContents.getAllWebContents().filter((w) => w.getType() === 'webview' && URL.canParse(w.getURL()))
       .map(async (w) => [new URL(w.getURL()).pathname.split('/')[1], { url: w.getURL(), t0: await w.executeJavaScript('window.t0').catch(() => null) }]))));
     const go = (from, to) => app.evaluate(async ({ webContents }, { from, to }) => {
-      const w = webContents.getAllWebContents().find((c) => c.getType() === 'webview' && new URL(c.getURL()).pathname.startsWith(`/${from}`));
+      const w = webContents.getAllWebContents().find((c) => c.getType() === 'webview' && URL.canParse(c.getURL()) && new URL(c.getURL()).pathname.startsWith(`/${from}`));
       await w.loadURL(to);
     }, { from, to });
     const tabs = () => win.evaluate(() => Object.fromEntries([...document.querySelectorAll('#ai-tabs .ai-tab')].map((b) => [b.dataset.ai.replace('ai-', ''), `${b.classList.contains('active') ? 'active ' : ''}${b.classList.contains('asleep') ? 'asleep' : 'awake'}`])));
@@ -74,8 +74,14 @@ export async function runAiSleepChecks(check) {
     };
     const nap = () => win.waitForTimeout(SLEEP_MS + 1600);
     /** Keys pressed in a tab's page, as a keyboard sends them. */
-    const typeIn = (name, keys) => app.evaluate(({ webContents }, { name, keys }) => {
-      const w = webContents.getAllWebContents().find((c) => c.getType() === 'webview' && new URL(c.getURL()).pathname.startsWith(`/${name}`));
+    // A tab's page that has not begun to load has no address yet: `new URL('')` threw, and stopped the
+    // whole run where the release is built (0.9.5). Such a page is not the one looked for, and the one
+    // looked for is waited for.
+    const typeIn = (name, keys) => app.evaluate(async ({ webContents }, { name, keys }) => {
+      const pathOf = (c) => { try { return new URL(c.getURL()).pathname; } catch { return ''; } };
+      const find = () => webContents.getAllWebContents().find((c) => c.getType() === 'webview' && pathOf(c).startsWith(`/${name}`));
+      let w = find();
+      for (let i = 0; i < 80 && !w; i += 1) { await new Promise((r) => setTimeout(r, 100)); w = find(); }
       w.focus();
       for (const key of keys) {
         w.sendInputEvent({ type: 'keyDown', keyCode: key });
@@ -84,7 +90,7 @@ export async function runAiSleepChecks(check) {
       }
     }, { name, keys });
     const written = (name) => app.evaluate(({ webContents }, n) => webContents.getAllWebContents()
-      .find((c) => c.getType() === 'webview' && new URL(c.getURL()).pathname.startsWith(`/${n}`))?.executeJavaScript('document.getElementById("t").value'), name);
+      .find((c) => { try { return c.getType() === 'webview' && new URL(c.getURL()).pathname.startsWith(`/${n}`); } catch { return false; } })?.executeJavaScript('document.getElementById("t").value'), name);
 
     await win.evaluate(() => document.querySelector('#pad [data-pad="ai"]').click());
     await win.waitForTimeout(700);

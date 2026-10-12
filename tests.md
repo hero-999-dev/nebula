@@ -1,3 +1,9 @@
+## 2026-10-12 (15:30) — 0.9.5: two checks that held only before the version changed
+
+- tests/e2e/v094.mjs "What's new ... its list scrolls when it is longer than the window": it measured the list of the version being run. Here the suite runs before the version is raised (0.9.4's long list); where the release is built it runs on the new version, whose list of two things has nothing to scroll. The check makes the list long itself now.
+- tests/e2e/ai-sleep.mjs: an AI tab whose page had not begun to load has no address, and `new URL('')` stopped the whole run on the build machine. Such a page is passed over, and the page looked for is waited for.
+- The whole smoke suite at version 0.9.5, as the build machine runs it: 924 of 924.
+
 ## 2026-10-12 (14:52) — 0.9.5: a caption's marks, and the taskbar's logo
 
 - tests/inline-family.test.js (+3): a mark on a caption leaves the picture whole, in a column and on the page; a pasted background comes off the words that get a highlight and off no others; "No colour" takes it off, and a colour of ours takes off a pasted one.

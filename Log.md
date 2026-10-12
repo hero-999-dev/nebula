@@ -10,6 +10,17 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+## [2026-10-12 15:30] v0.9.5 - by Claude (the build on GitHub stopped on two checks; the tag moved to their repair)
+
+The push went out with every gate here passed (unit 1128 of 1128, smoke 924 of 924; the first smoke run lost the window's focus in two label checks, which passed alone and in the second run). On GitHub the Windows build's own smoke run failed, so nothing was published:
+
+- "What's new ... its list scrolls when it is longer than the window" measured the list of the version being run. Here the suite runs before the version is raised, on 0.9.4's long list; there on 0.9.5's two items.
+- The AI-tab suite asked every page in the panel for its address; one had none yet, and `new URL('')` threw.
+
+Both are in the checks, not in the app. Repaired (tests.md), the whole suite run here once more at version 0.9.5 as GitHub runs it — 924 of 924 — and the tag `v0.9.5` moved to this commit: no release existed under it.
+
+The same kind of thing stopped 0.9.4 (a path that held on Windows only). What it comes to: the gates here run on the version before the bump, and on this computer; what differs where the release is built is the version and the machine's pace.
+
 ## [2026-10-12 15:09] v0.9.5 - by release-script
 
 A caption stays with its picture, and the taskbar wears the logo
