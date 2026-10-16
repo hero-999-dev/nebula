@@ -64,9 +64,11 @@ export async function runBlackHoleChecks(check) {
     }
     return out;
   };
+  /** A file as it is now; one the app removed between the listing and the read (a purge from the backups, 0.9.6 build) holds nothing. */
+  const bytesOf = (file) => { try { return fs.readFileSync(file); } catch { return Buffer.alloc(0); } };
   /** Files under storage and backups that hold these words in the clear. */
   const whereReadable = (...words) => [path.join(profile, 'storage'), backups].flatMap((dir) => everyFile(dir)).filter((file) => {
-    const text = fs.readFileSync(file).toString('latin1');
+    const text = bytesOf(file).toString('latin1');
     return words.some((w) => text.includes(w) || text.includes(Buffer.from(w, 'utf8').toString('latin1')));
   }).map((f) => path.relative(profile, f).replace(/\\/g, '/'));
   const holeIds = () => { try { return fs.readdirSync(holesDir); } catch { return []; } };
@@ -208,7 +210,7 @@ export async function runBlackHoleChecks(check) {
       await until(() => sealed(safe).length === 2 && !fs.existsSync(path.join(vault, 'n-plain.json')) && !fs.existsSync(path.join(vault, 'n-plain')) && whereReadable('7700-1234', 'Tax papers').length === 0),
       `${sealed(safe)} ${whereReadable('7700-1234', 'Tax papers')} ${fs.existsSync(path.join(vault, 'n-plain'))}`);
     const pngBytes = picture.toString('latin1');
-    check('its picture is nowhere on the disk as a picture', everyFile(path.join(profile, 'storage')).concat(everyFile(backups)).every((f) => !fs.readFileSync(f).toString('latin1').includes(pngBytes.slice(40, 200))));
+    check('its picture is nowhere on the disk as a picture', everyFile(path.join(profile, 'storage')).concat(everyFile(backups)).every((f) => !bytesOf(f).toString('latin1').includes(pngBytes.slice(40, 200))));
     check('it is listed in the black hole now', (await list())[0].notes.slice().sort().join() === 'Launch plan,Tax papers' && !(await outside()).includes('Tax papers'), JSON.stringify(await list()));
 
     // ---- Locked ----------------------------------------------------------------------
@@ -243,7 +245,7 @@ export async function runBlackHoleChecks(check) {
     const clipBytes = fs.readFileSync(path.join(root, 'tests', 'fixtures', 'clip.webm'));
     const clip = path.join(profile, 'Clip.webm');
     fs.writeFileSync(clip, clipBytes);
-    const clipInClear = () => [path.join(profile, 'storage'), backups].flatMap((d) => everyFile(d)).filter((f) => fs.readFileSync(f).includes(clipBytes.subarray(300, 400))).map((f) => path.relative(profile, f).replace(/\\/g, '/'));
+    const clipInClear = () => [path.join(profile, 'storage'), backups].flatMap((d) => everyFile(d)).filter((f) => bytesOf(f).includes(clipBytes.subarray(300, 400))).map((f) => path.relative(profile, f).replace(/\\/g, '/'));
     const player = () => win.evaluate(async () => {
       const v = document.querySelector('#editor .link-file video');
       if (!v) return null;
