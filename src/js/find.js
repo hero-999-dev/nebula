@@ -11,8 +11,14 @@
  * older, where the bar still counts matches and scrolls to them.
  */
 
+import { TRANSIENT_NODES } from './note-markup.js';
+import { setOpen } from './toggles.js';
+import { fold } from './fold.js';
+
 const HIGHLIGHT = 'nebula-find';
 const CURRENT = 'nebula-find-current';
+/** Controls drawn into the note's blocks, never part of what it says. */
+const DRAWN = `${TRANSIENT_NODES}, .code-head, select, button`;
 
 const supported = () => typeof CSS !== 'undefined' && typeof CSS.highlights !== 'undefined' && typeof Highlight === 'function';
 
@@ -21,7 +27,7 @@ const supported = () => typeof CSS !== 'undefined' && typeof CSS.highlights !== 
  * Case-insensitive. Pure apart from reading the DOM — tested in jsdom.
  */
 export function findMatches(root, query) {
-  const needle = String(query ?? '').toLowerCase();
+  const needle = fold(query);
   if (!root || needle.length === 0) return [];
 
   const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
@@ -29,14 +35,17 @@ export function findMatches(root, query) {
       // Code blocks keep their source in a data attribute and repaint from it;
       // the shape layer is not part of the prose. Neither is what "find in this
       // note" means, but both are visible text, so they stay searchable.
-      return node.nodeValue && node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      // What the screen draws over the note and never saves is not (hunt B14):
+      // a code block's language picker, a file's Open, a video's clock, a table's numbering.
+      if (!node.nodeValue || !node.nodeValue.trim() || node.parentElement?.closest(DRAWN)) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
     },
   });
 
   const out = [];
   let node;
   while ((node = walker.nextNode())) {
-    const hay = node.nodeValue.toLowerCase();
+    const hay = fold(node.nodeValue);
     let from = 0;
     for (;;) {
       const at = hay.indexOf(needle, from);
@@ -80,7 +89,24 @@ export function initFind(editorEl) {
     const range = matches[index];
     if (!range) return;
     const host = range.startContainer.parentElement;
-    host?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (!host) return;
+    // A match inside a folded toggle body is counted - the words are the note's -
+    // but cannot be seen while it is folded. Every folded ancestor on the chain
+    // opens first, as the search of OneNote and Notion expands a collapsed
+    // section to land on its hit. A locked note opens on screen only, exactly
+    // as its arrow does, and nothing is written. Opening is a note state, saved
+    // by the next save as an arrow's open would be; the undo stack is left
+    // alone - stepping through matches is navigation, not an edit.
+    const locked = editorEl.dataset.readonly === 'true';
+    let opened = false;
+    for (let el = host; el && el !== editorEl; el = el.parentElement) {
+      const toggle = el.classList.contains('toggle-body') ? el.parentElement : null;
+      // A toggle folded by its arrow has NO data-open attribute (setOpen
+      // deletes it), so folded is anything that is not open.
+      if (toggle?.classList.contains('blk-toggle') && toggle.dataset.open !== 'true') { setOpen(toggle, true); opened = true; }
+    }
+    if (opened && !locked) editorEl.dispatchEvent(new Event('input', { bubbles: true }));
+    host.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 
   function search(reset = true) {

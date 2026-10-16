@@ -24,7 +24,7 @@ import { dropFrozenInk } from './paste-clean.js';
 import { healColumns } from './columns.js';
 
 /** Bumped whenever a step is added, so the log line means something. */
-export const MARKUP_VERSION = '0.9.4';
+export const MARKUP_VERSION = '0.9.6';
 
 /**
  * @param {Element} root the editor
@@ -56,6 +56,8 @@ export function migrateNote(root, { fitShape } = {}) {
   dropFrozenInk(root);
   // 0.9.4 — columns as this version writes them: two, the divider between, a line in each.
   healColumns(root);
+  // 0.9.6 — half an emoji left at the end of a card's name (hunt B24).
+  dropHalfCharacters(root);
   return {
     shapes: migrateShapes(root, fitShape),
     code: migrateCodeBlocks(root),
@@ -64,6 +66,31 @@ export function migrateNote(root, { fitShape } = {}) {
     transient,
     gaps,
   };
+}
+
+/** Half of a character: a surrogate with no partner, drawn as "\uFFFD". */
+export const LONE_HALF = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+/**
+ * Half an emoji at the end of a card's name (hunt B24). Up to 0.9.5 a video's
+ * name was cut at 200 UTF-16 units, so a name with an emoji there kept its
+ * first half — saved in the note, in the card's data-name and on its face,
+ * and shown as "\uFFFD". The whole emoji cannot be known again; the half goes.
+ * Only a card's name: nothing else the app wrote was cut. Idempotent.
+ */
+export function dropHalfCharacters(root) {
+  let fixed = 0;
+  for (const card of root.querySelectorAll('.link-block[data-name]')) {
+    const name = card.getAttribute('data-name');
+    const title = card.querySelector('.link-card__title');
+    const whole = name.replace(LONE_HALF, '');
+    const face = title?.textContent.replace(LONE_HALF, '');
+    if (whole === name && face === title?.textContent) continue;
+    card.setAttribute('data-name', whole);
+    if (title) title.textContent = face;
+    fixed++;
+  }
+  return fixed;
 }
 
 /**

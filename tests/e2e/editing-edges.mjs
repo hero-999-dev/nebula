@@ -10,6 +10,8 @@ const shapes = '<div class="shape-layer" contenteditable="false"><div class="sha
 const fixture = [
   '<div class="shape-layer" contenteditable="false"></div><div class="shape-layer" contenteditable="false"></div><div><span>First prose line</span><div><div class="c-red"><div><p><br></p></div><hr class="blk-hr"><p><br></p><p>Text after the blank</p>' + codeBlockHtml('first\nsecond') + '</div></div></div>',
   shapes + '<div><span>First prose</span></div><div><hr class="blk-hr"><p><br></p><p>Text below gap</p>' + codeBlockHtml('first\nsecond') + '</div>',
+  // A note whose first block is a divider (0.9.6, the old-notes trials).
+  '<hr class="blk-hr"><p>Under the first divider</p>',
 ];
 export async function runEdgeChecks(check) {
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'nebula-edges-'));
@@ -66,6 +68,22 @@ export async function runEdgeChecks(check) {
         state.hr && !state.armed && !!state.nextText?.trim(), JSON.stringify(state));
       await win.keyboard.press('Backspace');
       check(`note ${i}: only the next press arms the divider`, await win.locator('#editor hr.armed').count() === 1);
+    }
+    if (!originals.length) {
+      // Opened right after Backspace in another note: no key brought the caret
+      // beside its first divider, so the divider is not picked — or the first
+      // Backspace in it would take the divider away.
+      await open(3);
+      await win.waitForFunction(() => document.querySelector('#editor p')?.textContent === 'Under the first divider', null, { polling: 50, timeout: 3000 }).catch(() => {});
+      // Where an opened note's caret can start (old-notes saw it): on the note itself, beside the divider.
+      await win.evaluate(() => {
+        const ed = document.getElementById('editor'); ed.focus();
+        const r = document.createRange(); r.setStart(ed, 0); r.collapse(true);
+        getSelection().removeAllRanges(); getSelection().addRange(r);
+      });
+      await win.waitForTimeout(150);
+      const opened =await win.evaluate(() => ({ armed: document.querySelectorAll('#editor hr.armed').length, hr: document.querySelectorAll('#editor hr').length }));
+      check('a note that starts with a divider opens with the divider not picked', opened.hr === 1 && opened.armed === 0, JSON.stringify(opened));
     }
     await open(1);
     const hint = win.locator('#editor .code-hint').first();

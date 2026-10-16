@@ -24,7 +24,8 @@ const NAME_MAX = 80;
 
 /** A folder name as it is kept: one line, trimmed, not empty, not endless. */
 export function cleanFolderName(raw) {
-  return String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
+  // characters, not UTF-16 units: an emoji cut in half was kept as "�" (hunt B24)
+  return Array.from(String(raw ?? '').replace(/\s+/g, ' ').trim()).slice(0, NAME_MAX).join('');
 }
 
 /** Only well-formed entries, each id once. */

@@ -15,7 +15,7 @@
  * exactly as it was and reported: a repair that loses a word is not a repair.
  */
 
-import { migrateNote, MARKUP_VERSION } from './migrate.js';
+import { migrateNote, MARKUP_VERSION, LONE_HALF } from './migrate.js';
 import { getCode } from './codeblock.js';
 
 /**
@@ -59,7 +59,8 @@ export function fingerprint(root) {
   return { words, canvas, code, tex, counts };
 }
 
-const tidy = (text) => text.replace(/\u200b/g, '').replace(/\s+/g, ' ').trim();
+// Half a character is no word anyone can read ("\uFFFD"): dropping it is a repair (hunt B24).
+const tidy = (text) => text.replace(/\u200b/g, '').replace(LONE_HALF, '').replace(/\s+/g, ' ').trim();
 
 export function sameNote(a, b) {
   return a.words === b.words && a.canvas === b.canvas && a.code === b.code && a.tex === b.tex

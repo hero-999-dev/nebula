@@ -11,6 +11,7 @@
  *     <id>.json                 the note: its words and markup
  *     <hash>.png                a picture, named by what it is
  *     vid-<time>-<rand>.mp4     a video dropped into the note
+ *     att-<time>-<rand>.pdf     a file attached to the note (0.9.6): kept, never shown
  *
  * In the note's file a picture is `nebula-media://note/<id>/<hash>.png`.
  *
@@ -67,8 +68,19 @@ export const VIDEO_MIME = {
 export const VIDEO_EXTENSIONS = Object.keys(VIDEO_MIME);
 export const mimeOf = (file) => IMAGE_MIME[extOf(file)] ?? VIDEO_MIME[extOf(file)] ?? 'application/octet-stream';
 const extOf = (file) => String(file).slice(String(file).lastIndexOf('.') + 1).toLowerCase();
-export const isPicture = (file) => extOf(file) in IMAGE_MIME;
-export const isVideoName = (file) => extOf(file) in VIDEO_MIME;
+/**
+ * A file attached to a note — "this note concerns these files" (the owner,
+ * after OneNote). Any kind of file: a PDF, a spreadsheet, an archive, a
+ * picture or a video too when it came with other files. It is kept as it is,
+ * never shown or played, so it is neither a picture nor a video here,
+ * whatever its extension; the note's card names it by the name it came with.
+ */
+const ATTACHMENT = /^att-[a-z0-9]+-[0-9a-f]{8}\.[a-z0-9]{2,5}$/;
+export const isAttachmentName = (file) => ATTACHMENT.test(String(file));
+export const isPicture = (file) => extOf(file) in IMAGE_MIME && !isAttachmentName(file);
+export const isVideoName = (file) => extOf(file) in VIDEO_MIME && !isAttachmentName(file);
+/** What is kept as a file of its own and swept only at a start: a video or an attached file. */
+export const isKeptFile = (file) => isVideoName(file) || isAttachmentName(file);
 
 /** A picture written into the text. Short ones (an icon) are left where they are. */
 const DATA_URL = /data:image\/(png|jpe?g|gif|webp|bmp|avif|svg\+xml);base64,([A-Za-z0-9+/]{400,}={0,2})/g;
@@ -246,8 +258,8 @@ const VIDEO_KIND = { mp4: 'mp4', m4v: 'mp4', webm: 'webm', ogv: 'ogg', mov: 'qui
 const VIDEO_EXT = { mp4: 'mp4', webm: 'webm', ogg: 'ogv', quicktime: 'mov' };
 const VIDEO_DATA = /data:video\/(mp4|webm|ogg|quicktime);base64,([A-Za-z0-9+/]{400,}={0,2})/g;
 
-/** A video sealed beside a note in a black hole (black-holes.js). */
-const SEALED = /nebula-media:\/\/hole\/([\w-]{1,120})\/([\w-]{1,120})\/(vid-[a-z0-9]+-[0-9a-f]{8}\.[a-z0-9]{2,5})/g;
+/** A video or an attached file sealed beside a note in a black hole (black-holes.js). */
+const SEALED = /nebula-media:\/\/hole\/([\w-]{1,120})\/([\w-]{1,120})\/((?:vid|att)-[a-z0-9]+-[0-9a-f]{8}\.[a-z0-9]{2,5})/g;
 
 /** Where the videos too large for an exported note's own file are put: a folder beside it, named after it. */
 export const travelFolder = (filePath) => `${String(filePath).replace(/\.json$/i, '')} videos`;
@@ -275,8 +287,9 @@ export async function travelWhole(text, notesDir, { budget = TRAVEL_VIDEO_BYTES,
   let left = 0;
   const beside = new Map();
   const swaps = [];
-  const fits = (file, size) => extOf(file) in VIDEO_KIND && size <= room;
-  for (const [address, id, file] of new Map([...out.matchAll(REFERENCE)].filter((m) => isVideoName(m[2])).map((m) => [m[0], m])).values()) {
+  // An attached file always goes beside: written in, it would come back as a video, or not at all.
+  const fits = (file, size) => isVideoName(file) && extOf(file) in VIDEO_KIND && size <= room;
+  for (const [address, id, file] of new Map([...out.matchAll(REFERENCE)].filter((m) => isKeptFile(m[2])).map((m) => [m[0], m])).values()) {
     const full = mediaPath(notesDir, id, file);
     let size = -1;
     try { size = fs.statSync(full).size; } catch { size = -1; }
@@ -340,7 +353,7 @@ export function stageVideos(text, notesDir) {
  */
 export async function stageTravelled(text, notesDir, filePath) {
   let out = stageVideos(text, notesDir);
-  const named = [...new Map([...out.matchAll(REFERENCE)].filter((m) => isVideoName(m[2]) && !INCOMING.test(m[1])).map((m) => [m[0], m])).values()];
+  const named = [...new Map([...out.matchAll(REFERENCE)].filter((m) => isKeptFile(m[2]) && !INCOMING.test(m[1])).map((m) => [m[0], m])).values()];
   if (!named.length) return out;
   const here = path.dirname(filePath);
   let incoming = null;
@@ -384,9 +397,12 @@ export function rehome(text, id, notesDir) {
   for (const [from, file] of others) {
     const src = mediaPath(notesDir, from, file);
     const dest = mediaPath(notesDir, id, file);
-    if (!src || !dest || !fs.existsSync(src)) continue;
+    if (!src || !dest) continue;
     try {
+      // Its copy already here is its own, the other note's file gone or not: a
+      // window still naming a deleted note's file must not leave this one unnamed.
       if (!fs.existsSync(dest)) {
+        if (!fs.existsSync(src)) continue;
         fs.mkdirSync(path.dirname(dest), { recursive: true });
         fs.copyFileSync(src, dest);
       }
@@ -406,7 +422,7 @@ export function unnamedOf(notesDir, id, text, { videos = false } = {}) {
   let names;
   try { names = fs.readdirSync(noteFolder(notesDir, id)); } catch { return []; }
   const { own } = referencesOf(text, id);
-  return names.filter((name) => !own.has(name) && !name.includes('.tmp-') && (isPicture(name) || (videos && isVideoName(name))));
+  return names.filter((name) => !own.has(name) && !name.includes('.tmp-') && (isPicture(name) || (videos && isKeptFile(name))));
 }
 
 /**
@@ -482,6 +498,32 @@ export function noteReleases(released, id, before, after) {
 }
 
 /**
+ * A file copied into a note's folder for the window, which no longer wants it:
+ * another note was opened while it was being copied (hunt B18). No write ever
+ * named it, so nothing released it, and the next start asked about "pictures
+ * no longer shown" for a file that never was in the note. Released here, it
+ * goes at the next start without a word — still only if the note does not
+ * name it then.
+ * @param {Map<string, Set<string>>} released changed in place
+ * @returns {boolean} whether the list changed
+ */
+export function releaseAdded(released, notesDir, id, url) {
+  if (!NOTE_ID.test(String(id))) return false;
+  const prefix = mediaUrl(id, '');
+  const name = String(url ?? '').startsWith(prefix) ? String(url).slice(prefix.length) : '';
+  if (!FILE_NAME.test(name) || !(isKeptFile(name) || isPicture(name))) return false;
+  if (!fs.existsSync(path.join(noteFolder(notesDir, id), name))) return false;
+  let text = '';
+  try { text = fs.readFileSync(noteFile(notesDir, id), 'utf8'); } catch { /* a note never saved names nothing */ }
+  if (referencesOf(text, id).own.has(name)) return false;
+  const names = released.get(id) ?? new Set();
+  if (names.has(name)) return false;
+  names.add(name);
+  released.set(id, names);
+  return true;
+}
+
+/**
  * What a note's folder holds that its text no longer names, removed.
  * @param {{videos?: boolean, only?: Set<string>}} [opts] videos too (at a
  *   start; never while the note is open, when an undo may still bring one
@@ -512,8 +554,8 @@ export function removeNoteFolder(notesDir, id) {
   return names.length;
 }
 
-/** What is written once and never changed: a picture, a video, a video sealed in a black hole. */
-const writtenOnce = (name) => !name.includes('.tmp-') && (isPicture(name) || isVideoName(name) || name.endsWith('.bhv'));
+/** What is written once and never changed: a picture, a video, an attached file, either sealed in a black hole. */
+const writtenOnce = (name) => !name.includes('.tmp-') && (isPicture(name) || isKeptFile(name) || name.endsWith('.bhv'));
 
 /**
  * The vault copied aside — a backup. What is written once and never changed
@@ -544,6 +586,8 @@ export function snapshotVault(src, dest, before = null) {
       done.shared += inner.shared;
       done.taken += inner.taken;
     } else if (entry.isFile()) {
+      // A copy cut short is never whole: no backup is the better for it (tidyVault removes it after).
+      if (isCutShort(entry.name)) continue;
       if (writtenOnce(entry.name)) {
         try { fs.linkSync(from, to); done.shared += 1; continue; } catch { /* this disk cannot share a file */ }
         if (old) {
@@ -602,7 +646,11 @@ export function tidyVault(notesDir, { released = null } = {}) {
     try {
       text = fs.readFileSync(file, 'utf8');
       if (!JSON.parse(text)?.id) continue;
-    } catch { continue; }
+    } catch {
+      if (abandonedFolder(notesDir, id)) result.swept += removeNoteFolder(notesDir, id);
+      continue;
+    }
+    result.swept += sweepCutShort(notesDir, id);
     try {
       const out = rehome(externalize(text, id, notesDir).text, id, notesDir);
       if (out !== text) { writeAtomic(file, out); result.moved += 1; text = out; }
@@ -619,6 +667,49 @@ export function tidyVault(notesDir, { released = null } = {}) {
   return result;
 }
 
+/** What a copy into a note's folder is written as until it is whole (copyInto, writeAtomic): `<name>.tmp-<pid>[-<time>-<random>]`. */
+const CUT_SHORT = /^(.+)\.tmp-\d+(?:-\d+-[a-z0-9]+)?$/;
+
+/** A copy cut short of a file this app writes into a note's folder — never whole, never worth keeping or backing up. With `id`: of that note's own file. */
+export function isCutShort(name, id = null) {
+  const base = CUT_SHORT.exec(String(name))?.[1];
+  return !!base && (isPicture(base) || isKeptFile(base) || (id == null ? base.endsWith('.json') : base === `${id}.json`));
+}
+
+/**
+ * Copies cut short in a saved note's folder — a quit or a crash while a file,
+ * a video, a picture or the note itself was being written — removed. Nothing
+ * names them, so nothing else ever would, and every daily backup would copy
+ * them in full. Only at a start: one app on the profile, nothing copying yet.
+ * Only what this app writes there; anything else stays.
+ * @returns {number} files removed
+ */
+function sweepCutShort(notesDir, id) {
+  const folder = noteFolder(notesDir, id);
+  let removed = 0;
+  let entries;
+  try { entries = fs.readdirSync(folder, { withFileTypes: true }); } catch { return 0; }
+  for (const entry of entries) {
+    if (!entry.isFile() || !isCutShort(entry.name, id)) continue;
+    shred(path.join(folder, entry.name));
+    removed += 1;
+  }
+  return removed;
+}
+
+/**
+ * A folder no note was ever written into, holding only files copied in for
+ * one (videos, attached files, a copy cut short): a new note left before its
+ * first save while its file was being copied. Nothing names them, and a note
+ * whose file is there but cannot be read is never this.
+ */
+function abandonedFolder(notesDir, id) {
+  if (fs.existsSync(noteFile(notesDir, id)) || fs.existsSync(path.join(notesDir, `${id}.json`))) return false;
+  let entries;
+  try { entries = fs.readdirSync(noteFolder(notesDir, id), { withFileTypes: true }); } catch { return false; }
+  return entries.every((e) => e.isFile() && (isKeptFile(e.name) || isKeptFile(e.name.replace(/\.tmp-\d+$/, ''))));
+}
+
 /**
  * A video file copied into a note's folder.
  * @returns {Promise<{ok: boolean, url?: string, name?: string, error?: string}>}
@@ -628,12 +719,38 @@ export async function addVideo(notesDir, id, source) {
   const from = String(source ?? '');
   const ext = extOf(from);
   if (!from || !(ext in VIDEO_MIME)) return { ok: false, error: 'not a video this app can play' };
+  return copyInto(notesDir, id, from, 'vid', ext);
+}
+
+/** The extension an attached file is kept under: its own, when it is a plain one; `bin` otherwise. */
+export function attachmentExt(source) {
+  const ext = path.extname(String(source ?? '')).slice(1).toLowerCase();
+  return /^[a-z0-9]{2,5}$/.test(ext) ? ext : 'bin';
+}
+
+/**
+ * Any file copied into a note's folder, to be kept there (isAttachmentName).
+ * The name it came with is handed back for the note's card; the folder keeps
+ * it under a name of its own, which no file name from outside can bend.
+ * @returns {Promise<{ok: boolean, url?: string, name?: string, size?: number, error?: string}>}
+ */
+export async function addAttachment(notesDir, id, source) {
+  if (!NOTE_ID.test(String(id))) return { ok: false, error: 'no note' };
+  const from = String(source ?? '');
+  if (!from) return { ok: false, error: 'no file' };
+  return copyInto(notesDir, id, from, 'att', attachmentExt(from));
+}
+
+async function copyInto(notesDir, id, from, prefix, ext) {
   try {
     const stat = await fs.promises.stat(from);
     if (!stat.isFile()) return { ok: false, error: 'not a file' };
     const folder = noteFolder(notesDir, id);
+    // A note saved before the copy and gone after it was deleted meanwhile: its
+    // folder must not come back with this file in it (tidyVault passes a folder with no note).
+    const saved = fs.existsSync(noteFile(notesDir, id));
     await fs.promises.mkdir(folder, { recursive: true });
-    const name = `vid-${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
+    const name = `${prefix}-${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
     const tmp = path.join(folder, `${name}.tmp-${process.pid}`);
     try {
       await fs.promises.copyFile(from, tmp);
@@ -641,6 +758,11 @@ export async function addVideo(notesDir, id, source) {
     } catch (err) {
       await fs.promises.rm(tmp, { force: true }).catch(() => {});
       throw err;
+    }
+    if (saved && !fs.existsSync(noteFile(notesDir, id))) {
+      await fs.promises.rm(path.join(folder, name), { force: true }).catch(() => {});
+      await fs.promises.rmdir(folder).catch(() => {});
+      return { ok: false, error: 'no note' };
     }
     return { ok: true, url: mediaUrl(id, name), name: path.basename(from), size: stat.size };
   } catch (err) {

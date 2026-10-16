@@ -249,7 +249,7 @@ export function taskbarDetails({ base, logo, pinned = null, target, name }) {
  * @returns {{ok: boolean, made?: boolean, file?: string, error?: string}}
  */
 export function makeShortcut({ dir, name, target, icon, shell }) {
-  const clean = String(name ?? '').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const clean = Array.from(String(name ?? '').replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 80).join(''); // characters, not UTF-16 units: never half an emoji (hunt B24)
   if (!dir || !clean || !target) return { ok: false, error: 'where' };
   const file = path.join(dir, `${clean}.lnk`);
   try {

@@ -121,6 +121,13 @@ describe('safeFileName', () => {
   it('keeps names short enough for any path', () => {
     expect(safeFileName('x'.repeat(300), 'md').length).toBeLessThanOrEqual(83);
   });
+
+  it('never cuts a character in half where it shortens (hunt B20)', () => {
+    // An emoji is two UTF-16 units: cut between them, the file was saved as "…�.md".
+    const name = safeFileName(`${'a'.repeat(79)}😀 trip`, 'md');
+    expect(name).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+    expect(name).toBe(`${'a'.repeat(79)}😀.md`);
+  });
 });
 
 describe('FORMATS', () => {

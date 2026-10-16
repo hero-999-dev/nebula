@@ -35,13 +35,18 @@ function signatureSource() {
       if (n.nodeType === 3) { const t = n.data.replace(/​/g, '').replace(/ /g, ' '); if (t) out.push(JSON.stringify(t)); return; }
       if (n.nodeType !== 1) return;
       // The painted layer of a code block is redrawn from its source; the source is compared.
-      if (n.matches('.code-paint, .katex')) return;
+      // What the app itself keeps out of a saved note (note-markup.js): the
+      // angle readout, a video's bar, what is drawn round a table, an attached
+      // file's Open and Save buttons. Drawn whenever a note is shown.
+      if (n.matches('.code-paint, .katex, .shape-angle, .video-bar, .tbl-ui, .attach-bar')) return;
       // Code is coloured by spans that are redrawn after every restore: its text is what counts.
       if (n.matches('.code-src')) { out.push(`<code.code-src>${JSON.stringify(n.textContent)}</>`); return; }
       // A link card's title is the page's, fetched when it answers — sometimes long after
       // the note opened. It arrives without being an edit (0.9.1); it is not the trial's doing.
       if (n.matches('.link-card__title')) { out.push('<strong.link-card__title></>'); return; }
-      const cls = [...n.classList].filter((c) => !['sel', 'arrow-target', 'active', 'editing'].includes(c)).sort().join('.');
+      // The state classes the app strips again before saving (note-markup.js
+      // CLASS_STATE): they mean something only while the note is on screen.
+      const cls = [...n.classList].filter((c) => !['sel', 'arrow-target', 'active', 'editing', 'armed', 'act', 'fill', 'is-selected', 'is-missing', 'cannot-play'].includes(c)).sort().join('.');
       out.push(`<${n.tagName.toLowerCase()}${cls ? `.${cls}` : ''}>`);
       n.childNodes.forEach(walk);
       out.push('</>');

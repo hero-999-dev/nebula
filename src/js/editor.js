@@ -84,6 +84,8 @@ export function bindEditor(el, store, onSaveState) {
       lastHtml = html;
       el.innerHTML = html;
       el.contentEditable = String(!!note);
+      // A note opened is a caret no key has moved yet (toolbar.js settleGap).
+      el.dispatchEvent(new CustomEvent('nebula-note-load'));
     },
     /**
      * The note as it now stands on screen is its starting point, not an edit.

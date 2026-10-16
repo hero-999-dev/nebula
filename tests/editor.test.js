@@ -8,6 +8,7 @@ import { codeBlockHtml, getCode } from '../src/js/codeblock.js';
 import { ICONS, icon } from '../src/js/icons.js';
 import { SEED_NOTES, GUIDE_NOTE, GUIDE_VERSION } from '../src/js/seed-notes.js';
 import { AI_SERVICES } from '../src/js/ai-panel.js';
+import { setLang } from '../src/js/i18n.js';
 
 describe('editing-bar layout (the pad moves the BAR, not the note)', () => {
   const base = { bar: 'top', barHidden: false, ai: false };
@@ -77,6 +78,14 @@ describe('slash menu', () => {
     expect(filterSlash('text')[0].id).toBe('text');
     // /video: a video file from the computer (0.9.4).
     expect(filterSlash('video').map((i) => i.id)).toEqual(['video']);
+  });
+
+  it('finds the Turkish names however the I is typed (hunt B19)', () => {
+    setLang('tr');
+    try {
+      expect(filterSlash('alinti').map((i) => i.id)).toContain('quote');
+      expect(filterSlash('BAŞLIK').map((i) => i.id)).toContain('h2');
+    } finally { setLang('en'); }
   });
 
   it('every item names a real icon', () => {

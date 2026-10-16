@@ -120,7 +120,11 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.9.5)
+## Current implementation state (v0.9.6)
+
+**Next (in Nebula Test, not released):** files in a note, as OneNote keeps them. Any file dropped on a note (or chosen with /file) is copied into the note's folder as `att-<time>-<hex>.<ext>` (`addAttachment` in note-media.js, `addFile` in black-holes.js, sealed like a video there) and stands as a card (`file-attach.js`, `.link-attach`): a folded-page logo coloured by its kind with its ending on it, its name, its size; a click saves a copy (`media:save-file`), Open hands a copy in `userData/opened` to the file's own program (`media:open-file`; the folder is cleared at start, quit, note delete and black-hole removal). A drop of pictures alone or with a video goes in as before; any other file among them makes every file a card. Exports write "📎 name" in its place; backups share it as they share a video; a held note gets it back as a card. Guide section 7 and "New in 0.9.6", in four languages.
+
+**Also in 0.9.6 (the 2026-10-16 hunt, B1–B27):** a page embedded in a note may ASK for the microphone, the camera or notifications — a native question, Don't allow first, the answer kept in memory for that page load only (`electron/permissions.js` `pageAnswers`, `askEmbed` in main.js; guide section 10); every session has a permission request and check handler; the main window stays on its page and only http/https/mailto reach the system (`navigation.js`); native dialogs speak the app's language (`electron/dialog-words.js`); a copy made by Open or Save a copy is marked as from the Internet on Windows (`electron/mark-of-the-web.js`); names and display text are cut by characters, never through an emoji; Find, search and every picker fold İ/ı (`src/js/fold.js`). The whole list: `test-results/orchestra/hunt/bugs.md`.
 
 **0.9.5:** fixes. A mark (underline, colour, highlight) stops at a picture's caption as at any block (`inline-family.js` BLOCKS) — it cut the picture in two; a paste into a caption is plain words; a colour or background written into pasted words comes off the selected ones when one of ours is given. On Windows a window wearing a logo of the user's takes the app ID `<app id>.logo.<hash>` (`app-logo.js` `taskbarDetails`): the taskbar draws a button from the Start-menu shortcut of the window's app ID, never from the window's icon.
 

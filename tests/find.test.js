@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { findMatches, stepIndex } from '../src/js/find.js';
+import { fold } from '../src/js/fold.js';
 
 let root;
 const mount = (html) => {
@@ -39,6 +40,41 @@ describe('findMatches', () => {
   it('finds repeats that touch each other', () => {
     mount('<p>aaaa</p>');
     expect(findMatches(root, 'aa')).toHaveLength(2); // non-overlapping
+  });
+
+  it('finds the note, not what the screen draws over it: pickers, bars, numbering (hunt B14)', () => {
+    mount(
+      '<div class="blk-code"><div class="code-head"><select class="code-lang"><option>Plain</option><option>Python</option></select><button>Copy</button></div><pre>print("python")</pre></div>' +
+      '<div class="link-block link-attach" contenteditable="false"><a class="link-card"><strong class="link-card__title">Open plan.pdf</strong></a>' +
+      '<div class="attach-bar"><button data-attach="open">Open</button><button data-attach="save">Save a copy</button></div></div>' +
+      '<figure class="note-video"><div class="video-bar">0:00 / 1:00</div></figure>' +
+      '<table><tbody><tr><td><div class="tbl-ui">1</div>row 1</td></tr></tbody></table>',
+    );
+    expect(texts(findMatches(root, 'python'))).toEqual(['python']);
+    expect(findMatches(root, 'copy')).toHaveLength(0);
+    expect(texts(findMatches(root, 'open'))).toEqual(['Open']);          // the card's name, which is the note's
+    expect(findMatches(root, '0:00')).toHaveLength(0);
+    expect(findMatches(root, '1')).toHaveLength(1);
+  });
+
+  it('keeps its place past a Turkish İ, and finds İ and ı as i (hunt B19)', () => {
+    // 'İ'.toLowerCase() is two units (i + a combining dot): every offset after one
+    // used to land a letter late, and past the end of the node it threw.
+    mount('<p>İzmir İstanbul abc</p><p>IRMAK ırmak</p>');
+    expect(texts(findMatches(root, 'abc'))).toEqual(['abc']);
+    expect(texts(findMatches(root, 'istanbul'))).toEqual(['İstanbul']);
+    expect(texts(findMatches(root, 'İZMİR'))).toEqual(['İzmir']);
+    expect(texts(findMatches(root, 'ırmak'))).toEqual(['IRMAK', 'ırmak']);
+  });
+
+  it('folds every character in Unicode to exactly its own length (hunt B19)', () => {
+    const grows = [];
+    for (let c = 0; c < 0x110000; c += 1) {
+      if (c >= 0xd800 && c < 0xe000) continue;
+      const s = String.fromCodePoint(c);
+      if (fold(s).length !== s.length) grows.push(c.toString(16));
+    }
+    expect(grows).toEqual([]);
   });
 
   it('returns nothing for an empty query, so the bar starts quiet', () => {

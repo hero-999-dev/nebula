@@ -6,6 +6,7 @@
  */
 
 import { on } from './bus.js';
+import { fold } from './fold.js';
 
 const MAX_LABELS = 20;
 const MAX_LENGTH = 40;
@@ -16,7 +17,8 @@ export function normalizeLabels(value) {
   const seen = new Set();
   return value
     .filter((v) => typeof v === 'string')
-    .map((v) => v.trim().replace(/^#+/, '').replace(/\s+/g, ' ').slice(0, MAX_LENGTH))
+    .map((v) => v.trim().replace(/^#+/, '').replace(/\s+/g, ' '))
+    .map((v) => Array.from(v).slice(0, MAX_LENGTH).join('')) // characters, not UTF-16 units: a label is kept in the note (hunt B24)
     .filter((v) => {
       const key = v.toLocaleLowerCase();
       if (!v || seen.has(key)) return false;
@@ -80,7 +82,7 @@ export function initLabels(store) {
     const note = store.get(forId);
     if (!note) { close(); return; }
     const selected = labelsOf(note);
-    const q = search.value.trim().replace(/^#+/, '').toLocaleLowerCase();
+    const q = fold(search.value.trim().replace(/^#+/, ''));
 
     // Every label in use anywhere, collected without the per-note limit.
     const catalog = new Map();
@@ -91,7 +93,7 @@ export function initLabels(store) {
 
     options.replaceChildren();
     for (const [key, label] of [...catalog].sort((a, b) => a[1].localeCompare(b[1]))) {
-      if (!key.includes(q)) continue;
+      if (!fold(label).includes(q)) continue;
       const row = document.createElement('label');
       const box = document.createElement('input');
       box.type = 'checkbox';

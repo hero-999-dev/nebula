@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
+import { FIREFOX_ESR } from '../src/js/ai-services.js';
 import { installAiSignIn, isGoogleSignIn, firefoxUserAgent, isGoogleAccountsPage, signInWindowOpener, isOAuthRequest, freshSignInUrl, GOOGLE_HOSTS, redactUrl } from '../electron/ai-browser-auth.js';
 
 const CHROME = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
@@ -211,7 +212,7 @@ describe('Google sign-in inside the app', () => {
     // Electron 44), then today's Firefox, then the ESR (the owner's log, 0.9.3).
     expect(one[1]).toBe(CHROMIUM);
     expect(two[1]).toMatch(/Firefox\/1[5-9]\d\.0$/);
-    expect(three[1]).toMatch(/Firefox\/140\.0$/);
+    expect(three[1]).toMatch(new RegExp(`Firefox/${FIREFOX_ESR}\\.0$`));   // whichever ESR is current (check:browsers)
     expect(last[0]).toMatch(/^data:text\/html/);
     expect(decodeURIComponent(last[0])).toContain('e-posta');   // in the app's language
     expect(win.loads).toHaveLength(4);                        // and no more rounds

@@ -468,6 +468,71 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    open in Downloads unless given a folder (`lastFolder` in main.js); a click
    in a <webview> reaches the app only as the window's `blur`. Electron no
    longer downloads itself on `npm install`: `npx install-electron --no`.
+61. **An attached file is neither a picture nor a video (0.9.6).** A file
+   dropped on a note is copied into its folder as `att-<time>-<hex>.<ext>`
+   (`addAttachment`, note-media.js; `addFile` in black-holes.js). `isPicture`
+   and `isVideoName` refuse that prefix whatever the ending — an attached
+   `.png` is a card, never an `<img>` — and `isKeptFile` keeps both kinds out
+   of the backup sweep. *Open* hands the file's own program a copy in
+   `userData/opened` (`electron/opened-files.js`), laid out as
+   `note/<id>/<stem>/` and `hole/<hid>/<id>/<stem>/` so each copy goes with
+   what it came from: at start and quit, with its note when deleted, with its
+   black hole when that is locked, removed or deleted (a sealed file opened is
+   in the clear — it must not outlive the lock), with its card when × takes
+   it out (`media:forget-file`). A card opens only the open note's own file
+   (`ownsAttachUrl`), and a copy that finishes after its note was deleted
+   is dropped (`copyInto`); a folder with no note file holding only copied-in
+   files is swept at start (`abandonedFolder`). Ownership is the card's rule,
+   not the IPC's: the bridge trusts the main window, which can read every note anyway.
+62. **`ELECTRON_RUN_AS_NODE=1` in the shell.** A terminal opened from another
+   Electron app (Test Orchestra's chats) inherits it, and then `electron.exe`
+   is plain Node: smoke dies with "Process failed to launch!", `electron
+   --version` prints a Node version. Run `env -u ELECTRON_RUN_AS_NODE npm run
+   smoke` there.
+63. **The main window loads whatever it is sent to, with the whole bridge.**
+   preload.js gives `window.nebula` to any page in the main window, and a
+   plain link in a non-editable part of a note (a note from another copy keeps
+   them) navigated it. `will-navigate` keeps the window on its own page
+   (`electron/navigation.js` `staysOnPage`); the window-open handler and the
+   `openExternal` permission hand the system only http, https and mailto
+   (`externalUrl`) — `ms-settings:`, `ms-msdt:`, `file:` and shares run
+   things. A new way to open a link goes through `externalUrl` (hunt B21).
+64. **A session with no permission handler grants everything.** Each
+   partition (`persist:embed`, `persist:ai-<id>`, the PDF preview) is its own
+   session; the list set on `defaultSession` alone let a page embedded in a
+   note use the microphone and read the clipboard. `app.on('session-created')`
+   gives every session `electron/permissions.js` `allowed`; a new partition
+   needs nothing more, a new permission goes in `WEB_PAGE` or `CHAT` (B22).
+   An embed ASKS for `ASK_EMBED` (microphone/camera, notifications): the
+   answer lives in `pageAnswers`, in memory, for one page load (B25). A session
+   with no permission CHECK handler answers every check "granted" — the embed
+   session has one; a new permission an embed may ask for needs both handlers.
+65. **An embed with `allowpopups` and no window-open handler** turns every
+   `window.open` into a bare app window — one page opened fifteen in two
+   seconds. Embeds deny always; `popupGate` gives the browser a link only just
+   after a real press in that page (B23).
+66. **Lowercase is not one unit per letter.** The window lowers in en-US on
+   any machine, where `İ`.toLowerCase() is two units: Find's offsets broke and
+   "istanbul" never found "İstanbul". Every search compares through
+   `src/js/fold.js` `fold()` (İ/ı → i, then lower), never `toLowerCase` or
+   `toLocaleLowerCase` alone (B19).
+67. **`.slice(0, n)` cuts an emoji in half.** A name cut to length kept a lone
+   surrogate, saved as "�" in file names, settings and note markup. Cut
+   names by characters: `Array.from(s).slice(0, n).join('')` (B20, B24);
+   `migrate.js` `dropHalfCharacters` repairs card names already saved.
+68. **A native dialog does not speak the app's language by itself.** The
+   renderer's `i18n.js` never reaches `dialog.*` in the main process. Every
+   dialog text goes through `electron/dialog-words.js` `words(en, lang, vars)`
+   with `await appLanguage()` (English when the window is gone or does not
+   answer in 250 ms); a new dialog string needs its de/pl/tr row there, or
+   `tests/dialog-words.test.js` fails (B26).
+69. **A copy that leaves the app is marked as from the Internet.** Open and
+   Save a copy write `Zone.Identifier` (ZoneId=3) on the finished copy
+   (`electron/mark-of-the-web.js`, Windows only, best effort), so Windows and
+   Office treat it like a download. Mark after `attachedTo`, never inside it:
+   that function also stages a sealed file for adoption into another note,
+   and a mark there would travel into stored note media (B27). macOS
+   quarantine is not done.
 
 ---
 

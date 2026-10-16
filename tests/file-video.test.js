@@ -50,6 +50,7 @@ describe('the card of a video file', () => {
     expect(card.getAttribute('contenteditable')).toBe('false');
     expect(card.dataset.kind).toBe('file');
     expect(card.dataset.name).toBe('My clip.mp4');
+    expect(makeVideoBlock(URL, `${'v'.repeat(199)}🌙 tail`).dataset.name).toBe(`${'v'.repeat(199)}🌙`); // hunt B24: never half an emoji
     expect(card.querySelector('.link-card__title').textContent).toBe('My clip.mp4');
     expect(card.querySelector('.link-card').hasAttribute('href')).toBe(false);      // a name, not a link
     expect(card.querySelector('.link-del').dataset.linkRemove).toBe('true');

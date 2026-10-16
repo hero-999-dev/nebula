@@ -93,6 +93,12 @@ describe('the command palette reads the menus', () => {
     expect(filterCommands(commands, 'nothingatall')).toEqual([]);
   });
 
+  it('finds İndir from indir and İNDİR, in an English or a Turkish window (hunt B19)', () => {
+    const commands = commandsOf([{ title: 'Dosya', items: [{ label: 'İndir', run() {} }] }]);
+    expect(filterCommands(commands, 'indir')).toHaveLength(1);
+    expect(filterCommands(commands, 'İNDİR')).toHaveLength(1);
+  });
+
   it('shows everything when nothing is typed', () => {
     const commands = commandsOf(menus());
     expect(filterCommands(commands, '')).toHaveLength(commands.length);

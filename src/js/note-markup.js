@@ -19,6 +19,7 @@ import { cleanTypingMarkers } from './inline-family.js';
 /** [where, the class that only means "on screen now"] */
 const CLASS_STATE = [
   ['.note-image.sel, .shape.sel', 'sel'],
+  ['.link-block.sel', 'sel'],
   ['.shape.editing', 'editing'],
   ['.note-arrow.is-selected', 'is-selected'],
   ['.arrow-target', 'arrow-target'],
@@ -37,9 +38,10 @@ const CLASS_STATE = [
  * readout, and the bar under a video's player (0.9.4, file-video.js) — drawn
  * whenever a note is shown, with the player's clock in it — and what is drawn
  * round a table (table.js): its numbering, grips, the two +, the fill square
- * and the choices for the selected cells.
+ * and the choices for the selected cells; and an attached file's Open and
+ * Save a copy (0.9.6, file-attach.js), in the app's language.
  */
-const TRANSIENT_NODES = '.shape-angle, .video-bar, .tbl-ui';
+export const TRANSIENT_NODES = '.shape-angle, .video-bar, .tbl-ui, .attach-bar';
 // (The crop frame and an embed's grip: the frame is on the page, not in the
 // note; the grip is in the note, rebuilt on load like a shape's handles.)
 

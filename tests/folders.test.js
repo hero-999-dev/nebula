@@ -95,6 +95,7 @@ describe('folders', () => {
     expect(cleanFolderName('  Work \n stuff  ')).toBe('Work stuff');
     expect(cleanFolderName('   ')).toBe('');
     expect(cleanFolderName('x'.repeat(200))).toHaveLength(80);
+    expect(cleanFolderName(`${'x'.repeat(79)}🌙 trip`)).toBe(`${'x'.repeat(79)}🌙`); // hunt B24: never half an emoji
   });
 
   it('reads only well-formed folders, each once', () => {

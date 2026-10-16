@@ -96,6 +96,7 @@ contextBridge.exposeInMainWorld('nebula', {
     remove: (id, noteId) => ipcRenderer.invoke('holes:remove', id, noteId),
     rename: (id, name) => ipcRenderer.invoke('holes:rename', id, name),
     addVideo: (id, noteId, source) => ipcRenderer.invoke('holes:add-video', id, noteId, String(source ?? '')),
+    addFile: (id, noteId, source) => ipcRenderer.invoke('holes:add-file', id, noteId, String(source ?? '')),
     importVideo: (id, noteId, file) => ipcRenderer.invoke('holes:import-video', id, noteId, file),
     exportVideo: (id, noteId, file) => ipcRenderer.invoke('holes:export-video', id, noteId, file),
     changePin: (id, pin) => ipcRenderer.invoke('holes:change-pin', id, pin),
@@ -138,6 +139,17 @@ contextBridge.exposeInMainWorld('nebula', {
     addVideo: (noteId, source) => ipcRenderer.invoke('media:add-video', String(noteId ?? ''), String(source ?? '')),
     pickVideo: () => ipcRenderer.invoke('media:pick-video'),
     openOutside: (url) => ipcRenderer.invoke('media:open-outside', String(url ?? '')),
+    // A file attached to a note (0.9.6, file-attach.js): copied in, chosen,
+    // saved out as a copy, or opened as a copy by its own program.
+    addFile: (noteId, source) => ipcRenderer.invoke('media:add-file', String(noteId ?? ''), String(source ?? '')),
+    pickFiles: () => ipcRenderer.invoke('media:pick-files'),
+    saveFile: (url, name) => ipcRenderer.invoke('media:save-file', String(url ?? ''), String(name ?? '')),
+    openFile: (url, name) => ipcRenderer.invoke('media:open-file', String(url ?? ''), String(name ?? '')),
+    forgetFile: (url) => ipcRenderer.invoke('media:forget-file', String(url ?? '')),
+    // A copy made for a note the window has left meanwhile: gone at the next start, unasked (hunt B18).
+    releaseAdded: (noteId, url) => ipcRenderer.invoke('media:release-added', String(noteId ?? ''), String(url ?? '')),
+    // A card pasted from another note: its file copied into this note at once (B4).
+    adoptFile: (noteId, hole, url) => ipcRenderer.invoke('media:adopt-file', String(noteId ?? ''), hole == null ? null : String(hole), String(url ?? '')),
     // Notes that lost many pictures at once: kept until the person answers (held-media.js).
     held: () => ipcRenderer.invoke('media:held'),
     dropHeld: (id) => ipcRenderer.invoke('media:drop-held', String(id ?? '')),

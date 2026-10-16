@@ -6,7 +6,7 @@
 
 import { loadJson, saveJson, generateId } from './storage.js';
 
-import { AI_SERVICES, firefoxUserAgentFor, isGoogleService, mergeServices, siteUrl, shouldSleep, sleepAfterMs } from './ai-services.js';
+import { AI_SERVICES, firefoxUserAgentFor, isGoogleService, mergeServices, siteUrl, cleanSiteName, shouldSleep, sleepAfterMs } from './ai-services.js';
 import { t } from './i18n.js';
 export { AI_SERVICES };
 
@@ -317,7 +317,7 @@ export function initAiPanel({ askText } = {}) {
     if (!site) return;
     menuItem(t('Change header'), async () => {
       const name = await askText?.(t('Header:'), site.name);
-      if (name?.trim()) changeSite(id, { name: name.trim().slice(0, 40) });
+      if (name?.trim()) changeSite(id, { name: cleanSiteName(name) });
     });
     menuItem(t('Change website'), async () => {
       const url = siteUrl(await askText?.(t('Website address:'), site.url));

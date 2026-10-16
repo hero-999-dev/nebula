@@ -1,3 +1,58 @@
+## 2026-10-16 (08:40) — after the consultation (B26, B27, the guide, two display cuts)
+
+- tests/dialog-words.test.js (new, Mistral): every dialog string has de, pl and tr; no translation drops or adds a {placeholder}; a full set of values leaves no {..}; an unknown key or language gives English (B26). tests/permissions.test.js (+1): the embed's question in tr, de and pl. FAIL-BEFORE: the module did not exist; askWords had no language.
+- tests/mark-of-the-web.test.js (new, 4, GPT Sol): ZoneId=3 written on Windows, read back from a real NTFS stream; nothing on other systems; a drive without streams does not fail the copy. tests/e2e/open-guard.mjs (+2, in smoke): the copy Open makes and the one Save a copy writes carry the mark, the stored attachment does not. FAIL-BEFORE: 0/2 on the old build (B27).
+- tests/opened-files.test.js (+1): every `clearOpened` scope goes through the real `shredTree` (spied), so an opened copy is overwritten before it goes.
+- tests/notes.test.js (+1), tests/link-preview.test.js (+1): the sidebar line and a link card's title never end in half an emoji (B24). FAIL-BEFORE: a lone high surrogate on the old code.
+- tests/e2e/v093.mjs: the landscape-then-Cancel check waits up to 6 s for a render still printing at Cancel to be discarded on arrival (pdf-preview.js) — it failed once in the full smoke on a loaded machine (1009/1010), passed 138/138 alone twice; not a leak.
+- tests/seed-guide.test.js, tests/e2e/guide.mjs: "10 · A page in a note that asks" before "11 · Where your notes live" and "12 · Code blocks"; "A page in a note asks first" in the feature list; new 0.9.6 signatures (en/de/pl/tr).
+
+## 2026-10-16 (05:00) — the bug hunt on the 0.9.6 test build (Claude, Mistral, GPT Sol; bugs B1–B24 in test-results/orchestra/hunt/bugs.md)
+
+Every test below failed on the code before its fix and passes after (each bug's entry in bugs.md says how it was checked).
+
+- tests/e2e/ipc-surface.mjs (new, in smoke): a backup label `.` or `..` is refused and a safe one makes a real backup (B1).
+- tests/e2e/app-lock-opened.mjs (new, in smoke): Lock Nebula clears an opened black-hole file (B3).
+- tests/file-attach.test.js, tests/opened-files.test.js: a long name is cut in its stem and keeps its ending (B2); the copied name always ends in the stored ending, a program/script/shortcut is known as one (B12); the card's face is drawn from the stored file, a true dotfile card stays true (B13); a real `.env` opens and saves as `.env` (B15).
+- tests/vault-presence.test.js (new), tests/e2e/vault-disconnect.mjs (new, in smoke): a vault folder gone missing is not made again; saving fails visibly (B6).
+- tests/e2e/attach-adopt.mjs (new, in smoke): a card pasted into another note is copied into it and opens there, plain and sealed (B4).
+- tests/note-media.test.js (+): a note keeps its own copy of a deleted note's file, at a start too (B5); a copy cut short goes from a saved note's folder and is never backed up (B8). tests/heal.test.js (+1): the museum exhibit for B5 — the markup repair leaves such an address to the disk repair.
+- tests/e2e/toggle-body.mjs (new, in smoke): a picture, a card or a video placed in a toggle body stays in it and folds with it (B7).
+- tests/e2e/dense.mjs: the old-notes signature skips what the screen draws (B9).
+- tests/e2e/pdf-scratch.mjs (new, in smoke): no PDF of a note left after Lock Nebula or locking a black hole (B10).
+- tests/e2e/card-keys.mjs (new, in smoke): a card can be picked, removed, undone and opened from the keyboard (B11).
+- tests/e2e/open-guard.mjs (new, in smoke): Open asks before a program; a forged card shows its stored ending (B12, B13).
+- tests/find.test.js (+): Find skips a code block's picker and a card's controls (B14); offsets stay right past İ, İ and ı match i, and no character in Unicode changes length when folded (B19). tests/e2e/find-folded.mjs (new, in smoke): a match in a folded toggle opens it (B16).
+- tests/notes.test.js (+): the sidebar search and preview skip a code block's picker (B17); "istanbul" finds "İstanbul" (B19).
+- tests/note-media.test.js (+1): a file copied for a note and given up when another note opened is released once, only from that note's own folder, so the next start asks nothing (B18).
+- tests/app-menu.test.js, tests/editor.test.js, tests/v093.test.js, tests/v094.test.js (+4): the command palette, @ and # suggestions, the label filter and picker and the slash menu find İndir, İstanbul, İş and Alıntı however the I is typed, in an English window (B19, part 2).
+- tests/export.test.js, tests/logo.test.js, tests/theme-custom.test.js (+1 each): a name cut to length never splits an emoji (B20); tests/folders.test.js, file-attach, file-video, v094 (fonts), black-holes, app-logo and labels tests the same at every other site (B24, 8 fail-before assertions by Mistral, +1 by Claude).
+- tests/heal.test.js (+1, residue museum): "up to 0.9.5: a video card whose name ended in half an emoji" — the half goes from the card's name and face, an emoji beside it stays, a second pass changes nothing (B24). tests/migrate.test.js: MARKUP_VERSION is 0.9.6.
+- tests/e2e/vault-disconnect.mjs: the test moves the folder away again for up to 5 s when Windows refuses for a moment (EPERM while the note's picture is read, or a scan) — it failed about half the runs at the wrap-up smoke, on Electron 44.7.2 as well as 44.8.0; then 3 of 3 runs 6/6. A folder held for good still fails it.
+- tests/navigation.test.js (new, 8): the app window stays on its page; only http, https and mailto go to the system; a page in a note opens nothing by itself and a pressed link goes to the browser once (B21, B23).
+- tests/permissions.test.js (new, 6): an embedded page never gets the microphone, the clipboard, notifications or the location; a chat tab keeps its voice; openExternal only for web and mail links; which sessions are AI tabs (B22).
+- tests/permissions.test.js (+6), tests/e2e/embed-ask.mjs (new, 7, in smoke) — B25, the owner's decision: an embedded page asking by itself gets no question; Don't allow leaves it without the microphone and it is not asked again; Allow gives it notifications (`Notification.permission` granted after, never before); a reload and the note opened again forget every answer. FAIL-BEFORE: on the old build the e2e failed 6 of 7 — `Notification.permission` was 'granted' with nobody asked, and no question was ever shown.
+- Probes kept outside the suite (they need a throwaway profile and a built app): test-results/orchestra/hunt/probes/ — c23/c23b (B21), c24 (B22), c25 (B23), c19 (B19), c18 (B18) and the rest.
+
+## 2026-10-15 (18:55) — files in a note (Nebula Test build, ships as 0.9.6)
+
+- tests/file-attach.test.js (new, 14): what a card says of its file (ending, kind, size, the line under the name); only a note's own attached file is an address it keeps; a name that is markup stays words; Open and Save a copy are added on the screen once and never saved; a click saves a copy, Open opens one, a locked black hole and a missing file are said, a cancelled save says nothing; a drop's kind; /file in the slash menu; "📎 name" for other programs; the file travels with the note into and out of a black hole; a held note gets its files back as cards.
+- tests/note-media.test.js (+5, "a file attached to a note (0.9.6)"): copied under a name of its own, the original left where it was; any ending, `bin` for an odd one; never outside a note; neither a picture nor a video whatever its ending; swept at the next start once the note no longer names it; shared by the backups and carried beside a note, never inside it.
+- tests/black-holes.test.js (+1): an attached file is sealed (its words are nowhere in the black hole) and comes out whole; a locked hole refuses it.
+- tests/opened-files.test.js (new, 12): what an attached file's address names, and nothing for a picture, a video, a path or a climb out; a name made a safe file name; where Open puts a copy, never outside its root; each copy goes with what it came from — a black hole locked or deleted (only its own), every black hole, a note taken out of one, a note deleted, a card taken out, the start; a scope that names no place clears nothing. (GPT findings 1-3.)
+- tests/file-attach.test.js (+2): a note opens only its own files — the address must name the open note and its black hole or none; a card pasted from another note is neither saved nor opened. (GPT finding 5.)
+- tests/note-media.test.js (+1): a note deleted while its file was being copied does not get its folder back; an unsaved note's first file still copies. (GPT finding 4.)
+- tests/note-media.test.js (+1): a new note left before its first save while its file was copied leaves nothing at the next start; a note that cannot be read, or a folder with anything else in it, is left. (GPT second review, 1.)
+- tests/e2e/editing-edges.mjs (+1, in smoke): a note whose first block is a divider, opened right after Backspace in another note with its caret on the note beside the divider, opens with the divider not picked. Fails on the code before the fix ({"armed":1}), passes after.
+- tests/e2e/smoke.mjs: a run that threw for a reason that is not a timeout exits 1, never 0; `ERR_ABORTED` / "(-3) loading" counts as could-not-finish (2). Mistral's run 2 had exited 0 with four suites never run.
+- npm run old-notes: 1 failed (the divider) twice in Mistral's runs → every trial passed after the fix.
+- tests/e2e/smoke.mjs: Help → Blocks lists 22 blocks (/file).
+- Unit, after the fixes: 68 files, 1164 of 1164.
+- Full smoke on the final tree (Claude, idle machine): 923 of 925. The two misses passed when their suites ran alone: note-folders "and Ctrl+Z brings the picture back", and black-holes "a passkey is added beside the PIN" (the passkey was written; the menu read straight after had not caught up). An earlier run, 866 of 878, failed the black-hole move-in cascade (as Mistral's run 3 did), and the suite failed alone on that dist/ too; after a fresh build it passed alone on the released 0.9.5 tree, on 0.9.5 with this tree's electron/ and src/, and on this tree. Most likely a stale dist/, not pinned down.
+- tests/ai-browser-auth.test.js: the ESR the sign-in tells Google is read from FIREFOX_ESR instead of a typed 140.
+- tests/check-browsers.test.js: "stops on an ESR that is no longer one" uses an ESR past the one the app tells (165), so it holds after each ESR bump.
+- tests/seed-guide.test.js, tests/guide-i18n.test.js: unchanged; pass on the 0.9.6 guide in four languages (signatures recorded).
+
 ## 2026-10-12 (15:30) — 0.9.5: two checks that held only before the version changed
 
 - tests/e2e/v094.mjs "What's new ... its list scrolls when it is longer than the window": it measured the list of the version being run. Here the suite runs before the version is raised (0.9.4's long list); where the release is built it runs on the new version, whose list of two things has nothing to scroll. The check makes the list long itself now.

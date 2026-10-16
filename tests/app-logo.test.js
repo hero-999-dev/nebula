@@ -248,6 +248,7 @@ describe('a shortcut made for the logo', () => {
   it('has a name a file may have, and is made nowhere without one', () => {
     const shell = shellOf();
     expect(path.basename(makeShortcut({ dir, name: 'Ne<bu>la: "Test"?', target: EXE, icon: EXE, shell }).file)).toBe('Ne bu la Test.lnk');
+    expect(path.basename(makeShortcut({ dir, name: `${'N'.repeat(79)}🌙 app`, target: EXE, icon: EXE, shell }).file)).toBe(`${'N'.repeat(79)}🌙.lnk`); // hunt B24: never half an emoji
     expect(makeShortcut({ dir, name: '  ', target: EXE, icon: EXE, shell })).toEqual({ ok: false, error: 'where' });
     expect(makeShortcut({ dir: '', name: 'Nebula', target: EXE, icon: EXE, shell })).toEqual({ ok: false, error: 'where' });
     const failing = { readShortcutLink: shell.readShortcutLink, writeShortcutLink: () => { throw new Error('denied'); } };

@@ -10,6 +10,75 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-10-16 08:23] v0.9.6 - by release-script
+
+
+* (no commits since the last release)
+
+---
+
+## [2026-10-16 08:40] v0.9.5 - by Claude (the owner: "GPT's limit is back, carry on; I approve everything you recommended; push afterwards — but first consult GPT")
+
+Not released until the push below. Consulted GPT Sol and Mistral on the nine open questions (test-results/orchestra/hunt/chat.md, 06:2x–08:3x); each change reviewed by another agent.
+
+- **Owner decisions recorded:** B5's rehome is an approved exception to the migrate.js rule; B7's old notes are left alone; B16 (Find does not push history) stays; label keys unchanged; imported links are not rewritten; the Firefox the sign-in windows claim needs nothing.
+- **B26** (Mistral; GPT OK) native dialogs (save, open, Open anyway, save error, the embed's question) were English in every language — `electron/dialog-words.js` `words(en, lang, vars)`, de/pl/tr, English per key when a row is missing; `appLanguage()` gives English when the window is gone, throws, or does not answer in 250 ms.
+- **B27** (GPT Sol; Claude and Mistral OK) a copy that left the app by Open or Save a copy carried no Mark-of-the-Web: Windows and Office treated it as a local file — `electron/mark-of-the-web.js` writes `Zone.Identifier` ZoneId=3 on the finished copy (Windows, best effort); the stored attachment and the sealed staging stay unmarked. macOS quarantine is not done (owner follow-up).
+- **Opened copies at lock and quit:** already shredded (`clearOpened` → `shredTree`) at start, quit, per card and when a black hole locks; a test now pins it (Claude; GPT OK).
+- **B24, display cuts** (Claude; GPT OK): the sidebar line (`plainSnippet`) and a link card's title cut by characters, never between an emoji's halves. Nothing stored changes.
+- **Guide:** B25 has its own section, "10 · A page in a note that asks", with a Try it; Where your notes live is 11, Code blocks 12; a "New in 0.9.6" line; en/de/pl/tr. GPT's wording objection taken: an embed never gets *what you copied* (writing to the clipboard, a Copy button, is allowed). Signatures: the first test build's renamed "0.9.6 first test build".
+- Electron 44.8.0 is current; check:browsers all ok.
+
+## [2026-10-16 05:00] v0.9.5 - by Claude (the owner: "the three of you look for bugs in new scenarios, talk, argue and fix them, report each fix to the others, do not cause new bugs — 4-5 hours"; later: "ChatGPT's limit ran out, you and Mistral carry on")
+
+Not released — a bug hunt on the 0.9.6 Nebula Test build, Claude, Mistral and GPT Sol (until its quota ran out, about 04:20), each fix reviewed by another. The record: `test-results/orchestra/hunt/` (bugs.md, chat.md, scenarios.md, probes/).
+
+- **B1** (GPT Sol; Claude OK) a backup label `..` wrote into backups/ itself and said it had worked — labels are a whitelist now.
+- **B2** (Claude; GPT OK) a long file name lost its ending: the card said "FILE", Save/Open gave a file with no ending — the clip keeps a short ending.
+- **B3** (GPT Sol; Claude OK) Lock Nebula left a black hole's opened file in the clear — every path that drops a hole's keys clears its opened copies.
+- **B4** (Mistral; GPT and Claude objected twice, then OK) a file card pasted into another note kept the first note's address — adopted into the new note: one copy plain to plain, a sealed source staged under its own folder and shredded, the ending kept.
+- **B5** (Claude; GPT OK) a note naming a deleted note's file lost its own copy at the next start — repaired on disk (`rehome`). The owner decides the migrate.js exception.
+- **B6** (GPT Sol; Claude OK) a vault folder gone missing was silently made again, empty — the app says so and does not write.
+- **B7** (Mistral; Claude OK, GPT asked for an old-note repair) things placed with the caret inside a toggle body landed after the toggle — `topBlockOf` stops at `.toggle-body`.
+- **B8** (Claude; Mistral and GPT OK) a copy cut short left `*.tmp-<pid>` in a saved note's folder for ever, and every backup copied it — swept at start, skipped by backups.
+- **B9** (Mistral; Claude and GPT OK) the old-notes/dense check counted on-screen controls, so real notes with a table, a card or a picked divider failed it.
+- **B10** (Claude; GPT OK) a note's PDF preview outlived Lock Nebula and printed from the system temp folder — `pdf-print/` in the profile, shredded.
+- **B11** (Mistral; GPT objected once, then OK) a bookmark or file card could be neither removed nor used from the keyboard.
+- **B12** (Claude; GPT OK) Open ran a program without a word, and the card's name chose the ending — the stored ending decides; a program asks first.
+- **B13** (Claude; GPT OK) a card's face was note text: "invoice.pdf" with a PDF logo over a stored .exe — the face is redrawn from the stored file.
+- **B14** (Claude; GPT OK) Ctrl+F counted a code block's language picker and a card's Open.
+- **B15** (GPT Sol; Claude OK) a real `.env` card opened and saved as `env` (`electron/opened-files.js`).
+- **B16** (Mistral; Claude OK) Find said "1 of 1" for a match inside a folded toggle and showed nothing — it opens the toggle.
+- **B17** (Claude; Mistral and GPT OK) the sidebar search and the list preview read a code block's picker: "python" found every note with a code block.
+- **B18** (Claude; Mistral OK) a file dropped, then another note opened while it copied: the next start asked about "pictures no longer shown" in a note that never had it.
+- **B19** (Claude; Mistral OK) the Turkish capital İ: Ctrl+F threw or marked the wrong letters, "istanbul" never found "İstanbul", and every search box (labels, @ notes, label filter and picker, command palette, slash menu) missed it — `src/js/fold.js`.
+- **B20** (Claude; Mistral OK) a name cut to length cut an emoji in half: an export saved as "…�.md", a logo theme or profile named "…�" — cut by characters.
+- **B21 — security** (Claude; Mistral OK) a plain link in a part of a note that is not editable (a note from another copy keeps them) took the app window to a web page that had the whole bridge — the notes, the black holes, the lock — or handed Windows `ms-settings:`, `ms-msdt:`, a file share. The main window now stays on its page (`will-navigate`), and only http, https and mailto ever go to the system (`electron/navigation.js`).
+- **B22 — privacy** (Claude; Mistral OK) a page embedded in a note had the microphone and read the clipboard, unasked: the permission list sat on the app window's session only. Every session gets it now (`electron/permissions.js`); embeds get full screen, the pointer and copy.
+- **B23** (Claude; Mistral OK) a page embedded in a note opened windows of the app's own with nobody clicking — fifteen in two seconds. Denied; a link pressed in the page goes to the browser, once per press.
+- **B24** (Mistral; Claude OK) the B20 cut in the other name sites: folders, file and video cards, toolbar fonts, the AI site name, a black hole's name and hint, the desktop shortcut, labels. A video card's name is saved in the note, so notes already holding half an emoji are repaired: `dropHalfCharacters` in migrate.js (MARKUP_VERSION 0.9.6 — every vault is brought up once, after a pre-heal backup); the heal guard does not count half a character as a word.
+- **B25 — the owner's decision, 05:45** (Claude): a page embedded in a note may ASK for the microphone, the camera or notifications. Nebula asks ("<site> wants to use your microphone", Don't allow / Allow, Don't allow first); with no Allow the page has nothing. The answer lives in memory only while that page is open — a reload, another page or the note opened again asks anew; a page that asks by itself, with nobody pressing anything in it, gets no question; one question at a time; a page told no is not asked again until it reloads. Found on the way: with no permission CHECK handler Electron told every embedded page `Notification.permission === 'granted'` — the embed session has one now, granting only what was allowed in this page load.
+- Electron 44.7.2 → 44.8.0 (check:browsers). tests/e2e/vault-disconnect.mjs moves the folder again for a moment when Windows refuses (it failed about half the runs, on both Electrons).
+- No other bug of the hunt wrote anything wrong into a note (B5's repair is on the disk, at every start). Owner questions: the B5 exception; B7's old-note repair; English native dialog titles; Mark-of-the-Web on opened and saved copies; whether opened copies are shredded at lock and quit; B16 not pushing history; label keys folded the same in every language; whether an embed may ever ask for the microphone or notifications.
+
+
+## [2026-10-15 18:55] v0.9.5 - by Claude (the owner: "OneNote-style file drag into a note — the file stays with its name, type and logo, a click downloads it; Mistral runs the tests, GPT Sol reviews")
+
+Not released — a Nebula Test build; it ships as 0.9.6 when the owner says "push".
+
+- **Files in a note.** Drag any file onto a note, or /file: a copy goes into the note's folder (`att-…` names; note-media.js `addAttachment`, black-holes.js `addFile` for a sealed note) and the note shows a card — a logo in the colour of its kind (PDF, Word, Excel, PowerPoint, archive, picture, sound, video, text, code, program, book, other) with the ending on it, the name, the size. A click on the card saves a copy where the person chooses; *Open* opens a copy with the file's own program (`userData/opened`, emptied at start, at quit, when a note is deleted and when a black hole is removed — a deleted note leaves no copy anywhere); × takes the card out, and the next start sweeps the file as it sweeps a video's.
+- An attached file is never shown as a picture or played as a video, whatever its ending; backups share it the way they share a video; a note moved into or out of a black hole carries it; a note held for lost files gets it back as a card; Markdown, Word and the other exports write "📎 name" where it stood.
+- A drop of pictures alone, or with a video, behaves as before; a drop with any other file makes every file a card.
+- The guide: "New in 0.9.6" and a Files part in section 7 ("7 · Links, pictures, videos and files"), in English, German, Polish and Turkish (GUIDE_VERSION 0.9.6).
+- Firefox ESR told to Google: 140 → 153 (check:browsers). Electron 44.7.0 → 44.7.2.
+- After GPT Sol's review (five findings, all fixed): a black hole locked, locked with the rest, or deleted takes the copies Open made of its files with it — they were in the clear until the quit; × on a card takes that file's opened copy; a copy that finishes after its note was deleted no longer brings the note's folder back (`copyInto`); a card opens and saves only the open note's own file (`ownsAttachUrl`). The opened copies' layout and rules are `electron/opened-files.js`. From Mistral's review: the × tooltip is translated, `media:forget-file` refuses after quit like its neighbours.
+- GPT's second review: a new note left before its first save while its file was copied left a folder no start swept; `tidyVault` now removes a folder with no note file in either layout that holds only copied-in files (`abandonedFolder`). Two limits stay, written down: a card's "only this note's file" is the note's rule, not the bridge's (a page that could call the bridge could already read every note through it); a copy another program holds open on Windows goes at the next clear, the quit or the start.
+- From Mistral's old-notes run (failed twice on a note of Nebula Test's, the same check): a note whose first block is a divider opened with that divider picked ("armed"), so the first Backspace in it would have taken the divider. The caret starts on the note itself beside the divider, and settleGap took that for a key that had brought it there — a key pressed in the note before, or none. Now only a key pressed in this note, since it opened and while it had the focus, can pick a divider that way; otherwise the line under it gets the caret (toolbar.js; editor.js sends `nebula-note-load`). Nothing was written into notes: `armed` is never saved.
+- Smoke no longer passes a run that threw: a throw that is not a timeout or a torn-down page exits 1 (it exited 0 with the suites after it never run), and an aborted page load (`ERR_ABORTED`) counts as "could not finish" (exit 2, which the release retries once).
+- Checked on the final tree: unit 1164 of 1164; full smoke 923 of 925, the two misses passing on their own (timing under the full run); Nebula Test.exe rebuilt.
+- The orchestra: Mistral runs the checks and writes test-results/orchestra/03-mistral-report.md; GPT Sol reads every report and writes 04-gpt-review.md.
+
 ## [2026-10-12 15:30] v0.9.5 - by Claude (the build on GitHub stopped on two checks; the tag moved to their repair)
 
 The push went out with every gate here passed (unit 1128 of 1128, smoke 924 of 924; the first smoke run lost the window's focus in two label checks, which passed alone and in the second run). On GitHub the Windows build's own smoke run failed, so nothing was published:

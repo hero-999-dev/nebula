@@ -10,6 +10,7 @@
  */
 
 import { t } from './i18n.js';
+import { fold } from './fold.js';
 
 /**
  * @param {object} ctx everything a command might need to act on
@@ -130,7 +131,7 @@ export function commandsOf(menus) {
     for (const item of menu.items) {
       if (item.separator || item.when?.() === false) continue;
       // Found by its English name and by the name it is shown under (i18n.js, 0.9.3).
-      out.push({ ...item, menu: menu.title, search: `${menu.title} ${item.label} ${t(menu.title)} ${t(item.label)}`.toLocaleLowerCase() });
+      out.push({ ...item, menu: menu.title, search: fold(`${menu.title} ${item.label} ${t(menu.title)} ${t(item.label)}`) });
     }
   }
   return out;
@@ -138,7 +139,7 @@ export function commandsOf(menus) {
 
 /** Commands whose label or menu matches every word of the query. Pure — tested. */
 export function filterCommands(commands, query) {
-  const words = String(query ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+  const words = fold(query).split(/\s+/).filter(Boolean);
   if (!words.length) return commands;
   return commands.filter((c) => words.every((w) => c.search.includes(w)));
 }

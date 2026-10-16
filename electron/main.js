@@ -16,8 +16,14 @@ import { AppLock } from './app-lock.js';
 import { readLogo, writeLogo, clearLogo, pointShortcuts, makeShortcut, pinnedAppId, taskbarDetails } from './app-logo.js';
 import { filesFromArgv, readNoteFile } from './open-file.js';
 import { offerOpenWith } from './open-with.js';
+import { attachedOf, attachedName, openedPath, runsCode, clearOpened as clearOpenedIn } from './opened-files.js';
+import { markOfTheWeb } from './mark-of-the-web.js';
+import { vaultPresence } from './vault-presence.js';
+import { staysOnPage, externalUrl, popupGate } from './navigation.js';
+import { allowed, isChatSession, isEmbedSession, ASK_EMBED, askKeys, checkKey, askWords, pageAnswers } from './permissions.js';
+import { words } from './dialog-words.js';
 import {
-  MEDIA_SCHEME, NOTE_ID, externalize, inlinePictures, rehome, removeNoteFolder, tidyVault, addVideo, pictureDataUrl, travelWhole, travelFolder, noteFile, noteIds, snapshotVault, missingMedia, sweepNote, RELEASED_FILE, readReleased, writeReleased, noteReleases,
+  MEDIA_SCHEME, NOTE_ID, externalize, inlinePictures, rehome, removeNoteFolder, tidyVault, addVideo, addAttachment, pictureDataUrl, travelWhole, travelFolder, noteFile, noteIds, snapshotVault, missingMedia, sweepNote, RELEASED_FILE, readReleased, writeReleased, noteReleases, releaseAdded,
   parseMediaUrl, mediaPath, mimeOf, byteRange, isVideoName, VIDEO_EXTENSIONS,
 } from './note-media.js';
 import { initUpdater } from './updater.js';
@@ -147,8 +153,33 @@ const PDF_OPTIONS = {
 };
 /** Where the export preview keeps its PDF while it is open: this app's own (Nebula Test and Nebula never share it). */
 const pdfPreviewDir = () => path.join(app.getPath('userData'), 'pdf-preview');
+/** Where the page a PDF is printed from lies while it prints: this app's own folder, never the system's. */
+const pdfPrintDir = () => path.join(app.getPath('userData'), 'pdf-print');
+/** The previews open now, each in a folder of its own under it: token -> { dir, file, data }. */
+const previews = new Map();
+let previewEpoch = 0;
+/**
+ * Every preview, and every page being printed, gone — shredded: they hold notes
+ * in the clear. At a lock (a black hole's note may be among them), at quit and
+ * at the start; a preview being made meanwhile is not kept.
+ */
+function dropAllPreviews() {
+  previewEpoch += 1;
+  previews.clear();
+  for (const dir of [pdfPreviewDir(), pdfPrintDir()]) {
+    try { shredTree(dir); } catch { /* another copy has one open: the next start */ }
+  }
+}
+/**
+ * Where an attached file is copied to be opened by its own program (0.9.6) —
+ * opened-files.js says where each lies and when it goes.
+ */
+const openedDir = () => path.join(app.getPath('userData'), 'opened');
+const clearOpened = (scope) => clearOpenedIn(openedDir(), scope);
 /** The preview's own session: a PDF shown, nothing navigated, nothing opened. */
 const PDF_PREVIEW_PARTITION = 'nebula-pdf-preview';
+/** Where a link embedded in a note is shown (src/js/rich-paste.js makeLinkBlock). */
+const EMBED_PARTITION = 'persist:embed';
 const inLastFolder = (name) => (lastFolder ? path.join(lastFolder, path.basename(name)) : name);
 const backupsRoot = () => path.join(app.getPath('userData'), 'backups');
 
@@ -543,7 +574,10 @@ function requestRendererSave(win) {
 
 app.on('before-quit', () => { quitRequested = true; });
 // The export preview's PDFs hold notes: none outlives the app (0.9.3).
-app.on('will-quit', () => { try { fsSync.rmSync(pdfPreviewDir(), { recursive: true, force: true }); } catch { /* in use */ } });
+app.on('will-quit', () => {
+  dropAllPreviews();
+  clearOpened();
+});
 
 /** The test build carries its own mark so the two are told apart at a glance. */
 function windowIconPath() {
@@ -752,9 +786,9 @@ function createWindow() {
       closing = false;
       if (win.isDestroyed()) return;
       await dialog.showMessageBox(win, {
-        type: 'error', buttons: ['Keep editing'],
-        message: 'Your latest changes could not be saved.',
-        detail: `${error.message}\nThe window has stayed open so you can retry saving.`,
+        type: 'error', buttons: [words('Keep editing', await appLanguage())],
+        message: words('Your latest changes could not be saved.', await appLanguage()),
+        detail: words('{error}\nThe window has stayed open so you can retry saving.', await appLanguage(), { error: error.message }),
       });
     });
   });
@@ -783,8 +817,14 @@ function createWindow() {
     win.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
+  // The window shows the app and nothing else (hunt B21, navigation.js): a page
+  // loaded in it would get the whole bridge. A link opens with Ctrl+click.
+  win.webContents.on('will-navigate', (event, url) => {
+    if (!staysOnPage(url, win.webContents.getURL())) event.preventDefault();
+  });
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    const href = externalUrl(url);
+    if (href) shell.openExternal(href);
     return { action: 'deny' };
   });
 
@@ -917,9 +957,9 @@ function registerShellHandlers() {
       rtf: [{ name: 'Rich Text', extensions: ['rtf'] }],
       enex: [{ name: 'Evernote export', extensions: ['enex'] }],
     };
-    const filters = FILTERS[format] ?? [{ name: 'Markdown', extensions: ['md'] }];
+    const filters = await appLanguage().then((lang) => (FILTERS[format] ?? [{ name: 'Markdown', extensions: ['md'] }]).map((f) => ({ ...f, name: words(f.name, lang) })));
     const { canceled, filePath } = await dialog.showSaveDialog(win, {
-      title: 'Export note',
+      title: words('Export note', await appLanguage()),
       defaultPath: inLastFolder(String(suggested ?? 'Untitled')),
       filters,
     });
@@ -983,31 +1023,35 @@ function registerShellHandlers() {
    * has nothing to offer it.
    */
   async function withPrintWindow(html, run) {
-    const dir = await fs.mkdtemp(path.join(app.getPath('temp'), 'nebula-print-'));
+    // The page is the note in the clear: it lies in this app's own folder,
+    // where a lock and the next start reach it, and is shredded when printed.
+    await fs.mkdir(pdfPrintDir(), { recursive: true });
+    const dir = await fs.mkdtemp(path.join(pdfPrintDir(), 'print-'));
     const file = path.join(dir, 'note.html');
-    await fs.writeFile(file, html, 'utf8');
-    const win = new BrowserWindow({
-      show: false,
-      width: 900,
-      height: 1200,
-      backgroundColor: '#FFFFFF',
-      webPreferences: {
-        javascript: false,
-        sandbox: true,
-        contextIsolation: true,
-        nodeIntegration: false,
-        webSecurity: true,
-      },
-    });
+    let win = null;
     try {
+      await fs.writeFile(file, html, 'utf8');
+      win = new BrowserWindow({
+        show: false,
+        width: 900,
+        height: 1200,
+        backgroundColor: '#FFFFFF',
+        webPreferences: {
+          javascript: false,
+          sandbox: true,
+          contextIsolation: true,
+          nodeIntegration: false,
+          webSecurity: true,
+        },
+      });
       await win.loadFile(file);
       // Web fonts (KaTeX) and the first layout; printing before they land gives
       // a page set in fallback faces.
       await new Promise((resolve) => { setTimeout(resolve, 350); });
       return await run(win);
     } finally {
-      try { win.destroy(); } catch { /* already gone */ }
-      try { await fs.rm(dir, { recursive: true, force: true }); } catch { /* leave it */ }
+      try { win?.destroy(); } catch { /* already gone */ }
+      try { shredTree(dir); } catch { /* the next start takes it */ }
     }
   }
 
@@ -1018,21 +1062,25 @@ function registerShellHandlers() {
    * The file holds the note, so it goes when the preview closes, and anything a
    * crash left behind goes at the next start (deleted notes stay deleted).
    */
-  const previews = new Map();          // token -> { file, data }
   async function dropPreview(token) {
     const p = previews.get(token);
     previews.delete(token);
-    if (p) await fs.rm(p.file, { force: true }).catch(() => {});
+    if (p) { try { shredTree(p.dir); } catch { /* the next start takes it */ } }
   }
   ipcMain.handle('note:pdf-preview', async (e, { document: html } = {}) => {
     if (!from(e) || typeof html !== 'string' || !html) return { ok: false };
+    const epoch = previewEpoch;
     try {
       const data = await withPrintWindow(html, (w) => w.webContents.printToPDF(PDF_OPTIONS));
-      await fs.mkdir(pdfPreviewDir(), { recursive: true });
+      // Locked while it was printing: what it was of is shut now, and nothing of it is kept.
+      if (epoch !== previewEpoch || shut()) return { ok: false, error: 'locked' };
       const token = randomUUID();
-      const file = path.join(pdfPreviewDir(), `${token}.pdf`);
+      const dir = path.join(pdfPreviewDir(), token);
+      const file = path.join(dir, 'preview.pdf');
+      await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(file, data);
-      previews.set(token, { file, data });
+      if (epoch !== previewEpoch) { try { shredTree(dir); } catch { /* the next start */ } return { ok: false, error: 'locked' }; }
+      previews.set(token, { dir, file, data });
       return { ok: true, token, url: pathToFileURL(file).href, bytes: data.length };
     } catch (err) {
       return { ok: false, error: err.message };
@@ -1043,7 +1091,7 @@ function registerShellHandlers() {
     const p = previews.get(token);
     if (!win || !p) return { ok: false };
     const { canceled, filePath } = await dialog.showSaveDialog(win, {
-      title: 'Export as PDF',
+      title: words('Export as PDF', await appLanguage()),
       defaultPath: inLastFolder(String(suggested ?? 'Untitled.pdf')),
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
     });
@@ -1063,7 +1111,7 @@ function registerShellHandlers() {
     const win = from(e);
     if (!win) return { ok: false };
     const { canceled, filePath } = await dialog.showSaveDialog(win, {
-      title: 'Export as PDF',
+      title: words('Export as PDF', await appLanguage()),
       defaultPath: inLastFolder(String(suggested ?? 'Untitled.pdf')),
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
     });
@@ -1113,11 +1161,11 @@ function registerShellHandlers() {
     if (!win) return { ok: false };
     const { canceled, filePaths } = await dialog.showOpenDialog(win, {
       ...(lastFolder ? { defaultPath: lastFolder } : {}),
-      title: 'Import a note',
+      title: words('Import a note', await appLanguage()),
       properties: ['openFile'],
       filters: [
-        { name: 'Notes', extensions: ['md', 'markdown', 'html', 'htm', 'txt', 'json', 'docx', 'odt', 'doc', 'rtf', 'enex'] },
-        { name: 'All files', extensions: ['*'] },
+        { name: words('Notes', await appLanguage()), extensions: ['md', 'markdown', 'html', 'htm', 'txt', 'json', 'docx', 'odt', 'doc', 'rtf', 'enex'] },
+        { name: words('All files', await appLanguage()), extensions: ['*'] },
       ],
     });
     if (!canceled && filePaths?.[0]) lastFolder = path.dirname(filePaths[0]);
@@ -1263,7 +1311,56 @@ async function measureRealScale(win) {
 }
 
 /** The app's language, for the page a sign-in window shows when Google refused every way. */
-const appLanguage = () => mainWindow?.webContents?.executeJavaScript("localStorage.getItem('nebula:lang') || 'en'").catch(() => 'en') ?? 'en';
+const appLanguage = async () => { try { const wc = mainWindow?.webContents; return wc && !wc.isDestroyed() ? await Promise.race([wc.executeJavaScript("localStorage.getItem('nebula:lang') || 'en'"), new Promise((r) => setTimeout(() => r('en'), 250))]) : 'en'; } catch { return 'en'; } }; // en when the window is gone, thrown at, or not answering (hunt B26)
+
+// Every other session — an embed in a note (persist:embed), an AI tab
+// (persist:ai-<id>), the PDF preview — is made when its first view is: with no
+// handler it granted a page everything, the microphone and the clipboard too (hunt B22).
+// The default session is made here too: its own handler, set once the app is
+// ready, takes the place of this one.
+app.on('session-created', (ses) => {
+  const chat = isChatSession(ses.storagePath);
+  const embed = isEmbedSession(ses.storagePath);
+  ses.setPermissionRequestHandler((wc, permission, cb, details) => {
+    if (embed && ASK_EMBED.has(permission)) { askEmbed(wc, permission, details).then(cb, () => cb(false)); return; }
+    cb(allowed(permission, { chat, externalURL: details?.externalURL }));
+  });
+  // With no check handler Electron answers every check "granted": an embedded
+  // page saw Notification.permission === 'granted' and showed notifications it
+  // never asked for. What it may ask for, it has only once the person said yes.
+  if (embed) {
+    ses.setPermissionCheckHandler((wc, permission, origin, details) => {
+      if (!ASK_EMBED.has(permission)) return true;
+      return !!(wc && embedPages.get(wc)?.granted(checkKey(permission, { origin, mediaType: details?.mediaType })));
+    });
+  }
+});
+
+// A page embedded in a note may ask for the microphone, the camera or
+// notifications; the person answers, and the answer lives only as long as that
+// page is open (owner, 2026-10-16; permissions.js, hunt B25).
+const embedPages = new WeakMap();
+async function askEmbed(wc, permission, details) {
+  const page = wc && embedPages.get(wc);
+  const url = details?.requestingUrl || wc?.getURL?.() || '';
+  const keys = askKeys(permission, { url, mediaTypes: details?.mediaTypes });
+  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+  const verdict = page && win && !shut() ? page.decide(keys) : 'deny';
+  if (verdict !== 'ask') return verdict === 'allow';
+  const load = page.load();
+  page.asking(true);
+  try {
+    const lang = await appLanguage(); const { message, detail } = askWords(permission, { url, mediaTypes: details?.mediaTypes, lang });
+    const { response } = await dialog.showMessageBox(win, {
+      type: 'question', buttons: [words("Don't allow", lang), words('Allow', lang)], defaultId: 0, cancelId: 0, noLink: true, message, detail,
+    });
+    const yes = response === 1 && !wc.isDestroyed() && page.load() === load && !shut();
+    page.answer(keys, yes, load);
+    return yes;
+  } finally {
+    if (page.load() === load) page.asking(false);
+  }
+}
 
 app.on('web-contents-created', (_event, contents) => {
   try { contents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp'); } catch { /* a contents that cannot take it */ }
@@ -1273,8 +1370,23 @@ app.on('web-contents-created', (_event, contents) => {
     contents.on('will-navigate', (ev) => ev.preventDefault());
     contents.setWindowOpenHandler(() => ({ action: 'deny' }));
   }
+  if (contents.getType() === 'webview' && contents.session === session.fromPartition(EMBED_PARTITION)) {
+    // A page embedded in a note opened windows of the app's own, unasked (hunt
+    // B23, navigation.js): a link the user just pressed goes to the browser.
+    const gate = popupGate();
+    const page = pageAnswers();
+    embedPages.set(contents, page);
+    contents.on('input-event', (_e, input) => { if (input.type === 'mouseDown' || input.type === 'keyDown') { gate.touched(); page.pressed(); } });
+    // A reload or another page in the embed is asked again (hunt B25).
+    contents.on('did-navigate', () => page.reset());
+    contents.setWindowOpenHandler(({ url }) => {
+      const href = gate.take(url);
+      if (href) shell.openExternal(href);
+      return { action: 'deny' };
+    });
+  }
   if (contents.getType() === 'webview') {
-    const id = Object.keys(AI_SERVICES).find(id => contents.session === session.fromPartition('persist:ai-' + id));
+    const id =Object.keys(AI_SERVICES).find(id => contents.session === session.fromPartition('persist:ai-' + id));
     // Google sign-in stays in the app, in this service's own session (0.9.2).
     if (id) {
       const popupOptions = { parent: mainWindow ?? undefined };
@@ -1349,6 +1461,7 @@ app.whenReady().then(async () => {
       if (!JSON.parse(text)?.id) return { ok: false, error: 'unreadable' };
       const only = new Set(files);
       const removed = sweepNote(notesRoot(), String(id), text, { videos: true, only });
+      if (!fsSync.existsSync(path.join(notesRoot(), String(id)))) vault?.forget(String(id));
       purgeUnnamedFromBackups(notesRoot(), backupsRoot(), { only: new Map([[String(id), only]]) });
       heldMedia.delete(String(id));
       return { ok: true, removed };
@@ -1369,21 +1482,25 @@ app.whenReady().then(async () => {
   ipcMain.handle('media:data-url', (e, url) => (e.sender === mainWindow?.webContents && !shut() ? pictureDataUrl(notesRoot(), String(url ?? '')) : null));
   // A copy is made while the key is still down: this one answers at once.
   ipcMain.on('media:inline-sync', (e, html) => { e.returnValue = e.sender === mainWindow?.webContents && !shut() ? inlinePictures(String(html ?? ''), notesRoot()) : String(html ?? ''); });
-  // Webviews load arbitrary sites — allow only what chat UIs legitimately need.
-  const ALLOWED_PERMISSIONS = new Set([
-    'media', 'notifications', 'fullscreen', 'clipboard-sanitized-write', 'pointerLock', 'openExternal',
-  ]);
-  session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => {
+  // The app's own window. Embeds and AI tabs have sessions of their own,
+  // guarded where each is made (session-created, permissions.js).
+  session.defaultSession.setPermissionRequestHandler((wc, permission, cb, details) => {
     // The font menu's "Add a font" lists the fonts of this computer (0.9.4).
     // Only the app's own window may ask: an embedded page must not learn them.
     if (permission === 'local-fonts') { cb(wc === mainWindow?.webContents); return; }
-    cb(ALLOWED_PERMISSIONS.has(permission));
+    // openExternal: a link with a scheme the browser does not know asks this
+    // before Windows runs it — ms-settings:, ms-msdt:, a file share (hunt B21).
+    cb(allowed(permission, { chat: true, externalURL: details?.externalURL }));
   });
 
-  try { fsSync.rmSync(pdfPreviewDir(), { recursive: true, force: true }); } catch { /* another copy has one open */ }
+  dropAllPreviews();
+  clearOpened();
   snapshotStorage();
   purgeOldDeletions();
   prepareNoteFolders();
+  // Capture after startup migrations, which legitimately move and create folders.
+  const vault = vaultPresence(notesRoot());
+  vault.capture();
   stampVaultMeta();
   dropOldBackups();
   protocol.handle(MEDIA_SCHEME, serveMedia);
@@ -1445,6 +1562,8 @@ app.whenReady().then(async () => {
   lock('now', () => {
     if (!appLock.lockNow()) return { ok: false, error: 'unset' };
     blackHoles.lockAll();
+    clearOpened({ holes: true });
+    dropAllPreviews();
     setImmediate(() => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.reload(); });
     return { ok: true };
   });
@@ -1465,8 +1584,9 @@ app.whenReady().then(async () => {
     if (swept?.length) purgeHoleFilesFromBackups(backupsRoot(), String(id), swept);
     return res;
   });
-  hole('lock', (id) => ({ ok: blackHoles.lock(String(id ?? '')) }));
-  hole('lock-all', () => { blackHoles.lockAll(); return { ok: true }; });
+  // Shut, a black hole's files are in the clear nowhere: the copies Open made go too.
+  hole('lock', (id) => { const ok = blackHoles.lock(String(id ?? '')); clearOpened({ holeId: String(id ?? '') }); dropAllPreviews(); return { ok }; });
+  hole('lock-all', () => { blackHoles.lockAll(); clearOpened({ holes: true }); dropAllPreviews(); return { ok: true }; });
   // Sealed whole: a note that still names pictures in the notes folder (it was
   // just moved in) has them written into it first — the folder goes with its plain file.
   hole('write', (id, noteId, json) => blackHoles.write(String(id ?? ''), String(noteId ?? ''), inlinePictures(String(json ?? ''), notesRoot())));
@@ -1474,11 +1594,14 @@ app.whenReady().then(async () => {
     const res = blackHoles.remove(String(id ?? ''), String(noteId ?? ''));
     // Deleted is deleted: its sealed copies leave the backups too.
     if (res.ok) purgeHoleNoteFromBackups(backupsRoot(), String(id), String(noteId));
+    if (res.ok) clearOpened({ holeId: String(id ?? ''), noteId: String(noteId ?? '') });
     return res;
   });
   hole('rename', (id, name) => blackHoles.rename(String(id ?? ''), name));
   // A video file for a note in a black hole: sealed there, never in the notes folder.
   hole('add-video', (id, noteId, source) => blackHoles.addVideo(String(id ?? ''), String(noteId ?? ''), String(source ?? '')));
+  // Any file attached to a note in a black hole (0.9.6): sealed beside it as a video is.
+  hole('add-file', (id, noteId, source) => blackHoles.addFile(String(id ?? ''), String(noteId ?? ''), String(source ?? '')));
   // A note moved in with its videos: each is sealed under the name it has, from the note's own folder.
   hole('import-video', (id, noteId, file) => {
     const source = mediaPath(notesRoot(), String(noteId ?? ''), String(file ?? ''));
@@ -1489,7 +1612,9 @@ app.whenReady().then(async () => {
   hole('export-video', async (id, noteId, file) => {
     const dest = mediaPath(notesRoot(), String(noteId ?? ''), String(file ?? ''));
     if (!dest) return { ok: false, error: 'missing' };
+    vault.assert(String(noteId));
     const res = await blackHoles.exportVideo(String(id ?? ''), String(noteId), String(file), dest);
+    if (res.ok) vault.remember(String(noteId));
     return res.ok ? { ok: true, url: `nebula-media://note/${noteId}/${file}` } : res;
   });
   hole('change-pin', (id, pin) => blackHoles.changePin(String(id ?? ''), pin));
@@ -1499,6 +1624,7 @@ app.whenReady().then(async () => {
   hole('delete', async (id, by) => {
     const res = await blackHoles.delete(String(id ?? ''), by ?? {});
     if (res.ok) purgeHoleFromBackups(backupsRoot(), String(id));
+    if (res.ok) clearOpened({ holeId: String(id ?? '') });
     return res;
   });
   app.on('before-quit', () => blackHoles.lockAll());
@@ -1513,7 +1639,12 @@ app.whenReady().then(async () => {
   // A video file dropped into a note: copied into that note's folder (0.9.4).
   ipcMain.handle('media:add-video', async (e, id, source) => {
     if (e.sender !== mainWindow?.webContents || shut()) return { ok: false, error: 'not allowed' };
-    return addVideo(notesRoot(), String(id ?? ''), String(source ?? ''));
+    try {
+      vault.assert(String(id ?? ''));
+      const res = await addVideo(notesRoot(), String(id ?? ''), String(source ?? ''));
+      if (res.ok) vault.remember(String(id));
+      return res;
+    } catch (err) { return { ok: false, error: err.message }; }
   });
   // /video (0.9.4): a video file chosen from the computer. Only its path goes
   // back; it is copied into the note, or sealed into its black hole, as a dropped one is.
@@ -1522,10 +1653,10 @@ app.whenReady().then(async () => {
     if (!win || e.sender !== mainWindow?.webContents) return { ok: false };
     if (pickingVideo) return { ok: false, canceled: true };
     const options = {
-      title: 'Add a video',
+      title: words('Add a video', await appLanguage()),
       defaultPath: lastFolder || undefined,
       properties: ['openFile'],
-      filters: [{ name: 'Video', extensions: VIDEO_EXTENSIONS }, { name: 'All files', extensions: ['*'] }],
+      filters: [{ name: words('Video', await appLanguage()), extensions: VIDEO_EXTENSIONS }, { name: words('All files', await appLanguage()), extensions: ['*'] }],
     };
     // On Windows the dialog is nobody's child. /video is typed, and Chromium
     // hides the pointer while one types until the mouse moves over its window;
@@ -1541,6 +1672,160 @@ app.whenReady().then(async () => {
     if (canceled || !filePaths?.[0]) return { ok: false, canceled: true };
     lastFolder = path.dirname(filePaths[0]);
     return { ok: true, path: filePaths[0] };
+  });
+  // Any file dropped into a note with other kinds, or chosen by /file (0.9.6):
+  // copied into the note's folder and kept there, under a name of its own (note-media.js).
+  ipcMain.handle('media:add-file', async (e, id, source) => {
+    if (e.sender !== mainWindow?.webContents || shut()) return { ok: false, error: 'not allowed' };
+    try {
+      vault.assert(String(id ?? ''));
+      const res = await addAttachment(notesRoot(), String(id ?? ''), String(source ?? ''));
+      if (res.ok) vault.remember(String(id));
+      return res;
+    } catch (err) { return { ok: false, error: err.message }; }
+  });
+  // /file (0.9.6): files chosen from the computer, to be attached. Only their paths go back.
+  ipcMain.handle('media:pick-files', async (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win || e.sender !== mainWindow?.webContents) return { ok: false };
+    if (pickingVideo) return { ok: false, canceled: true };
+    const options = { title: words('Attach files', await appLanguage()), defaultPath: lastFolder || undefined, properties: ['openFile', 'multiSelections'] };
+    // Nobody's child on Windows, for the hidden pointer (media:pick-video).
+    pickingVideo = true;
+    let picked;
+    try { picked = await (process.platform === 'win32' ? dialog.showOpenDialog(options) : dialog.showOpenDialog(win, options)); }
+    finally { pickingVideo = false; }
+    if (!win.isDestroyed()) win.focus();
+    const { canceled, filePaths } = picked;
+    if (canceled || !filePaths?.length) return { ok: false, canceled: true };
+    lastFolder = path.dirname(filePaths[0]);
+    return { ok: true, paths: filePaths };
+  });
+  /**
+   * An attached file, by its address, copied to dest: from the note's own
+   * folder, or — in a black hole — opened out of its seal. Only an attached file.
+   */
+  const attachedTo = async (url, dest) => {
+    const of = attachedOf(url);
+    if (!of) return { ok: false, error: 'missing' };
+    if (of.holeId) {
+      const res = await blackHoles.exportVideo(of.holeId, of.noteId, of.file, dest);
+      return res.ok ? { ok: true } : { ok: false, error: res.error ?? 'missing' };
+    }
+    const file = mediaPath(notesRoot(), of.noteId, of.file);
+    if (!file || !fsSync.existsSync(file)) return { ok: false, error: 'missing' };
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    const tmp = dest + '.tmp-' + process.pid;
+    try {
+      await fs.copyFile(file, tmp);
+      await fs.rename(tmp, dest);
+    } catch (err) {
+      await fs.rm(tmp, { force: true }).catch(() => {});
+      throw err;
+    }
+    return { ok: true };
+  };
+  // A click on a file's card (0.9.6): a copy of it saved where the person says, in Downloads unless they choose.
+  ipcMain.handle('media:save-file', async (e, url, name) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (!win || e.sender !== mainWindow?.webContents || shut()) return { ok: false };
+    const of = attachedOf(url);
+    if (!of) return { ok: false, error: 'missing' };
+    const options = { title: words('Save a copy', await appLanguage()), defaultPath: path.join(app.getPath('downloads'), attachedName(name, of.file)) };
+    const picked = await (process.platform === 'win32' ? dialog.showSaveDialog(options) : dialog.showSaveDialog(win, options));
+    if (!win.isDestroyed()) win.focus();
+    if (picked.canceled || !picked.filePath) return { ok: false, canceled: true };
+    try {
+      const res = await attachedTo(url, picked.filePath);
+      if (res.ok) await markOfTheWeb(picked.filePath);
+      return res.ok ? { ok: true, path: picked.filePath } : res;
+    } catch (err) { return { ok: false, error: err.message }; }
+  });
+  // "Open" on a file's card: a copy, opened by the program the system has for its kind (openedDir).
+  ipcMain.handle('media:open-file', async (e, url, name) => {
+    if (e.sender !== mainWindow?.webContents || shut()) return { ok: false };
+    // A folder of its own per file, so two files of one name both open.
+    const dest = openedPath(openedDir(), url, name);
+    if (!dest) return { ok: false, error: 'missing' };
+    // A program, a script, a shortcut is run, not shown: never at one click (hunt B12).
+    // Judged by the stored ending — the name on the card is note text and may say anything.
+    if (runsCode(attachedOf(url).file, name)) {
+      const win = BrowserWindow.fromWebContents(e.sender);
+      const lang = await appLanguage(); const options = {
+        type: 'warning', buttons: [words('Cancel', lang), words('Open anyway', lang)], defaultId: 0, cancelId: 0, noLink: true,
+        message: words('{file} can run code on this computer.', lang, { file: path.basename(dest) }),
+        detail: words('What it runs can reach everything you can. Open it only if you trust where this note came from. Save a copy keeps it without running it.', lang),
+      };
+      const { response } = await (win ? dialog.showMessageBox(win, options) : dialog.showMessageBox(options));
+      if (response !== 1) return { ok: false, canceled: true };
+      if (shut()) return { ok: false };
+    }
+    try {
+      // Opened already since the start: the same copy — a program may hold it, and the file never changes.
+      if (!fsSync.existsSync(dest)) {
+        const res = await attachedTo(url, dest);
+        if (!res.ok) return res;
+        await markOfTheWeb(dest);
+      }
+      const error = await shell.openPath(dest);
+      return error ? { ok: false, error } : { ok: true };
+    } catch (err) { return { ok: false, error: err.message }; }
+  });
+  // A file's card taken out of its note: the copy Open made of it goes now (the file itself at the next start).
+  ipcMain.handle('media:forget-file', (e, url) => {
+    if (e.sender !== mainWindow?.webContents || shut()) return { ok: false };
+    return { ok: true, removed: clearOpened({ url: String(url ?? '') }) };
+  });
+  // A file, video or adopted card copied for a note the window has left meanwhile (hunt B18): never
+  // named, so nothing released it — released now, it goes at the next start without a question.
+  ipcMain.handle('media:release-added', (e, id, url) => {
+    if (e.sender !== mainWindow?.webContents || shut()) return { ok: false };
+    try {
+      if (!releaseAdded(released, notesRoot(), String(id ?? ''), String(url ?? ''))) return { ok: false };
+      writeReleased(releasedFile(), released);
+      return { ok: true };
+    } catch (err) { return { ok: false, error: err.message }; }
+  });
+  // A file card pasted into this note from another one: the file it names is
+  // copied in here at once — sealed beside the note when it is in a black
+  // hole — and the card is given this note's own address for it. The save's
+  // rehome would copy the file later, but the live card is never told: without
+  // this the card's click is refused until a restart.
+  ipcMain.handle('media:adopt-file', async (e, id, hole, url) => {
+    if (e.sender !== mainWindow?.webContents || shut()) return { ok: false, error: 'not allowed' };
+    const noteId = String(id ?? '');
+    const holeId = hole == null ? null : String(hole);
+    const of = attachedOf(String(url ?? ''));
+    if (!NOTE_ID.test(noteId) || !of) return { ok: false, error: 'missing' };
+    if (of.holeId === holeId && of.noteId === noteId) return { ok: true, url: String(url ?? '') };
+    try { if (!holeId) vault.assert(noteId); }
+    catch (err) { return { ok: false, error: err.message }; }
+    const plain = of.holeId ? null : mediaPath(notesRoot(), of.noteId, of.file);
+    if (plain && !fsSync.existsSync(plain)) return { ok: false, error: 'missing' };
+    // A plain source is copied straight in, once, from the note's own file:
+    // sealed when the destination is a black hole, a folder file otherwise.
+    if (plain) {
+      const added = holeId ? await blackHoles.addFile(holeId, noteId, plain) : await addAttachment(notesRoot(), noteId, plain);
+      if (!holeId && added?.ok) vault.remember(noteId);
+      return added?.ok ? { ok: true, url: added.url } : { ok: false, error: added?.error ?? 'missing' };
+    }
+    // A sealed source: its bytes come out through one plain copy under the
+    // source's opened scope — inside the profile, under the source hole, so a
+    // hole's lock or deletion shreds it and the next start takes any a crash
+    // left behind — named as the stored file, so its ending is kept. The
+    // folder is unique and is shredded when the copy is done.
+    const stage = path.join(openedDir(), 'hole', of.holeId, of.noteId, 'adopt', `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, of.file);
+    try {
+      const copied = await attachedTo(String(url ?? ''), stage);
+      if (!copied.ok) return copied;
+      const added = holeId ? await blackHoles.addFile(holeId, noteId, stage) : await addAttachment(notesRoot(), noteId, stage);
+      if (!holeId && added?.ok) vault.remember(noteId);
+      return added?.ok ? { ok: true, url: added.url } : { ok: false, error: added?.error ?? 'missing' };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    } finally {
+      try { shredTree(path.dirname(stage)); } catch { /* already gone */ }
+    }
   });
   // A video the app's own player cannot play (an AVI, a WMV): the system's
   // player is asked to. Only a video file of a note's own folder, by its address.
@@ -1577,9 +1862,13 @@ app.whenReady().then(async () => {
   // one step that writes notes nobody opened — the vault is put aside under a
   // label. A labelled copy is never overwritten, so asking twice keeps the first.
   ipcMain.handle('storage:backup', (_e, label) => {
-    const safe = String(label ?? '').replace(/[^\w.-]/g, '').slice(0, 64);
-    if (!safe) return { ok: false };
-    const dest = snapshotStorage({ label: safe });
+    const name = String(label ?? '');
+    // A label is one folder name, never a path. In particular '.' and '..'
+    // would make snapshotStorage mistake backups/ or the profile root for a
+    // completed backup; a stray .making there could make it remove that tree.
+    if (!/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$/.test(name)
+        || /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(name)) return { ok: false };
+    const dest = snapshotStorage({ label: name });
     return dest ? { ok: true, path: dest } : { ok: false };
   });
 
@@ -1587,6 +1876,7 @@ app.whenReady().then(async () => {
     // Shut (app-lock.js): "could not be read", never "not there" — the window must not take it for an empty vault.
     if (shut()) return { ok: false, missing: false, error: 'locked' };
     try {
+      vault.assert(noteIdOf(rel));
       let data;
       try {
         data = await fs.readFile(inStorage(rel), 'utf8');
@@ -1609,12 +1899,13 @@ app.whenReady().then(async () => {
   // never left half-written (a crash or a racing write can't corrupt it).
   ipcMain.handle('storage:write', async (_e, rel, content) => {
     if (shut()) throw new Error('Nebula is locked');
+    const noteId = noteIdOf(rel);
+    vault.assert(noteId);
     const abs = inStorage(rel);
     await fs.mkdir(path.dirname(abs), { recursive: true });
     // A note's pictures go to its folder as files, and its file keeps their
     // names (note-media.js): the files first, so the text never names one
     // that is not there.
-    const noteId = noteIdOf(rel);
     const stored = noteId ? rehome(externalize(content, noteId, notesRoot()).text, noteId, notesRoot()) : content;
     // What this write takes out of the note is written down as taken out by the person — so that the next start
     // deletes it without asking — and written down first: cut off between the two, the note still names the file.
@@ -1634,6 +1925,7 @@ app.whenReady().then(async () => {
       await fs.rm(tmp, { force: true }).catch(() => {});
       throw err;
     }
+    if (noteId) vault.remember(noteId);
     // A picture taken out of the note keeps its file until the next start: an undo may still want it.
     return { ok: true, path: abs };
   });
@@ -1641,6 +1933,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('storage:list', async (_e, relDir) => {
     if (shut()) return { ok: false, files: [], error: 'locked' };
     try {
+      vault.assert();
       const dir = resolveInStorage(relDir);
       const files = await fs.readdir(dir);
       // The notes: each is a folder with its file in it, named to the window as `<id>.json`.
@@ -1663,6 +1956,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('storage:delete', async (_e, rel) => {
     if (shut()) return { ok: false };
     try {
+      vault.assert(noteIdOf(rel));
       const abs = resolveInStorage(rel);
       if (!rel || abs === storageRoot()) return { ok: false };
       // A note: its file is in its folder, which goes whole just below (and a flat file of an older vault with it).
@@ -1670,7 +1964,7 @@ app.whenReady().then(async () => {
       // A note deleted from the vault (the Trash's Delete) leaves every backup
       // with it: a deleted note must not be recoverable (owner, 2026-09-27).
       const note = /^notes[\\/]([\w-]+)\.json$/.exec(String(rel));
-      if (note && NOTE_ID.test(note[1])) removeNoteFolder(notesRoot(), note[1]);   // its pictures and videos with it
+      if (note && NOTE_ID.test(note[1])) { removeNoteFolder(notesRoot(), note[1]); vault.forget(note[1]); clearOpened({ noteId: note[1] }); }   // its pictures, videos and files with it
       if (note) purgeNoteFromBackups(backupsRoot(), note[1]);
       return { ok: true };
     } catch {

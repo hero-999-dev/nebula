@@ -44,7 +44,7 @@ describe('guide page', () => {
     expect(text).toContain(`New in ${GUIDE_VERSION}`);
     for (const feature of ['Four themes', 'Save this profile', 'Matcha', 'A divider that splits the page', 'two columns', 'beside the picture before it', 'AI tabs that sleep', 'Keep awake', 'A folder for each note', 'a folder of its own', 'A video file of your own', 'Black holes', 'AES-256', 'recovery key', 'Open with Nebula', 'violet document icon', 'Your privacy', 'Add a font', 'Arrows', 'angle shows', 'Link any words', 'Ctrl+click', 'Videos', 'caption', 'behind the text', 'one canvas', 'Rust', 'Nebula note (.json)', 'Bookmark',
       'Embed', 'Mention', 'Only view', 'F12', 'snaps', 'Ctrl+F', 'Ctrl+K', 'Archive', 'Restore', 'Pin to top', 'The / menu', 'Quotes and dividers', 'Import', 'PDF', 'Labels', 'four corner handles', 'Google sign-in',
-      'Older notes are brought up to date', 'pre-heal', 'Pictures\\Nebula', 'Deleted is deleted']) {
+      'Older notes are brought up to date', 'pre-heal', 'Pictures\\Nebula', 'Deleted is deleted', 'A page in a note asks first']) {
       expect(text).toContain(feature);
     }
   });
@@ -54,15 +54,16 @@ describe('guide order (owner, 0.8.9)', () => {
   const doc = new DOMParser().parseFromString(`<body>${GUIDE_NOTE.content}</body>`, 'text/html');
   const h2 = [...doc.querySelectorAll('h2')].map((h) => h.textContent);
 
-  it('ends with Where your notes live as 10 and Code blocks as 11, the last section', () => {
-    // Your privacy is 9 since 0.9.4; the last two keep their places at the end.
-    expect(h2.at(-3)).toBe('9 · Your privacy');
-    expect(h2.at(-2)).toBe('10 · Where your notes live');
-    expect(h2.at(-1)).toBe('11 · Code blocks');
+  it('ends with Where your notes live as 11 and Code blocks as 12, the last section', () => {
+    // Your privacy is 9 since 0.9.4, a page that asks 10 since 0.9.6; the last two keep their places at the end.
+    expect(h2.at(-4)).toBe('9 · Your privacy');
+    expect(h2.at(-3)).toBe('10 · A page in a note that asks');
+    expect(h2.at(-2)).toBe('11 · Where your notes live');
+    expect(h2.at(-1)).toBe('12 · Code blocks');
   });
 
   it('opens the code samples with Markdown', () => {
-    const codeHeading = [...doc.querySelectorAll('h2')].find((h) => h.textContent === '11 · Code blocks');
+    const codeHeading = [...doc.querySelectorAll('h2')].find((h) => h.textContent === '12 · Code blocks');
     let el = codeHeading.nextElementSibling;
     while (el && el.tagName !== 'H3') el = el.nextElementSibling;
     expect(el.textContent).toBe('Markdown');

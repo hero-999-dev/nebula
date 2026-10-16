@@ -9,6 +9,7 @@ describe('note labels',()=>{
     expect(normalizeLabels([' #Work ','work',null,{},'  two   words ','#'])).toEqual(['Work','two words']);
     expect(normalizeLabels('work')).toEqual([]);
     expect(normalizeLabels(Array.from({length:30},(_,i)=>'label'+i))).toHaveLength(20);
+    expect(normalizeLabels(['a'.repeat(39)+'\u{1F600}x'])).toEqual(['a'.repeat(39)+'\u{1F600}']); // never half an emoji (hunt B24)
   });
   it('persists labels and searches them without reordering the note',()=>{
     const store=new NoteStore({allowSeed:false});const n=store.createNote('First');const time=n.updatedAt;

@@ -2,6 +2,8 @@ import { normalizeLabels } from './labels.js';
 import { loadJson, saveJson, generateId } from './storage.js';
 import { emit } from './bus.js';
 import { SEED_NOTES } from './seed-notes.js';
+import { TRANSIENT_NODES } from './note-markup.js';
+import { fold } from './fold.js';
 
 const STORAGE_KEY_NOTES = 'nebula:notes';
 const STORAGE_KEY_ACTIVE = 'nebula:active-note';
@@ -38,7 +40,11 @@ export function noteText(html) {
   let text;
   if (typeof DOMParser === 'function') {
     const doc = new DOMParser().parseFromString(src.replace(/data:image\/[^\s"'<>]+/gi, 'data:,'), 'text/html');
-    doc.body.querySelectorAll('.shape-layer, .image-layer').forEach((el) => el.remove());
+    // Nor the controls saved inside its blocks (hunt B17): a code block's
+    // language picker named every language, so the search found "python" or
+    // "copy" in every note with a code block, and its preview read "PlainJavaScript…".
+    // A file card keeps its name; its icon and size line are drawn from its data.
+    doc.body.querySelectorAll(`.shape-layer, .image-layer, ${TRANSIENT_NODES}, .code-head, .link-del, .attach-icon, .link-attach .link-card__kind, select, button`).forEach((el) => el.remove());
     // textContent joins blocks with nothing at all, so a heading ran straight
     // into the paragraph under it ("Welcome to NebulaA calm place"). Inline
     // elements must NOT get one, or a word split across <strong> comes apart.
@@ -67,7 +73,10 @@ export function plainSnippet(html, max = 80) {
   let src = String(html ?? '');
   if (src.length > SNIPPET_SOURCE) src = src.replace(/data:image\/[^\s"'<>]+/gi, 'data:,').slice(0, SNIPPET_SOURCE);
   const text = noteText(src);
-  return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
+  // Cut by characters: a cut through an emoji's two halves showed a broken
+  // glyph at the end of the line (hunt B24).
+  const chars = Array.from(text);
+  return chars.length <= max ? text : `${chars.slice(0, max - 1).join('')}…`;
 }
 
 export function relativeTime(ts) {
@@ -383,10 +392,10 @@ export class NoteStore {
    * they have their own sections.
    */
   filter(query) {
-    const q = query.trim().toLowerCase();
+    const q = fold(query.trim());
     if (!q) return this.sorted();
     return this.sorted().filter((n) => {
-      const hay = `${n.title} ${normalizeLabels(n.labels).map(label => "#" + label).join(" ")} ${noteText(n.content)}`.toLowerCase();
+      const hay = fold(`${n.title} ${normalizeLabels(n.labels).map(label => "#" + label).join(" ")} ${noteText(n.content)}`);
       return hay.includes(q);
     });
   }

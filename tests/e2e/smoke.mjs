@@ -36,6 +36,16 @@ import { runDenseChecks } from './dense.mjs';
 import { OLD_NOTE } from './old-note.mjs';
 import { sweepStaleProfiles } from './profiles.mjs';
 import { runDeletedChecks } from './deleted.mjs';
+import { runIpcSurfaceChecks } from './ipc-surface.mjs';
+import { runAppLockOpenedChecks } from './app-lock-opened.mjs';
+import { runAttachAdoptChecks } from './attach-adopt.mjs';
+import { runToggleBodyChecks } from './toggle-body.mjs';
+import { runCardKeysChecks } from './card-keys.mjs';
+import { runFindFoldedChecks } from './find-folded.mjs';
+import { runPdfScratchChecks } from './pdf-scratch.mjs';
+import { runOpenGuardChecks } from './open-guard.mjs';
+import { runVaultDisconnectChecks } from './vault-disconnect.mjs';
+import { runEmbedAskChecks } from './embed-ask.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mainJs = path.join(root, 'dist-electron', 'main.js');
@@ -435,7 +445,7 @@ try {
         icons: document.querySelectorAll('#blocks-body .bl-ic svg').length,
       }));
       // 16 since the toggle list (0.9.3), 19 with the three toggle headings, 21 with the table and the columns (0.9.4).
-      check('Help -> Blocks lists every block the / menu offers, from the same source', blocks.shown && blocks.rows === 21 && blocks.icons === 21, JSON.stringify(blocks));
+      check('Help -> Blocks lists every block the / menu offers, from the same source', blocks.shown && blocks.rows === 22 && blocks.icons === 22, JSON.stringify(blocks));
     }
     await win.keyboard.press('Escape');
   }
@@ -2409,6 +2419,16 @@ try {
   await runBlackHoleChecks(check);
   await runOpenWithChecks(check);
   await runDeletedChecks(check);
+  await runIpcSurfaceChecks(check);
+  await runEmbedAskChecks(check);
+  await runAppLockOpenedChecks(check);
+  await runAttachAdoptChecks(check);
+  await runToggleBodyChecks(check);
+  await runCardKeysChecks(check);
+  await runFindFoldedChecks(check);
+  await runPdfScratchChecks(check);
+  await runOpenGuardChecks(check);
+  await runVaultDisconnectChecks(check);
 } catch (err) {
   failure = err;
   check('smoke run completed', false, err.message);
@@ -2432,7 +2452,9 @@ if (failure) console.error(failure);
  * code, so the release retries once on a 2 and stops on a 1, which is a check
  * that actually failed.
  */
-const aborted = failure && /Timeout|Target closed|browser has been closed|ENOMEM/i.test(failure.message ?? '');
+const aborted = failure && /Timeout|Target closed|browser has been closed|ENOMEM|ERR_ABORTED|\(-3\) loading/i.test(failure.message ?? '');
 const realFailures = failed.filter((r) => r.name !== 'smoke run completed');
-if (realFailures.length) process.exit(1);
+// A run that threw for any other reason did not finish either, and is never a
+// pass: before 0.9.6 it exited 0 with the suites after the throw never run.
+if (realFailures.length || (failure && !aborted)) process.exit(1);
 process.exit(aborted ? 2 : 0);
