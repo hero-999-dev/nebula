@@ -11,6 +11,17 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+## [2026-10-16 09:00] v0.9.6 - by Claude (the build on GitHub stopped on one check, and a preview could outlive its close; the tag moved to its repair)
+
+The push went out with every gate here passed (unit 1229 of 1229, smoke 1010 of 1010, rebuild 100%, the old-notes trials). On GitHub the Windows build's smoke run stopped at 1009 of 1010, so nothing was published (macOS built):
+
+- "three tabs opened are three pages loaded" asked for the panel's pages 700 ms after the third tab was clicked; on the build machine the third page had not begun to load (one,two). The check now waits for it, up to 8 s more.
+- Run again here under the whole suite, "turned back to landscape and closed: no preview left behind" failed once more (it passes alone, 4 of 4). The likely cause is in the app: a preview just closed can still be held by its viewer on Windows, the shred threw, was swallowed, and the folder — the note in the clear — stayed until the next start. dropPreview (electron/main.js) now tries again for two seconds; the check prints what is left if it ever fails.
+- The run after that missed note-folders "and Ctrl+Z brings the picture back" (seen once before, 0.9.5; passes alone, 2 of 2): its wait for the disk was four seconds, now ten.
+- The next missed black-holes "a passkey is added beside the PIN" (also seen at 0.9.5): the passkey was on the disk, the menu read straight after had not caught up. The menu is waited for now.
+
+The first is in the check; the second is a small leftover in the app, repaired. Both (tests.md), the whole smoke suite run here again at 0.9.6 — 1010 of 1010 — and the tag `v0.9.6` moved to this commit: no release existed under it.
+
 ## [2026-10-16 08:23] v0.9.6 - by release-script
 
 
