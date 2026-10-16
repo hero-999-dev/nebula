@@ -14,7 +14,7 @@ import { SLASH_ITEMS, filterSlash } from '../src/js/slash-menu.js';
 import { exitListOnEmptyItem, liftListItemAtStart } from '../src/js/lists.js';
 import { detectTagQuery, matchLabels, syncTagChips, contentTags } from '../src/js/mentions.js';
 import { paintLabelHits } from '../src/js/label-filter.js';
-import { FONTS, cleanFontName, customFontStack, fontRows } from '../src/js/toolbar.js';
+import { FONTS, cleanFontName, cleanFontStack, customFontStack, fontRows } from '../src/js/toolbar.js';
 
 describe('arrows as they are typed', () => {
   it('turns --> into a right arrow and <-- into a left one', () => {
@@ -110,7 +110,7 @@ describe('the theme\'s ink a paste froze into the words', () => {
     expect(root.querySelectorAll('span')[1].style.color).toBe('rgb(200, 0, 0)');
     expect(root.querySelector('.shape').style.color).toBe('rgb(17, 17, 17)');
     expect(dropFrozenInk(root)).toBe(0);
-    expect(MARKUP_VERSION).toBe('0.9.4');
+    expect(MARKUP_VERSION >= '0.9.4').toBe(true);
   });
 
   it('after a paste, only what the paste made loses its colour', () => {
@@ -187,6 +187,14 @@ describe('labels: a list to pick from, and a chip whose label follows its word',
     expect(matchLabels(labels, '', { limit: 2 })).toHaveLength(2);
   });
 
+  it('offers İş for iş and İŞ, and Alıntı for alinti (hunt B19)', () => {
+    // In the window's en-US lower case İ is i + a combining dot: "iş" never found "İş".
+    const labels = ['İş', 'iş planı', 'Ev', 'Alıntı'];
+    expect(matchLabels(labels, 'iş').sort()).toEqual(['iş planı', 'İş'].sort());
+    expect(matchLabels(labels, 'İŞ')).toHaveLength(2);
+    expect(matchLabels(labels, 'alinti')).toEqual(['Alıntı']);
+  });
+
   it('a chip edited to another word is that label, and the old one is gone', () => {
     const root = dom('<p><span class="note-tag" data-tag="abc">#abd</span> and <span class="note-tag" data-tag="keep">#keep</span></p>');
     expect(syncTagChips(root)).toBe(1);
@@ -217,6 +225,8 @@ describe('the font menu: a search, and adding a font', () => {
     expect(cleanFontName('Evil"; color: red; {')).toBe('Evil color: red');
     expect(cleanFontName('')).toBe('');
     expect(customFontStack('Noto Serif')).toBe('"Noto Serif", serif');
+    expect(cleanFontName(`${'x'.repeat(59)}🌙 bold`)).toBe(`${'x'.repeat(59)}🌙`); // hunt B24: never half an emoji
+    expect(cleanFontStack(`${'x'.repeat(199)}🌙 bold`)).toBe(`${'x'.repeat(199)}🌙`); // hunt B24: never half an emoji
   });
 
   it('lists the app’s fonts, then the ones added, then this computer’s, narrowed by what is typed', () => {

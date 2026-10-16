@@ -12,6 +12,7 @@
 import { normalizeLabels } from './labels.js';
 import { contentTags } from './mentions.js';
 import { t } from './i18n.js';
+import { fold } from './fold.js';
 
 /** Every label of each kind on these notes, each once, sorted. Pure — tested. */
 export function labelCatalog(notes) {
@@ -173,12 +174,12 @@ export function initLabelFilter({ store, button, panel, onChange, onDelete }) {
     const catalog = { any: [...merged.values()].sort((x, y) => x.localeCompare(y)) };
     // A label that no note has any more is not a filter any more.
     if (pick && !catalog[pick.kind].some((l) => l.toLocaleLowerCase() === pick.label.toLocaleLowerCase())) pick = null;
-    const q = (search?.value || '').trim().replace(/^#+/, '').toLocaleLowerCase();
+    const q = fold((search?.value || '').trim().replace(/^#+/, ''));
     for (const kind of ['any']) {
       const host = groups[kind];
       if (!host) continue;
       host.replaceChildren();
-      const shown = catalog[kind].filter((l) => l.toLocaleLowerCase().includes(q));
+      const shown = catalog[kind].filter((l) => fold(l).includes(q));
       host.closest('.lf-group').hidden = !catalog[kind].length;
       for (const l of shown) {
         const on = pick?.kind === kind && pick.label.toLocaleLowerCase() === l.toLocaleLowerCase();

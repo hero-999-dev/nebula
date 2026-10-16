@@ -52,7 +52,7 @@ export async function runGuideChecks(check) {
       page.dividerBefore.length >= 10 && page.dividerBefore.every(Boolean), JSON.stringify(page.sections.filter((_, i) => !page.dividerBefore[i])));
     check('no two dividers in a row, none at the end, no empty section', !page.doubleDividers && !page.endsWithDivider && !page.emptySection, JSON.stringify(page));
     check('Where your notes live and Code blocks are the last two sections',
-      page.sections.at(-2) === '10 · Where your notes live' && page.sections.at(-1) === '11 · Code blocks', JSON.stringify(page.sections.slice(-3)));
+      page.sections.at(-2) === '11 · Where your notes live' && page.sections.at(-1) === '12 · Code blocks', JSON.stringify(page.sections.slice(-3)));
 
     const code = await win.evaluate(() => {
       const blocks = [...document.querySelectorAll('#editor .blk-code')];
@@ -60,7 +60,7 @@ export async function runGuideChecks(check) {
         first: blocks[0]?.dataset.lang,
         count: blocks.length,
         unpainted: blocks.filter((b) => b.dataset.lang !== 'plain' && !b.querySelector('.code-src [class^="tok-"]')).map((b) => b.dataset.lang),
-        afterCodeHeading: (() => { const h = [...document.querySelectorAll('#editor h2')].find((x) => x.textContent === '11 · Code blocks'); let el = h; while (el && !el.matches('.blk-code')) el = el.nextElementSibling; return el?.dataset.lang; })(),
+        afterCodeHeading: (() => { const h = [...document.querySelectorAll('#editor h2')].find((x) => x.textContent === '12 · Code blocks'); let el = h; while (el && !el.matches('.blk-code')) el = el.nextElementSibling; return el?.dataset.lang; })(),
       };
     });
     check('the code samples open with Markdown, and every one is coloured', code.afterCodeHeading === 'markdown' && code.count >= 16 && code.unpainted.length === 0, JSON.stringify(code));

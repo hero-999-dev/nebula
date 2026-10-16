@@ -112,12 +112,12 @@ export function fontLabelFor(family) {
  * end a CSS value, not endless. '' when nothing usable is left. Pure — tested.
  */
 export function cleanFontName(raw) {
-  return String(raw ?? '').replace(/["'`;{}<>\\,]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+  return Array.from(String(raw ?? '').replace(/["'`;{}<>\\,]/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 60).join(''); // characters, not UTF-16 units: never half an emoji (hunt B24)
 }
 
 /** A font stack as it may be kept: nothing in it that could end a CSS value, not endless. */
 export function cleanFontStack(raw) {
-  return String(raw ?? '').replace(/[;{}<>\\()@!]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+  return Array.from(String(raw ?? '').replace(/[;{}<>\\()@!]/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 200).join(''); // characters, not UTF-16 units: never half an emoji (hunt B24)
 }
 
 /** The stack a font added by name is written with: quoted, and a generic after it. */
@@ -630,6 +630,13 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     const TEXT = 'p, div:not([class]), h1, h2, h3, h4, h5, h6, blockquote, li';
     const lineIn = (el) => (el.matches(TEXT) ? el : el.matches('.blk-cols, .blk-toggle, ul, ol') ? el.querySelector(TEXT) : null);
     const cell = under.matches('.blk-table') ? under.querySelector('td') : null;
+    // A card above the empty line a Backspace takes away: the card is offered,
+    // as a picture is - the next press removes it (rich-paste.js picks it).
+    if (back && over?.matches('.link-block')) {
+      editorEl.dispatchEvent(new CustomEvent('nebula-pick-card', { detail: over }));
+      dirty();
+      return true;
+    }
     if (!back && over?.matches(TEXT)) placeCaretAt(over, true);
     else if (cell) placeCaretAt(cell, false);
     else {
@@ -637,6 +644,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       for (let el = under; el && !to; el = step(el, 'nextElementSibling')) to = lineIn(el);
       if (to) placeCaretAt(to, false);
       else if (under.matches('.note-image')) editorEl.dispatchEvent(new CustomEvent('nebula-select-image', { detail: under }));
+      else if (under.matches('.link-block')) editorEl.dispatchEvent(new CustomEvent('nebula-pick-card', { detail: under }));
     }
     dirty();
     return true;
@@ -709,6 +717,10 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   let lastKey = '';
   editorEl.addEventListener('keydown', (e) => { lastKey = e.key; }, true);
   editorEl.addEventListener('mousedown', () => { lastKey = ''; }, true);
+  // A key pressed in the note before it lost the focus, or in the note before
+  // this one, did not bring the caret to where it is now.
+  editorEl.addEventListener('blur', () => { lastKey = ''; });
+  editorEl.addEventListener('nebula-note-load', () => { lastKey = ''; });
   const loose = (n) => n && ((n.nodeType === Node.TEXT_NODE && !n.nodeValue.trim())
     || (n.nodeType === Node.ELEMENT_NODE && n.tagName === 'BR'));
   function settleGap() {
@@ -748,6 +760,10 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
         editorEl.dispatchEvent(new CustomEvent('nebula-select-image', { detail: below }));
       }
       else if (!up && line(below)) placeCaretAt(below, false);
+      // No key brought it there — a note opened with a divider first, a click:
+      // the divider is not picked, or the first Backspace would take it (0.9.6,
+      // found by the old-notes trials). The line under it has the caret, if any.
+      else if (!lastKey) { if (line(below)) placeCaretAt(below, false); }
       else editorEl.dispatchEvent(new CustomEvent('nebula-pick-divider', { detail: hr }));
       return;
     }
@@ -2179,6 +2195,20 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
         return;
       }
       editorEl.dispatchEvent(new CustomEvent('nebula-select-image', { detail: edge }));
+      return;
+    }
+    // A card beside the caret's line, reached the same way as a picture above:
+    // the empty line goes and the card is offered - the next press takes it,
+    // Enter does what a click on it does (rich-paste.js picks it up).
+    if (edge?.matches?.('.link-block') && !edge.closest('.shape-layer, .image-layer')) {
+      e.preventDefault();
+      const line = lineOf(window.getSelection().getRangeAt(0).startContainer);
+      if (line && isBlankLine(line)) {
+        history?.push();
+        line.remove();
+      }
+      editorEl.dispatchEvent(new CustomEvent('nebula-pick-card', { detail: edge }));
+      dirty();
       return;
     }
     // Backspace at the start of a line under an empty line: the empty line goes

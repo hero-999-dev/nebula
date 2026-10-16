@@ -8,6 +8,7 @@ import { icon } from './icons.js';
 import { t } from './i18n.js';
 import { makeToggle } from './toggles.js';
 import { blockFromNode, convertBlock, insertDivider, ensureLineBox } from './blocks.js';
+import { fold } from './fold.js';
 
 export const SLASH_ITEMS = [
   // "Paragraph", as the outline dropdown calls it: /paragraph finds it, and /text still does (its id).
@@ -31,6 +32,8 @@ export const SLASH_ITEMS = [
   { id: 'shape', ic: 'shapes', label: 'Shape' },
   // A video file from the computer (0.9.4): copied into the note and played there.
   { id: 'video', ic: 'video', label: 'Video' },
+  // Any file from the computer (0.9.6): kept in the note as a card with its name and kind.
+  { id: 'file', ic: 'clip', label: 'File' },
   { id: 'embed', ic: 'link', label: 'Embed' },
   { id: 'bookmark', ic: 'bookmark', label: 'Bookmark' },
   { id: 'url', ic: 'link', label: 'URL' },
@@ -46,9 +49,9 @@ export function detectSlash(textBeforeCaret) {
 }
 
 export function filterSlash(query) {
-  const q = query.toLocaleLowerCase();
-  return SLASH_ITEMS.filter((it) => it.label.toLowerCase().includes(q) || it.id.includes(q)
-    || t(it.label).toLocaleLowerCase().includes(q));
+  const q = fold(query);
+  return SLASH_ITEMS.filter((it) => fold(it.label).includes(q) || it.id.includes(q)
+    || fold(t(it.label)).includes(q));
 }
 
 export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
@@ -110,6 +113,10 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
     editorEl.focus();
     if (id === 'video') {
       void links?.pickVideo?.();
+      return;
+    }
+    if (id === 'file') {
+      void links?.pickFiles?.();
       return;
     }
     if (links && ['embed', 'bookmark', 'url', 'mention'].includes(id)) {

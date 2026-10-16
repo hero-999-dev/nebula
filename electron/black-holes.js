@@ -48,6 +48,7 @@
  * A video is too large to be sealed into its note, so it is sealed beside it:
  *
  *   storage/blackholes/<hole>/<note>~vid-….mp4.bhv
+ *   storage/blackholes/<hole>/<note>~att-….pdf.bhv   a file attached to the note, sealed the same way
  *
  * "NBV1", the size of a piece (1 MiB) and the video's length, then the video
  * in pieces, each sealed by itself (its own nonce; the hole, the note, the
@@ -59,7 +60,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { shred, VIDEO_EXTENSIONS } from './note-media.js';
+import { shred, VIDEO_EXTENSIONS, attachmentExt } from './note-media.js';
 
 const ID = /^[\w-]{1,120}$/;
 const MAGIC = Buffer.from('NBH1');
@@ -68,8 +69,8 @@ const VIDEO_MAGIC = Buffer.from('NBV1');
 export const VIDEO_PIECE = 1024 * 1024;
 const PIECE_COST = 28;                       // nonce 12 + tag 16
 const VIDEO_HEAD = 16;                       // magic 4 + piece size 4 + length 8
-/** A video's name in a note: as the vault names one, and of a kind a note can hold (note-media.js). */
-const VIDEO_NAME = new RegExp(`^vid-[a-z0-9]+-[0-9a-f]{8}\\.(${VIDEO_EXTENSIONS.join('|')})$`);
+/** A video's name in a note: as the vault names one, and of a kind a note can hold — or an attached file's, of any kind (note-media.js). */
+const VIDEO_NAME = new RegExp(`^(?:vid-[a-z0-9]+-[0-9a-f]{8}\\.(${VIDEO_EXTENSIONS.join('|')})|att-[a-z0-9]+-[0-9a-f]{8}\\.[a-z0-9]{2,5})$`);
 const sealedVideo = (noteId, name) => `${noteId}~${name}.bhv`;
 export const KDF = { name: 'scrypt', N: 1 << 16, r: 8, p: 1 };
 /**
@@ -100,7 +101,7 @@ export function newRecoveryKey(bytes = crypto.randomBytes(20)) {
 }
 /** As typed: any case, with or without the dashes and spaces. */
 export const cleanRecoveryKey = (raw) => String(raw ?? '').toUpperCase().replace(/[^A-Z2-7]/g, '');
-export const cleanHoleName = (raw) => String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
+export const cleanHoleName = (raw) => Array.from(String(raw ?? '').replace(/\s+/g, ' ').trim()).slice(0, NAME_MAX).join(''); // characters, not UTF-16 units: never half an emoji (hunt B24)
 /**
  * A hint for the PIN (the owner: "an option to set a hint"). It is kept in the
  * clear beside the black hole's name and shown to whoever is asked for the PIN
@@ -108,7 +109,7 @@ export const cleanHoleName = (raw) => String(raw ?? '').replace(/\s+/g, ' ').tri
  * away is not kept.
  */
 const HINT_MAX = 80;
-export const cleanHint = (raw) => String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, HINT_MAX);
+export const cleanHint = (raw) => Array.from(String(raw ?? '').replace(/\s+/g, ' ').trim()).slice(0, HINT_MAX).join(''); // characters, not UTF-16 units: never half an emoji (hunt B24)
 const hintTells = (hint, pin) => !!pin && String(hint).replace(/\D/g, '').includes(String(pin));
 
 function derive(secret, salt, kdf = KDF) {
@@ -458,6 +459,11 @@ export class BlackHoles {
     } finally {
       await input?.close().catch(() => {});
     }
+  }
+
+  /** Any file sealed into an open black hole as attached to one of its notes (note-media.js addAttachment). */
+  addFile(id, noteId, source) {
+    return this.addVideo(id, noteId, source, `att-${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}.${attachmentExt(source)}`);
   }
 
   /** How long a sealed video is, or null when it is not there or the black hole is locked. */

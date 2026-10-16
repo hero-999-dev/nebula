@@ -8,8 +8,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  externalize, inlinePictures, referencesOf, rehome, sweepNote, removeNoteFolder, tidyVault, addVideo, noteFile, noteIds, moveNotesIn, snapshotVault, missingMedia, shred, unnamedOf, readReleased, writeReleased, noteReleases, RELEASED_FILE,
-  mediaUrl, mediaPath, parseMediaUrl, mimeOf, byteRange, isVideoName, pictureDataUrl, travelWhole, travelFolder, stageTravelled, VIDEO_EXTENSIONS, stageVideos,
+  externalize, inlinePictures, referencesOf, rehome, sweepNote, removeNoteFolder, tidyVault, addVideo, noteFile, noteIds, moveNotesIn, snapshotVault, missingMedia, shred, unnamedOf, readReleased, writeReleased, noteReleases, releaseAdded, RELEASED_FILE,
+  mediaUrl, mediaPath, parseMediaUrl, mimeOf, byteRange, isVideoName, pictureDataUrl, travelWhole, addAttachment, attachmentExt, isAttachmentName, isPicture, isKeptFile, travelFolder, stageTravelled, VIDEO_EXTENSIONS, stageVideos,
 } from '../electron/note-media.js';
 import { readNoteFile } from '../electron/open-file.js';
 import { purgeNoteFromBackups, purgeDeletedFromBackups, shredTree, staleLabelled, pruneLabelled, oldWayCopies, dropOldWayCopies, purgeUnnamedFromBackups } from '../electron/backup-purge.js';
@@ -126,6 +126,27 @@ describe('each note owns what it shows', () => {
     const text = note('b', `<video src="${mediaUrl('a', 'vid-1-aa.mp4')}"></video>`);
     expect(rehome(text, 'b', notes)).toBe(text);
   });
+
+  // Hunt B5: the window still held a pasted card naming note a; a was deleted,
+  // b was typed in and saved — and b's own copy, no longer named, went at the next start.
+  it('a name whose copy the note already holds is the note’s own, though the other note is gone', () => {
+    fs.mkdirSync(path.join(notes, 'b'));
+    fs.writeFileSync(path.join(notes, 'b', 'att-1-aaaaaaaa.pdf'), 'the file');
+    const stale = note('b', `<div class="link-attach" data-src="${mediaUrl('a', 'att-1-aaaaaaaa.pdf')}"></div>`);
+    const out = rehome(stale, 'b', notes);
+    expect(out).toContain(mediaUrl('b', 'att-1-aaaaaaaa.pdf'));
+    expect(out).not.toContain(mediaUrl('a', 'att-1-aaaaaaaa.pdf'));
+    expect(files('a')).toBeNull();
+  });
+
+  it('and at a start that note keeps its file instead of losing it', () => {
+    fs.mkdirSync(path.join(notes, 'b'));
+    fs.writeFileSync(path.join(notes, 'b', 'att-1-aaaaaaaa.pdf'), 'the file');
+    fs.writeFileSync(noteFile(notes, 'b'), note('b', `<div class="link-attach" data-src="${mediaUrl('a', 'att-1-aaaaaaaa.pdf')}"></div>`));
+    tidyVault(notes);
+    expect(files('b')).toContain('att-1-aaaaaaaa.pdf');
+    expect(fs.readFileSync(noteFile(notes, 'b'), 'utf8')).toContain(mediaUrl('b', 'att-1-aaaaaaaa.pdf'));
+  });
 });
 
 describe('at a start', () => {
@@ -148,6 +169,18 @@ describe('at a start', () => {
     expect(files('broken')).toEqual(['aaaaaaaaaaaaaaaaaaaaaaaa.png', 'broken.json']);   // a note that cannot be read keeps everything
     expect(fs.readFileSync(noteFile(notes, 'broken'), 'utf8')).toBe('{ not json');
     expect(tidyVault(notes)).toEqual({ inside: 0, moved: 0, swept: 0, held: [] });  // and once is enough
+  });
+
+  it('a copy cut short in a saved note’s folder goes — it would lie there for good, and in every backup', () => {
+    fs.mkdirSync(path.join(notes, 'n1'));
+    fs.writeFileSync(noteFile(notes, 'n1'), note('n1', `<div class="link-attach" data-src="${mediaUrl('n1', 'att-1-aaaaaaaa.pdf')}"></div>`));
+    fs.writeFileSync(path.join(notes, 'n1', 'att-1-aaaaaaaa.pdf'), 'kept');
+    const cut = ['att-2-bbbbbbbb.zip.tmp-4242', 'vid-3-cccccccc.mp4.tmp-4242', 'aaaaaaaaaaaaaaaaaaaaaaaa.png.tmp-1-2-x1y2z3', 'n1.json.tmp-4242-1700000000000-abc123'];
+    for (const name of cut) fs.writeFileSync(path.join(notes, 'n1', name), 'half');
+    fs.writeFileSync(path.join(notes, 'n1', 'notes.txt.tmp-4242'), 'not ours');   // nothing this app writes: left alone
+    tidyVault(notes);
+    expect(files('n1').sort()).toEqual(['att-1-aaaaaaaa.pdf', 'n1.json', 'notes.txt.tmp-4242']);
+    expect(JSON.parse(fs.readFileSync(noteFile(notes, 'n1'), 'utf8')).id).toBe('n1');
   });
 
   it('a note’s file lies in the note’s folder — moved there from a vault that kept it beside', () => {
@@ -364,6 +397,21 @@ describe('a backup of the vault', () => {
     expect(fs.readFileSync(path.join(there, 'n1.json'), 'utf8')).toBe(kept);
   });
 
+  it('a copy cut short is never backed up, and goes from a backup that took one before', () => {
+    make();
+    const cut = `${VIDEO.replace('m1abc', 'm2abc')}.tmp-4242`;
+    fs.writeFileSync(path.join(notes, 'n1', cut), Buffer.alloc(30_000, 1));
+    expect(snapshotVault(vault(), backup('2026-10-07'))).toEqual({ copied: 3, shared: 3, taken: 0 });   // as without it
+    expect(fs.existsSync(path.join(backup('2026-10-07'), 'notes', 'n1', cut))).toBe(false);
+    // A backup an older version made, which copied it in full.
+    fs.copyFileSync(path.join(notes, 'n1', cut), path.join(backup('2026-10-07'), 'notes', 'n1', cut));
+    fs.writeFileSync(path.join(backup('2026-10-07'), 'notes', 'n1', 'notes.txt.tmp-4242'), 'not ours');
+    expect(purgeUnnamedFromBackups(notes, path.join(root, 'backups'))).toBe(1);
+    expect(fs.existsSync(path.join(backup('2026-10-07'), 'notes', 'n1', cut))).toBe(false);
+    expect(fs.existsSync(path.join(backup('2026-10-07'), 'notes', 'n1', 'notes.txt.tmp-4242'))).toBe(true);
+    expect(fs.existsSync(path.join(backup('2026-10-07'), 'notes', 'n1', VIDEO))).toBe(true);   // what the note names stays
+  });
+
   it('a video or a picture taken out of its note leaves the vault at the next start, and every backup with it', () => {
     make();
     const png = files('n1').find((name) => name.endsWith('.png'));
@@ -545,6 +593,31 @@ describe('what the person took out is gone; what went some other way is asked ab
     expect([pngs('all'), pngs('some')]).toEqual([0, 2]);
     expect(purgeUnnamedFromBackups(notes, backups(), { keep: new Map() })).toBe(10);
     expect([pngs('all', copy()), pngs('some', copy())]).toEqual([0, 2]);
+  });
+
+  it('a file copied for the window and never named — another note opened meanwhile — goes without a question (hunt B18)', async () => {
+    withPictures('n1', 1);
+    const src = path.join(root, 'plan.pdf');
+    fs.writeFileSync(src, '%PDF-1.4');
+    const res = await addAttachment(notes, 'n1', src);
+    const name = res.url.split('/').pop();
+    // Left as it was, the start asks about "pictures no longer shown" that never were in the note.
+    expect(tidyVault(notes, { released: new Map() }).held).toEqual([{ id: 'n1', files: [name] }]);
+    const released = new Map();
+    expect(releaseAdded(released, notes, 'n1', res.url)).toBe(true);
+    expect(releaseAdded(released, notes, 'n1', res.url)).toBe(false);                    // once
+    expect(tidyVault(notes, { released }).held).toEqual([]);
+    expect(fs.existsSync(path.join(notes, 'n1', name))).toBe(false);
+    expect(pngs('n1')).toBe(1);                                                          // the note's own picture stays
+    // Never a file the note names, another note's, a note's own file, or a climb out.
+    const named = await addAttachment(notes, 'n1', src);
+    fs.writeFileSync(noteFile(notes, 'n1'), note('n1', `<div data-src="${named.url}"></div>`));
+    expect(releaseAdded(released, notes, 'n1', named.url)).toBe(false);
+    expect(releaseAdded(released, notes, 'n2', named.url)).toBe(false);
+    expect(releaseAdded(released, notes, 'n1', mediaUrl('n1', 'n1.json'))).toBe(false);
+    expect(releaseAdded(released, notes, 'n1', mediaUrl('n1', '../n2/x.pdf'))).toBe(false);
+    expect(releaseAdded(released, notes, '../n1', named.url)).toBe(false);
+    expect([...released.get('n1')]).toEqual([name]);                                     // only the first
   });
 
   it('a file nothing in the app took out stays, in the folder and the backups, and is named to be asked about — even one', () => {
@@ -746,6 +819,107 @@ describe('a video dropped into a note', () => {
     expect((await addVideo(notes, 'n1', path.join(root, 'missing.mp4'))).ok).toBe(false);
     expect((await addVideo(notes, '../n1', text.replace('.txt', '.mp4'))).ok).toBe(false);
     expect(files('n1')).toBeNull();
+  });
+});
+
+describe('a file attached to a note (0.9.6)', () => {
+  const ATT = 'att-m1abc-0a1b2c3d.pdf';
+  it('is copied into the note’s folder under a name of its own; the name it came with goes back for the card', async () => {
+    const source = path.join(root, 'Quarterly Report.PDF');
+    fs.writeFileSync(source, 'pages');
+    const res = await addAttachment(notes, 'n1', source);
+    expect(res).toMatchObject({ ok: true, name: 'Quarterly Report.PDF', size: 5 });
+    const named = parseMediaUrl(res.url);
+    expect(named.id).toBe('n1');
+    expect(named.file).toMatch(/^att-[a-z0-9]+-[0-9a-f]{8}\.pdf$/);
+    expect(fs.readFileSync(mediaPath(notes, 'n1', named.file), 'utf8')).toBe('pages');
+    expect(fs.existsSync(source)).toBe(true);                    // a copy: the file stays where it was
+  });
+
+  it('any file, kept under its own ending when that is a plain one — `bin` otherwise; never outside a note', async () => {
+    expect(attachmentExt('C:\\x\\a.XLSX')).toBe('xlsx');
+    expect(attachmentExt('/x/README')).toBe('bin');
+    expect(attachmentExt('/x/a.tar.gz')).toBe('gz');
+    expect(attachmentExt('/x/a.verylong')).toBe('bin');
+    expect(attachmentExt('/x/a.p-q')).toBe('bin');
+    const odd = path.join(root, 'README');
+    fs.writeFileSync(odd, 'x');
+    expect(parseMediaUrl((await addAttachment(notes, 'n1', odd)).url).file).toMatch(/^att-[a-z0-9]+-[0-9a-f]{8}\.bin$/);
+    expect((await addAttachment(notes, '../n1', odd)).ok).toBe(false);
+    expect((await addAttachment(notes, 'n1', path.join(root, 'missing.pdf'))).ok).toBe(false);
+    expect((await addAttachment(notes, 'n1', root)).ok).toBe(false);          // a folder is not a file
+    expect((await addAttachment(notes, 'n1', '')).ok).toBe(false);
+  });
+
+  it('does not bring back the folder of a note deleted while it was being copied', async () => {
+    const source = path.join(root, 'big.pdf');
+    fs.writeFileSync(source, 'pages');
+    fs.mkdirSync(path.join(notes, 'n1'));
+    fs.writeFileSync(noteFile(notes, 'n1'), note('n1', '<p>x</p>'));
+    // The note is deleted while the copy runs: copyFile is where the wait is.
+    const copy = fs.promises.copyFile;
+    fs.promises.copyFile = async (...args) => { fs.rmSync(path.join(notes, 'n1'), { recursive: true, force: true }); fs.mkdirSync(path.join(notes, 'n1')); return copy(...args); };
+    try {
+      expect(await addAttachment(notes, 'n1', source)).toMatchObject({ ok: false, error: 'no note' });
+    } finally { fs.promises.copyFile = copy; }
+    expect(fs.existsSync(path.join(notes, 'n1'))).toBe(false);
+    // A note not saved yet has no file to lose: its first file is copied as ever.
+    expect((await addAttachment(notes, 'n2', source)).ok).toBe(true);
+  });
+
+  it('a new note left before its first save while its file was copied leaves nothing at the next start', () => {
+    fs.mkdirSync(path.join(notes, 'n3'));
+    fs.writeFileSync(path.join(notes, 'n3', ATT), 'orphan');
+    fs.writeFileSync(path.join(notes, 'n3', 'vid-m1abc-0a1b2c3d.mp4.tmp-42'), 'cut short');
+    // Not abandoned: a note that is there but cannot be read, a flat note file, anything else in the folder.
+    fs.mkdirSync(path.join(notes, 'n4'));
+    fs.writeFileSync(noteFile(notes, 'n4'), '{ not json');
+    fs.writeFileSync(path.join(notes, 'n4', ATT), 'kept');
+    fs.mkdirSync(path.join(notes, 'n5'));
+    fs.writeFileSync(path.join(notes, 'n5', ATT), 'kept');
+    fs.writeFileSync(path.join(notes, 'n5', 'mine.txt'), 'not ours');
+    expect(tidyVault(notes).swept).toBe(2);
+    expect(fs.existsSync(path.join(notes, 'n3'))).toBe(false);
+    expect(fs.existsSync(path.join(notes, 'n4', ATT))).toBe(true);
+    expect(fs.existsSync(path.join(notes, 'n5', ATT))).toBe(true);
+  });
+
+  it('is neither a picture nor a video, whatever its ending — it is kept, never shown or played', () => {
+    expect(isAttachmentName(ATT)).toBe(true);
+    expect(isAttachmentName('att-m1abc-0a1b2c3d.png')).toBe(true);
+    expect(isAttachmentName('att-m1abc-0a1b2c3dXpng')).toBe(false);
+    expect(isAttachmentName('vid-m1abc-0a1b2c3d.mp4')).toBe(false);
+    expect(isPicture('att-m1abc-0a1b2c3d.png')).toBe(false);
+    expect(isVideoName('att-m1abc-0a1b2c3d.mp4')).toBe(false);
+    expect(isKeptFile('att-m1abc-0a1b2c3d.png')).toBe(true);
+    expect(isKeptFile('vid-m1abc-0a1b2c3d.mp4')).toBe(true);
+    expect(isKeptFile('0123456789abcdef01234567.png')).toBe(false);       // a picture is swept by its own rule
+    fs.mkdirSync(path.join(notes, 'n1'), { recursive: true });
+    fs.writeFileSync(path.join(notes, 'n1', 'att-m1abc-0a1b2c3d.png'), Buffer.alloc(900, 1));
+    expect(pictureDataUrl(notes, mediaUrl('n1', 'att-m1abc-0a1b2c3d.png'))).toBeNull();
+  });
+
+  it('stays while its note names it, and leaves the folder at the next start once it does not', () => {
+    fs.mkdirSync(path.join(notes, 'n1'));
+    fs.writeFileSync(noteFile(notes, 'n1'), note('n1', `<div class="link-block link-attach" data-src="${mediaUrl('n1', ATT)}"></div>`));
+    fs.writeFileSync(path.join(notes, 'n1', ATT), 'kept');
+    fs.writeFileSync(path.join(notes, 'n1', 'att-m1abc-0a1b2c3e.zip'), 'taken out');
+    expect(unnamedOf(notes, 'n1', fs.readFileSync(noteFile(notes, 'n1'), 'utf8'))).toEqual([]);    // only a start sweeps it, as a video
+    expect(tidyVault(notes).swept).toBe(1);
+    expect(files('n1')).toEqual([ATT, 'n1.json']);
+  });
+
+  it('is shared by the backups as a video is — and travels beside the note, never inside it', async () => {
+    fs.mkdirSync(path.join(notes, 'n1'), { recursive: true });
+    const text = note('n1', `<div class="link-attach" data-src="${mediaUrl('n1', ATT)}"></div>`);
+    fs.writeFileSync(noteFile(notes, 'n1'), text);
+    fs.writeFileSync(path.join(notes, 'n1', ATT), Buffer.alloc(300, 4));
+    snapshotVault(path.join(root, 'storage'), path.join(root, 'backups', '2026-10-15'));
+    expect(fs.statSync(path.join(notes, 'n1', ATT)).nlink).toBe(2);
+    const out = await travelWhole(text, notes);
+    expect(out.left).toBe(0);
+    expect(out.beside.map((v) => v.name)).toEqual([ATT]);
+    expect(out.text).toContain(mediaUrl('n1', ATT));
   });
 });
 

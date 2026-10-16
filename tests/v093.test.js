@@ -98,6 +98,17 @@ describe('@ and # in a note', () => {
     expect(matchNotes(notes, 'shop list').map((n) => n.id)).toEqual(['a']);
     expect(matchNotes(notes, '', { exclude: 'a' }).map((n) => n.id)).toEqual(['b']);
   });
+
+  it('finds İstanbul from istanbul and IRMAK from ırmak, in an en-US window (hunt B19)', () => {
+    // The app's window lowers case in en-US whatever the computer's locale (probes/c20-claude.mjs);
+    // this test runner may be Turkish, so the window's lowering is pinned here.
+    const lower = String.prototype.toLocaleLowerCase;
+    String.prototype.toLocaleLowerCase = function (locale) { return lower.call(this, locale ?? 'en-US'); };
+    try {
+      expect(matchNotes([{ id: 'a', title: 'İstanbul gezisi' }], 'istanbul').map((n) => n.id)).toEqual(['a']);
+      expect(matchNotes([{ id: 'b', title: 'IRMAK kenarı' }], 'ırmak').map((n) => n.id)).toEqual(['b']);
+    } finally { String.prototype.toLocaleLowerCase = lower; }
+  });
 });
 
 describe('four languages', () => {

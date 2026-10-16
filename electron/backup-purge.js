@@ -17,7 +17,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { noteIds, noteFile, referencesOf, isPicture, isVideoName } from './note-media.js';
+import { noteIds, noteFile, referencesOf, isPicture, isKeptFile, isCutShort } from './note-media.js';
 
 /** A note id is a file name, never a path. */
 const NOTE_ID = /^[\w-]{1,120}$/;
@@ -206,7 +206,7 @@ export function purgeHoleNoteFromBackups(backupsDir, holeId, noteId) {
   for (const dir of holeDirs(backupsDir, holeId)) {
     const file = path.join(dir, `${noteId}.bh`);
     if (fs.existsSync(file)) { shred(file); removed += 1; }
-    // Its sealed videos stand beside it: <note>~vid-….bhv.
+    // Its sealed videos and attached files stand beside it: <note>~vid-….bhv, <note>~att-….bhv.
     for (const name of fs.readdirSync(dir)) {
       if (name.startsWith(`${noteId}~`) && name.endsWith('.bhv')) { shred(path.join(dir, name)); removed += 1; }
     }
@@ -314,7 +314,9 @@ export function purgeUnnamedFromBackups(notesDir, backupsDir, { keep = null, onl
       let files;
       try { files = fs.readdirSync(path.join(dir, id)); } catch { continue; }
       for (const name of files) {
-        if (own.has(name) || name.includes('.tmp-') || !(isPicture(name) || isVideoName(name))) continue;
+        // A copy cut short, carried in by a backup made before the start's sweep: never whole, so never a backup's to keep.
+        const cut = isCutShort(name, id);
+        if (!cut && (own.has(name) || name.includes('.tmp-') || !(isPicture(name) || isKeptFile(name)))) continue;
         if (kept?.has(name) || (only && !only.get(id).has(name))) continue;
         shred(path.join(dir, id, name));
         removed += 1;

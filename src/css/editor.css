@@ -893,6 +893,8 @@ body.divider-dragging .link-frame { pointer-events: none; }
    specificity and would otherwise win by source order and hang it over the text. */
 .note-image.note-image--inline .image-caption { position: static; margin-top: 6px; }
 .note-image.sel { outline: 2px solid var(--clay); outline-offset: 2px; }
+/* A link card picked from the keyboard (rich-paste.js): the same outline a selected picture wears. */
+.link-block.sel { outline: 2px solid var(--clay); outline-offset: 2px; }
 /* A picture in the text is the selection while it is outlined; the caret the
    browser keeps beside it stands on no line, and blinked next to the divider
    above it (the owner, 0.9.3). A picked divider draws none either. */
@@ -1925,7 +1927,7 @@ body.resizing webview { pointer-events: none; }
   .image-layer { position: relative !important; inset: auto !important; }
   .note-image--inline, .image-layer .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; margin: 8px 0; }
   .note-image .image-caption { position: static; margin-top: 4px; }
-  .image-h, .link-del, .tbl-ui { display: none !important; }
+  .image-h, .link-del, .tbl-ui, .attach-bar { display: none !important; }
   .blk-table { display: block; break-inside: avoid; }
   .blk-table td { border-color: #bbb !important; }
 }
@@ -2227,6 +2229,79 @@ body.resizing { cursor: col-resize; user-select: none; }
 /* A video the player cannot play has no picture to size the card by. */
 .link-file.cannot-play .link-frame { min-height: 96px; }
 .link-file.cannot-play .video-bar [data-video]:not([data-video="outside"]), .link-file.cannot-play .video-now { display: none; }
+/* A file attached to the note (0.9.6, file-attach.js), as OneNote shows one:
+   a page with a folded corner in the colour of its kind and its ending on it,
+   then its name and size, then Open and Save a copy. A click saves a copy. */
+.link-block.link-attach {
+  width: min(460px, 100%);
+  min-height: 58px;
+  align-items: center;
+  gap: 2px;
+  padding-left: 12px;
+}
+.link-attach .attach-icon {
+  --attach: #6b6f7a;
+  position: relative;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 40px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 6px;
+  border-radius: 3px 0 3px 3px;
+  background: var(--attach);
+  clip-path: polygon(0 0, 68% 0, 100% 26%, 100% 100%, 0 100%);
+  cursor: pointer;
+  user-select: none;
+}
+.link-attach .attach-icon::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 32%;
+  height: 26%;
+  background: rgba(255, 255, 255, .45);
+  border-bottom-left-radius: 3px;
+}
+.link-attach .attach-icon__ext {
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: .03em;
+  line-height: 1;
+}
+.link-attach .attach-icon[data-type="pdf"] { --attach: #d93a2f; }
+.link-attach .attach-icon[data-type="doc"] { --attach: #2b62c9; }
+.link-attach .attach-icon[data-type="sheet"] { --attach: #1f8a4c; }
+.link-attach .attach-icon[data-type="slides"] { --attach: #d4622a; }
+.link-attach .attach-icon[data-type="archive"] { --attach: #a27b1c; }
+.link-attach .attach-icon[data-type="image"] { --attach: #8a4fd0; }
+.link-attach .attach-icon[data-type="audio"] { --attach: #c93f86; }
+.link-attach .attach-icon[data-type="video"] { --attach: #13897f; }
+.link-attach .attach-icon[data-type="text"] { --attach: #5b6576; }
+.link-attach .attach-icon[data-type="code"] { --attach: #4b4fc4; }
+.link-attach .attach-icon[data-type="app"] { --attach: #2f3440; }
+.link-attach .attach-icon[data-type="book"] { --attach: #8a5a37; }
+.link-attach .link-card { cursor: pointer; padding: 8px 10px; }
+.link-attach .link-card__title { font-size: 13.5px; }
+.link-attach .attach-bar { display: flex; flex: 0 0 auto; gap: 5px; padding: 0 4px; user-select: none; }
+.link-attach .attach-bar button {
+  padding: 3px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.link-attach .attach-bar button:hover { border-color: var(--clay); color: var(--clay); }
+@media (max-width: 520px) { .link-attach .attach-bar { display: none; } }
 
 /* Labels share the title row, ahead of the save indicator. */
 .note-labels {

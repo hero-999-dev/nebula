@@ -12,6 +12,7 @@ import { bindLinkPreview } from './link-preview.js';
 import { resizeImageBox, ensureImageHandles } from './image-resize.js';
 import { injectIcons } from './icons.js';
 import { isVideoFile, isMediaUrl, makeVideoBlock, refreshVideoBlocks, initVideoPlayers } from './file-video.js';
+import { makeAttachBlock, refreshAttachBlocks, initAttachCards, dropKind, isAttachUrl, ownsAttachUrl } from './file-attach.js';
 import { createPictureDrag, alignOf, setAlign, inRow, leaveRow, putBeside, pictureBefore, tidyRows, inWord, putInLine, leaveLine } from './image-place.js';
 import { cleanPastedHtml, cleanNebulaHtml, fromNebula, undressInserted, dressInNoteFont } from './paste-clean.js';
 
@@ -566,14 +567,52 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
   editor.addEventListener('mousedown', (event) => {
     if (event.target.closest('[data-link-remove]')) event.preventDefault();
   });
+  /** Take a link card out of the note - its x, or the keyboard on a picked card. */
+  function removeLinkCard(card) {
+    if (!card || !editor.contains(card)) return;
+    history?.push();
+    // A file's card: the copy Open made of it goes now (undo brings the card back; Open copies again).
+    if (card.classList.contains('link-attach')) void window.nebula?.media?.forgetFile?.(card.dataset.src)?.catch?.(() => {});
+    card.remove();
+    dirty();
+  }
+
   editor.addEventListener('click', (event) => {
     const card = event.target.closest('[data-link-remove]')?.closest('.link-block');
     if (!card || !editor.contains(card)) return;
     event.preventDefault();
-    history?.push();
-    card.remove();
-    dirty();
+    removeLinkCard(card);
   });
+
+  /**
+   * A link card picked from the keyboard (nebula-pick-card, toolbar.js): it is
+   * outlined, and the keys work on it - Enter does what a click on the card
+   * does, Backspace or Delete takes it away by the same path as its x, any
+   * other key lets go of it. A card could not be reached by Tab, which the
+   * editor uses for indentation, so this is how the keyboard meets it.
+   */
+  let pickedCard = null;
+  const unpickCard = () => { if (pickedCard) { pickedCard.classList.remove('sel'); pickedCard = null; } };
+  editor.addEventListener('nebula-pick-card', (e) => {
+    unpickCard();
+    const card = e.detail;
+    if (!card?.isConnected || !editor.contains(card) || !card.matches('.link-block')) return;
+    pickedCard = card;
+    card.classList.add('sel');
+    editor.focus({ preventScroll: true });
+  });
+  editor.addEventListener('keydown', (e) => {
+    if (!pickedCard) return;
+    // The note changed under the pick: the card is gone with it, and the key
+    // belongs to the note now open.
+    if (!pickedCard.isConnected || !editor.contains(pickedCard)) { unpickCard(); return; }
+    if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
+    const card = pickedCard;
+    if (e.key === 'Enter') { e.preventDefault(); unpickCard(); card.querySelector('.link-card')?.click(); return; }
+    if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); e.stopImmediatePropagation(); unpickCard(); removeLinkCard(card); return; }
+    unpickCard();
+  });
+  editor.addEventListener('mousedown', () => unpickCard(), true);
 
   function ensureImageBar() {
     let bar = $('image-bar');
@@ -758,6 +797,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     // A row whose other picture was deleted, cut or undone away is no row.
     tidyRows(editor);
     refreshVideoBlocks(editor);
+    refreshAttachBlocks(editor);
     if (selectedImage && !selectedImage.isConnected) selectImage(null);
   }
 
@@ -795,8 +835,11 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
       const child = range && range.startContainer === editor ? editor.childNodes[range.startOffset - 1] : null;
       return child?.nodeType === Node.ELEMENT_NODE && !child.matches('.shape-layer, .image-layer') ? child : null;
     }
-    // In a column the picture stays in the column (0.9.4).
-    while (el.parentElement && el.parentElement !== editor && !el.parentElement.classList.contains('blk-col')) el = el.parentElement;
+    // In a column the picture stays in the column (0.9.4); in a toggle's body it
+    // stays in the body, where the fold can hide it — what is put in with
+    // the caret in the body used to land after the whole toggle, visible folded.
+    const staysIn = (el) => el.classList?.contains('blk-col') || el.classList?.contains('toggle-body');
+    while (el.parentElement && el.parentElement !== editor && !staysIn(el.parentElement)) el = el.parentElement;
     if (el.matches('.blk-col, .blk-cols')) return null;
     return el.matches('.shape-layer, .image-layer') ? null : el;
   }
@@ -1485,6 +1528,8 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     document.execCommand('insertHTML', false, clean);
     undressInserted(editor, had);
     dirty();
+    // A pasted file card names another note's file: the file is copied in here at once.
+    void adoptPastedCards();
   });
 
   /**
@@ -1528,7 +1573,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     const hole = noteHole?.() ?? null;
     try { res = hole ? await window.nebula.holes.addVideo(hole, id, source) : await window.nebula.media.addVideo(id, source); } catch { res = null; }
     // Another note is open by now: the copy is nobody's, and goes at the next start.
-    if (started !== generation || noteId?.() !== id) return null;
+    if (started !== generation || noteId?.() !== id) { leftBehind(id, hole, res); if (res?.ok) say('The video could not be added'); return null; }
     if (!res?.ok) { say('The video could not be added'); return null; }
     history?.push();
     const card = makeVideoBlock(res.url, res.name);
@@ -1563,8 +1608,127 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
   }
   initVideoPlayers(editor);
 
+  /**
+   * Files attached to the note (0.9.6, file-attach.js): each is copied into the
+   * note's folder — sealed beside it in a black hole — and stands as a card,
+   * one after another, after the line they were dropped on.
+   * @param {Array<File|string>} files dropped files, or paths chosen with /file
+   */
+  /**
+   * A copy made for a note the window has left meanwhile: no write ever named
+   * it, so the next start asked about "pictures no longer shown" (hunt B18).
+   * Released, it goes then without a question. (A black hole keeps its own.)
+   */
+  function leftBehind(id, hole, res) {
+    if (hole || !res?.ok || !res.url) return;
+    window.nebula?.media?.releaseAdded?.(id, res.url)?.catch?.(() => {});
+  }
+
+  async function insertAttachFiles(files, range) {
+    const id = noteId?.();
+    const sources = [...(files ?? [])].map((file) => ({
+      path: typeof file === 'string' ? file : (window.nebula?.media?.pathOf?.(file) || ''),
+      name: typeof file === 'string' ? file.split(/[\\/]/).pop() : file.name,
+    }));
+    if (!id || !sources.length || sources.some((s) => !s.path)) { say('The file could not be added'); return []; }
+    const started = generation;
+    say(sources.length > 1 ? 'Copying the files into the note…' : 'Copying the file into the note…');
+    const hole = noteHole?.() ?? null;
+    const added = [];
+    let failed = 0;
+    for (const source of sources) {
+      let res = null;
+      try { res = hole ? await window.nebula.holes.addFile(hole, id, source.path) : await window.nebula.media.addFile(id, source.path); } catch { res = null; }
+      // Another note is open by now: what was copied is nobody's, and goes at the next start.
+      if (started !== generation || noteId?.() !== id) {
+        for (const done of [...added, res]) leftBehind(id, hole, done);
+        say(sources.length > 1 ? 'The files could not be added' : 'The file could not be added');
+        return [];
+      }
+      if (res?.ok) added.push(res); else failed += 1;
+    }
+    if (!added.length) { say(failed > 1 ? 'The files could not be added' : 'The file could not be added'); return []; }
+    history?.push();
+    const block = topBlockOf(range?.startContainer && editor.contains(range.startContainer) ? range : currentRange(editor));
+    const empty = block && !block.textContent.trim() && !block.querySelector('img, hr, .link-block, .note-image, .blk-code, .inline-eq');
+    const cards = added.map((res) => makeAttachBlock(res.url, res.name, res.size));
+    let last = null;
+    for (const card of cards) {
+      if (last) last.after(card);
+      else if (block && empty) block.replaceWith(card);
+      else if (block) block.after(card);
+      else editor.append(card);
+      last = card;
+    }
+    let next = last.nextElementSibling;
+    if (!next || next.matches('.note-image, .link-block, hr, .blk-code')) {
+      next = document.createElement('p');
+      next.innerHTML = '<br>';
+      last.after(next);
+    }
+    placeCaretIn(next);
+    refreshAttachBlocks(editor);
+    onGeometry?.();
+    dirty();
+    say(failed ? 'Some files could not be added' : (cards.length > 1 ? 'Files added' : 'File added'));
+    return cards;
+  }
+
+  /** A card already being adopted — two quick pastes must not copy one file twice. */
+  const adopting = new WeakSet();
+
+  /**
+   * A file card pasted from another note still names that note's file. The
+   * save's rehome copies the file and rewrites the stored text, but the live
+   * card is never told — its click is refused ("The file is not in this note")
+   * until a restart. Instead the file is copied into this note at once and the
+   * card is given this note's own address; a card whose source is gone (or its
+   * black hole is locked) keeps what it has, and its click says what is wrong.
+   */
+  async function adoptPastedCards() {
+    const id = noteId?.();
+    const adopt = window.nebula?.media?.adoptFile;
+    if (!id || !adopt) return;
+    const hole = noteHole?.() ?? null;
+    const started = generation;
+    for (const card of [...editor.querySelectorAll('.link-attach')]) {
+      const src = card.dataset.src || '';
+      if (!isAttachUrl(src) || ownsAttachUrl(src, { id, hole }) || adopting.has(card)) continue;
+      adopting.add(card);
+      let res = null;
+      try { res = await adopt(id, hole, src); } catch { res = null; } finally { adopting.delete(card); }
+      // Another note is open by now: the copies already made are nobody's, and go at the next start.
+      if (started !== generation || noteId?.() !== id) { leftBehind(id, hole, res); return; }
+      if (res?.ok) {
+        card.dataset.src = res.url;
+        refreshAttachBlocks(editor);
+        dirty();
+      }
+    }
+  }
+
+  /** /file: files chosen from the computer go in where the caret was. */
+  async function pickFiles() {
+    if (editor.dataset.readonly === 'true' || !window.nebula?.media?.pickFiles) return [];
+    const at = currentRange(editor);
+    let res = null;
+    try { res = await window.nebula.media.pickFiles(); } catch { res = null; }
+    if (!res?.ok || !res.paths?.length) return [];
+    return insertAttachFiles(res.paths, at);
+  }
+  initAttachCards(editor, { say, owner: () => ({ id: noteId?.() ?? null, hole: noteHole?.() ?? null }) });
+
   editor.addEventListener('drop', (event) => {
-    const video = [...(event.dataTransfer?.files || [])].find(isVideoFile);
+    const dropped = [...(event.dataTransfer?.files || [])];
+    // Anything that is neither a picture nor a video among them: every file is attached (0.9.6).
+    if (dropKind(dropped, { isImage: (f) => isImageMime(f.type), isVideo: isVideoFile }) === 'attach') {
+      event.preventDefault();
+      if (window.nebula?.media?.addFile && editor.dataset.readonly !== 'true') {
+        void insertAttachFiles(dropped, document.caretRangeFromPoint?.(event.clientX, event.clientY) ?? null);
+      }
+      return;
+    }
+    const video = dropped.find(isVideoFile);
     if (video && window.nebula?.media?.addVideo && editor.dataset.readonly !== 'true') {
       event.preventDefault();
       void insertVideoFile(video, document.caretRangeFromPoint?.(event.clientX, event.clientY) ?? null);
@@ -1653,6 +1817,8 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     refresh: refreshImages,
     insertVideoFile,
     pickVideo,
+    insertAttachFiles,
+    pickFiles,
     reset: () => { generation += 1; drag = null; editor.classList.remove('image-dragging'); selectImage(null); hideLinkMenu(); crop.cancel(); embedDrag = null; },
     insertImageBlob,
     copyImage,

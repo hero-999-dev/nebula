@@ -13,6 +13,16 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.9.6': {
+    headline: 'Files in a note, a page that asks first, and a safer app.',
+    items: [
+      { title: 'Files in a note', text: 'Drag any file onto a note, or type /file: it is kept in the note as a card with its name, its kind and its size. A click saves a copy wherever you like; Open hands it to the program your computer has for it. A program or a script asks before it runs, and a copy that leaves Nebula is marked as downloaded, as a browser would.' },
+      { title: 'A page in a note asks first', text: 'An embedded page that wants your microphone, your camera or notifications asks you, with Don’t allow already chosen. The answer is never kept: the next time the page opens, it asks again. The guide has a section on it.' },
+      { title: 'Safer', text: 'A link in a note can no longer take the app’s window away to a web page, an embedded page can no longer open windows by itself or read what you copied, and Lock Nebula takes a file opened from a black hole and a PDF preview with it.' },
+      { title: 'Finding things', text: 'Find, the search box and every list you type into find İstanbul however the I is typed, a match inside a folded toggle opens it, and a code block’s language no longer counts as a match.' },
+      { title: 'Small things', text: 'Save and open windows speak your language, a name cut to length never cuts an emoji in half, and a card can be picked, removed and opened from the keyboard.' },
+    ],
+  },
   '0.9.5': {
     headline: 'A caption stays with its picture, and the taskbar wears your logo.',
     items: [
@@ -563,6 +573,38 @@ export const RELEASE_NOTES = {
  * a version or a language that is not here is shown in English.
  */
 export const RELEASE_NOTES_I18N = {
+  '0.9.6': {
+    de: {
+      headline: 'Dateien in einer Notiz, eine Seite, die zuerst fragt, und eine sicherere App.',
+      items: [
+        { title: 'Dateien in einer Notiz', text: 'Zieh eine beliebige Datei auf eine Notiz oder tippe /file: Sie bleibt als Karte mit Namen, Art und Größe in der Notiz. Ein Klick speichert eine Kopie, wo du willst; Öffnen gibt sie dem Programm, das dein Computer dafür hat. Ein Programm oder Skript fragt, bevor es läuft, und eine Kopie, die Nebula verlässt, ist als heruntergeladen markiert, wie es ein Browser tut.' },
+        { title: 'Eine Seite in einer Notiz fragt zuerst', text: 'Eine eingebettete Seite, die dein Mikrofon, deine Kamera oder Benachrichtigungen möchte, fragt dich, und Nicht erlauben ist schon gewählt. Die Antwort wird nie behalten: Beim nächsten Öffnen fragt die Seite erneut. Die Anleitung hat einen Abschnitt dazu.' },
+        { title: 'Sicherer', text: 'Ein Link in einer Notiz kann das Fenster der App nicht mehr zu einer Webseite wegführen, eine eingebettete Seite kann keine Fenster mehr von selbst öffnen oder lesen, was du kopiert hast, und Nebula sperren nimmt eine aus einem schwarzen Loch geöffnete Datei und eine PDF-Vorschau mit.' },
+        { title: 'Dinge finden', text: 'Suchen, das Suchfeld und jede Liste, in die du tippst, finden İstanbul, wie auch immer das I getippt wird; ein Treffer in einer zugeklappten Aufklappliste öffnet sie, und die Sprache eines Codeblocks zählt nicht mehr als Treffer.' },
+        { title: 'Kleinigkeiten', text: 'Die Fenster zum Speichern und Öffnen sprechen deine Sprache, ein gekürzter Name schneidet nie ein Emoji in zwei Hälften, und eine Karte lässt sich mit der Tastatur wählen, entfernen und öffnen.' },
+      ],
+    },
+    pl: {
+      headline: 'Pliki w notatce, strona, która najpierw pyta, i bezpieczniejsza aplikacja.',
+      items: [
+        { title: 'Pliki w notatce', text: 'Przeciągnij dowolny plik na notatkę albo wpisz /file: zostaje w notatce jako karta z nazwą, rodzajem i rozmiarem. Kliknięcie zapisuje kopię, gdzie chcesz; Otwórz przekazuje ją programowi, który twój komputer ma dla takich plików. Program albo skrypt pyta, zanim się uruchomi, a kopia, która opuszcza aplikację Nebula, jest oznaczona jako pobrana, jak robi to przeglądarka.' },
+        { title: 'Strona w notatce najpierw pyta', text: 'Osadzona strona, która chce mikrofonu, kamery albo powiadomień, pyta ciebie, a Nie zezwalaj jest już wybrane. Odpowiedź nigdy nie jest zachowywana: przy następnym otwarciu strona pyta znowu. Przewodnik ma o tym część.' },
+        { title: 'Bezpieczniej', text: 'Link w notatce nie może już zabrać okna aplikacji na stronę internetową, osadzona strona nie może już sama otwierać okien ani czytać skopiowanych treści, a Zablokuj Nebula zabiera ze sobą plik otwarty z czarnej dziury i podgląd PDF.' },
+        { title: 'Szukanie', text: 'Znajdź, pole wyszukiwania i każda lista, w której piszesz, znajdują İstanbul, jakkolwiek wpiszesz I; trafienie w zwiniętej sekcji ją otwiera, a język bloku kodu nie liczy się już jako trafienie.' },
+        { title: 'Drobiazgi', text: 'Okna zapisu i otwierania mówią w twoim języku, skrócona nazwa nigdy nie przecina emoji na pół, a kartę można wybrać, usunąć i otworzyć z klawiatury.' },
+      ],
+    },
+    tr: {
+      headline: 'Nottaki dosyalar, önce soran bir sayfa ve daha güvenli bir uygulama.',
+      items: [
+        { title: 'Nottaki dosyalar', text: 'Herhangi bir dosyayı bir notun üzerine sürükleyin ya da /file yazın: adı, türü ve boyutuyla bir kart olarak notta kalır. Bir tık, bir kopyasını istediğiniz yere kaydeder; Aç, onu bilgisayarınızın o dosya için kullandığı programa verir. Bir program ya da betik çalışmadan önce sorar; Nebula’dan çıkan bir kopya da, bir tarayıcının yaptığı gibi, indirilmiş olarak işaretlenir.' },
+        { title: 'Nottaki bir sayfa önce sorar', text: 'Mikrofonunuzu, kameranızı ya da bildirimleri isteyen gömülü bir sayfa size sorar; İzin verme zaten seçilidir. Cevap hiçbir zaman saklanmaz: sayfa bir dahaki açılışta yeniden sorar. Kılavuzda bununla ilgili bir bölüm var.' },
+        { title: 'Daha güvenli', text: 'Nottaki bir bağlantı artık uygulamanın penceresini bir web sayfasına götüremez, gömülü bir sayfa artık kendi kendine pencere açamaz ya da kopyaladıklarınızı okuyamaz; Nebula’yı kilitle de bir kara delikten açılmış dosyayı ve PDF önizlemesini birlikte götürür.' },
+        { title: 'Bir şey bulmak', text: 'Bul, arama kutusu ve yazdığınız her liste, I nasıl yazılırsa yazılsın İstanbul’u bulur; katlanmış bir açılır bölümdeki eşleşme onu açar, bir kod bloğunun dili de artık eşleşme sayılmaz.' },
+        { title: 'Küçük şeyler', text: 'Kaydetme ve açma pencereleri sizin dilinizde konuşur, kısaltılan bir ad bir emojiyi asla ikiye bölmez, bir kart da klavyeyle seçilip kaldırılabilir ve açılabilir.' },
+      ],
+    },
+  },
   '0.9.5': {
     de: {
       headline: 'Eine Bildunterschrift bleibt bei ihrem Bild, und die Taskleiste trägt dein Logo.',

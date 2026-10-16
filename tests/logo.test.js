@@ -172,6 +172,7 @@ describe('themes that are the logo’s alone', () => {
     expect(cleanLogoThemes([{ name: 'Half', colors: { star: '#fff' } }])).toEqual([{ name: 'Half', colors: { ...OWN_LOGO.main, star: '#FFFFFF' } }]);
     expect(cleanLogoThemes(Array.from({ length: 40 }, (_, i) => ({ name: `T${i}`, colors: red })))).toHaveLength(24);
     expect(cleanLogoName('x'.repeat(60))).toHaveLength(32);
+    expect(cleanLogoName(`${'x'.repeat(31)}🌙 night`)).toBe(`${'x'.repeat(31)}🌙`); // hunt B20: never half an emoji
   });
 
   it('are kept under a name: a new one, or that one again with new colours', () => {

@@ -14,6 +14,7 @@
  */
 
 import { t } from './i18n.js';
+import { fold } from './fold.js';
 
 /**
  * The labels written in a note's text (#word chips), each once, in order.
@@ -84,12 +85,12 @@ export function detectTagQuery(textBeforeCaret) {
  * it first, then those that hold it, each once whatever its case. Pure — tested.
  */
 export function matchLabels(labels, query, { limit = 8 } = {}) {
-  const q = String(query || '').toLocaleLowerCase();
+  const q = fold(query);
   const seen = new Map();
   for (const l of labels) if (l && !seen.has(l.toLocaleLowerCase())) seen.set(l.toLocaleLowerCase(), l);
   const all = [...seen.values()].sort((a, b) => a.localeCompare(b));
-  const starts = all.filter((l) => l.toLocaleLowerCase().startsWith(q));
-  const holds = all.filter((l) => !l.toLocaleLowerCase().startsWith(q) && l.toLocaleLowerCase().includes(q));
+  const starts = all.filter((l) => fold(l).startsWith(q));
+  const holds = all.filter((l) => !fold(l).startsWith(q) && fold(l).includes(q));
   return [...starts, ...holds].slice(0, limit);
 }
 
@@ -118,10 +119,10 @@ export function syncTagChips(root) {
 
 /** Notes whose title holds every word of the query. Pure — tested. */
 export function matchNotes(notes, query, { exclude = null, limit = 8 } = {}) {
-  const words = String(query || '').toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const words = fold(query).split(/\s+/).filter(Boolean);
   return notes
     .filter((n) => n.id !== exclude && !n.deletedAt && !n.archivedAt)
-    .filter((n) => { const title = String(n.title || 'Untitled').toLocaleLowerCase(); return words.every((w) => title.includes(w)); })
+    .filter((n) => { const title = fold(n.title || 'Untitled'); return words.every((w) => title.includes(w)); })
     .slice(0, limit);
 }
 

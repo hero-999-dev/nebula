@@ -22,9 +22,9 @@ describe('check-browsers', () => {
   });
 
   it('stops on an ESR that is no longer one', async () => {
-    const r = await checkBrowsers({ now: NOW, mozilla: mozilla(157, '153.5.0esr', ''), chrome: [], engine: null });
+    const r = await checkBrowsers({ now: NOW, mozilla: mozilla(157, '165.0.0esr', ''), chrome: [], engine: null });   // an ESR past the one the app tells
     expect(r.ok).toBe(false);
-    expect(r.rows.find((x) => x.name === 'Firefox ESR').fix).toContain('153');
+    expect(r.rows.find((x) => x.name === 'Firefox ESR').fix).toContain('165');
   });
 
   it('says loudly, without stopping, that Electron\'s Chromium is years behind', async () => {

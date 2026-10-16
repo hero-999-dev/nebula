@@ -113,6 +113,41 @@ describe('the residue museum: each exhibit comes out as this version writes it',
     });
   }
 
+  // Up to 0.9.6 test builds: a card or picture pasted from another note was saved
+  // naming that note's file even after its own copy was made, and once that note
+  // was deleted the copy was unnamed and shredded at a start. The repair needs
+  // the disk — only it can tell "this note already holds the file" from "nothing
+  // does" — so it is not a markup step: tidyVault rehomes every note at every
+  // start, before it sweeps (tests/note-media.test.js, "…keeps its file instead
+  // of losing it"). Here: the markup repair must leave such an address alone,
+  // since rewriting it blind would kill one that is still good.
+  it('0.9.6 test builds: a card naming another note\'s file is repaired from the disk at a start, never rewritten blind here', () => {
+    const html = '<p>x</p><div class="link-block link-attach" contenteditable="false" data-block-type="link" data-src="nebula-media://note/n-a/att-1-aaaaaaaa.pdf" data-name="a.pdf"></div>'
+      + '<figure class="note-image note-image--inline" contenteditable="false" data-block-type="image"><img src="nebula-media://note/n-a/0123456789abcdef01234567.png"></figure>';
+    const out = healHtml(html);
+    expect(out.safe).toBe(true);
+    const el = parse(out.html);
+    expect(el.querySelector('.link-attach').getAttribute('data-src')).toBe('nebula-media://note/n-a/att-1-aaaaaaaa.pdf');
+    expect(el.querySelector('img').getAttribute('src')).toBe('nebula-media://note/n-a/0123456789abcdef01234567.png');
+  });
+
+  // Up to 0.9.5 a video's name was cut at 200 UTF-16 units: a name with an emoji
+  // there kept the emoji's first half, saved in the card's data-name and on its
+  // face, drawn as "�" (hunt B24). The half goes; every other word stays.
+  it('up to 0.9.5: a video card whose name ended in half an emoji', () => {
+    const name = `${'v'.repeat(199)}\uD83D`;
+    const html = `<p>before \u{1F600} after</p><div class="link-block link-embed link-file" contenteditable="false" data-block-type="link" data-kind="file" data-name="${name}">`
+      + `<a class="link-card"><span class="link-card__kind">Video</span><strong class="link-card__title">${name}</strong></a></div>`;
+    const first = healHtml(html);
+    expect(first.safe).toBe(true);
+    expect(first.changed).toBe(true);
+    const card = parse(first.html).querySelector('.link-file');
+    expect(card.getAttribute('data-name')).toBe('v'.repeat(199));
+    expect(card.querySelector('.link-card__title').textContent).toBe('v'.repeat(199));
+    expect(parse(first.html).querySelector('p').textContent).toBe('before \u{1F600} after');
+    expect(healHtml(first.html).changed).toBe(false);
+  });
+
   it('the guide this version ships needs nothing on a second pass', () => {
     const once = healHtml(GUIDE_NOTE.content);
     expect(once.safe).toBe(true);

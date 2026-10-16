@@ -304,7 +304,7 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '0.9.4';
+export const GUIDE_VERSION = '0.9.6';
 
 /**
  * The guide's words, without its markup, shapes, code or equations — so a
@@ -488,6 +488,14 @@ export const GUIDE_SIGNATURES = {
   '0.9.4 de': 'b73b4833',
   '0.9.4 pl': '356932d5',
   '0.9.4 tr': '44dc6b07',
+  '0.9.6 first test build': 'c51c53b0',
+  '0.9.6 first test build de': '19e7a4cb',
+  '0.9.6 first test build pl': '1a2146c9',
+  '0.9.6 first test build tr': 'df783cdb',
+  '0.9.6': '4dde44d2',
+  '0.9.6 de': 'fe1c04a3',
+  '0.9.6 pl': '51e1c07e',
+  '0.9.6 tr': '004c6008',
 };
 
 /** Whether a vault's guide is one we shipped and nobody has typed in. */
@@ -523,6 +531,10 @@ export const GUIDE_NOTE = {
     // section they belong to. See GUIDE_SIGNATURES before changing any text.
     // A divider closes each section before the next heading (owner, 0.8.9).
     '<hr class="blk-hr">' +
+    '<h2>New in 0.9.6</h2>' +
+    '<ul><li><strong>Files in a note.</strong> Drag any file — a PDF, a spreadsheet, an archive — onto a note, or choose it with /file: a copy stays in the note as a card with the logo of its kind, its name and its size. A click saves a copy wherever you like — section 7.</li><li><strong>A page in a note asks first.</strong> An embedded page that wants your microphone, your camera or notifications asks you, and the answer is forgotten when the page closes — section 10.</li></ul>' +
+
+    '<hr class="blk-hr">' +
     '<h2>New in 0.9.4</h2>' +
     '<ul>' +
     '<li><strong>This guide in your language.</strong> Choose Deutsch, Polski or Türkçe and this page follows, as long as you have not written in it — section 1.</li>' +
@@ -541,8 +553,8 @@ export const GUIDE_NOTE = {
     '<li><strong>A divider that splits the page.</strong> Pull a divider sideways and it stands up: the part of the note above it becomes two columns, and pulled over a column it cuts that one again — as many columns as the line has room for. A Word, OpenDocument or Rich Text file keeps them as columns — sections 4 and 8.</li>' +
     '<li><strong>Tables.</strong> <span class="inline-code">/table</span>, or the table button on the bar, makes a table: its columns numbered x1, x2… and its rows y1, y2…, with cells you can colour, merge and fill by pulling a corner, and a + to make it longer or wider — section 4.</li>' +
     '<li><strong>AI tabs that sleep.</strong> Tabs stay awake unless you say otherwise: a tab told it may sleep gives its memory back after twenty minutes unseen and loads again when you open it; a temporary chat, or words not sent yet, keep it awake all the same — section 1.</li>' +
-    '<li><strong>A folder for each note.</strong> A note is a folder of its own now — its file, its pictures and its videos in it — and a picture is no longer text inside the note. A video file dropped on a note, or chosen with /video, is copied there and played, and goes along when the note is exported as a Nebula note, whatever its size — sections 7, 8 and 10.</li>' +
-    '<li><strong>Black holes.</strong> Notes kept encrypted, in a section of their own under your notes: opened with a 6-digit PIN, and with a passkey — your fingerprint, your face or the computer’s own PIN — if you add one; deleting one, or taking a note out of it, asks for it again — sections 1 and 10.</li>' +
+    '<li><strong>A folder for each note.</strong> A note is a folder of its own now — its file, its pictures and its videos in it — and a picture is no longer text inside the note. A video file dropped on a note, or chosen with /video, is copied there and played, and goes along when the note is exported as a Nebula note, whatever its size — sections 7, 8 and 11.</li>' +
+    '<li><strong>Black holes.</strong> Notes kept encrypted, in a section of their own under your notes: opened with a 6-digit PIN, and with a passkey — your fingerprint, your face or the computer’s own PIN — if you add one; deleting one, or taking a note out of it, asks for it again — sections 1 and 11.</li>' +
     '<li><strong>Open with Nebula.</strong> Right-click a Word, OpenDocument or Rich Text file and choose Open with → Nebula: it opens as a new note, in the Nebula that is already running. Make Nebula the default for such files and they wear a violet document icon — section 8.</li>' +
     '<li><strong>Settings.</strong> <em>Settings</em>, beside Help at the top, sets what a new note starts with — its font, its text size and its page — puts the AI panel or the black holes away, and gives Nebula’s logo colours of your own — section 1.</li>' +
     '<li><strong>A lock on opening.</strong> In Settings, a 6-digit PIN locks Nebula each time it opens, and a passkey can be added beside it; <em>File → Lock Nebula</em> shuts it at once — section 1.</li>' +
@@ -693,7 +705,7 @@ export const GUIDE_NOTE = {
     '<p><strong>Try it:</strong> in a note of your own, add two shapes and an arrow, pull each end near a shape until it snaps, then drag the shapes apart — the arrow stretches with them. Click an arrow so it lights up and press Delete to remove it.</p>' +
 
     '<hr class="blk-hr">' +
-    '<h2>7 · Links, pictures and videos</h2>' +
+    '<h2>7 · Links, pictures, videos and files</h2>' +
     '<p><strong>Pasted words take this note’s font.</strong> Text copied from a web page or a document arrives in the note’s writing font and colours; its paragraphs, headings, lists, links, bold and italic stay. Words copied from another Nebula note keep a font that was chosen for them — a line in Consolas stays in Consolas. A right-click pastes it the other two ways: with its original format, or as text only (section 2). <strong>Try it:</strong> copy a paragraph from any web page and paste it into a note — it looks like the rest of the note.</p>' +
     '<p><strong>Paste a web address</strong> on its own (or type <span class="inline-code">/embed</span>, <span class="inline-code">/bookmark</span>, <span class="inline-code">/url</span> or <span class="inline-code">/mention</span>) and Nebula asks how to show it:</p>' +
     '<ul>' +
@@ -710,6 +722,8 @@ export const GUIDE_NOTE = {
     '<p><strong>Videos:</strong> embed a YouTube or Vimeo link and you get the player itself, as wide as the text (up to a comfortable size) so the picture is sharp, black while it loads like on any site — a start time in the link is kept. A video file of your own — MP4, WebM, MOV, MKV, and AVI, WMV and the other kinds too — dropped on a note, or chosen from the computer with /video, is copied into the note’s folder and played from there, with its name under it and a bar of its own: back and on by ten seconds, the speed, the whole screen. A kind the app’s player cannot play is kept all the same, and its card offers to open it in another program. A file for another program shows a line with the video’s name in its place; a note exported as a Nebula note takes its videos along. In a black hole the video is sealed beside its note, like the note itself, and plays while the black hole is open.</p>' +
     '<p><strong>Pictures:</strong> paste an image and it goes on the line you are on, part of the text, so it moves with the words at any window size. Click it for its bar, where three buttons say where it lives and the current one is lit: <em>▾</em> behind the text, <em>▴</em> above the text (floating, on top), <em>≡</em> in the text. <em>Aa</em> writes a caption under it — so does a <strong>double-click</strong> on the picture — <em>✂</em> crops it (drag the frame’s edges or corners, Enter crops, Esc leaves it whole, one Ctrl+Z brings the whole picture back), <em>✕</em> deletes it, and any of its four corner handles resizes it proportionally. <strong>Ctrl+C</strong> with a picture selected (or <em>Copy image</em> on a right-click) copies the picture itself, ready for any program. In the text, Backspace at the start of the line under a picture, or Delete at the end of the line above, first selects the picture and only a second press deletes it; an empty line beside a picture simply goes. With a picture in the text selected, Enter opens a line under it and Alt+↑ / Alt+↓ move it up or down a line. On floating pictures, the opposite corner stays in place. An image dropped from a folder floats where you drop it. A picture in the text has five more buttons on its bar: left, middle and right say where it stands on its line, and the fourth puts it beside the picture before it — two pictures on one line, which get smaller in a narrow window rather than cut off. Dragging does the same: pulled sideways it snaps left, middle or right; held over another picture a mark stands at that picture’s side; held between two lines a mark lies there — let go, and it moves. The last button, a▫a, stands the picture inside a line of words, as a letter of that line: drag it and a mark shows the caret it will go to; press Enter and you type on right after it. Such a picture has no caption; the same button, or left, middle or right, takes it out of the line again.</p>' +
     '<p><strong>Try it:</strong> copy any picture, click at the end of this line and paste. Give it a caption, then make the window narrow and wide — the picture stays between the same two lines.</p>' +
+    '<p><strong>Files:</strong> drag any file from Explorer or Finder onto a note, or type <span class="inline-code">/file</span> and choose one. Nebula keeps its own copy inside the note — the original stays where it was — and shows it as a card: the logo of its kind (PDF red, Word blue, Excel green…), its name and its size. A click on the card saves a copy wherever you choose; <em>Open</em> opens it in its own program — changes made there do not go back into the note; × takes it out of the note. Pictures and videos dropped on their own still go in as pictures and videos.</p>' +
+    '<p><strong>Try it:</strong> in a note of your own, drag a PDF from your Downloads folder onto an empty line, then click the card and save the copy to your desktop.</p>' +
 
     '<hr class="blk-hr">' +
     '<h2>8 · Import, export, print and moving a note</h2>' +
@@ -727,7 +741,12 @@ export const GUIDE_NOTE = {
     '<p><strong>Try it:</strong> right-click an AI tab you are signed in to and choose <em>Clear session data</em> — the page loads again, signed out.</p>' +
 
     '<hr class="blk-hr">' +
-    '<h2>10 · Where your notes live</h2>' +
+    '<h2>10 · A page in a note that asks</h2>' +
+    '<p>An embedded page — a meeting, a voice recorder, a news site — may ask for your <strong>microphone</strong>, your <strong>camera</strong> or to <strong>show notifications</strong>. Nebula asks you first, naming the site and what it wants, and <em>Don\'t allow</em> is the answer already chosen: a page you do not allow gets nothing. Your answer is never saved. It lasts while that page is open; a reload, another page in the embed or the note opened again asks again. A page that asks on its own, with nothing pressed in it, is not asked about at all, and some sites then never ask — open those in your browser. Everything else — what you copied, your location, your devices — an embedded page never gets.</p>' +
+    '<p><strong>Try it:</strong> in a note of your own, embed a page that records your voice, press its record button and choose <em>Don\'t allow</em> — the page hears nothing. Open the note again and press it once more: Nebula asks again.</p>' +
+
+    '<hr class="blk-hr">' +
+    '<h2>11 · Where your notes live</h2>' +
     '<p>Click the version number at the bottom of the sidebar to see every folder this copy uses. Each note is a folder of its own: in it the note’s JSON file, written atomically, and its pictures and videos as files — a picture is written once, so typing saves only the words. A dated snapshot of the whole vault is kept alongside, one a day, and only the newest is kept: it copies the notes’ own files and shares their pictures and videos with the vault instead of copying them, so a video is on the disk once. On a disk that cannot share a file — a flash drive, a network folder — the copy holds them itself, so they are there twice. Of the copies made before an update and before a repair, the newest of each kind is kept. A note deleted from the Trash takes its folder with it, in every snapshot too. Black holes are beside the notes, in blackholes: one folder each, every note in it one sealed file.</p>' +
     '<p>An update replaces the application folder only. The vault is copied into Backups before anything installs, and <strong>nothing in it is ever deleted</strong>. The installed app, the portable copy, the test build and the dev build each keep their own separate notes.</p>' +
     '<p><strong>File → Open notes folder</strong> shows that folder in Explorer. Pictures taken with F12 go to <em>Pictures\\Nebula</em>, outside the vault.</p>' +
@@ -736,7 +755,7 @@ export const GUIDE_NOTE = {
     '<p><strong>Try it:</strong> after the next update, open the Backups folder from the version number: beside the dated copy there is one called <em>pre-heal-</em> with the version it was taken for.</p>' +
 
     '<hr class="blk-hr">' +
-    '<h2>11 · Code blocks</h2>' +
+    '<h2>12 · Code blocks</h2>' +
     '<p>Markdown-style: pick a language and the colours follow, the way GitHub, Discord or Notion do it. Click into the code to edit it; changing the language repaints the same text; <em>Copy</em> takes the raw source. Every language Nebula knows has a sample below.</p>' +
     '<h3>Markdown</h3>' + code(MD_SRC, 'markdown') +
     '<h3>JavaScript</h3>' + code(JS_SRC, 'javascript') +

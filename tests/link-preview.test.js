@@ -48,6 +48,15 @@ describe('preview metadata and load status', () => {
     expect(changed).toHaveBeenCalledTimes(1);
   });
 
+  it('cuts a long page title by characters, never between an emoji’s halves (hunt B24)', () => {
+    const c = card();
+    bindLinkPreview(c);
+    const frame = c.querySelector('webview');
+    event(frame, 'page-title-updated', { title: `${'a'.repeat(499)}😀😀` });
+    event(frame, 'did-finish-load');
+    expect(c.querySelector('strong').textContent).toBe(`${'a'.repeat(499)}😀`);
+  });
+
   it('ignores a title reported while the page is still loading', () => {
     const c = card('embed', 'https://www.youtube.com/watch?v=x', 'www.youtube.com/watch?v=x');
     const changed = vi.fn((write) => write());

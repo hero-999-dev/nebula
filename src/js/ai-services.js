@@ -6,7 +6,7 @@
  * so, these two lines are what to change.
  */
 export const FIREFOX_RELEASE = { version: 157, date: '2026-09-29' };
-export const FIREFOX_ESR = 140;
+export const FIREFOX_ESR = 153;
 
 function osPart(platform) {
   return platform === 'darwin' ? 'Macintosh; Intel Mac OS X 10.15'
@@ -200,4 +200,10 @@ export function siteUrl(raw) {
     const u = new URL(url);
     return ['https:', 'http:'].includes(u.protocol) && u.hostname.includes('.') ? u.toString() : null;
   } catch { return null; }
+}
+
+/** A site's name as the panel may keep it: one line, trimmed, not endless.
+ * Characters, not UTF-16 units, so no emoji is cut in half (hunt B24). */
+export function cleanSiteName(raw) {
+  return Array.from(String(raw ?? '').trim()).slice(0, 40).join('');
 }

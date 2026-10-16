@@ -759,6 +759,9 @@ export async function runV093Checks(check) {
     await win.waitForTimeout(300);
     await win.click('#ov-pdf [data-pdf="cancel"]');
     await win.waitForTimeout(300);
+    // A landscape render still printing when Cancel was pressed lands after it and is
+    // discarded on arrival (pdf-preview.js); a loaded machine needs a moment for that.
+    for (let i = 0; i < 40 && previewFiles() > 0; i += 1) await win.waitForTimeout(150);
     check('turned back to landscape and closed: no preview left behind', !(await previewState()).open && previewFiles() === 0
       && await win.evaluate(() => localStorage.getItem('nebula:nw-orientation') === 'landscape'));
     // ---- Auto order page (0.9.3) -----------------------------------------

@@ -4,7 +4,7 @@
  * something. What the panel does with it is in tests/e2e/ai-sleep.mjs.
  */
 import { describe, it, expect } from 'vitest';
-import { SLEEP_AFTER_MS, isTemporaryChat, namesSavedChat, wouldLoseOnReload, shouldSleep, sleepAfterMs } from '../src/js/ai-services.js';
+import { SLEEP_AFTER_MS, isTemporaryChat, namesSavedChat, wouldLoseOnReload, shouldSleep, sleepAfterMs, cleanSiteName } from '../src/js/ai-services.js';
 
 describe('an address that says the chat is not kept', () => {
   it('is ChatGPT’s temporary chat, Claude’s incognito, and their like', () => {
@@ -96,5 +96,13 @@ describe('when a tab sleeps', () => {
     expect(sleepAfterMs('-3')).toBe(SLEEP_AFTER_MS);
     expect(shouldSleep({ ...tab, lastSeen: 0 }, sleepAfterMs('0'))).toBe(false);
     expect(shouldSleep({ ...tab, lastSeen: tab.now - 5 * 60 * 1000 }, sleepAfterMs('5'))).toBe(true);
+  });
+});
+
+describe('a site name as the panel may keep it', () => {
+  it('is one trimmed line, never endless — and never half an emoji (hunt B24)', () => {
+    expect(cleanSiteName('  My   Chat ')).toBe('My   Chat');
+    expect(cleanSiteName('x'.repeat(200))).toHaveLength(40);
+    expect(cleanSiteName(`${'x'.repeat(39)}🌙 chat`)).toBe(`${'x'.repeat(39)}🌙`);
   });
 });

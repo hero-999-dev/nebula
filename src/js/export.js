@@ -292,11 +292,12 @@ ${doc.body.innerHTML}
 
 /** A filename that cannot surprise a filesystem. Pure — tested. */
 export function safeFileName(title, ext) {
-  const base = String(title ?? '').trim()
+  const base = Array.from(String(title ?? '').trim()
     .replace(/[\\/:*?"<>|]/g, '-')      // reserved on Windows
     .replace(/\s+/g, ' ')
-    .replace(/^\.+/, '')                 // no leading dots: not a hidden file
-    .slice(0, 80)
+    .replace(/^\.+/, ''))                // no leading dots: not a hidden file
+    .slice(0, 80)                        // characters, not UTF-16 units: an emoji cut in half was saved as "�" (hunt B20)
+    .join('')
     .trim();
   return `${base || 'Untitled'}.${ext}`;
 }

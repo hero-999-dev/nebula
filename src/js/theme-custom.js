@@ -122,7 +122,7 @@ export function cleanColors(raw, fallback = MATCHA.colors) {
 }
 
 /** A profile name as it is kept: one line, trimmed, not endless. */
-export const cleanProfileName = (raw) => String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, 32);
+export const cleanProfileName = (raw) => Array.from(String(raw ?? '').replace(/\s+/g, ' ').trim()).slice(0, 32).join('').trim(); // characters, not UTF-16 units: no emoji cut in half (hunt B20)
 
 /**
  * Every token the stylesheet reads, from the five picks.

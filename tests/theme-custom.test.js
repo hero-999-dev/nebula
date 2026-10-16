@@ -111,6 +111,7 @@ describe('profiles', () => {
       .toEqual([{ name: 'a', colors: MATCHA.colors }]);
     expect(cleanProfiles('nonsense')).toEqual([]);
     expect(cleanProfileName('x'.repeat(80))).toHaveLength(32);
+    expect(cleanProfileName(`${'x'.repeat(31)}🌙 night`)).toBe(`${'x'.repeat(31)}🌙`); // hunt B20: never half an emoji
   });
 
   it('are known by their colours', () => {

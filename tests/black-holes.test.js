@@ -229,6 +229,7 @@ describe('the PIN', () => {
     const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193', hint: '  the   year we moved, twice ' });
     expect(hole.hint).toBe('the year we moved, twice');
     expect(cleanHint('x'.repeat(200))).toHaveLength(80);
+    expect(cleanHint(`${'x'.repeat(79)}🌙 hint`)).toBe(`${'x'.repeat(79)}🌙`); // hunt B24: never half an emoji
     h.lock(hole.id);
     expect(h.list()[0].hint).toBe('the year we moved, twice');   // a locked black hole shows it: that is what it is for
     expect(h.setHint(hole.id, 'another')).toEqual({ ok: false, error: 'locked' });   // but only its owner changes it
@@ -582,6 +583,27 @@ describe('a video in a black hole', () => {
     expect('swept' in (await h.unlock(hole.id, { pin: '482193' }))).toBe(false);
   });
 
+  it('any file attached to a note is sealed the same way, and comes out whole (0.9.6)', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    const doc = path.join(root, 'Contract.PDF');
+    fs.writeFileSync(doc, `%PDF ${SECRET}`);
+    const res = await h.addFile(hole.id, 'n1', doc);
+    expect(res).toMatchObject({ ok: true, name: 'Contract.PDF' });
+    expect(res.url).toMatch(new RegExp(`^nebula-media://hole/${hole.id}/n1/att-[a-z0-9]+-[0-9a-f]{8}\\.pdf$`));
+    expect(onDisk()).toContain(SECRET);                                   // the person's own file, where it was
+    fs.rmSync(doc);
+    expect(onDisk()).not.toContain(SECRET);                               // and nowhere in the black hole
+    const out = path.join(root, 'out', 'Contract.pdf');
+    expect((await h.exportVideo(hole.id, 'n1', res.file, out)).ok).toBe(true);
+    expect(fs.readFileSync(out, 'utf8')).toBe(`%PDF ${SECRET}`);
+    const plain = path.join(root, 'README');
+    fs.writeFileSync(plain, 'x');
+    expect((await h.addFile(hole.id, 'n1', plain)).file).toMatch(/^att-[a-z0-9]+-[0-9a-f]{8}\.bin$/);
+    h.lock(hole.id);
+    expect((await h.addFile(hole.id, 'n1', plain)).error).toBe('locked');
+  });
+
   it('only a video, and only under a name a video has', async () => {
     const h = holes();
     const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
@@ -610,6 +632,7 @@ describe('names and keys', () => {
   it('a name is one line, not endless; a locked black hole can be renamed', async () => {
     expect(cleanHoleName('  a\n b  ')).toBe('a b');
     expect(cleanHoleName('x'.repeat(200))).toHaveLength(60);
+    expect(cleanHoleName(`${'x'.repeat(59)}🌙 hole`)).toBe(`${'x'.repeat(59)}🌙`); // hunt B24: never half an emoji
     const h = holes();
     const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
     h.lock(hole.id);

@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NoteStore, plainSnippet, relativeTime, noteText } from '../src/js/notes.js';
+import { codeBlockHtml } from '../src/js/codeblock.js';
+import { makeAttachBlock } from '../src/js/file-attach.js';
 import { SEED_NOTES } from '../src/js/seed-notes.js';
 
 describe('NoteStore', () => {
@@ -176,6 +178,17 @@ describe('note text', () => {
     expect(plainSnippet(html, 40)).not.toContain('Heyo');
   });
 
+  it('is what the note says, not the controls saved with its blocks (hunt B17)', () => {
+    // A code block is saved with its language picker (every language's name),
+    // its hint and its Copy / ✕; a card with its ×. The sidebar search found
+    // "python" or "copy" in every note with a code block.
+    const code = codeBlockHtml('', 'python').replace('<code class="code-src" contenteditable="true" spellcheck="false"></code>', '<code class="code-src">x = 1</code>');
+    const card = makeAttachBlock('nebula-media://note/n1/att-m1abc-0a1b2c3d.pdf', 'plan.pdf', 900).outerHTML;
+    const text = noteText(`<p>Intro</p>${code}${card}<p>end</p>`);
+    expect(text).toBe('Intro x = 1 plan.pdf end');
+    for (const word of ['Python', 'JavaScript', 'Copy', 'click the code', '✕', '×']) expect(text, word).not.toContain(word);
+  });
+
   it('drops both layers, not just the first', () => {
     const html = '<div class="shape-layer shape-layer--behind"><div class="shape-text">back</div></div>'
       + '<div class="shape-layer"><div class="shape-text">front</div></div><p>real text</p>';
@@ -187,6 +200,12 @@ describe('note text', () => {
     const snip = plainSnippet(long, 48);
     expect(snip).toHaveLength(48);
     expect(snip.endsWith('…')).toBe(true);
+  });
+
+  it('never cuts an emoji in half at the end of the line (hunt B24)', () => {
+    const snip = plainSnippet(`<p>${'a'.repeat(46)}😀😀😀</p>`, 48);
+    expect(snip).toBe(`${'a'.repeat(46)}😀…`);
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(snip)).toBe(false);
   });
 
   it('is empty for an empty note', () => {
@@ -207,6 +226,16 @@ describe('NoteStore.filter searches the whole note', () => {
       { id: 'b', title: 'Other', content: '<p>nothing here</p>', createdAt: 1, updatedAt: 1 },
     ];
     expect(store.filter('needle').map((n) => n.id)).toEqual(['a']);
+  });
+
+  it('finds İstanbul from "istanbul" and IRMAK from "ırmak" (hunt B19)', () => {
+    const store = new NoteStore({ allowSeed: false });
+    store.notes = [
+      { id: 'a', title: 'İstanbul trip', content: '<p>IRMAK</p>', createdAt: 1, updatedAt: 2 },
+      { id: 'b', title: 'Other', content: '<p>nothing here</p>', createdAt: 1, updatedAt: 1 },
+    ];
+    expect(store.filter('istanbul').map((n) => n.id)).toEqual(['a']);
+    expect(store.filter('ırmak').map((n) => n.id)).toEqual(['a']);
   });
 
   it('still matches on the title, and keeps only what matched', () => {

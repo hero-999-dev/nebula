@@ -58,14 +58,14 @@ export function videoClock(seconds) {
  */
 export const isMediaUrl = (url) => /^nebula-media:\/\/(?:note|hole\/[\w-]{1,120})\/[\w-]{1,120}\/[\w-]{1,80}\.[a-z0-9]{2,5}$/.test(String(url ?? ''));
 
-/** The video files a note's markup names in its own folder: [address, note, file]. */
+/** The video files, and the attached files (file-attach.js), a note's markup names in its own folder: [address, note, file]. */
 export function plainVideosOf(html) {
-  return [...new Map([...String(html ?? '').matchAll(/nebula-media:\/\/note\/([\w-]{1,120})\/(vid-[a-z0-9]+-[0-9a-f]{8}\.[a-z0-9]{2,5})/g)].map((m) => [m[0], [m[0], m[1], m[2]]])).values()];
+  return [...new Map([...String(html ?? '').matchAll(/nebula-media:\/\/note\/([\w-]{1,120})\/((?:vid|att)-[a-z0-9]+-[0-9a-f]{8}\.[a-z0-9]{2,5})/g)].map((m) => [m[0], [m[0], m[1], m[2]]])).values()];
 }
 
-/** The videos a note's markup names sealed in a black hole: [address, hole, note, file]. */
+/** The videos and attached files a note's markup names sealed in a black hole: [address, hole, note, file]. */
 export function sealedVideosOf(html) {
-  return [...new Map([...String(html ?? '').matchAll(/nebula-media:\/\/hole\/([\w-]{1,120})\/([\w-]{1,120})\/(vid-[a-z0-9]+-[0-9a-f]{8}\.[a-z0-9]{2,5})/g)].map((m) => [m[0], [m[0], m[1], m[2], m[3]]])).values()];
+  return [...new Map([...String(html ?? '').matchAll(/nebula-media:\/\/hole\/([\w-]{1,120})\/([\w-]{1,120})\/((?:vid|att)-[a-z0-9]+-[0-9a-f]{8}\.[a-z0-9]{2,5})/g)].map((m) => [m[0], [m[0], m[1], m[2], m[3]]])).values()];
 }
 
 /**
@@ -79,7 +79,7 @@ export function makeVideoBlock(url, name, doc = document) {
   card.setAttribute('contenteditable', 'false');
   card.dataset.blockType = 'link';
   card.dataset.kind = 'file';
-  card.dataset.name = String(name || 'video').slice(0, 200);
+  card.dataset.name = Array.from(String(name || 'video')).slice(0, 200).join(''); // characters, not UTF-16 units: an emoji cut in half stayed in the note (hunt B24)
 
   const label = doc.createElement('a');
   label.className = 'link-card';
@@ -213,12 +213,14 @@ export function initVideoPlayers(editor) {
 
 /**
  * For a file another program opens: each video of the note becomes a line
- * with its name. In place, on a parsed copy of the note.
+ * with its name, and so does each attached file (file-attach.js). In place,
+ * on a parsed copy of the note.
  */
 export function fileVideoLines(doc) {
-  for (const card of [...doc.querySelectorAll('.link-block.link-file')]) {
+  for (const card of [...doc.querySelectorAll('.link-block.link-file, .link-block.link-attach')]) {
     const line = doc.createElement('p');
-    line.textContent = `▶ ${card.dataset.name || card.querySelector('.link-card__title')?.textContent || 'video'}`;
+    const attached = card.classList.contains('link-attach');
+    line.textContent = `${attached ? '📎' : '▶'} ${card.dataset.name || card.querySelector('.link-card__title')?.textContent || (attached ? 'file' : 'video')}`;
     card.replaceWith(line);
   }
   return doc;

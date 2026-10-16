@@ -52,7 +52,8 @@ export function bindLinkPreview(card, { onTitle, placeholder } = {}) {
   // `onTitle(write)` decides how the title goes in (the editor folds it into
   // its history without making it an edit); without one it is simply written.
   const update = (raw) => {
-    const text = String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, 500);
+    // Cut by characters, never between an emoji's two halves (hunt B24).
+    const text = Array.from(String(raw ?? '').replace(/\s+/g, ' ').trim()).slice(0, 500).join('');
     if (!text || !card.isConnected || !title || title.textContent === text || !untitled()) return;
     const write = () => { title.textContent = text; };
     if (onTitle) onTitle(write); else write();

@@ -16,6 +16,7 @@
  */
 import { t } from './i18n.js';
 import { makeVideoBlock, VIDEO_EXTENSIONS } from './file-video.js';
+import { makeAttachBlock } from './file-attach.js';
 
 const PICTURES = new Set(['png', 'jpg', 'gif', 'webp', 'bmp', 'avif', 'svg']);
 const VIDEOS = new Set(VIDEO_EXTENSIONS);
@@ -35,11 +36,13 @@ function sizeOf(url) {
 
 /**
  * The markup that puts a note's files back into it: each picture a picture in
- * the text, each video its player, and a line to type on after them.
+ * the text, each video its player, each attached file its card (under the
+ * name it is kept by: the one it came with was in the note), and a line to
+ * type on after them.
  * @param {string} id the note
  * @param {string[]} files file names in the note's folder
  * @param {(url: string) => Promise<{width: number, height: number}>} [measure]
- * @returns {Promise<string>} '' when none of them is a picture or a video
+ * @returns {Promise<string>} '' when none of them is a picture, a video or an attached file
  */
 export async function heldMarkup(id, files, measure = sizeOf) {
   const holder = document.createElement('div');
@@ -47,7 +50,10 @@ export async function heldMarkup(id, files, measure = sizeOf) {
     const ext = FILE.exec(String(name))?.[1];
     if (!ext || !/^[\w-]{1,120}$/.test(String(id))) continue;
     const url = `nebula-media://note/${id}/${name}`;
-    if (PICTURES.has(ext)) {
+    // An attached file first: it may end like a picture, and is none.
+    if (/^att-[a-z0-9]+-[0-9a-f]{8}\./.test(name)) {
+      holder.append(makeAttachBlock(url, name));
+    } else if (PICTURES.has(ext)) {
       const { width, height } = await measure(url);
       const shown = Math.min(WIDEST, Math.max(1, width));
       const figure = document.createElement('figure');
