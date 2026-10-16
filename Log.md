@@ -20,6 +20,8 @@ The push went out with every gate here passed (unit 1229 of 1229, smoke 1010 of 
 - The run after that missed note-folders "and Ctrl+Z brings the picture back" (seen once before, 0.9.5; passes alone, 2 of 2): its wait for the disk was four seconds, now ten.
 - The next missed black-holes "a passkey is added beside the PIN" (also seen at 0.9.5): the passkey was on the disk, the menu read straight after had not caught up. The menu is waited for now.
 
+- The moved tag's build then stopped in black-holes, where the suite listed the backup's files and the app removed one (the purge a note moved into a black hole asks for) before the suite read it: ENOENT ended the run. A file gone between the listing and the read now counts as holding nothing.
+
 The first is in the check; the second is a small leftover in the app, repaired. Both (tests.md), the whole smoke suite run here again at 0.9.6 — 1010 of 1010 — and the tag `v0.9.6` moved to this commit: no release existed under it.
 
 ## [2026-10-16 08:23] v0.9.6 - by release-script

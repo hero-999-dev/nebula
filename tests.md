@@ -3,6 +3,7 @@
 - tests/e2e/ai-sleep.mjs "three tabs opened are three pages loaded": the third tab's page was looked for 700 ms after its click; the slower Windows runner had not begun it. The check now waits for the page (up to 40 × 200 ms) before it counts. Alone here: 16 of 16.
 - tests/e2e/v093.mjs "turned back to landscape and closed": prints the files left in pdf-preview when it fails. tests/e2e/note-folders.mjs: until waits up to ten seconds for the disk, not four.
 - tests/e2e/black-holes.mjs "a passkey is added beside the PIN": the menu is read until it offers "Remove the passkey" (up to five seconds), not once.
+- tests/e2e/black-holes.mjs: every file the suite reads to look for words in the clear is read through bytesOf, which gives nothing for a file the app removed after it was listed (the second 0.9.6 build stopped there on ENOENT). Alone here: every check passed, twice.
 - With dropPreview retrying (electron/main.js), the whole smoke suite at 0.9.6: 1010 of 1010.
 
 ## 2026-10-16 (08:40) — after the consultation (B26, B27, the guide, two display cuts)
