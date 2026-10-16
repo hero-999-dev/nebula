@@ -762,8 +762,9 @@ export async function runV093Checks(check) {
     // A landscape render still printing when Cancel was pressed lands after it and is
     // discarded on arrival (pdf-preview.js); a loaded machine needs a moment for that.
     for (let i = 0; i < 40 && previewFiles() > 0; i += 1) await win.waitForTimeout(150);
+    const leftBehind = (() => { try { return fs.readdirSync(path.join(profile, 'pdf-preview'), { recursive: true }); } catch { return []; } })();
     check('turned back to landscape and closed: no preview left behind', !(await previewState()).open && previewFiles() === 0
-      && await win.evaluate(() => localStorage.getItem('nebula:nw-orientation') === 'landscape'));
+      && await win.evaluate(() => localStorage.getItem('nebula:nw-orientation') === 'landscape'), JSON.stringify({ leftBehind, state: await previewState() }));
     // ---- Auto order page (0.9.3) -----------------------------------------
     // A shape across the first page line goes to just under it; NW has nothing to order.
     check('Auto order page does nothing on Nebula Wide (the button is off, and faded)', await win.evaluate(() => {

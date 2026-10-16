@@ -369,8 +369,9 @@ export async function runBlackHoleChecks(check) {
     check('the menu of an open black hole: Lock, Rename, Change PIN, the hint, Add a passkey, Move to trash', (await holeMenu('Safe')).join('|') === 'Lock|Rename black hole|Change PIN|Change hint|Add a passkey|Move to trash');
     await holeMenu('Safe', 'Add a passkey');
     const safeMeta = () => JSON.parse(fs.readFileSync(path.join(holesDir, safe, 'hole.json'), 'utf8'));
+    // The passkey is on the disk before the list the menu is made from has heard of it (smoke under load, 0.9.5 and 0.9.6): the menu is waited for too.
     check('a passkey is added beside the PIN of an open black hole — and taken away again from the same menu', await until(() => !!safeMeta().passkey?.box) && safeMeta().lock === 'pin'
-      && (await holeMenu('Safe')).join('|') === 'Lock|Rename black hole|Change PIN|Change hint|Remove the passkey|Move to trash', JSON.stringify(Object.keys(safeMeta())));
+      && await until(async () => (await holeMenu('Safe')).join('|') === 'Lock|Rename black hole|Change PIN|Change hint|Remove the passkey|Move to trash'), JSON.stringify(Object.keys(safeMeta())));
     await holeMenu('Safe', 'Remove the passkey');
     await until(() => !safeMeta().passkey);
 

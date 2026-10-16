@@ -102,7 +102,9 @@ export async function runAiSleepChecks(check) {
     const draft = await written('two');
     await tab('three');
     await win.waitForTimeout(700);
-    const first = await guests();
+    // A slow machine has not begun "three" in 700 ms (the 0.9.6 release build saw one,two): wait for it.
+    let first = await guests();
+    for (let i = 0; i < 40 && !first.three; i += 1) { await win.waitForTimeout(200); first = await guests(); }
     check('three tabs opened are three pages loaded, and words typed in one are in its page', Object.keys(first).sort().join() === 'one,three,two' && draft === 'draft', `${JSON.stringify(first)} ${draft}`);
 
     await nap();

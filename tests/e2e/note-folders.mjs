@@ -87,8 +87,8 @@ export async function runNoteFolderChecks(check) {
       await win.waitForFunction((t) => document.querySelector('#title').value === t, title, { polling: 50 });
       await win.waitForTimeout(200);
     };
-    /** Until the disk says so, or two seconds. */
-    const until = async (what) => { for (let i = 0; i < 40; i += 1) { if (await what()) return true; await win.waitForTimeout(100); } return !!(await what()); };
+    /** Until the disk says so, or ten seconds: under the whole smoke run the undo's write once took longer than four. */
+    const until = async (what) => { for (let i = 0; i < 100; i += 1) { if (await what()) return true; await win.waitForTimeout(100); } return !!(await what()); };
 
     // ---- A vault written the old way, at its first start ----------------------
     const moved = stored('n-old');

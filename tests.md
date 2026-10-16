@@ -1,3 +1,10 @@
+## 2026-10-16 (09:00) — 0.9.6: one check that raced the build machine, one preview the viewer held
+
+- tests/e2e/ai-sleep.mjs "three tabs opened are three pages loaded": the third tab's page was looked for 700 ms after its click; the slower Windows runner had not begun it. The check now waits for the page (up to 40 × 200 ms) before it counts. Alone here: 16 of 16.
+- tests/e2e/v093.mjs "turned back to landscape and closed": prints the files left in pdf-preview when it fails. tests/e2e/note-folders.mjs: until waits up to ten seconds for the disk, not four.
+- tests/e2e/black-holes.mjs "a passkey is added beside the PIN": the menu is read until it offers "Remove the passkey" (up to five seconds), not once.
+- With dropPreview retrying (electron/main.js), the whole smoke suite at 0.9.6: 1010 of 1010.
+
 ## 2026-10-16 (08:40) — after the consultation (B26, B27, the guide, two display cuts)
 
 - tests/dialog-words.test.js (new, Mistral): every dialog string has de, pl and tr; no translation drops or adds a {placeholder}; a full set of values leaves no {..}; an unknown key or language gives English (B26). tests/permissions.test.js (+1): the embed's question in tr, de and pl. FAIL-BEFORE: the module did not exist; askWords had no language.

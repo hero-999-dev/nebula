@@ -1065,7 +1065,14 @@ function registerShellHandlers() {
   async function dropPreview(token) {
     const p = previews.get(token);
     previews.delete(token);
-    if (p) { try { shredTree(p.dir); } catch { /* the next start takes it */ } }
+    if (!p) return;
+    // The viewer of a preview just closed can hold its PDF a moment longer on Windows, and the
+    // folder stayed until the next start (0.9.6 smoke, under load): tried again for two seconds.
+    for (let i = 0; i < 10; i += 1) {
+      try { shredTree(p.dir); } catch { /* still held */ }
+      if (!fsSync.existsSync(p.dir)) return;
+      await new Promise((r) => { setTimeout(r, 200); });
+    }
   }
   ipcMain.handle('note:pdf-preview', async (e, { document: html } = {}) => {
     if (!from(e) || typeof html !== 'string' || !html) return { ok: false };
