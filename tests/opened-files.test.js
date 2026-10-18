@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { attachedOf, attachedName, openedFolder, openedPath, runsCode, clearOpened } from '../electron/opened-files.js';
+import { attachedOf, attachedName, openedFolder, openedPath, runsCode, clearOpened, clearOpenedAsync } from '../electron/opened-files.js';
 import { shredTree } from '../electron/backup-purge.js';
 
 // The real shredder, watched: a copy is overwritten before it goes, not just unlinked.
@@ -156,6 +156,27 @@ describe('each copy goes with what it was made from', () => {
   it('a note deleted: its copies in the notes folder', () => {
     expect(clearOpened(root, { noteId: 'n1' })).toBe(1);
     expect(fs.existsSync(plain)).toBe(false);
+    expect(fs.existsSync(sealed)).toBe(true);
+  });
+
+  it('asynchronously clears a large opened copy for a deleted note while preserving others', async () => {
+    fs.writeFileSync(plain, Buffer.alloc(16 * 1024 * 1024, 0x71));
+    expect(await clearOpenedAsync(root, { noteId: 'n1' })).toBe(1);
+    expect(fs.existsSync(plain)).toBe(false);
+    expect(fs.existsSync(sealed)).toBe(true);
+  });
+
+  it('unlinks a junction in the opened-copy tree without touching its target', async () => {
+    const outside = path.join(root, 'outside');
+    fs.mkdirSync(outside);
+    const sentinel = path.join(outside, 'keep.pdf');
+    fs.writeFileSync(sentinel, 'external copy');
+    const link = path.join(root, 'note', 'n1');
+    fs.rmSync(link, { recursive: true, force: true });
+    fs.symlinkSync(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
+    expect(await clearOpenedAsync(root, { noteId: 'n1' })).toBe(1);
+    expect(fs.existsSync(link)).toBe(false);
+    expect(fs.readFileSync(sentinel, 'utf8')).toBe('external copy');
     expect(fs.existsSync(sealed)).toBe(true);
   });
 

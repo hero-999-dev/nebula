@@ -4,7 +4,7 @@
  * keys and files. Real folders in the system's temp directory; the operating
  * system's part (safeStorage, Windows Hello) is played by the test.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -49,6 +49,21 @@ describe('a black hole', () => {
     expect(h.list()).toHaveLength(1);
     expect(onDisk()).not.toContain(made.recoveryKey);
     expect(onDisk()).not.toContain('482193');
+    expect(onDisk()).not.toContain('My secrets');
+    expect(JSON.parse(fs.readFileSync(path.join(root, 'storage', 'blackholes', made.hole.id, 'hole.json'), 'utf8')).nameBox).toBeTruthy();
+  });
+
+  it('protects a legacy clear-text label on the next read without changing the visible label', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Private label', pin: '482193' });
+    const file = path.join(root, 'storage', 'blackholes', hole.id, 'hole.json');
+    const old = JSON.parse(fs.readFileSync(file, 'utf8'));
+    delete old.nameBox;
+    old.name = 'Private label';
+    fs.writeFileSync(file, JSON.stringify(old));
+    h.lock(hole.id);
+    expect(holes().list()[0].name).toBe('Private label');
+    expect(fs.readFileSync(file, 'utf8')).not.toContain('Private label');
   });
 
   it('needs a name, a way to lock it, and exactly six digits', async () => {
@@ -88,6 +103,38 @@ describe('a note in a black hole', () => {
     expect(opened.notes.sort()).toEqual([note('n1'), note('n2', { pinned: true })].sort());
   });
 
+  it('does not reveal a note whose asynchronous read finishes after the hole locks', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', pin: '482193' });
+    h.write(hole.id, 'n1', note('n1'));
+    h.lock(hole.id);
+    const original = fs.promises.readFile;
+    const spy = vi.spyOn(fs.promises, 'readFile').mockImplementation(async (...args) => {
+      const bytes = await original(...args);
+      if (String(args[0]).endsWith('n1.bh')) h.lock(hole.id);
+      return bytes;
+    });
+    try { expect(await h.unlock(hole.id, { pin: '482193' })).toEqual({ ok: false, error: 'locked' }); }
+    finally { spy.mockRestore(); }
+    expect(h.isOpen(hole.id)).toBe(false);
+  });
+
+  it('keeps an asynchronous large-note write off the delete path and cancels it on lock', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', pin: '482193' });
+    const pending = h.writeAsync(hole.id, 'n-large', note('n-large', { content: 'x'.repeat(2_000_000) }));
+    expect(await h.remove(hole.id, 'n-large')).toMatchObject({ ok: false, error: 'in-use' });
+    h.lock(hole.id);
+    expect(await pending).toMatchObject({ ok: false, error: 'locked' });
+    expect(fs.existsSync(path.join(root, 'storage', 'blackholes', hole.id, 'n-large.bh'))).toBe(false);
+    expect((await h.unlock(hole.id, { pin: '482193' })).ok).toBe(true);
+    expect(await h.writeAsync(hole.id, 'n-large', note('n-large'))).toEqual({ ok: true });
+    const latest = note('n-large', { title: 'Latest sealed edit' });
+    expect(await h.writeAsync(hole.id, 'n-large', latest)).toEqual({ ok: true });
+    h.lock(hole.id);
+    expect((await h.unlock(hole.id, { pin: '482193' })).notes).toContain(latest);
+  });
+
   it('is sealed afresh at every save, and cannot be written to a locked black hole', async () => {
     const h = holes();
     const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
@@ -121,7 +168,7 @@ describe('a note in a black hole', () => {
     const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
     h.write(hole.id, 'n1', note('n1'));
     h.write(hole.id, 'n2', note('n2'));
-    expect(h.remove(hole.id, 'n1').ok).toBe(true);
+    expect((await h.remove(hole.id, 'n1')).ok).toBe(true);
     expect(h.list()[0].notes).toBe(1);
     // Only with its answer — open as it is: whoever found the app open deletes nothing.
     expect(await h.delete(hole.id)).toEqual({ ok: false, error: 'pin' });
@@ -130,7 +177,7 @@ describe('a note in a black hole', () => {
     expect(await h.delete(hole.id, { pin: '482193' })).toEqual({ ok: true, removed: 2 });
     expect(h.list()).toEqual([]);
     expect(fs.existsSync(path.join(root, 'storage', 'blackholes', hole.id))).toBe(false);
-    expect(h.remove('..', 'n1').ok).toBe(false);
+    expect((await h.remove('..', 'n1')).ok).toBe(false);
     expect((await h.delete('../..', { pin: '482193' })).ok).toBe(false);
   });
 
@@ -210,14 +257,19 @@ describe('the PIN', () => {
     expect((await holes().unlock(hole.id, { pin: '482193' })).ok).toBe(true);
   });
 
-  it('can be changed while the black hole is open; the old one is then no key', async () => {
+  it('can be changed while the black hole is open — after its old answer; the old one is then no key', async () => {
     const h = holes();
     const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
     h.write(hole.id, 'n1', note('n1'));
-    expect(h.changePin(hole.id, '12')).toMatchObject({ ok: false });
-    expect(h.changePin(hole.id, '909090').ok).toBe(true);
+    // Being open is not knowing it: no answer, or the wrong one, changes nothing.
+    expect(await h.changePin(hole.id, '909090')).toEqual({ ok: false, error: 'pin' });
+    expect((await h.changePin(hole.id, '909090', { pin: '000000' })).error).toBe('wrong');
+    expect(await h.changePin(hole.id, '12', { pin: '482193' })).toMatchObject({ ok: false });
+    expect((await h.changePin(hole.id, '909090', { pin: '482193' })).ok).toBe(true);
+    // The passkey answers for whoever does not know the current PIN.
+    expect((await h.changePin(hole.id, '314159', { hello: true })).error).toBe('hello');   // it has no passkey
     h.lock(hole.id);
-    expect(h.changePin(hole.id, '111111')).toEqual({ ok: false, error: 'locked' });
+    expect(await h.changePin(hole.id, '111111', { pin: '909090' })).toEqual({ ok: false, error: 'locked' });
     expect((await h.unlock(hole.id, { pin: '482193' })).error).toBe('wrong');
     expect((await h.unlock(hole.id, { pin: '909090' })).notes).toEqual([note('n1')]);
   });
@@ -237,7 +289,7 @@ describe('the PIN', () => {
     expect(h.setHint(hole.id, 'grandmother’s door').hole.hint).toBe('grandmother’s door');
     // A new PIN that the hint would tell takes the hint away.
     h.setHint(hole.id, 'starts with 9090 90');
-    expect(h.changePin(hole.id, '909090').ok).toBe(true);
+    expect((await h.changePin(hole.id, '909090', { pin: '482193' })).ok).toBe(true);
     expect(h.list()[0].hint).toBe('');
     expect(h.setHint(hole.id, '').hole.hint).toBe('');
     expect(JSON.parse(fs.readFileSync(path.join(root, 'storage', 'blackholes', hole.id, 'hole.json'), 'utf8')).hint).toBeUndefined();
@@ -261,8 +313,8 @@ describe('the PIN', () => {
     expect(h.list()[0]).toMatchObject({ lock: 'pin', digits: 4 });
     expect((await h.unlock(hole.id, { pin: '482100' })).error).toBe('pin');       // six digits are not its PIN
     expect((await h.unlock(hole.id, { pin: '4821' })).notes).toEqual([note('n1')]);
-    expect(h.changePin(hole.id, '9090')).toMatchObject({ ok: false, error: 'pin' });
-    expect(h.changePin(hole.id, '909090').ok).toBe(true);
+    expect(await h.changePin(hole.id, '9090', { pin: '4821' })).toMatchObject({ ok: false, error: 'pin' });
+    expect((await h.changePin(hole.id, '909090', { pin: '4821' })).ok).toBe(true);
     h.lock(hole.id);
     expect(h.list()[0].digits).toBe(6);
     expect((await h.unlock(hole.id, { pin: '4821' })).error).toBe('pin');
@@ -293,11 +345,56 @@ describe('off this computer', () => {
     expect(newRecoveryKey(Buffer.alloc(20))).toBe('AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA-AAAA');
   });
 
-  it('where the system cannot keep a key, the PIN alone wraps it — and still opens it', async () => {
-    const bare = { canProtect: () => false };
-    const { hole } = await holes(bare).create({ name: 'Safe', lock: 'pin', pin: '482193' });
-    expect((await holes(bare).unlock(hole.id, { pin: '482193' })).ok).toBe(true);
-    expect((await holes(bare).unlock(hole.id, { pin: '482194' })).error).toBe('wrong');
+  it('a new recovery key replaces the old one, which stops working', async () => {
+    const h = holes(computer('mine'));
+    const { hole, recoveryKey: oldKey } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    h.write(hole.id, 'n1', note('n1'));
+    h.lock(hole.id);
+    expect(h.newRecovery(hole.id)).toEqual({ ok: false, error: 'locked' });     // only while it is open
+    expect((await h.unlock(hole.id, { pin: '482193' })).ok).toBe(true);
+    const res = h.newRecovery(hole.id);
+    expect(res.ok).toBe(true);
+    expect(res.recoveryKey).toMatch(/^([A-Z2-7]{4}-){7}[A-Z2-7]{4}$/);
+    expect(res.recoveryKey).not.toBe(oldKey);
+    expect(onDisk()).not.toContain(res.recoveryKey);                            // shown once, never on the disk
+    h.lock(hole.id);
+    const other = holes(computer('new laptop'));
+    expect((await other.unlock(hole.id, { recovery: oldKey, pin: '777777' })).error).toBe('wrong');
+    expect((await other.unlock(hole.id, { recovery: res.recoveryKey, pin: '777777' })).notes).toEqual([note('n1')]);
+  });
+
+  it('refuses a new PIN wrapper when OS secure storage is unavailable', async () => {
+    const bare = holes({ canProtect: () => false });
+    expect(await bare.create({ name: 'Safe', lock: 'pin', pin: '482193' })).toEqual({ ok: false, error: 'storage-unavailable' });
+    expect(bare.list()).toEqual([]);
+  });
+
+  it('keeps an old unprotected wrapper readable, then upgrades it on a valid PIN when OS protection returns', async () => {
+    let available = true;
+    const machine = { ...computer('mine'), canProtect: () => available };
+    const maker = holes(machine);
+    const { hole } = await maker.create({ name: 'Safe', pin: '482193' });
+    maker.write(hole.id, 'n1', note('n1'));
+    maker.lock(hole.id);
+    const file = path.join(root, 'storage', 'blackholes', hole.id, 'hole.json');
+    const meta = JSON.parse(fs.readFileSync(file, 'utf8'));
+    meta.key.box = machine.unprotect(Buffer.from(meta.key.box, 'base64')).toString('base64');
+    meta.key.os = false; // a legacy wrapper written while safeStorage was unavailable
+    fs.writeFileSync(file, JSON.stringify(meta));
+    available = false;
+    const legacy = holes(machine);
+    expect(legacy.list()[0].needsProtection).toBe(true);
+    expect((await legacy.unlock(hole.id, { pin: '482193' })).notes).toEqual([note('n1')]);
+    expect(await legacy.changePin(hole.id, '777777', { pin: '482193' })).toEqual({ ok: false, error: 'storage-unavailable' });
+    legacy.lock(hole.id);
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).key.os).toBe(false);
+    available = true;
+    expect((await legacy.unlock(hole.id, { pin: '482193' })).ok).toBe(true);
+    expect(JSON.parse(fs.readFileSync(file, 'utf8')).key.os).toBe(true);
+    expect(legacy.list()[0].needsProtection).toBe(false);
+    legacy.lock(hole.id);
+    expect((await holes(computer('thief')).unlock(hole.id, { pin: '482193' })).error).toBe('other-computer');
+    expect((await holes(machine).unlock(hole.id, { pin: '482193' })).notes).toEqual([note('n1')]);
   });
 });
 
@@ -358,15 +455,16 @@ describe('the PIN is the lock; a passkey stands beside it', () => {
     expect((await h.unlock(hole.id, { pin: '482193' })).ok).toBe(true);
   });
 
-  it('the PIN is changed without the passkey being lost', async () => {
+  it('the PIN is changed without the passkey being lost — the passkey answers for the current PIN too', async () => {
     const h = holes();
     const { hole } = await h.create({ name: 'Both', pin: '482193', passkey: true });
-    expect(h.changePin(hole.id, '111111').ok).toBe(true);
+    expect((await h.changePin(hole.id, '111111', { pin: '482193' })).ok).toBe(true);
+    expect((await h.changePin(hole.id, '222222', { hello: true })).ok).toBe(true);
     h.lock(hole.id);
     expect((await h.unlock(hole.id, { pin: '482193' })).error).toBe('wrong');
     expect((await h.unlock(hole.id, { hello: true })).ok).toBe(true);
     h.lock(hole.id);
-    expect((await h.unlock(hole.id, { pin: '111111' })).ok).toBe(true);
+    expect((await h.unlock(hole.id, { pin: '222222' })).ok).toBe(true);
   });
 
   it('on another computer the passkey’s copy is no key; the recovery key opens it and the passkey is added anew', async () => {
@@ -434,8 +532,8 @@ describe('a black hole opened by Windows Hello or Touch ID — as the first buil
     expect(hole).toMatchObject({ lock: 'hello', pin: false, passkey: true, digits: 0 });
     h.write(hole.id, 'n1', note('n1'));
     expect(await h.setPasskey(hole.id, false)).toEqual({ ok: false, error: 'pin' });       // it would have no lock left
-    expect(h.changePin(hole.id, '1234')).toEqual({ ok: false, error: 'pin' });
-    expect(h.changePin(hole.id, '482193').ok).toBe(true);
+    expect(await h.changePin(hole.id, '1234', { hello: true })).toEqual({ ok: false, error: 'pin' });
+    expect((await h.changePin(hole.id, '482193', { hello: true })).ok).toBe(true);
     expect(h.list()[0]).toMatchObject({ lock: 'pin', pin: true, passkey: true, digits: 6 });
     h.lock(hole.id);
     expect((await h.unlock(hole.id, { pin: '482193' })).notes).toEqual([note('n1')]);
@@ -466,7 +564,7 @@ describe('a black hole opened by Windows Hello or Touch ID — as the first buil
 
   it('cannot be made where there is no Hello, or nowhere for the system to keep the key', async () => {
     expect((await firstBuild(computer('mine'), { helloAvailable: async () => false }).create({ name: 'x', lock: 'hello' })).error).toBe('hello-unavailable');
-    expect((await firstBuild({ canProtect: () => false }).create({ name: 'x', lock: 'hello' })).error).toBe('hello-unavailable');
+    expect((await firstBuild({ canProtect: () => false }).create({ name: 'x', lock: 'hello' })).error).toBe('storage-unavailable');
   });
 
   it('is asked through a script that answers in words this reads', () => {
@@ -545,8 +643,23 @@ describe('a video in a black hole', () => {
     expect((await h.exportVideo(hole.id, 'n1', NAME, out)).ok).toBe(true);
     expect(fs.readFileSync(out).equals(bytes)).toBe(true);
     h.write(hole.id, 'n1', note('n1'));
-    h.remove(hole.id, 'n1');
+    await h.remove(hole.id, 'n1');
     expect(fs.readdirSync(path.join(root, 'storage', 'blackholes', hole.id)).sort()).toEqual(['hole.json', `n2~${NAME}.bhv`]);
+  });
+
+  it('refuses note or hole deletion while a sealed video response holds a file open', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', pin: '482193' });
+    h.write(hole.id, 'n1', note('n1'));
+    await h.addVideo(hole.id, 'n1', source, NAME);
+    const stream = h.videoPart(hole.id, 'n1', NAME, 0, bytes.length - 1);
+    expect((await stream.next()).done).toBe(false);
+    expect(await h.remove(hole.id, 'n1')).toEqual({ ok: false, error: 'in-use' });
+    expect(await h.delete(hole.id, { pin: '482193' })).toEqual({ ok: false, error: 'in-use' });
+    expect(fs.existsSync(path.join(root, 'storage', 'blackholes', hole.id, 'n1.bh'))).toBe(true);
+    await stream.return();
+    expect(await h.remove(hole.id, 'n1')).toEqual({ ok: true });
+    expect((await h.delete(hole.id, { pin: '482193' })).ok).toBe(true);
   });
 
   it('a video no note shows any more is gone the next time the black hole is opened — unless a note could not be read', async () => {
@@ -664,5 +777,367 @@ describe('deleted is deleted, in the backups too', () => {
     expect(purgeHoleNoteFromBackups(backups, '..', 'n1')).toBe(0);
     expect(purgeHoleFromBackups(backups, hole.id)).toBe(4);
     for (const name of ['2026-10-06', 'pre-update-x']) expect(fs.existsSync(path.join(backups, name, 'blackholes', hole.id))).toBe(false);
+  });
+});
+
+describe('an answer that arrives after the lock (2026-10-17 security audit)', () => {
+  const tick = () => new Promise((r) => setImmediate(r));
+  /** A hello the test holds: the passkey answers when the test says so. */
+  const gated = () => {
+    const waiting = [];
+    const h = holes(computer('mine'), { hello: () => new Promise((r) => { waiting.push(r); }) });
+    return { h, hello: (yes = true) => { for (const r of waiting.splice(0)) r(yes); } };
+  };
+  const metaOf = (id) => JSON.parse(fs.readFileSync(path.join(root, 'storage/blackholes', id, 'hole.json'), 'utf8'));
+
+  it('a passkey answer that outlived "lock all" opens nothing', async () => {
+    const { h, hello } = gated();
+    const making = h.create({ name: 'Safe', lock: 'pin', pin: '482193', passkey: true });
+    await tick(); hello(true);                                    // the passkey agrees to be added
+    const { hole } = await making;
+    h.lock(hole.id);
+    const pending = h.unlock(hole.id, { hello: true });           // the prompt is up
+    await tick();
+    expect(h.isOpen(hole.id)).toBe(false);
+    h.lockAll();                                                  // "Lock all holes" while the prompt is up
+    hello(true);                                                  // ... and the passkey says yes anyway
+    expect(await pending).toEqual({ ok: false, error: 'locked' });
+    expect(h.isOpen(hole.id)).toBe(false);
+  });
+
+  it('a passkey added while the hole was locked meanwhile is not stored — no wrapper of the zeroed key', async () => {
+    const { h, hello } = gated();
+    const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    h.write(hole.id, 'n1', note('n1'));
+    const pending = h.setPasskey(hole.id, true);
+    await tick();
+    h.lock(hole.id);                                              // the lock zeroes the very buffer the passkey would wrap
+    hello(true);
+    expect(await pending).toEqual({ ok: false, error: 'locked' });
+    expect(metaOf(hole.id).passkey).toBeUndefined();
+    expect(await h.unlock(hole.id, { pin: '482193' })).toMatchObject({ ok: true, notes: [note('n1')] });
+  });
+
+  it('a stale answer does not ride a hole opened again meanwhile: the key it began with is gone', async () => {
+    const { h, hello } = gated();
+    const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    h.write(hole.id, 'n1', note('n1'));
+    const adding = h.setPasskey(hole.id, true);
+    await tick(); hello(true);
+    expect((await adding).ok).toBe(true);
+    h.lock(hole.id);
+    const pending = h.unlock(hole.id, { hello: true });           // starts shut
+    await tick();
+    h.lock(hole.id);                                              // ... locked ...
+    expect(await h.unlock(hole.id, { pin: '482193' })).toMatchObject({ ok: true });   // ... and opened again by the PIN
+    hello(true);
+    expect(await pending).toEqual({ ok: false, error: 'locked' });
+    expect(h.isOpen(hole.id)).toBe(true);                         // the PIN's opening stands
+  });
+
+  it('a passkey taken away while its own yes was on its way is not resurrected by it', async () => {
+    const { h, hello } = gated();
+    const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    const adding = h.setPasskey(hole.id, true);
+    await tick(); hello(true);
+    expect((await adding).ok).toBe(true);
+    const readding = h.setPasskey(hole.id, true);                  // asked for again
+    await tick();
+    expect(await h.setPasskey(hole.id, false)).toMatchObject({ ok: true });   // taken away meanwhile
+    hello(true);
+    expect(await readding).toEqual({ ok: false, error: 'locked' });
+    expect(metaOf(hole.id).passkey).toBeUndefined();
+    h.lock(hole.id);
+    expect((await h.unlock(hole.id, { hello: true })).error).toBe('hello');   // there is no passkey any more
+  });
+
+  it('a proof and a delete whose answers outlived "lock all" prove and destroy nothing', async () => {
+    const { h, hello } = gated();
+    const making = h.create({ name: 'Safe', lock: 'pin', pin: '482193', passkey: true });
+    await tick(); hello(true);
+    const { hole } = await making;
+    h.write(hole.id, 'n1', note('n1'));
+    h.lock(hole.id);
+    const proof = h.prove(hole.id, { hello: true });
+    const gone = h.delete(hole.id, { hello: true });
+    await tick();
+    h.lockAll();
+    hello(true);
+    expect(await proof).toEqual({ ok: false, error: 'locked' });
+    expect(await gone).toEqual({ ok: false, error: 'locked' });
+    expect(h.list()[0].notes).toBe(1);
+    expect(fs.existsSync(path.join(root, 'storage/blackholes', hole.id, 'n1.bh'))).toBe(true);
+  });
+
+  it('a black hole is not born open behind a "lock all" pressed while its passkey was asked for', async () => {
+    const { h, hello } = gated();
+    const making = h.create({ name: 'Safe', lock: 'pin', pin: '482193', passkey: true });
+    await tick();
+    h.lockAll();                                                   // pressed while the passkey that makes it is asked for
+    hello(true);
+    expect(await making).toEqual({ ok: false, error: 'locked' });
+    expect(h.list()).toEqual([]);
+    expect(fs.existsSync(path.join(root, 'storage/blackholes'))).toBe(false);   // nothing was born
+  });
+
+  it('a playing stops when the hole locks between a read and the piece it would have opened', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    h.write(hole.id, 'n1', note('n1'));
+    const src = path.join(root, 'two.mp4');
+    fs.writeFileSync(src, Buffer.alloc(2 * VIDEO_PIECE, 9));
+    const added = await h.addVideo(hole.id, 'n1', src);
+    const real = fs.promises.open;
+    const spy = vi.spyOn(fs.promises, 'open').mockImplementation(async (...args) => {
+      const handle = await real(...args);
+      const read = handle.read?.bind(handle);
+      if (!read) return handle;
+      let reads = 0;
+      handle.read = async (...ra) => { const r = await read(...ra); reads += 1; if (reads === 1) h.lock(hole.id); return r; };
+      return handle;
+    });
+    try {
+      const parts = [];
+      for await (const part of h.videoPart(hole.id, 'n1', added.file, 0, 2 * VIDEO_PIECE - 1)) parts.push(part);
+      expect(parts).toEqual([]);          // nothing opened after the lock — and no throw, no piece under the dead key
+    } finally { spy.mockRestore(); }
+  });
+
+  it('a video is not sealed under the zeroed key when the hole locks mid-copy', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    h.write(hole.id, 'n1', note('n1'));
+    const big = path.join(root, 'big.mp4');
+    fs.writeFileSync(big, Buffer.alloc(3 * VIDEO_PIECE, 1));       // three pieces
+    const real = fs.promises.open;
+    const spy = vi.spyOn(fs.promises, 'open').mockImplementation(async (...args) => {
+      const handle = await real(...args);
+      const read = handle.read?.bind(handle);
+      if (!read) return handle;
+      let reads = 0;
+      handle.read = async (...ra) => { const r = await read(...ra); reads += 1; if (reads === 2) h.lock(hole.id); return r; };
+      return handle;
+    });
+    try {
+      expect(await h.addVideo(hole.id, 'n1', big)).toEqual({ ok: false, error: 'locked' });
+    } finally { spy.mockRestore(); }
+    // Nothing of the video is kept — not even a half-written tmp.
+    expect(fs.readdirSync(path.join(root, 'storage/blackholes', hole.id)).sort()).toEqual(['hole.json', 'n1.bh']);
+  });
+
+  it('will not move a hole to Trash or remove its note during a media import', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', pin: '482193' });
+    h.write(hole.id, 'n1', note('n1'));
+    const source = path.join(root, 'incoming.mp4');
+    fs.writeFileSync(source, Buffer.alloc(VIDEO_PIECE, 7));
+    const pending = h.addVideo(hole.id, 'n1', source);
+    expect(h.trash(hole.id)).toMatchObject({ ok: false, error: 'in-use' });
+    expect(await h.remove(hole.id, 'n1')).toMatchObject({ ok: false, error: 'in-use' });
+    expect((await pending).ok).toBe(true);
+    expect(h.trash(hole.id).ok).toBe(true);
+  });
+
+  it('no copy comes out of a hole that locked before the file was committed — an empty one too', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    h.write(hole.id, 'n1', note('n1'));
+    const empty = path.join(root, 'empty.mp4');
+    fs.writeFileSync(empty, Buffer.alloc(0));
+    const added = await h.addVideo(hole.id, 'n1', empty);
+    expect(added.ok).toBe(true);
+    const out = path.join(root, 'out', 'empty.mp4');
+    const real = fs.promises.open;
+    const spy = vi.spyOn(fs.promises, 'open').mockImplementation(async (...args) => {
+      const handle = await real(...args);
+      if (String(args[0]).includes('.tmp-')) {
+        const close = handle.close.bind(handle);
+        handle.close = async () => { const r = await close(); h.lock(hole.id); return r; };   // the lock lands just before the rename
+      }
+      return handle;
+    });
+    try {
+      expect(await h.exportVideo(hole.id, 'n1', added.file, out)).toEqual({ ok: false, error: 'locked' });
+    } finally { spy.mockRestore(); }
+    expect(fs.existsSync(out)).toBe(false);
+    expect(fs.readdirSync(path.join(root, 'out')).filter((f) => f.includes('.tmp-'))).toEqual([]);
+  });
+
+  it('a lock that lands while the sweep shreds takes the notes with it — nothing is handed over after the lock (GPT race 1)', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    const source = path.join(root, 'loose.mp4');
+    fs.writeFileSync(source, Buffer.from('a video no note names'));
+    await h.addVideo(hole.id, 'n1', source);                    // unreferenced: the sweep takes it
+    h.write(hole.id, 'n1', note('n1'));
+    h.lock(hole.id);
+    const realStat = fs.promises.lstat.bind(fs.promises);
+    let armed = true;
+    const spy = vi.spyOn(fs.promises, 'lstat').mockImplementation(async (...args) => {
+      const res = await realStat(...args);
+      if (armed && String(args[0]).endsWith('.bhv')) { armed = false; h.lock(hole.id); }   // the lock lands mid-sweep
+      return res;
+    });
+    try {
+      const res = await h.unlock(hole.id, { pin: '482193' });
+      expect(res).toEqual({ ok: false, error: 'locked' });      // the notes leave with the lock
+      expect(h.isOpen(hole.id)).toBe(false);
+      expect(fs.existsSync(path.join(root, 'storage/blackholes', hole.id, 'n1.bh'))).toBe(true);
+    } finally { spy.mockRestore(); }
+  });
+
+  it('nothing commits onto a note while its removal runs — writes and imports refuse, and work again after (GPT race 2)', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    h.write(hole.id, 'n1', note('n1'));
+    const source = path.join(root, 'v.mp4');
+    fs.writeFileSync(source, Buffer.from('video bytes'));
+    await h.addVideo(hole.id, 'n1', source);
+    const seen = {};
+    const realStat = fs.promises.lstat.bind(fs.promises);
+    const spy = vi.spyOn(fs.promises, 'lstat').mockImplementation(async (...args) => {
+      const file = String(args[0]);
+      if (file.endsWith('.bh')) {
+        if (!seen.sync) seen.sync = h.write(hole.id, 'n1', note('n1'));
+        if (!seen.async) seen.async = await h.writeAsync(hole.id, 'n1', JSON.stringify(note('n1')));
+      }
+      if (file.endsWith('.bhv') && !seen.import) seen.import = await h.addVideo(hole.id, 'n1', source);
+      return realStat(...args);
+    });
+    try {
+      expect(await h.remove(hole.id, 'n1')).toEqual({ ok: true });
+      expect(seen.sync).toEqual({ ok: false, error: 'in-use' });
+      expect(seen.async).toEqual({ ok: false, error: 'in-use' });
+      expect(seen.import).toEqual({ ok: false, error: 'in-use' });
+      const dir = path.join(root, 'storage/blackholes', hole.id);
+      expect(fs.readdirSync(dir).filter((f) => f.startsWith('n1'))).toEqual([]);
+    } finally { spy.mockRestore(); }
+    expect((await h.addVideo(hole.id, 'n1', source)).ok).toBe(true);   // once the removal is done, an import works again
+  });
+
+  it('a junction planted where the hole’s directory belongs is unlinked, never followed', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    const holesRootDir = path.join(root, 'storage', 'blackholes');
+    const realMeta = fs.readFileSync(path.join(holesRootDir, hole.id, 'hole.json'), 'utf8');
+    fs.rmSync(path.join(holesRootDir, hole.id), { recursive: true, force: true });
+    const victim = path.join(root, 'outside', 'not-the-holes-to-destroy');
+    fs.mkdirSync(victim, { recursive: true });
+    fs.writeFileSync(path.join(victim, 'precious.bh'), 'the words must survive');
+    fs.writeFileSync(path.join(victim, 'hole.json'), realMeta);   // the planted link must pass for the real hole
+    try {
+      fs.symlinkSync(victim, path.join(holesRootDir, hole.id), process.platform === 'win32' ? 'junction' : 'dir');
+    } catch {
+      return;   // this platform needs a privilege to make links; the code path is the same elsewhere
+    }
+    expect(await h.delete(hole.id, { pin: '482193' })).toEqual({ ok: true, removed: 0 });   // the link went, nothing else
+    expect(fs.existsSync(path.join(holesRootDir, hole.id))).toBe(false);
+    expect(fs.readFileSync(path.join(victim, 'precious.bh'), 'utf8')).toBe('the words must survive');
+  });
+
+  it('the passkey prompt names its action: opening says open, deleting says delete', async () => {
+    const asked = [];
+    const seen = { open: null, delete: null };
+    const watching = holes(computer('mine'), { hello: async (name, action) => { asked.push({ name, action }); return true; } });
+    const made = await watching.create({ name: 'Mine', lock: 'pin', pin: '482193', passkey: true });
+    watching.lock(made.hole.id);
+    expect((await watching.unlock(made.hole.id, { hello: true })).ok).toBe(true);
+    seen.open = asked[asked.length - 1];
+    watching.lock(made.hole.id);
+    expect((await watching.delete(made.hole.id, { hello: true })).ok).toBe(true);
+    seen.delete = asked[asked.length - 1];
+    expect(seen.open).toMatchObject({ name: 'Mine', action: 'open' });
+    expect(seen.delete).toMatchObject({ name: 'Mine', action: 'delete' });   // the OS prompt never says open for a deletion
+  });
+
+  it('nothing touches a black hole while its whole deletion runs — no second delete, no unlock, write, import, note removal or trash (Codex addendum)', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    h.write(hole.id, 'n1', note('n1'));
+    const source = path.join(root, 'v.mp4');
+    fs.writeFileSync(source, Buffer.from('video bytes'));
+    const seen = {};
+    const realStat = fs.promises.lstat.bind(fs.promises);
+    const spy = vi.spyOn(fs.promises, 'lstat').mockImplementation(async (...args) => {
+      const file = String(args[0]);
+      if (file.includes(hole.id) && !seen.anything) {
+        seen.anything = true;                                     // the deletion's first shred is in flight
+        seen.delete = await h.delete(hole.id, { pin: '482193' });
+        seen.deleteWrong = await h.delete(hole.id, { pin: '000000' });
+        seen.unlock = await h.unlock(hole.id, { pin: '482193' });
+        seen.write = h.write(hole.id, 'n1', note('n1'));
+        seen.import = await h.addVideo(hole.id, 'n1', source);
+        seen.remove = await h.remove(hole.id, 'n1');
+        seen.trash = h.trash(hole.id);
+        seen.restore = h.restore(hole.id);
+        seen.rename = h.rename(hole.id, 'A new name');
+        seen.prove = await h.prove(hole.id, { pin: '000000' });   // a wrong PIN would write its fail count mid-destruction
+      }
+      return realStat(...args);
+    });
+    try {
+      expect(await h.delete(hole.id, { pin: '482193' })).toEqual({ ok: true, removed: 2 });
+      expect(seen.delete).toEqual({ ok: false, error: 'in-use' });
+      expect(seen.deleteWrong).toEqual({ ok: false, error: 'in-use' });   // no failed-PIN metadata write mid-shred
+      expect(seen.unlock).toEqual({ ok: false, error: 'in-use' });
+      // The writes and the import answer 'locked' — the deletion drops the key first, so
+      // there is nothing to seal with; the refusal is what matters.
+      expect(seen.write).toEqual({ ok: false, error: 'locked' });
+      expect(seen.import).toEqual({ ok: false, error: 'locked' });
+      expect(seen.remove).toEqual({ ok: false, error: 'locked' });
+      expect(seen.trash).toEqual({ ok: false, error: 'in-use' });
+      expect(seen.restore).toEqual({ ok: false, error: 'in-use' });   // no resurrection mid-destruction
+      expect(seen.rename).toEqual({ ok: false, error: 'in-use' });    // no label written into a hole being destroyed
+      expect(seen.prove).toEqual({ ok: false, error: 'in-use' });     // no fail count either
+      expect(fs.existsSync(path.join(root, 'storage/blackholes', hole.id))).toBe(false);
+    } finally { spy.mockRestore(); }
+  });
+
+  it('nothing is taken out of a locked black hole: remove refuses while it is shut', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    h.write(hole.id, 'n1', note('n1'));
+    h.lock(hole.id);
+    expect(await h.remove(hole.id, 'n1')).toEqual({ ok: false, error: 'locked' });
+    expect(h.list()[0].notes).toBe(1);
+    expect(await h.unlock(hole.id, { pin: '482193' })).toMatchObject({ ok: true });
+    expect((await h.remove(hole.id, 'n1')).ok).toBe(true);
+  });
+
+  it('the sweep can be left to the caller that is restoring what it withheld (preserveMedia)', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    const source = path.join(root, 'v.mp4');
+    fs.writeFileSync(source, Buffer.from('video bytes'));
+    const kept = await h.addVideo(hole.id, 'n1', source);
+    const dropped = await h.addVideo(hole.id, 'n1', source);
+    h.write(hole.id, 'n1', note('n1', { content: `<video src="${kept.url}"></video>` }));
+    h.lock(hole.id);
+    const opened = await h.unlock(hole.id, { pin: '482193' }, { preserveMedia: true });
+    expect(opened.ok).toBe(true);
+    expect('swept' in opened).toBe(false);
+    expect(fs.readdirSync(path.join(root, 'storage/blackholes', hole.id)).filter((f) => f.endsWith('.bhv'))).toHaveLength(2);
+  });
+});
+
+describe('the residue of an answer that outlived the lock', () => {
+  /** What the race wrote, as it was: the passkey's wrapper of a zeroed key. */
+  const deadWrapper = (id) => {
+    const file = path.join(root, 'storage/blackholes', id, 'hole.json');
+    const meta = JSON.parse(fs.readFileSync(file, 'utf8'));
+    meta.passkey = { box: computer('mine').protect(Buffer.alloc(32)).toString('base64') };
+    fs.writeFileSync(file, JSON.stringify(meta, null, 2));
+  };
+
+  it('is no key when asked for — and is taken away by the next PIN unlock', async () => {
+    const h = holes();
+    const { hole } = await h.create({ name: 'Safe', lock: 'pin', pin: '482193' });
+    h.write(hole.id, 'n1', note('n1'));
+    deadWrapper(hole.id);
+    h.lock(hole.id);
+    expect(await h.unlock(hole.id, { hello: true })).toEqual({ ok: false, error: 'damaged' });   // the dead wrapper opens nothing
+    expect(h.isOpen(hole.id)).toBe(false);
+    expect(await h.unlock(hole.id, { pin: '482193' })).toMatchObject({ ok: true, notes: [note('n1')] });
+    expect(JSON.parse(fs.readFileSync(path.join(root, 'storage/blackholes', hole.id, 'hole.json'), 'utf8')).passkey).toBeUndefined();
   });
 });

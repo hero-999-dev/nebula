@@ -10,20 +10,20 @@ import { AI_SERVICES, isGoogleService } from '../src/js/ai-services.js';
 import { realScaleFor } from '../src/js/page-zoom.js';
 import { fetchPageTitle, fetchVideoPoster } from './link-metadata.js';
 import { installContextMenu, registerEditingHandlers, writeImageToClipboard, forgetIgnoredWords } from './context-menu.js';
-import { purgeNoteFromBackups, purgeDeletedFromBackups, purgeHoleNoteFromBackups, purgeHoleFromBackups, purgeHoleFilesFromBackups, purgeUnnamedFromBackups, shredTree, pruneLabelled, oldWayCopies, dropOldWayCopies } from './backup-purge.js';
+import { purgeNoteFromBackupsAsync, purgeDeletedFromBackups, purgeHoleNoteFromBackupsAsync, purgeHoleFromBackupsAsync, purgeHoleFilesFromBackupsAsync, protectLegacyHoleBackups, purgeUnnamedFromBackups, shredTree, pruneLabelled, oldWayCopies, dropOldWayCopies } from './backup-purge.js';
 import { BlackHoles, WINDOWS_HELLO_SCRIPT, readHelloAnswer } from './black-holes.js';
 import { AppLock } from './app-lock.js';
 import { readLogo, writeLogo, clearLogo, pointShortcuts, makeShortcut, pinnedAppId, taskbarDetails } from './app-logo.js';
 import { filesFromArgv, readNoteFile } from './open-file.js';
 import { offerOpenWith } from './open-with.js';
-import { attachedOf, attachedName, openedPath, runsCode, clearOpened as clearOpenedIn } from './opened-files.js';
+import { attachedOf, attachedName, openedPath, runsCode, clearOpened as clearOpenedIn, clearOpenedAsync as clearOpenedAsyncIn } from './opened-files.js';
 import { markOfTheWeb } from './mark-of-the-web.js';
 import { vaultPresence } from './vault-presence.js';
 import { staysOnPage, externalUrl, popupGate } from './navigation.js';
 import { allowed, isChatSession, isEmbedSession, ASK_EMBED, askKeys, checkKey, askWords, pageAnswers } from './permissions.js';
 import { words } from './dialog-words.js';
 import {
-  MEDIA_SCHEME, NOTE_ID, externalize, inlinePictures, rehome, removeNoteFolder, tidyVault, addVideo, addAttachment, pictureDataUrl, travelWhole, travelFolder, noteFile, noteIds, snapshotVault, missingMedia, sweepNote, RELEASED_FILE, readReleased, writeReleased, noteReleases, releaseAdded,
+  MEDIA_SCHEME, NOTE_ID, externalize, inlinePictures, rehome, removeNoteFolderAsync, tidyVault, addVideo, addAttachment, pictureDataUrl, travelWhole, travelFolder, noteFile, noteIds, snapshotVault, missingMedia, sweepNote, RELEASED_FILE, readReleased, writeReleased, noteReleases, releaseAdded,
   parseMediaUrl, mediaPath, mimeOf, byteRange, isVideoName, VIDEO_EXTENSIONS,
 } from './note-media.js';
 import { initUpdater } from './updater.js';
@@ -176,6 +176,32 @@ function dropAllPreviews() {
  */
 const openedDir = () => path.join(app.getPath('userData'), 'opened');
 const clearOpened = (scope) => clearOpenedIn(openedDir(), scope);
+const clearOpenedAsync = (scope) => clearOpenedAsyncIn(openedDir(), scope);
+/** A Windows program may release a copy after its hole or note was removed. Retry then. */
+function retryReleasedCopies() {
+  let ids;
+  try { ids = fsSync.readdirSync(path.join(openedDir(), 'hole'), { withFileTypes: true }); }
+  catch { ids = []; }
+  for (const entry of ids) {
+    if (entry.isDirectory() && /^[\w-]{1,120}$/.test(entry.name) && !blackHoles.isOpen(entry.name)) {
+      clearOpened({ holeId: entry.name });
+    }
+  }
+  let existingNotes = noteIds(notesRoot());
+  if (existingNotes === null) {
+    try { fsSync.statSync(notesRoot()); return; }
+    catch (err) { if (err.code !== 'ENOENT') return; existingNotes = new Set(); }
+  }
+  if (existingNotes === null) return; // an unreadable vault never justifies deleting copies
+  let plain;
+  try { plain = fsSync.readdirSync(path.join(openedDir(), 'note'), { withFileTypes: true }); }
+  catch { return; }
+  for (const entry of plain) {
+    if (entry.isDirectory() && NOTE_ID.test(entry.name) && !existingNotes.has(entry.name)) {
+      clearOpened({ noteId: entry.name });
+    }
+  }
+}
 /** The preview's own session: a PDF shown, nothing navigated, nothing opened. */
 const PDF_PREVIEW_PARTITION = 'nebula-pdf-preview';
 /** Where a link embedded in a note is shown (src/js/rich-paste.js makeLinkBlock). */
@@ -354,7 +380,7 @@ async function helloAsk(what) {
   if (process.platform !== 'win32') return false;
   return (await askWindowsHello(true, `Nebula — ${what}`)).verified;
 }
-const helloVerify = (name) => helloAsk(`open the black hole “${name}”`);
+const helloVerify = (name, action = 'open') => helloAsk(`${action === 'delete' ? 'delete' : action === 'change-pin' ? 'change the PIN of' : 'open'} the black hole “${name}”`);
 
 /** The vault's black holes (black-holes.js): their keys are wrapped for this user by the operating system. */
 const holesRoot = () => path.join(storageRoot(), 'blackholes');
@@ -1502,6 +1528,8 @@ app.whenReady().then(async () => {
 
   dropAllPreviews();
   clearOpened();
+  app.on('browser-window-focus', retryReleasedCopies);
+  setInterval(retryReleasedCopies, 30_000).unref();
   snapshotStorage();
   purgeOldDeletions();
   prepareNoteFolders();
@@ -1566,10 +1594,10 @@ app.whenReady().then(async () => {
   lock('passkey', (on, by) => appLock.passkey(on === true, by ?? {}));
   // "Lock Nebula": shut now. The black holes let go of their keys, and the
   // window is loaded again — it holds nothing then, and asks before it shows anything.
-  lock('now', () => {
+  lock('now', async () => {
     if (!appLock.lockNow()) return { ok: false, error: 'unset' };
     blackHoles.lockAll();
-    clearOpened({ holes: true });
+    await clearOpenedAsync({ holes: true });
     dropAllPreviews();
     setImmediate(() => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.reload(); });
     return { ok: true };
@@ -1579,32 +1607,76 @@ app.whenReady().then(async () => {
     if (e.sender !== mainWindow?.webContents || shut()) return { ok: false, error: 'not allowed' };
     try { return await run(...args); } catch (err) { console.warn(`[nebula] black hole ${name} failed:`, err.message); return { ok: false, error: 'failed' }; }
   });
-  hole('list', async () => ({ ok: true, holes: blackHoles.list(), hello: await helloAvailable() }));
+  const protectedHoleBackups = new Set();
+  hole('list', async () => {
+    const holes = blackHoles.list();
+    for (const item of holes) {
+      if (protectedHoleBackups.has(item.id)) continue;
+      const nameBox = blackHoles.protectedNameBox(item.id);
+      if (!nameBox) continue;
+      const result = protectLegacyHoleBackups(backupsRoot(), item.id, null, nameBox);
+      if (!result.failed) protectedHoleBackups.add(item.id);
+    }
+    return { ok: true, holes, hello: await helloAvailable() };
+  });
   // A black hole is locked by a PIN, always; a passkey is an addition (black-holes.js).
   hole('create', (how) => blackHoles.create({ name: how?.name, pin: how?.pin, hint: how?.hint, passkey: how?.passkey === true }));
   // Its answer, asked before a note is taken out of it.
   hole('prove', (id, by) => blackHoles.prove(String(id ?? ''), by ?? {}));
   hole('passkey', (id, on) => blackHoles.setPasskey(String(id ?? ''), on === true));
   hole('unlock', async (id, by) => {
+    // A failed retry in earlier builds could leave a newer hole-marked plain
+    // note. The renderer restores it after authentication; do not sweep media
+    // that only that pending edit references before it has been re-sealed.
+    const plainIds = noteIds(notesRoot());
+    const preserveMedia = plainIds === null || [...plainIds].some((noteId) => {
+      // A previous boot could strip the marker from a leaked copy. An exact
+      // note-id collision with a sealed note is enough to keep its media
+      // until the renderer has reconciled the two versions.
+      if (blackHoles.hasSealedNote(String(id), noteId)) return true;
+      try { return JSON.parse(fsSync.readFileSync(noteFile(notesRoot(), noteId), 'utf8')).hole === String(id); }
+      catch { return true; } // unreadable state is never grounds to delete media
+    });
     // The sealed videos its notes no longer show went as it opened: they leave the backups too.
-    const { swept, ...res } = await blackHoles.unlock(String(id ?? ''), by ?? {});
-    if (swept?.length) purgeHoleFilesFromBackups(backupsRoot(), String(id), swept);
+    const { swept, ...res } = await blackHoles.unlock(String(id ?? ''), by ?? {}, { preserveMedia });
+    // A backup that was unreadable during the first upgrade gets another
+    // chance whenever the protected live hole is authenticated again.
+    if (res.ok) {
+      const wrapper = blackHoles.protectedKeyWrapper(String(id));
+      const backupResult = protectLegacyHoleBackups(backupsRoot(), String(id), wrapper, blackHoles.protectedNameBox(String(id)));
+      if (backupResult.failed) {
+        console.warn(`[nebula] ${backupResult.failed} old black-hole backup key wrappers could not be strengthened`);
+        res.backupProtectionIncomplete = true;
+      }
+    }
+    if (swept?.length) await purgeHoleFilesFromBackupsAsync(backupsRoot(), String(id), swept);
+    // Backup shredding can also yield to a Lock command. Never deliver the
+    // plaintext unlock result after the hole has closed in that interval.
+    if (res.ok && !blackHoles.isOpen(String(id ?? ''))) return { ok: false, error: 'locked' };
     return res;
   });
   // Shut, a black hole's files are in the clear nowhere: the copies Open made go too.
-  hole('lock', (id) => { const ok = blackHoles.lock(String(id ?? '')); clearOpened({ holeId: String(id ?? '') }); dropAllPreviews(); return { ok }; });
-  hole('lock-all', () => { blackHoles.lockAll(); clearOpened({ holes: true }); dropAllPreviews(); return { ok: true }; });
+  hole('lock', async (id) => { const ok = blackHoles.lock(String(id ?? '')); await clearOpenedAsync({ holeId: String(id ?? '') }); dropAllPreviews(); return { ok }; });
+  hole('lock-all', async () => { blackHoles.lockAll(); await clearOpenedAsync({ holes: true }); dropAllPreviews(); return { ok: true }; });
   // Sealed whole: a note that still names pictures in the notes folder (it was
   // just moved in) has them written into it first — the folder goes with its plain file.
-  hole('write', (id, noteId, json) => blackHoles.write(String(id ?? ''), String(noteId ?? ''), inlinePictures(String(json ?? ''), notesRoot())));
-  hole('remove', (id, noteId) => {
-    const res = blackHoles.remove(String(id ?? ''), String(noteId ?? ''));
+  hole('write', (id, noteId, json) => blackHoles.writeAsync(String(id ?? ''), String(noteId ?? ''), inlinePictures(String(json ?? ''), notesRoot())));
+  hole('remove', async (id, noteId) => {
+    const res = await blackHoles.remove(String(id ?? ''), String(noteId ?? ''));
     // Deleted is deleted: its sealed copies leave the backups too.
-    if (res.ok) purgeHoleNoteFromBackups(backupsRoot(), String(id), String(noteId));
-    if (res.ok) clearOpened({ holeId: String(id ?? ''), noteId: String(noteId ?? '') });
+    if (res.ok) await purgeHoleNoteFromBackupsAsync(backupsRoot(), String(id), String(noteId));
+    if (res.ok) await clearOpenedAsync({ holeId: String(id ?? ''), noteId: String(noteId ?? '') });
     return res;
   });
-  hole('rename', (id, name) => blackHoles.rename(String(id ?? ''), name));
+  hole('rename', (id, name) => {
+    const holeId = String(id ?? '');
+    const res = blackHoles.rename(holeId, name);
+    if (res.ok) {
+      const backup = protectLegacyHoleBackups(backupsRoot(), holeId, null, blackHoles.protectedNameBox(holeId));
+      if (backup.failed) res.backupProtectionIncomplete = true;
+    }
+    return res;
+  });
   // A video file for a note in a black hole: sealed there, never in the notes folder.
   hole('add-video', (id, noteId, source) => blackHoles.addVideo(String(id ?? ''), String(noteId ?? ''), String(source ?? '')));
   // Any file attached to a note in a black hole (0.9.6): sealed beside it as a video is.
@@ -1624,14 +1696,19 @@ app.whenReady().then(async () => {
     if (res.ok) vault.remember(String(noteId));
     return res.ok ? { ok: true, url: `nebula-media://note/${noteId}/${file}` } : res;
   });
-  hole('change-pin', (id, pin) => blackHoles.changePin(String(id ?? ''), pin));
+  hole('change-pin', (id, pin, by) => blackHoles.changePin(String(id ?? ''), pin, by ?? {}));
+  hole('new-recovery', (id) => blackHoles.newRecovery(String(id ?? '')));
   hole('hint', (id, hint) => blackHoles.setHint(String(id ?? ''), hint));
-  hole('trash', (id) => blackHoles.trash(String(id ?? '')));
+  hole('trash', async (id) => {
+    const res = blackHoles.trash(String(id ?? ''));
+    if (res.ok) { await clearOpenedAsync({ holeId: String(id) }); dropAllPreviews(); }
+    return res;
+  });
   hole('restore', (id) => blackHoles.restore(String(id ?? '')));
   hole('delete', async (id, by) => {
     const res = await blackHoles.delete(String(id ?? ''), by ?? {});
-    if (res.ok) purgeHoleFromBackups(backupsRoot(), String(id));
-    if (res.ok) clearOpened({ holeId: String(id ?? '') });
+    if (res.ok) await purgeHoleFromBackupsAsync(backupsRoot(), String(id));
+    if (res.ok) await clearOpenedAsync({ holeId: String(id ?? '') });
     return res;
   });
   app.on('before-quit', () => blackHoles.lockAll());
@@ -1751,6 +1828,11 @@ app.whenReady().then(async () => {
   // "Open" on a file's card: a copy, opened by the program the system has for its kind (openedDir).
   ipcMain.handle('media:open-file', async (e, url, name) => {
     if (e.sender !== mainWindow?.webContents || shut()) return { ok: false };
+    const of = attachedOf(url);
+    const accessible = () => !shut() && !!of && (!of.holeId || blackHoles.isOpen(of.holeId));
+    // A program can hold a plaintext copy past lock on Windows. Its presence
+    // is never permission to open it again through Nebula.
+    if (!accessible()) return { ok: false, error: 'locked' };
     // A folder of its own per file, so two files of one name both open.
     const dest = openedPath(openedDir(), url, name);
     if (!dest) return { ok: false, error: 'missing' };
@@ -1765,7 +1847,7 @@ app.whenReady().then(async () => {
       };
       const { response } = await (win ? dialog.showMessageBox(win, options) : dialog.showMessageBox(options));
       if (response !== 1) return { ok: false, canceled: true };
-      if (shut()) return { ok: false };
+      if (!accessible()) return { ok: false, error: 'locked' };
     }
     try {
       // Opened already since the start: the same copy — a program may hold it, and the file never changes.
@@ -1774,14 +1856,18 @@ app.whenReady().then(async () => {
         if (!res.ok) return res;
         await markOfTheWeb(dest);
       }
+      if (!accessible()) {
+        if (of.holeId) await clearOpenedAsync({ url: String(url) });
+        return { ok: false, error: 'locked' };
+      }
       const error = await shell.openPath(dest);
       return error ? { ok: false, error } : { ok: true };
     } catch (err) { return { ok: false, error: err.message }; }
   });
   // A file's card taken out of its note: the copy Open made of it goes now (the file itself at the next start).
-  ipcMain.handle('media:forget-file', (e, url) => {
+  ipcMain.handle('media:forget-file', async (e, url) => {
     if (e.sender !== mainWindow?.webContents || shut()) return { ok: false };
-    return { ok: true, removed: clearOpened({ url: String(url ?? '') }) };
+    return { ok: true, removed: await clearOpenedAsync({ url: String(url ?? '') }) };
   });
   // A file, video or adopted card copied for a note the window has left meanwhile (hunt B18): never
   // named, so nothing released it — released now, it goes at the next start without a question.
@@ -1907,6 +1993,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('storage:write', async (_e, rel, content) => {
     if (shut()) throw new Error('Nebula is locked');
     const noteId = noteIdOf(rel);
+    if (noteId && JSON.parse(String(content))?.hole) return { ok: false, error: 'Encrypted notes require black-hole storage' };
     vault.assert(noteId);
     const abs = inStorage(rel);
     await fs.mkdir(path.dirname(abs), { recursive: true });
@@ -1971,8 +2058,8 @@ app.whenReady().then(async () => {
       // A note deleted from the vault (the Trash's Delete) leaves every backup
       // with it: a deleted note must not be recoverable (owner, 2026-09-27).
       const note = /^notes[\\/]([\w-]+)\.json$/.exec(String(rel));
-      if (note && NOTE_ID.test(note[1])) { removeNoteFolder(notesRoot(), note[1]); vault.forget(note[1]); clearOpened({ noteId: note[1] }); }   // its pictures, videos and files with it
-      if (note) purgeNoteFromBackups(backupsRoot(), note[1]);
+      if (note && NOTE_ID.test(note[1])) { await removeNoteFolderAsync(notesRoot(), note[1]); vault.forget(note[1]); await clearOpenedAsync({ noteId: note[1] }); }   // its pictures, videos and files with it
+      if (note) await purgeNoteFromBackupsAsync(backupsRoot(), note[1]);
       return { ok: true };
     } catch {
       return { ok: false };

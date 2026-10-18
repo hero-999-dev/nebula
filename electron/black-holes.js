@@ -7,7 +7,7 @@
  * opening one in the app asks for a password: a 4-digit PIN, set when the
  * black hole is made — or a passkey (fingerprint, the computer's PIN)."
  *
- *   storage/blackholes/<hole>/hole.json    its name, how it is locked, its key — wrapped
+ *   storage/blackholes/<hole>/hole.json    protected label, how it is locked, wrapped key
  *   storage/blackholes/<hole>/<note>.bh    one note, encrypted whole: title, words, pictures
  *
  * Each black hole has a key of its own, 256 random bits, and every note in it
@@ -23,7 +23,9 @@
  *     key that wraps it. Six digits are a million guesses, which no key
  *     derivation can make many; so the wrapped key is wrapped once more by the
  *     operating system for this user (Electron safeStorage: DPAPI on Windows,
- *     the Keychain on a Mac). Copied off this computer — a backup, a flash
+ *     the Keychain on a Mac). New PIN wrappers require that protection;
+ *     an older unprotected wrapper is upgraded after a valid PIN opens it.
+ *     Copied off this computer — a backup, a flash
  *     drive — the files cannot be guessed at.
  *   – beside the PIN, if the owner adds one, by a passkey (Windows Hello /
  *     Touch ID): a second copy of the key, wrapped by the operating system
@@ -45,6 +47,12 @@
  * While a black hole is open its key is in this process's memory, and its
  * notes are in the window's; locking it, or quitting, lets go of both.
  *
+ * An answer can take seconds to come — a passkey prompt outlives a lock — and
+ * the lock does not wait for it. Every lock and every change marks the black
+ * hole's generation, and an answer that arrives after its own has passed
+ * opens nothing, adds nothing and deletes nothing; a file the lock caught
+ * half written goes with it, and no wrapper of a dead key is kept.
+ *
  * A video is too large to be sealed into its note, so it is sealed beside it:
  *
  *   storage/blackholes/<hole>/<note>~vid-….mp4.bhv
@@ -60,7 +68,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { shred, VIDEO_EXTENSIONS, attachmentExt } from './note-media.js';
+import { shredAsync, VIDEO_EXTENSIONS, attachmentExt } from './note-media.js';
 
 const ID = /^[\w-]{1,120}$/;
 const MAGIC = Buffer.from('NBH1');
@@ -151,6 +159,48 @@ const un64 = (text) => Buffer.from(String(text ?? ''), 'base64');
 export class BlackHoles {
   /** id → the hole's key, while it is open */
   #keys = new Map();
+  /** A paused media response can still hold a Windows file handle. */
+  #activeVideo = new Map();
+  #activeWrites = new Map();
+  #activeImports = new Map();
+  /** A note's removal in flight: writes, imports and new streams refuse, so nothing is committed onto files that are being destroyed. */
+  #activeRemoval = new Map();
+  /** The whole hole's deletion in flight: nothing else may touch it — no unlock, write, import, note removal or trash — until it is gone. */
+  #activeDeletion = new Map();
+  #nameCache = new Map();
+  #videoTag(id, noteId) { return `${id}/${noteId}`; }
+  #videoBusy(id, noteId = null) {
+    if (noteId !== null) return (this.#activeVideo.get(this.#videoTag(id, noteId)) ?? 0) > 0;
+    return [...this.#activeVideo].some(([tag, count]) => count > 0 && tag.startsWith(`${id}/`));
+  }
+  #writeBusy(id, noteId = null) {
+    if (noteId !== null) return (this.#activeWrites.get(this.#videoTag(id, noteId)) ?? 0) > 0;
+    return [...this.#activeWrites].some(([tag, count]) => count > 0 && tag.startsWith(`${id}/`));
+  }
+  #importBusy(id, noteId = null) {
+    if (noteId !== null) return (this.#activeImports.get(this.#videoTag(id, noteId)) ?? 0) > 0;
+    return [...this.#activeImports].some(([tag, count]) => count > 0 && tag.startsWith(`${id}/`));
+  }
+  #removalBusy(id, noteId = null) {
+    if (noteId !== null) return (this.#activeRemoval.get(this.#videoTag(id, noteId)) ?? 0) > 0;
+    return [...this.#activeRemoval].some(([tag, count]) => count > 0 && tag.startsWith(`${id}/`));
+  }
+  #deletionBusy(id) { return (this.#activeDeletion.get(String(id)) ?? 0) > 0; }
+
+  /**
+   * Every lock and every change marks the black hole it touched (#bump), and
+   * "lock all" marks every hole at once — even one that holds no key now, for
+   * an answer may still be on its way to one. An answer (or a file being
+   * sealed) that arrives to find a mark made after it started is stale: it
+   * opens, changes and writes nothing.
+   */
+  #epochs = new Map();
+  #epochAll = 0;
+  #token(id) { return `${this.#epochAll}:${this.#epochs.get(String(id)) ?? 0}`; }
+  #bump(id) { this.#epochs.set(String(id), (this.#epochs.get(String(id)) ?? 0) + 1); }
+
+  /** Whether the key an operation began with is still the one the hole holds: a lock empties the place, a fresh opening fills it with another buffer. */
+  #stillHolds(id, key) { return this.#keys.get(id) === key; }
 
   /**
    * @param {object} deps
@@ -188,8 +238,33 @@ export class BlackHoles {
     if (!ID.test(String(id))) return null;
     try {
       const meta = JSON.parse(fs.readFileSync(this.#metaFile(id), 'utf8'));
-      return meta?.id === id && meta.key && meta.recovery ? meta : null;
+      if (meta?.id !== id || !meta.key || !meta.recovery) return null;
+      // Older builds kept the label in clear text. Safe storage is available
+      // before a PIN is entered, so protect that label at the first read.
+      if (typeof meta.name === 'string' && this.canProtect()) {
+        try {
+          const upgraded = { ...meta, nameBox: b64(this.protect(Buffer.from(meta.name, 'utf8'))) };
+          delete upgraded.name;
+          this.#saveMeta(upgraded);
+          return upgraded;
+        } catch { /* keep the original label until protection works */ }
+      }
+      return meta;
     } catch { return null; }
+  }
+
+  #name(meta) {
+    if (meta.nameBox) {
+      const cached = this.#nameCache.get(meta.id);
+      if (cached?.box === meta.nameBox) return cached.name;
+      try {
+        const name = cleanHoleName(this.unprotect(un64(meta.nameBox)).toString('utf8')) || 'Black hole';
+        this.#nameCache.set(meta.id, { box: meta.nameBox, name });
+        return name;
+      }
+      catch { return 'Black hole'; } // a backup brought from another computer
+    }
+    return cleanHoleName(meta.name) || 'Black hole';
   }
 
   #saveMeta(meta) {
@@ -201,15 +276,30 @@ export class BlackHoles {
     try { return fs.readdirSync(this.#dir(id)).filter((f) => f.endsWith('.bh') && ID.test(f.slice(0, -3))); } catch { return []; }
   }
 
+  /** Main-process check for an old plain copy that lost its hole marker. */
+  hasSealedNote(id, noteId) {
+    return ID.test(String(id)) && ID.test(String(noteId)) && fs.existsSync(path.join(this.#dir(id), `${noteId}.bh`));
+  }
+
+  /** Wrapped metadata only, for upgrading old local backup copies. */
+  protectedKeyWrapper(id) {
+    const key = this.#meta(id)?.key;
+    return key?.os === true ? { ...key } : null;
+  }
+
+  /** Protected label for upgrading the local backup metadata too. */
+  protectedNameBox(id) { return this.#meta(id)?.nameBox ?? null; }
+
   #describe(meta) {
     const fails = meta.fails?.count ?? 0;
     const wait = Math.max(0, (meta.fails?.at ?? 0) + waitAfter(fails) - this.now());
     return {
-      id: meta.id, name: meta.name, createdAt: meta.createdAt, lock: meta.lock, digits: pinDigits(meta),
+      id: meta.id, name: this.#name(meta), createdAt: meta.createdAt, lock: meta.lock, digits: pinDigits(meta),
       // What opens it: its PIN (always, but for one of the first builds), and a passkey where one was added.
       pin: meta.lock === 'pin', passkey: meta.lock === 'hello' || !!meta.passkey?.box,
       hint: meta.lock === 'pin' ? cleanHint(meta.hint) : '',
       notes: this.#noteFiles(meta.id).length, open: this.#keys.has(meta.id), waitMs: wait,
+      needsProtection: meta.lock === 'pin' && meta.key?.os !== true,
       trashedAt: meta.trashedAt ?? 0,
     };
   }
@@ -237,24 +327,32 @@ export class BlackHoles {
     // The PIN is the lock, always: a passkey alone makes no black hole.
     if (lock === 'hello' && !this.passkeyOnly) return { ok: false, error: 'pin' };
     if (lock === 'pin' && !this.#newPin(pin)) return { ok: false, error: 'pin' };
+    if (!this.canProtect()) return { ok: false, error: 'storage-unavailable' };
     const reminder = lock === 'pin' ? cleanHint(hint) : '';
     if (hintTells(reminder, pin)) return { ok: false, error: 'hint' };
     const also = lock === 'pin' && passkey === true;
     if (lock === 'hello' || also) {
+      const epochAll = this.#epochAll;
       if (!this.canProtect() || !(await this.helloAvailable())) return { ok: false, error: 'hello-unavailable' };
       if (!(await this.hello(clean))) return { ok: false, error: 'hello-refused' };
+      // "Lock all" while the passkey was being asked for: this yes is stale —
+      // no black hole is born open behind a lock its owner just pressed.
+      if (this.#epochAll !== epochAll) return { ok: false, error: 'locked' };
     }
     const id = `bh-${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}`;
     const key = crypto.randomBytes(32);
     const recoveryKey = newRecoveryKey();
     const rsalt = crypto.randomBytes(16);
-    const meta = {
-      v: 1, id, name: clean, createdAt: this.now(), lock, ...(lock === 'pin' ? { digits: this.digits } : {}), ...(reminder ? { hint: reminder } : {}),
-      cipher: 'aes-256-gcm', kdf: { ...this.kdf },
-      key: this.#wrap(id, lock, key, pin),
-      ...(also ? { passkey: { box: b64(this.protect(key)) } } : {}),
-      recovery: { salt: b64(rsalt), box: b64(seal(derive(cleanRecoveryKey(recoveryKey), rsalt, this.kdf), key, `${id}/recovery`)) },
-    };
+    let meta;
+    try {
+      meta = {
+        v: 1, id, nameBox: b64(this.protect(Buffer.from(clean, 'utf8'))), createdAt: this.now(), lock, ...(lock === 'pin' ? { digits: this.digits } : {}), ...(reminder ? { hint: reminder } : {}),
+        cipher: 'aes-256-gcm', kdf: { ...this.kdf },
+        key: this.#wrap(id, lock, key, pin),
+        ...(also ? { passkey: { box: b64(this.protect(key)) } } : {}),
+        recovery: { salt: b64(rsalt), box: b64(seal(derive(cleanRecoveryKey(recoveryKey), rsalt, this.kdf), key, `${id}/recovery`)) },
+      };
+    } catch { key.fill(0); return { ok: false, error: 'storage-unavailable' }; }
     this.#saveMeta(meta);
     this.#keys.set(id, key);
     return { ok: true, hole: this.#describe(meta), recoveryKey };
@@ -262,11 +360,11 @@ export class BlackHoles {
 
   /** The hole's key wrapped for this computer: by the PIN and the operating system, or by the operating system alone. */
   #wrap(id, lock, key, pin) {
-    const os = this.canProtect();
+    if (!this.canProtect()) throw new Error('storage-unavailable');
     if (lock === 'hello') return { os: true, box: b64(this.protect(key)) };
     const salt = crypto.randomBytes(16);
     const inner = seal(derive(pin, salt, this.kdf), key, `${id}/pin`);
-    return { os, salt: b64(salt), box: b64(os ? this.protect(inner) : inner) };
+    return { os: true, salt: b64(salt), box: b64(this.protect(inner)) };
   }
 
   #fail(meta) {
@@ -276,13 +374,29 @@ export class BlackHoles {
   }
 
   /**
+   * A passkey whose wrapped key is all zeroes: the residue of a passkey added
+   * while the hole was being locked (the lock zeroed the key buffer before the
+   * wrapper was written). Whoever unwraps it holds no key, so it is refused
+   * when asked for and taken away when the real answer next opens the hole.
+   */
+  #deadPasskey(meta) {
+    if (!meta.passkey?.box) return false;
+    let key = null;
+    try {
+      key = this.unprotect(un64(meta.passkey.box));
+      return key.length === 32 && key.every((b) => b === 0);
+    } catch { return false; }
+    finally { key?.fill(0); }
+  }
+
+  /**
    * The black hole's key, for the right answer: its recovery key; the passkey,
    * where the black hole has one (or is one of the first builds, opened by a
    * passkey alone); its PIN. Counts a wrong PIN or key; a passkey refused is
    * no guess. Nothing of the black hole is changed here but that count.
    * @returns {Promise<{ok: true, key: Buffer, by: 'recovery'|'hello'|'pin'} | {ok: false, error: string, waitMs?: number, triesLeft?: number}>}
    */
-  async #answer(meta, { pin, recovery, hello } = {}) {
+  async #answer(meta, { pin, recovery, hello } = {}, action = 'open') {
     const id = meta.id;
     const wait = (meta.fails?.at ?? 0) + waitAfter(meta.fails?.count ?? 0) - this.now();
     if (wait > 0) return { ok: false, error: 'wait', waitMs: wait };
@@ -297,8 +411,10 @@ export class BlackHoles {
       if (!kept) return { ok: false, error: 'hello' };
       let box;
       try { box = this.unprotect(un64(kept)); } catch { return { ok: false, error: 'other-computer' }; }
+      if (box.length === 32 && box.every((b) => b === 0)) return { ok: false, error: 'damaged' };
       if (!(await this.helloAvailable())) return { ok: false, error: 'hello-unavailable' };
-      if (!(await this.hello(meta.name))) return { ok: false, error: 'hello-refused' };
+      // The OS prompt names what is being done — opening says open, deleting says delete (main.js).
+      if (!(await this.hello(this.#name(meta), action))) { box.fill(0); return { ok: false, error: 'hello-refused' }; }
       return { ok: true, by: 'hello', key: box };
     }
     if (!isPinOf(meta, pin)) return { ok: false, error: 'pin' };
@@ -318,10 +434,14 @@ export class BlackHoles {
    * @returns {Promise<{ok: boolean, error?: string, waitMs?: number, triesLeft?: number}>}
    */
   async prove(id, by = {}) {
+    if (this.#deletionBusy(id)) return { ok: false, error: 'in-use' };   // a wrong answer would write its fail count into a hole being destroyed
     const meta = this.#meta(id);
     if (!meta) return { ok: false, error: 'missing' };
+    const token = this.#token(id);
     const res = await this.#answer(meta, by);
     if (!res.ok) return res;
+    // The answer arrived after the hole was locked or changed: it proves the hole as it was, not as it is now.
+    if (this.#token(id) !== token) { res.key.fill(0); return { ok: false, error: 'locked' }; }
     const good = res.key.length === 32;
     res.key.fill(0);
     if (!good) return { ok: false, error: 'damaged' };
@@ -332,47 +452,84 @@ export class BlackHoles {
   /**
    * Open a black hole: by its PIN, by the passkey where it has one, or by its
    * recovery key (with a new PIN for a PIN one — it is wrapped for this
-   * computer again).
+   * computer again). An answer that arrives after the hole was locked or
+   * changed opens nothing (`error: 'locked'`).
    * @param {string} id
    * @param {{pin?: string, hello?: boolean, recovery?: string}} by
+   * @param {{preserveMedia?: boolean}} [opts] true: the sweep of videos no note
+   * shows is left to the caller, which is restoring notes that name them (the
+   * main process only — the window never chooses this).
    * @returns {Promise<{ok: boolean, notes?: string[], damaged?: number, error?: string, waitMs?: number, triesLeft?: number}>}
    */
-  async unlock(id, { pin, recovery, hello } = {}) {
+  async unlock(id, { pin, recovery, hello } = {}, { preserveMedia = false } = {}) {
+    // Before the meta read: even a read can write (a legacy label upgrade), and the
+    // hole's files are being destroyed — nothing of it is touched until it is gone.
+    if (this.#deletionBusy(id)) return { ok: false, error: 'in-use' };
     const meta = this.#meta(id);
     if (!meta) return { ok: false, error: 'missing' };
     if (meta.trashedAt) return { ok: false, error: 'trashed' };
     let key = this.#keys.get(id) ?? null;
     if (!key) {
+      const token = this.#token(id);
       // A recovery key opens a PIN black hole only together with the new PIN it is to have.
       if (recovery !== undefined && meta.lock === 'pin' && cleanRecoveryKey(recovery).length === 32 && !this.#newPin(pin)
         && (meta.fails?.at ?? 0) + waitAfter(meta.fails?.count ?? 0) - this.now() <= 0) return { ok: false, error: 'pin' };
+      if (recovery !== undefined && !this.canProtect()) return { ok: false, error: 'storage-unavailable' };
       const res = await this.#answer(meta, { pin, recovery, hello });
       if (!res.ok) return res;
+      // The lock (or a change to the hole) did not wait for the passkey's answer.
+      if (this.#token(id) !== token) { res.key.fill(0); return { ok: false, error: 'locked' }; }
       key = res.key;
+      if (key.length !== 32) { key.fill(0); return { ok: false, error: 'damaged' }; }
       if (res.by === 'recovery') {
         // Wrapped for this computer again; a Hello one only where the system can keep it.
-        if (meta.lock === 'hello' && !this.canProtect()) return { ok: false, error: 'hello-unavailable' };
-        meta.key = this.#wrap(id, meta.lock, key, pin);
+        try { meta.key = this.#wrap(id, meta.lock, key, pin); }
+        catch { key.fill(0); return { ok: false, error: 'storage-unavailable' }; }
         if (meta.lock === 'pin') meta.digits = this.digits;
         // A passkey's copy of the key was wrapped for the computer it was added on: it is added again here, if wanted.
         delete meta.passkey;
       }
-      if (key.length !== 32) return { ok: false, error: 'damaged' };
-      if (meta.fails || res.by === 'recovery') { delete meta.fails; this.#saveMeta(meta); }
+      // Old versions could write a PIN wrapper with no OS protection. A
+      // successful PIN supplies the original key and lets us replace it now.
+      // Keep the legacy wrapper if the OS still cannot protect it; never
+      // create another one or silently weaken a recovery reset.
+      const upgrade = res.by === 'pin' && meta.lock === 'pin' && !meta.key.os && this.canProtect();
+      if (upgrade) {
+        try { meta.key = this.#wrap(id, 'pin', key, pin); }
+        catch { key.fill(0); return { ok: false, error: 'storage-unavailable' }; }
+      }
+      // A passkey whose wrapped key is the dead one is taken away: the real answer is in hand here.
+      const dead = res.by !== 'hello' && this.#deadPasskey(meta);
+      if (dead) delete meta.passkey;
+      if (meta.fails || res.by === 'recovery' || dead || upgrade) { delete meta.fails; this.#saveMeta(meta); this.#bump(id); }
       this.#keys.set(id, key);
     }
     const notes = [];
     let damaged = 0;
-    for (const file of this.#noteFiles(id)) {
+    const files = this.#noteFiles(id);
+    const decryptKey = files.length ? await crypto.webcrypto.subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt']) : null;
+    if (!this.#stillHolds(id, key)) return { ok: false, error: 'locked' };
+    for (const file of files) {
       try {
-        const bytes = fs.readFileSync(path.join(this.#dir(id), file));
-        if (!bytes.subarray(0, 4).equals(MAGIC)) throw new Error('not a note');
-        notes.push(unseal(key, bytes.subarray(4), `${id}/${file.slice(0, -3)}`).toString('utf8'));
-      } catch { damaged += 1; }
+        const bytes = await fs.promises.readFile(path.join(this.#dir(id), file));
+        if (!this.#stillHolds(id, key)) return { ok: false, error: 'locked' };
+        if (!bytes.subarray(0, 4).equals(MAGIC) || bytes.length < 32) throw new Error('not a note');
+        const clear = await crypto.webcrypto.subtle.decrypt({
+          name: 'AES-GCM', iv: bytes.subarray(4, 16),
+          additionalData: Buffer.from(`${id}/${file.slice(0, -3)}`), tagLength: 128,
+        }, decryptKey, bytes.subarray(16));
+        if (!this.#stillHolds(id, key)) return { ok: false, error: 'locked' };
+        const text = Buffer.from(clear).toString('utf8');
+        new Uint8Array(clear).fill(0);
+        notes.push(text);
+      } catch { if (!this.#stillHolds(id, key)) return { ok: false, error: 'locked' }; damaged += 1; }
     }
     // A video taken out of a note since the black hole was last opened goes now —
     // and `swept` names it for the caller, who takes it out of the backups too.
-    const swept = this.#sweepVideos(id, notes, damaged);
+    const swept = preserveMedia ? [] : await this.#sweepVideos(id, notes, damaged);
+    // The sweep awaited: the hole may have been locked while it shredded. The
+    // notes are plaintext in hand — they leave with the lock, not after it.
+    if (!this.#stillHolds(id, key)) return { ok: false, error: 'locked' };
     return { ok: true, notes, damaged, ...(swept.length ? { swept } : {}) };
   }
 
@@ -380,12 +537,14 @@ export class BlackHoles {
 
   /** Let go of the key. The files stay as they are: sealed. */
   lock(id) {
+    this.#bump(id);
     const key = this.#keys.get(id);
     if (key) key.fill(0);
     return this.#keys.delete(id);
   }
 
   lockAll() {
+    this.#epochAll += 1;   // every hole, even one holding no key now — an answer may still be on its way to one
     for (const id of [...this.#keys.keys()]) this.lock(id);
   }
 
@@ -394,16 +553,69 @@ export class BlackHoles {
     const key = this.#keys.get(id);
     if (!key) return { ok: false, error: 'locked' };
     if (!ID.test(String(noteId)) || !this.#meta(id)) return { ok: false, error: 'missing' };
+    if (this.#writeBusy(id, noteId) || this.#removalBusy(id, noteId) || this.#deletionBusy(id)) return { ok: false, error: 'in-use' };
     writeAtomic(path.join(this.#dir(id), `${noteId}.bh`), Buffer.concat([MAGIC, seal(key, Buffer.from(String(json), 'utf8'), `${id}/${noteId}`)]));
     return { ok: true };
   }
 
-  /** One note out of a black hole, for good — its videos with it. */
-  remove(id, noteId) {
+  /** Seal in memory, then write without blocking Electron's event loop on a
+   * large file. Commit is synchronous after the last lock check. */
+  async writeAsync(id, noteId, json) {
+    const key = this.#keys.get(id);
+    if (!key) return { ok: false, error: 'locked' };
+    if (!ID.test(String(noteId)) || !this.#meta(id)) return { ok: false, error: 'missing' };
+    if (this.#writeBusy(id, noteId) || this.#removalBusy(id, noteId) || this.#deletionBusy(id)) return { ok: false, error: 'in-use' };
+    const tag = this.#videoTag(id, noteId);
+    this.#activeWrites.set(tag, (this.#activeWrites.get(tag) ?? 0) + 1);
+    const dest = path.join(this.#dir(id), `${noteId}.bh`);
+    const tmp = `${dest}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      const plain = Buffer.from(String(json), 'utf8');
+      let bytes;
+      try {
+        const nonce = crypto.randomBytes(12);
+        const wrapped = await crypto.webcrypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt']);
+        if (!this.#stillHolds(id, key)) return { ok: false, error: 'locked' };
+        const body = await crypto.webcrypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce, additionalData: Buffer.from(`${id}/${noteId}`), tagLength: 128 }, wrapped, plain);
+        bytes = Buffer.concat([MAGIC, nonce, Buffer.from(body)]);
+      }
+      finally { plain.fill(0); }
+      if (!this.#stillHolds(id, key)) return { ok: false, error: 'locked' };
+      await fs.promises.writeFile(tmp, bytes);
+      if (!this.#stillHolds(id, key)) return { ok: false, error: 'locked' };
+      fs.renameSync(tmp, dest);
+      return { ok: true };
+    } catch (err) { return { ok: false, error: err.message }; }
+    finally {
+      try { fs.rmSync(tmp, { force: true }); } catch { /* Windows may still hold it; keep the write result */ }
+      const count = (this.#activeWrites.get(tag) ?? 1) - 1;
+      if (count) this.#activeWrites.set(tag, count); else this.#activeWrites.delete(tag);
+    }
+  }
+
+  /**
+   * One note out of a black hole, for good — its videos with it. Only while the
+   * black hole is open: whoever found the app open takes nothing out of what
+   * is shut (the window asks for the hole's answer before it calls this; the
+   * bridge is trusted, but the door is shut here too).
+   */
+  async remove(id, noteId) {
     if (!ID.test(String(id)) || !ID.test(String(noteId))) return { ok: false, error: 'missing' };
-    shred(path.join(this.#dir(id), `${noteId}.bh`));
-    for (const file of this.#videoFiles(id)) if (file.startsWith(`${noteId}~`)) shred(path.join(this.#dir(id), file));
-    return { ok: true };
+    if (!this.#keys.has(id)) return { ok: false, error: 'locked' };
+    if (this.#videoBusy(id, noteId) || this.#writeBusy(id, noteId) || this.#importBusy(id, noteId)) return { ok: false, error: 'in-use' };
+    if (this.#removalBusy(id, noteId) || this.#deletionBusy(id)) return { ok: false, error: 'in-use' };
+    const tag = this.#videoTag(id, noteId);
+    this.#activeRemoval.set(tag, (this.#activeRemoval.get(tag) ?? 0) + 1);
+    try {
+      // The overwrite yields the turn between blocks: a locked window stays live while a large video is cleaned.
+      // While it runs, nothing may commit onto the note it is destroying.
+      await shredAsync(path.join(this.#dir(id), `${noteId}.bh`));
+      for (const file of this.#videoFiles(id)) if (file.startsWith(`${noteId}~`)) await shredAsync(path.join(this.#dir(id), file));
+      return { ok: true };
+    } finally {
+      const count = (this.#activeRemoval.get(tag) ?? 1) - 1;
+      if (count) this.#activeRemoval.set(tag, count); else this.#activeRemoval.delete(tag);
+    }
   }
 
   #videoFiles(id) {
@@ -424,10 +636,18 @@ export class BlackHoles {
     const key = this.#keys.get(id);
     if (!key) return { ok: false, error: 'locked' };
     if (!ID.test(String(noteId)) || !this.#meta(id)) return { ok: false, error: 'missing' };
+    // The key is held across awaits: the hole may be locked while the copy runs,
+    // and the lock zeroes this very buffer. Every await is followed by a look
+    // at whether the key in the hole is still this one — before a piece is
+    // sealed, and again before the file is committed (an empty one too).
+    if (this.#removalBusy(id, noteId) || this.#deletionBusy(id)) return { ok: false, error: 'in-use' };
+    const still = () => this.#stillHolds(id, key);
     const from = String(source ?? '');
     const ext = from.slice(from.lastIndexOf('.') + 1).toLowerCase();
     const name = keepName ?? `vid-${Date.now().toString(36)}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
     if (!VIDEO_NAME.test(name)) return { ok: false, error: 'not a video this app can play' };
+    const tag = this.#videoTag(id, noteId);
+    this.#activeImports.set(tag, (this.#activeImports.get(tag) ?? 0) + 1);
     const dest = path.join(this.#dir(id), sealedVideo(noteId, name));
     const tmp = `${dest}.tmp-${process.pid}-${Date.now()}`;
     let input = null;
@@ -444,20 +664,24 @@ export class BlackHoles {
       const piece = Buffer.alloc(VIDEO_PIECE);
       for (let i = 0, at = 0; at < size; i += 1) {
         const { bytesRead } = await input.read(piece, 0, VIDEO_PIECE, at);
+        if (!still()) throw new Error('locked');
         if (!bytesRead) throw new Error('the file ended early');
         await output.write(seal(key, piece.subarray(0, bytesRead), `${id}/${noteId}/${name}/${i}/${size}`));
         at += bytesRead;
       }
       await output.close();
       output = null;
-      await fs.promises.rename(tmp, dest);
+      if (!still()) throw new Error('locked');
+      fs.renameSync(tmp, dest);   // the commit: no await after the check, so no lock can land between them
       return { ok: true, url: BlackHoles.videoUrl(id, noteId, name), name: path.basename(from), file: name, size };
     } catch (err) {
       await output?.close().catch(() => {});
-      await fs.promises.rm(tmp, { force: true }).catch(() => {});
+      fs.rmSync(tmp, { force: true });
       return { ok: false, error: err.message };
     } finally {
       await input?.close().catch(() => {});
+      const count = (this.#activeImports.get(tag) ?? 1) - 1;
+      if (count) this.#activeImports.set(tag, count); else this.#activeImports.delete(tag);
     }
   }
 
@@ -486,16 +710,25 @@ export class BlackHoles {
    * @returns {AsyncGenerator<Buffer>}
    */
   async* videoPart(id, noteId, name, start, end) {
+    const key = this.#keys.get(id);               // BEFORE any await: the key this playing was let in with
     const size = this.videoSize(id, noteId, name);
-    if (size === null || start > end || end >= size) return;
-    const handle = await fs.promises.open(path.join(this.#dir(id), sealedVideo(noteId, name)), 'r');
+    if (!key || size === null || start > end || end >= size) return;
+    if (this.#removalBusy(id, noteId)) return;    // its note is being destroyed
+    const tag = this.#videoTag(id, noteId);
+    this.#activeVideo.set(tag, (this.#activeVideo.get(tag) ?? 0) + 1);
+    let handle = null;
     try {
+      handle = await fs.promises.open(path.join(this.#dir(id), sealedVideo(noteId, name)), 'r');
+      if (!this.#stillHolds(id, key)) return;
       const sealed = Buffer.alloc(VIDEO_PIECE + PIECE_COST);
       for (let i = Math.floor(start / VIDEO_PIECE); i * VIDEO_PIECE <= end; i += 1) {
-        const key = this.#keys.get(id);
-        if (!key) return;                    // locked while it played
+        // Locked while it played — or emptied and opened again, another key in
+        // the place of this one: the playing stops, it does not limp on.
+        if (!this.#stillHolds(id, key)) return;
         const plainLength = Math.min(VIDEO_PIECE, size - i * VIDEO_PIECE);
         const { bytesRead } = await handle.read(sealed, 0, plainLength + PIECE_COST, VIDEO_HEAD + i * (VIDEO_PIECE + PIECE_COST));
+        // After the read, before a byte is opened: the lock zeroes the very buffer `key` names.
+        if (!this.#stillHolds(id, key)) return;
         if (bytesRead !== plainLength + PIECE_COST) throw new Error('a piece is missing');
         const plain = unseal(key, sealed.subarray(0, bytesRead), `${id}/${noteId}/${name}/${i}/${size}`);
         const from = Math.max(0, start - i * VIDEO_PIECE);
@@ -503,12 +736,16 @@ export class BlackHoles {
         yield Buffer.from(plain.subarray(from, to));
       }
     } finally {
-      await handle.close().catch(() => {});
+      await handle?.close().catch(() => {});
+      const remaining = (this.#activeVideo.get(tag) ?? 1) - 1;
+      if (remaining) this.#activeVideo.set(tag, remaining); else this.#activeVideo.delete(tag);
     }
   }
 
   /** A sealed video written out in the clear — for a note that is taken out of its black hole. */
   async exportVideo(id, noteId, name, dest) {
+    const key = this.#keys.get(id);
+    if (!key) return { ok: false, error: 'missing' };
     const size = this.videoSize(id, noteId, name);
     if (size === null) return { ok: false, error: 'missing' };
     const tmp = `${dest}.tmp-${process.pid}-${Date.now()}`;
@@ -520,12 +757,15 @@ export class BlackHoles {
       const written = (await output.stat()).size;
       await output.close();
       output = null;
+      // The last look before the file is committed: the hole may have been
+      // locked while the copy came out (an empty file never enters the loop).
+      if (!this.#stillHolds(id, key)) throw new Error('locked');
       if (written !== size) throw new Error('the video did not come out whole');
-      await fs.promises.rename(tmp, dest);
+      fs.renameSync(tmp, dest);   // the commit: no await after the check, so no lock can land between them
       return { ok: true };
     } catch (err) {
       await output?.close().catch(() => {});
-      await fs.promises.rm(tmp, { force: true }).catch(() => {});
+      fs.rmSync(tmp, { force: true });
       return { ok: false, error: err.message };
     }
   }
@@ -536,7 +776,7 @@ export class BlackHoles {
    * be read is left alone.
    * @param {string[]} notes each note's JSON @param {number} damaged notes that did not open
    */
-  #sweepVideos(id, notes, damaged) {
+  async #sweepVideos(id, notes, damaged) {
     if (damaged) return [];
     const all = notes.join('\n');
     const removed = [];
@@ -546,18 +786,24 @@ export class BlackHoles {
       const noteId = file.slice(0, at);
       const name = file.slice(at + 1, -4);
       if (all.includes(BlackHoles.videoUrl(id, noteId, name))) continue;
-      shred(path.join(this.#dir(id), file));
+      await shredAsync(path.join(this.#dir(id), file));
       removed.push(file);
     }
     return removed;
   }
 
   rename(id, name) {
-    const meta = this.#meta(id);
     const clean = cleanHoleName(name);
-    if (!meta || !clean) return { ok: false, error: 'name' };
-    meta.name = clean;
+    if (!clean) return { ok: false, error: 'name' };
+    if (this.#deletionBusy(id)) return { ok: false, error: 'in-use' };   // no label written into a hole being destroyed
+    const meta = this.#meta(id);
+    if (!meta) return { ok: false, error: 'name' };
+    if (!this.canProtect()) return { ok: false, error: 'storage-unavailable' };
+    try { meta.nameBox = b64(this.protect(Buffer.from(clean, 'utf8'))); }
+    catch { return { ok: false, error: 'storage-unavailable' }; }
+    delete meta.name;
     this.#saveMeta(meta);
+    this.#bump(id);   // an answer still on its way belongs to the hole as it was
     return { ok: true, hole: this.#describe(meta) };
   }
 
@@ -569,19 +815,29 @@ export class BlackHoles {
     const reminder = cleanHint(hint);
     if (reminder) meta.hint = reminder; else delete meta.hint;
     this.#saveMeta(meta);
+    this.#bump(id);
     return { ok: true, hole: this.#describe(meta) };
   }
 
   /**
-   * A new PIN for an open black hole. One of the first builds that is opened
-   * by a passkey alone takes its PIN here, and is a PIN black hole with a
-   * passkey beside it from then on.
+   * A new PIN for an open black hole — after its old answer: the current PIN,
+   * or the passkey for whoever does not know it (the owner, 2026-10-18);
+   * being open is not knowing it. One of the first builds that is opened by
+   * a passkey alone proves with the passkey and takes its PIN here, becoming
+   * a PIN black hole with the passkey beside it.
+   * @param {string} id @param {string} pin @param {{pin?: string, hello?: boolean}} by
    */
-  changePin(id, pin) {
+  async changePin(id, pin, by = {}) {
     const meta = this.#meta(id);
     const key = this.#keys.get(id);
     if (!meta || !key) return { ok: false, error: 'locked' };
+    const proof = await this.#answer(meta, by, 'change-pin');
+    if (!proof.ok) return proof;
+    // The lock — or a change, or a delete — did not wait for the passkey's
+    // answer: this yes is stale, and nothing is written.
+    if (!this.#stillHolds(id, key)) return { ok: false, error: 'locked' };
     if (!this.#newPin(pin)) return { ok: false, error: 'pin' };
+    if (!this.canProtect()) return { ok: false, error: 'storage-unavailable' };
     if (meta.lock === 'hello') {
       meta.passkey = { box: meta.key.box };
       meta.lock = 'pin';
@@ -592,7 +848,28 @@ export class BlackHoles {
     if (hintTells(meta.hint ?? '', pin)) delete meta.hint;
     delete meta.fails;
     this.#saveMeta(meta);
+    this.#bump(id);   // a new PIN makes every answer still on its way stale
     return { ok: true };
+  }
+
+  /**
+   * A new recovery key for an open black hole, shown once. The old one dies
+   * with the swap: a key written down or left with someone is made wrong
+   * again. Being open is the answer here — the key is in hand, as for a new
+   * PIN — and everything after the guards is synchronous, so no answer still
+   * on its way can land in between (the lock drops the key first).
+   */
+  newRecovery(id) {
+    const meta = this.#meta(id);
+    const key = this.#keys.get(id);
+    if (!meta || !key) return { ok: false, error: 'locked' };
+    if (!meta.recovery || !meta.key) return { ok: false, error: 'recovery' };
+    const recoveryKey = newRecoveryKey();
+    const rsalt = crypto.randomBytes(16);
+    meta.recovery = { salt: b64(rsalt), box: b64(seal(derive(cleanRecoveryKey(recoveryKey), rsalt, this.kdf), key, `${id}/recovery`)) };
+    this.#saveMeta(meta);
+    this.#bump(id);
+    return { ok: true, recoveryKey };
   }
 
   /**
@@ -607,14 +884,20 @@ export class BlackHoles {
     const key = this.#keys.get(id);
     if (!meta || !key) return { ok: false, error: 'locked' };
     if (meta.lock !== 'pin') return { ok: false, error: on ? 'set' : 'pin' };
+    const token = this.#token(id);
     if (!on) {
-      if (meta.passkey) { delete meta.passkey; this.#saveMeta(meta); }
+      if (meta.passkey) { delete meta.passkey; this.#saveMeta(meta); this.#bump(id); }
       return { ok: true, hole: this.#describe(meta) };
     }
     if (!this.canProtect() || !(await this.helloAvailable())) return { ok: false, error: 'hello-unavailable' };
-    if (!(await this.hello(meta.name))) return { ok: false, error: 'hello-refused' };
+    if (!(await this.hello(this.#name(meta)))) return { ok: false, error: 'hello-refused' };
+    // The hole was locked — or changed, or emptied and opened again with another
+    // key — while the passkey was being asked for: this yes is stale, and no
+    // wrapper of the key it began with (zeroed by the lock) is written.
+    if (!this.#stillHolds(id, key) || this.#token(id) !== token) return { ok: false, error: 'locked' };
     meta.passkey = { box: b64(this.protect(key)) };
     this.#saveMeta(meta);
+    this.#bump(id);
     return { ok: true, hole: this.#describe(meta) };
   }
 
@@ -628,6 +911,7 @@ export class BlackHoles {
   trash(id) {
     const meta = this.#meta(id);
     if (!meta) return { ok: false, error: 'missing' };
+    if (this.#writeBusy(id) || this.#importBusy(id) || this.#deletionBusy(id)) return { ok: false, error: 'in-use' };
     this.lock(id);
     if (!meta.trashedAt) { meta.trashedAt = this.now(); this.#saveMeta(meta); }
     return { ok: true, hole: this.#describe(meta) };
@@ -637,7 +921,8 @@ export class BlackHoles {
   restore(id) {
     const meta = this.#meta(id);
     if (!meta) return { ok: false, error: 'missing' };
-    if (meta.trashedAt) { delete meta.trashedAt; this.#saveMeta(meta); }
+    if (this.#deletionBusy(id)) return { ok: false, error: 'in-use' };   // it is being destroyed, not brought back
+    if (meta.trashedAt) { delete meta.trashedAt; this.#saveMeta(meta); this.#bump(id); }
     return { ok: true, hole: this.#describe(meta) };
   }
 
@@ -650,17 +935,33 @@ export class BlackHoles {
    * @param {{pin?: string, hello?: boolean, recovery?: string}} by
    */
   async delete(id, by = {}) {
+    if (this.#deletionBusy(id)) return { ok: false, error: 'in-use' };
     const meta = ID.test(String(id)) ? this.#meta(id) : null;
     if (!meta) return { ok: false, error: 'missing' };
-    const proof = await this.#answer(meta, by);
+    const token = this.#token(id);
+    const proof = await this.#answer(meta, by, 'delete');
     if (!proof.ok) return proof;
+    // Locked (or changed) while the answer was being asked for: the answer
+    // destroys the hole as it was, not the one that is there now.
+    if (this.#token(id) !== token) { proof.key.fill(0); return { ok: false, error: 'locked' }; }
+    if (this.#videoBusy(id) || this.#writeBusy(id) || this.#importBusy(id) || this.#removalBusy(id)) { proof.key.fill(0); return { ok: false, error: 'in-use' }; }
+    if (this.#deletionBusy(id)) { proof.key.fill(0); return { ok: false, error: 'in-use' }; }
     proof.key.fill(0);
     this.lock(id);
-    const dir = this.#dir(id);
-    let removed = 0;
-    for (const name of fs.readdirSync(dir)) { shred(path.join(dir, name)); removed += 1; }
-    fs.rmSync(dir, { recursive: true, force: true });
-    return { ok: true, removed };
+    this.#activeDeletion.set(String(id), (this.#activeDeletion.get(String(id)) ?? 0) + 1);
+    try {
+      const dir = this.#dir(id);
+      // The directory itself may be a planted link or junction: it is unlinked,
+      // never followed — whatever it points at is not this hole's to destroy.
+      if (fs.lstatSync(dir).isSymbolicLink()) { fs.rmSync(dir, { force: true }); return { ok: true, removed: 0 }; }
+      let removed = 0;
+      for (const name of fs.readdirSync(dir)) { await shredAsync(path.join(dir, name)); removed += 1; }
+      fs.rmSync(dir, { recursive: true, force: true });
+      return { ok: true, removed };
+    } finally {
+      const count = (this.#activeDeletion.get(String(id)) ?? 1) - 1;
+      if (count) this.#activeDeletion.set(String(id), count); else this.#activeDeletion.delete(String(id));
+    }
   }
 }
 

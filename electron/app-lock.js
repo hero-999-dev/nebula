@@ -73,6 +73,12 @@ export class AppLock {
   /** Answered since this process started (or since "Lock now"). */
   #open = false;
   /**
+   * Every "Lock now" and every change to the lock marks it: an answer that
+   * arrives after its own mark is stale and opens nothing. A passkey's answer
+   * can take seconds to come, and "Lock now" does not wait for it.
+   */
+  #epoch = 0;
+  /**
    * Whether a lock is set and on, once looked up: `isLocked` is asked before
    * every note is handed over, and must not read the disk each time. Every
    * change goes through this object, which keeps it true to the file.
@@ -136,6 +142,7 @@ export class AppLock {
   #remove() {
     fs.rmSync(this.file(), { force: true });
     this.#known = { set: false, on: false };
+    this.#epoch += 1;
   }
 
   #look() {
@@ -205,10 +212,14 @@ export class AppLock {
     if (!isPin(pin)) return { ok: false, error: 'pin' };
     const reminder = cleanHint(hint);
     if (hintTells(reminder, pin)) return { ok: false, error: 'hint' };
+    const token = this.#epoch;
     if (passkey) {
       if (!(await this.helloAvailable())) return { ok: false, error: 'hello-unavailable' };
       if (!(await this.hello())) return { ok: false, error: 'hello-refused' };
     }
+    // Another lock was set meanwhile — or everything was shut ("Lock now"):
+    // this one, arriving late, is not written over it.
+    if (this.#epoch !== token || this.#meta()) return { ok: false, error: 'set' };
     const recoveryKey = newRecoveryKey();
     this.#save({
       v: 2, on: true, createdAt: this.now(), kdf: { ...this.kdf },
@@ -217,6 +228,7 @@ export class AppLock {
       passkey: passkey === true,
       recovery: keep(cleanRecoveryKey(recoveryKey), this.kdf),
     });
+    this.#epoch += 1;
     // Whoever set it is at the app: it stays open until the app is next started.
     this.#open = true;
     return { ok: true, recoveryKey };
@@ -263,8 +275,11 @@ export class AppLock {
   async unlock(by = {}) {
     const meta = this.#meta();
     if (!meta) { this.#open = true; this.#known = { set: false, on: false }; return { ok: true }; }
+    const token = this.#epoch;
     const res = await this.#answer(meta, by);
     if (!res.ok) return res;
+    // The lock was shut ("Lock now") or changed while the answer was on its way: it opens nothing.
+    if (this.#epoch !== token) return { ok: false, error: 'locked' };
     this.#open = true;
     if (res.by === 'recovery') { this.#remove(); return { ok: true, cleared: true }; }
     this.#forgive(meta);
@@ -287,14 +302,18 @@ export class AppLock {
       if (meta.on) return { ok: true };
       meta.on = true;
       this.#save(meta);
+      this.#epoch += 1;
       this.#open = true;
       return { ok: true };
     }
+    const token = this.#epoch;
     const res = await this.#answer(meta, by);
     if (!res.ok) return res;
+    if (this.#epoch !== token) return { ok: false, error: 'locked' };
     delete meta.fails;
     meta.on = false;
     this.#save(meta);
+    this.#epoch += 1;
     this.#open = true;
     return { ok: true };
   }
@@ -316,17 +335,22 @@ export class AppLock {
     if (!on) {
       if (this.isLocked()) return { ok: false, error: 'locked' };
       if (!meta.pin?.hash) return { ok: false, error: 'pin' };
-      if (meta.passkey) { meta.passkey = false; this.#save(meta); }
+      if (meta.passkey) { meta.passkey = false; this.#save(meta); this.#epoch += 1; }
       return { ok: true };
     }
     if (meta.passkey) return { ok: true };
+    const token = this.#epoch;
     const res = await this.#answer(meta, by, { passkey: false });
     if (!res.ok) return res;
+    if (this.#epoch !== token) return { ok: false, error: 'locked' };
     this.#forgive(meta);
     if (!(await this.helloAvailable())) return { ok: false, error: 'hello-unavailable' };
     if (!(await this.hello())) return { ok: false, error: 'hello-refused' };
+    // The lock was shut or changed while the passkey was being asked for: this yes is stale.
+    if (this.#epoch !== token) return { ok: false, error: 'locked' };
     meta.passkey = true;
     this.#save(meta);
+    this.#epoch += 1;
     return { ok: true };
   }
 
@@ -334,8 +358,10 @@ export class AppLock {
   async clear(by = {}) {
     const meta = this.#meta();
     if (!meta) { this.#known = { set: false, on: false }; return { ok: true }; }
+    const token = this.#epoch;
     const res = await this.#answer(meta, by);
     if (!res.ok) return res;
+    if (this.#epoch !== token) return { ok: false, error: 'locked' };
     this.#remove();
     this.#open = true;
     return { ok: true };
@@ -344,6 +370,7 @@ export class AppLock {
   /** Shut again, now ("Lock Nebula"). Nothing to do where no lock is on. */
   lockNow() {
     if (!this.isOn()) return false;
+    this.#epoch += 1;   // an answer still on its way opens nothing after this
     this.#open = false;
     return true;
   }

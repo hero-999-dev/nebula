@@ -410,7 +410,9 @@ export async function runNoteFolderChecks(check) {
     await win.waitForFunction(() => [...document.querySelectorAll('.drawer-item')].some((i) => i.textContent.includes('Into the bin')), null, { polling: 50 });
     await win.evaluate(() => {
       const item = [...document.querySelectorAll('.drawer-item')].find((i) => i.textContent.includes('Into the bin'));
-      [...item.querySelectorAll('.drawer-actions button')].find((b) => b.textContent === 'Delete').click();
+      // Delete in the Trash asks first: the second press is the "Delete for good?" one.
+      const btn = [...item.querySelectorAll('.drawer-actions button')].find((b) => b.textContent === 'Delete');
+      btn.click(); btn.click();
     });
     check('deleted from the Trash, the note and its folder are gone from the vault', await until(() => !fs.existsSync(path.join(vault, 'n-bin.json')) && folder('n-bin') === null), `${folder('n-bin')}`);
     check('and from every backup, the one put aside before the change among them', await until(() => inBackups().length === 0), inBackups().join());

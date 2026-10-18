@@ -655,6 +655,56 @@ Double-click files in the repo root: `Nebula Test.exe` (test build),
 
 ## Current browser and canvas work
 
+### Black-hole security audit follow-up
+
+- A retry must preserve the note's requested storage destination. `flushDisk`
+  derives it from the pending JSON; defaulting to the ordinary vault exposed
+  encrypted notes after a failed save. Main rejects hole-marked ordinary writes,
+  and the browser-cache fallback refuses encrypted notes.
+- Old plain files still carrying `hole` are withheld at boot and re-sealed after
+  authenticated unlock by `pendingSeals` in `disk-store.js`. The plaintext file
+  and backups are removed only after encryption succeeds. Main preserves media
+  during that unlock so recovery does not sweep attachments from the newer edit.
+  A previously stripped marker can be reconciled only when its exact note ID
+  also exists in the opened sealed hole; newer `updatedAt` content wins, then
+  the plain file and backups go after successful sealing. No matching sealed
+  ID means the origin cannot be inferred safely. This is a storage migration,
+  not an HTML migration; changing MARKUP_VERSION cannot repair it.
+- Locking must invalidate pending authentication even when no key is open yet.
+  File operations must check the original key's identity after asynchronous I/O;
+  never seal with a buffer that lock has zeroed. A retained opened copy is not
+  authorization to reopen a locked hole. Trash also clears opened copies.
+- New PIN wrappers require OS secure storage. Legacy `os:false` wrappers remain
+  readable and are rewrapped on a valid PIN unlock when secure storage returns;
+  `needsProtection` warns until then. Accessible local backups with the old
+  wrapper are updated after each authenticated unlock; failed updates are
+  reported and retried at the next unlock. A paused video response holds a Windows
+  file handle: note/hole deletion returns `in-use` before shredding. Opened
+  copies retained by another program are retried on window focus and every
+  30 seconds after their hole locks or their note is deleted.
+- Owner acceptance checks: [docs/BLACKHOLE-TESTS.md](docs/BLACKHOLE-TESTS.md).
+- A Blackhole label formerly lived in clear `hole.json` metadata and backup
+  metadata. `nameBox` now holds the OS-protected label; reading old metadata
+  migrates it and listing/unlocking protects accessible local backups. A
+  transferred OS-bound label is displayed generically until renamed there.
+- Do not announce an ordinary note's move into a Blackhole on `setHole` alone.
+  `moveIn` waits for `flushNote` to finish encryption and plain/backup purge.
+  A failed move restores the original note. `pendingSeals` withholds older
+  marked plaintext until authenticated repair. Active writes/imports must
+  block Trash and deletion; a fully buffered video may have no open stream.
+- Trash deletion must arm on the first click for an empty Blackhole too. The
+  second click asks for authentication; entering a PIN is not the final action.
+  The dialog's explicit “Delete for good?” press performs deletion.
+- Large media deletion uses `shredAsync` in `electron/note-media.js`, including
+  Blackhole removal, ordinary note folders, backup purges and opened copies.
+  Await cleanup before reporting success. A lock can run during each await:
+  check that the original key still owns an unlock before returning plaintext,
+  and refuse writes/imports while a note is being removed. The older sync
+  helpers still serve startup cleanup; keep their blocks bounded in memory.
+- Local consultation and evidence: `test-results/orchestra/security-2026-10-17/`.
+  OS authentication is mocked in race tests; physical Windows Hello and macOS
+  keychain/Touch ID require testing on their respective systems.
+
 Google redirects in built-in AI webviews are handed to the default browser at the provider root URL. Authentication continues there; cookies are not transferred to Electron. `electron/ai-browser-auth.js` handles redirects and popups, and `src/js/ai-services.js` owns provider URLs. Bookmark title requests are bounded and credential-free in `electron/link-metadata.js`; `src/js/link-preview.js` binds cards after import/history restore. Labels persist as a normalized note array and in native JSON exports. Shape anchors use unrotated geometry plus rotation through `shape-anchor.js`.
 
 Local-only progress and private report references: `test-results/CODEX-DEVIR.md`. Keep owner note text/images out of this public repository. Latest validation checkpoint is in tests.md; do not treat an in-progress entry as a release.

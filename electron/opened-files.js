@@ -15,7 +15,7 @@
  * of these, at the latest at the quit or the next start.
  */
 import path from 'node:path';
-import { shredTree } from './backup-purge.js';
+import { shredTree, shredTreeAsync } from './backup-purge.js';
 import { isAttachmentName } from './note-media.js';
 
 const ID = /^[\w-]{1,120}$/;
@@ -116,16 +116,28 @@ export function openedPath(root, url, name) {
  * black hole's. Anything that does not name a place clears nothing.
  * @returns {number} files shredded
  */
-export function clearOpened(root, scope = {}) {
+function openedTarget(root, scope = {}) {
   const { noteId = null, holeId = null, url = null, holes = false } = scope;
   let target = null;
   if (url != null) target = openedFolder(root, url);
   else if (holes) target = path.join(root, 'hole');
   else if (holeId != null) {
-    if (!ID.test(String(holeId)) || (noteId != null && !ID.test(String(noteId)))) return 0;
+    if (!ID.test(String(holeId)) || (noteId != null && !ID.test(String(noteId)))) return null;
     target = noteId != null ? path.join(root, 'hole', holeId, noteId) : path.join(root, 'hole', holeId);
   } else if (noteId != null) target = ID.test(String(noteId)) ? path.join(root, 'note', noteId) : null;
   else target = root;
+  return target;
+}
+
+export function clearOpened(root, scope = {}) {
+  const target = openedTarget(root, scope);
   if (!target) return 0;
   try { return shredTree(target); } catch { return 0; }
+}
+
+/** Remove opened copies without blocking the window on a large attachment. */
+export async function clearOpenedAsync(root, scope = {}) {
+  const target = openedTarget(root, scope);
+  if (!target) return 0;
+  try { return await shredTreeAsync(target); } catch { return 0; }
 }

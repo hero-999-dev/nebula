@@ -382,3 +382,62 @@ describe('a lock file that is not one', () => {
     }
   });
 });
+
+describe('an answer that arrives after "Lock now" (2026-10-17 security audit)', () => {
+  const tick = () => new Promise((r) => setImmediate(r));
+  /** A hello the test holds: the passkey answers when the test says so. */
+  const gated = () => {
+    const waiting = [];
+    const l = new AppLock({ file, kdf: LIGHT, now: () => clock, hello: () => new Promise((r) => { waiting.push(r); }), helloAvailable: async () => true });
+    return { l, hello: (yes = true) => { for (const r of waiting.splice(0)) r(yes); } };
+  };
+
+  it('a passkey answer that outlived "Lock now" opens nothing', async () => {
+    await lock().set({ pin: PIN, passkey: true });
+    const { l, hello } = gated();
+    expect(l.isLocked()).toBe(true);
+    const pending = l.unlock({ hello: true });       // the prompt is up
+    await tick();
+    expect(l.lockNow()).toBe(true);                   // "Lock now" while the prompt is up
+    hello(true);                                      // ... and the passkey says yes anyway
+    expect(await pending).toEqual({ ok: false, error: 'locked' });
+    expect(l.isLocked()).toBe(true);
+    expect(await l.unlock({ pin: PIN })).toEqual({ ok: true });
+  });
+
+  it('a passkey asked for is not added after the lock was removed meanwhile — the removed lock is not written back', async () => {
+    const { l, hello } = gated();
+    expect((await l.set({ pin: PIN })).ok).toBe(true);
+    const pending = l.passkey(true, { pin: PIN });
+    await tick();
+    expect(await l.clear({ pin: PIN })).toEqual({ ok: true });   // the lock is gone while its yes is on its way
+    hello(true);
+    expect(await pending).toEqual({ ok: false, error: 'locked' });
+    expect(l.isSet()).toBe(false);
+    expect(fs.existsSync(file())).toBe(false);
+  });
+
+  it('a pending answer is not an opening after the lock was turned off meanwhile', async () => {
+    await lock().set({ pin: PIN, passkey: true });
+    const { l, hello } = gated();
+    expect(l.isLocked()).toBe(true);
+    const pending = l.unlock({ hello: true });
+    await tick();
+    expect(await l.turn(false, { pin: PIN })).toEqual({ ok: true });   // turned off while the prompt was up
+    hello(true);
+    expect(await pending).toEqual({ ok: false, error: 'locked' });
+    expect(l.isLocked()).toBe(false);   // off: it opens without asking anyway
+  });
+
+  it('a late "set" does not write over a lock set meanwhile', async () => {
+    const { l, hello } = gated();
+    const first = l.set({ pin: '111111', passkey: true });          // at its passkey prompt
+    await tick();
+    expect((await lock().set({ pin: '222222' })).ok).toBe(true);    // set and finished while the first was asked for
+    hello(true);
+    expect(await first).toEqual({ ok: false, error: 'set' });
+    const next = lock();
+    expect(await next.unlock({ pin: '111111' })).toMatchObject({ ok: false, error: 'wrong' });
+    expect(await next.unlock({ pin: '222222' })).toEqual({ ok: true });
+  });
+});

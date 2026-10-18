@@ -17,28 +17,10 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { noteIds, noteFile, referencesOf, isPicture, isKeptFile, isCutShort } from './note-media.js';
+import { noteIds, noteFile, referencesOf, isPicture, isKeptFile, isCutShort, shred, shredAsync } from './note-media.js';
 
 /** A note id is a file name, never a path. */
 const NOTE_ID = /^[\w-]{1,120}$/;
-
-function shred(file) {
-  try {
-    const { size, nlink } = fs.statSync(file);
-    // A picture or a video a backup shares with the vault or with another
-    // backup (note-media.js snapshotVault): this place lets go of it, and the
-    // last place to do so takes the bytes with it.
-    if (nlink > 1) { fs.rmSync(file, { force: true }); return; }
-    const fd = fs.openSync(file, 'r+');
-    try {
-      if (size) fs.writeSync(fd, Buffer.alloc(size));
-      fs.fsyncSync(fd);
-    } finally {
-      fs.closeSync(fd);
-    }
-  } catch { /* it is removed below all the same */ }
-  fs.rmSync(file, { force: true });
-}
 
 /**
  * The copies of the vault the app itself puts aside under a label, by kind:
@@ -152,7 +134,7 @@ export async function dropOldWayCopies(backupsDir, { pause = () => new Promise((
     }
     for (const file of filesIn(dir)) {
       await pause();
-      shred(file);
+      await shredAsync(file);
     }
     fs.rmSync(dir, { recursive: true, force: true });
     gone.push(name.startsWith(GOING) ? name.slice(GOING.length) : name);
@@ -168,7 +150,12 @@ export async function dropOldWayCopies(backupsDir, { pause = () => new Promise((
  */
 export function shredTree(dir) {
   let entries;
-  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return 0; }
+  try {
+    const info = fs.lstatSync(dir);
+    if (info.isSymbolicLink()) { fs.rmSync(dir, { force: true }); return 1; }
+    if (!info.isDirectory()) return 0;
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch { return 0; }
   let removed = 0;
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
@@ -179,14 +166,55 @@ export function shredTree(dir) {
   return removed;
 }
 
+/** The same tree purge with each file overwritten asynchronously. A large
+ * media file must never hold Electron's main event loop while it is purged. */
+export async function shredTreeAsync(dir) {
+  let entries;
+  try {
+    const info = await fs.promises.lstat(dir);
+    if (info.isSymbolicLink()) { await fs.promises.rm(dir, { force: true }); return 1; }
+    if (!info.isDirectory()) return 0;
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch { return 0; }
+  let removed = 0;
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) removed += await shredTreeAsync(full);
+    else { await shredAsync(full); removed += 1; }
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+  return removed;
+}
+
 /** A note's own folder in a backup — its pictures and videos (0.9.4) — and everything in it. */
 function shredFolder(folder) {
   let names;
   try {
-    if (!fs.statSync(folder).isDirectory()) return 0;
+    const info = fs.lstatSync(folder);
+    if (info.isSymbolicLink()) { fs.rmSync(folder, { force: true }); return 1; }
+    if (!info.isDirectory()) return 0;
     names = fs.readdirSync(folder);
   } catch { return 0; }
-  for (const name of names) shred(path.join(folder, name));
+  for (const name of names) {
+    const full = path.join(folder, name);
+    if (fs.lstatSync(full).isDirectory()) shredTree(full); else shred(full);
+  }
+  fs.rmSync(folder, { recursive: true, force: true });
+  return names.length;
+}
+
+async function shredFolderAsync(folder) {
+  let names;
+  try {
+    const info = await fs.promises.lstat(folder);
+    if (info.isSymbolicLink()) { await fs.promises.rm(folder, { force: true }); return 1; }
+    if (!info.isDirectory()) return 0;
+    names = fs.readdirSync(folder);
+  } catch { return 0; }
+  for (const name of names) {
+    const full = path.join(folder, name);
+    if ((await fs.promises.lstat(full)).isDirectory()) await shredTreeAsync(full); else await shredAsync(full);
+  }
   fs.rmSync(folder, { recursive: true, force: true });
   return names.length;
 }
@@ -196,7 +224,46 @@ function holeDirs(backupsDir, holeId) {
   if (!NOTE_ID.test(String(holeId))) return [];
   let entries;
   try { entries = fs.readdirSync(backupsDir, { withFileTypes: true }); } catch { return []; }
-  return entries.filter((e) => e.isDirectory()).map((e) => path.join(backupsDir, e.name, 'blackholes', holeId)).filter((dir) => fs.existsSync(dir));
+  return entries.filter((e) => e.isDirectory()).map((e) => path.join(backupsDir, e.name, 'blackholes', holeId)).filter((dir) => {
+    try { return fs.lstatSync(path.dirname(dir)).isDirectory() && fs.lstatSync(dir).isDirectory(); }
+    catch { return false; }
+  });
+}
+
+/** Replace legacy PIN-only wrappers and clear-text labels in local backups.
+ * The sealed note bytes keep the same hole key; only metadata changes. A
+ * copied backup from before this repair, on another disk or already stolen,
+ * cannot be reached here.
+ */
+export function protectLegacyHoleBackups(backupsDir, holeId, wrapper, nameBox = null) {
+  if (!NOTE_ID.test(String(holeId)) || (wrapper?.os !== true && !nameBox)) return { updated: 0, failed: 0 };
+  let updated = 0;
+  let failed = 0;
+  for (const dir of holeDirs(backupsDir, holeId)) {
+    const file = path.join(dir, 'hole.json');
+    if (!fs.existsSync(file)) continue;
+    const tmp = `${file}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      const meta = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (meta?.id !== holeId || !meta.key) { failed += 1; continue; }
+      let changed = false;
+      if (meta.key.os === false && wrapper?.os === true && wrapper.box && wrapper.salt) {
+        meta.key = { ...wrapper };
+        changed = true;
+      } else if (meta.key.os !== true && meta.key.os !== false) { failed += 1; continue; }
+      if (typeof meta.name === 'string' && nameBox) {
+        meta.nameBox = nameBox;
+        delete meta.name;
+        changed = true;
+      }
+      if (!changed) continue;
+      fs.writeFileSync(tmp, JSON.stringify(meta, null, 2));
+      fs.renameSync(tmp, file);
+      updated += 1;
+    } catch { failed += 1; }
+    finally { try { fs.rmSync(tmp, { force: true }); } catch { /* a later cleanup */ } }
+  }
+  return { updated, failed };
 }
 
 /** A note deleted from a black hole (0.9.4): its sealed copies leave every backup. */
@@ -209,6 +276,19 @@ export function purgeHoleNoteFromBackups(backupsDir, holeId, noteId) {
     // Its sealed videos and attached files stand beside it: <note>~vid-….bhv, <note>~att-….bhv.
     for (const name of fs.readdirSync(dir)) {
       if (name.startsWith(`${noteId}~`) && name.endsWith('.bhv')) { shred(path.join(dir, name)); removed += 1; }
+    }
+  }
+  return removed;
+}
+
+export async function purgeHoleNoteFromBackupsAsync(backupsDir, holeId, noteId) {
+  if (!NOTE_ID.test(String(noteId))) return 0;
+  let removed = 0;
+  for (const dir of holeDirs(backupsDir, holeId)) {
+    const file = path.join(dir, `${noteId}.bh`);
+    if (fs.existsSync(file)) { await shredAsync(file); removed += 1; }
+    for (const name of fs.readdirSync(dir)) {
+      if (name.startsWith(`${noteId}~`) && name.endsWith('.bhv')) { await shredAsync(path.join(dir, name)); removed += 1; }
     }
   }
   return removed;
@@ -231,10 +311,28 @@ export function purgeHoleFilesFromBackups(backupsDir, holeId, files) {
   return removed;
 }
 
+export async function purgeHoleFilesFromBackupsAsync(backupsDir, holeId, files) {
+  const names = (files ?? []).filter((name) => /^[\w-]{1,120}~[\w.-]{1,120}\.bhv$/.test(String(name)));
+  let removed = 0;
+  for (const dir of holeDirs(backupsDir, holeId)) {
+    for (const name of names) {
+      const file = path.join(dir, name);
+      if (fs.existsSync(file)) { await shredAsync(file); removed += 1; }
+    }
+  }
+  return removed;
+}
+
 /** A black hole deleted: it leaves every backup, with every note in it. */
 export function purgeHoleFromBackups(backupsDir, holeId) {
   let removed = 0;
   for (const dir of holeDirs(backupsDir, holeId)) removed += shredFolder(dir);
+  return removed;
+}
+
+export async function purgeHoleFromBackupsAsync(backupsDir, holeId) {
+  let removed = 0;
+  for (const dir of holeDirs(backupsDir, holeId)) removed += await shredFolderAsync(dir);
   return removed;
 }
 
@@ -245,7 +343,7 @@ function noteDirs(backupsDir) {
   return entries
     .filter((e) => e.isDirectory())
     .map((e) => path.join(backupsDir, e.name, 'notes'))
-    .filter((dir) => fs.existsSync(dir));
+    .filter((dir) => { try { return fs.lstatSync(dir).isDirectory(); } catch { return false; } });
 }
 
 /**
@@ -259,6 +357,17 @@ export function purgeNoteFromBackups(backupsDir, id) {
     const file = path.join(dir, `${id}.json`);
     if (fs.existsSync(file)) { shred(file); removed += 1; }
     removed += shredFolder(path.join(dir, id));   // its pictures and videos (0.9.4)
+  }
+  return removed;
+}
+
+export async function purgeNoteFromBackupsAsync(backupsDir, id) {
+  if (!NOTE_ID.test(String(id))) return 0;
+  let removed = 0;
+  for (const dir of noteDirs(backupsDir)) {
+    const file = path.join(dir, `${id}.json`);
+    if (fs.existsSync(file)) { await shredAsync(file); removed += 1; }
+    removed += await shredFolderAsync(path.join(dir, id));
   }
   return removed;
 }

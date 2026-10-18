@@ -26,6 +26,9 @@ async function take(bridge, id, where) {
 }
 const lastWritten = new Map();
 const desired = new Map();
+// Earlier flush retries could write a hole-marked note into the plain vault.
+// Withhold it until its hole is authenticated, then retry the encrypted move.
+const pendingSeals = new Map();
 const failures = new Map();
 let readError = null;
 let generation = 0;
@@ -134,7 +137,12 @@ export async function flushDisk() {
   // Retry only at the start of an explicit flush. A persistent disk error must
   // reject this flush, not spin forever or report a successful save.
   for (const id of failures.keys()) {
-    if (!queues.has(id) && desired.has(id)) enqueue(id, desired.get(id));
+    if (!queues.has(id) && desired.has(id)) {
+      const json = desired.get(id);
+      // Retry the requested destination, including a move that never reached
+      // placed. Defaulting to the vault writes encrypted notes in plaintext.
+      enqueue(id, json, json === null ? VAULT : placeOf(JSON.parse(json)));
+    }
   }
   while (queues.size) await Promise.all([...queues.values()].map((entry) => entry.promise));
   if (failures.size) throw new Error(getDiskStatus().error);
@@ -161,6 +169,7 @@ export async function initDiskStorage() {
   placed.clear();
   lastWritten.clear();
   desired.clear();
+  pendingSeals.clear();
   failures.clear();
   queues.clear();
   readError = null;
@@ -206,7 +215,10 @@ export async function initDiskStorage() {
       try {
         const note = JSON.parse(res.data);
         if (note?.id) {
-          // A file in the notes folder is a plain note, whatever it says of itself.
+          if (typeof note.hole === 'string' && /^[\w-]{1,120}$/.test(note.hole)) {
+            pendingSeals.set(note.id, note);
+            continue;
+          }
           const marked = 'hole' in note;
           delete note.hole;
           notes.push(note);
@@ -230,7 +242,7 @@ export async function initDiskStorage() {
 
     localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
     setSaveHook(mirror);
-    return { bridge: true, ok: true, empty: notes.length === 0, error: null };
+    return { bridge: true, ok: true, empty: notes.length === 0 && pendingSeals.size === 0, error: null };
   }
 
   // No files on disk. If localStorage still holds notes this is an upgrade from
@@ -293,7 +305,30 @@ export function adoptHoleNotes(holeId, jsons) {
     lastWritten.set(note.id, now);
     desired.set(note.id, now);
   }
+  for (const [id, residue] of pendingSeals) {
+    if (residue.hole !== holeId) continue;
+    const index = notes.findIndex((note) => note.id === id);
+    // The failed retry contains the latest unsaved edit. A newer sealed note
+    // wins, but either way the leftover plain copy must leave the vault.
+    const recovered = index >= 0 && Number(notes[index].updatedAt || 0) > Number(residue.updatedAt || 0) ? notes[index] : residue;
+    if (index >= 0) notes[index] = recovered; else notes.push(recovered);
+    placed.set(id, VAULT);
+    lastWritten.delete(id);
+    const json = JSON.stringify(recovered, null, 2);
+    desired.set(id, json);
+    void enqueue(id, json, `hole:${holeId}`);
+    pendingSeals.delete(id);
+  }
   return notes;
+}
+
+/** Await one note's current move/write, so the UI does not announce a move
+ * while its old plaintext file is still waiting to be removed. */
+export async function flushNote(id) {
+  if (!api) return;
+  const entry = queues.get(id);
+  if (entry) await entry.promise;
+  if (failures.has(id)) throw new Error(failures.get(id));
 }
 
 /**

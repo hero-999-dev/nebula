@@ -64,14 +64,31 @@ export function noteText(html) {
 
 /** How much of a note's markup the sidebar line reads, pictures taken out. */
 const SNIPPET_SOURCE = 40_000;
+const DATA_IMAGE_START = /data:image\//i;
+const DATA_IMAGE_END = /[\s"'<>]/g;
+
+function snippetSource(src) {
+  if (src.length <= SNIPPET_SOURCE) return src;
+  let out = '';
+  let at = 0;
+  while (at < src.length && out.length < SNIPPET_SOURCE) {
+    const part = src.slice(at, at + SNIPPET_SOURCE - out.length);
+    const image = DATA_IMAGE_START.exec(part);
+    if (!image) return out + part;
+    out += part.slice(0, image.index) + 'data:,';
+    DATA_IMAGE_END.lastIndex = at + image.index + image[0].length;
+    const end = DATA_IMAGE_END.exec(src);
+    at = end ? end.index : src.length;
+  }
+  return out.slice(0, SNIPPET_SOURCE);
+}
 
 export function plainSnippet(html, max = 80) {
   // The first words, not a parse of the whole note: every save redraws the
   // list, and the note being typed in is new markup each time — a 900 KB note
   // with pictures was parsed whole on every autosave. Cut after the pictures
   // are taken out, so a picture cannot use up the part that is read.
-  let src = String(html ?? '');
-  if (src.length > SNIPPET_SOURCE) src = src.replace(/data:image\/[^\s"'<>]+/gi, 'data:,').slice(0, SNIPPET_SOURCE);
+  const src = snippetSource(String(html ?? ''));
   const text = noteText(src);
   // Cut by characters: a cut through an emoji's two halves showed a broken
   // glyph at the end of the line (hunt B24).
@@ -271,7 +288,15 @@ export class NoteStore {
       const at = this.notes.findIndex((n) => n.id === note.id);
       if (at < 0) { this.notes.push(note); continue; }
       if (this.notes[at].hole === hole) continue;
-      this.notes[at] = note;
+      // A failed encrypted write could leave a newer plain copy of this
+      // exact note, and an older boot could strip its hole marker. Reconcile
+      // by the note's edit time before the mirror seals it and removes the
+      // plain file. A sealed version still wins ties.
+      const prior = this.notes[at];
+      const newerPlain = !prior.hole && Number(prior.updatedAt || 0) > Number(note.updatedAt || 0);
+      const chosen = newerPlain ? { ...prior, hole } : note;
+      delete chosen.folder;
+      this.notes[at] = chosen;
       again.push(note.id);
     }
     if (again.length) this.save(again);
@@ -298,12 +323,12 @@ export class NoteStore {
   }
 
   /** Into a black hole, or out of one with null. Not an edit: the date stays. */
-  setHole(id, hole) {
+  setHole(id, hole, { notify = true } = {}) {
     const note = this.get(id);
     if (!note || (note.hole ?? null) === (hole ?? null)) return note;
     if (hole) { note.hole = hole; delete note.folder; } else delete note.hole;
     this.save([id]);
-    emit('note-changed', { id });
+    if (notify) emit('note-changed', { id });
     return note;
   }
 

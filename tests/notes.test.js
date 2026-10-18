@@ -202,6 +202,11 @@ describe('note text', () => {
     expect(snip.endsWith('…')).toBe(true);
   });
 
+  it('finds words after a very large embedded picture without carrying its bytes into the preview', () => {
+    const html = `<p>Before</p><img src="data:image/png;base64,${'A'.repeat(8_000_000)}"><p>After</p>`;
+    expect(plainSnippet(html, 48)).toBe('Before After');
+  });
+
   it('never cuts an emoji in half at the end of the line (hunt B24)', () => {
     const snip = plainSnippet(`<p>${'a'.repeat(46)}😀😀😀</p>`, 48);
     expect(snip).toBe(`${'a'.repeat(46)}😀…`);

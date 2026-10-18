@@ -13,6 +13,15 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '0.9.7': {
+    headline: 'Black holes ask clearly before deleting and stay responsive with large files.',
+    items: [
+      { title: 'Delete for good?', text: 'Every note in the Trash asks for a second press before permanent deletion. A note from a black hole is labelled there, and deleting a black hole asks for its PIN or passkey and a final confirmation.' },
+      { title: 'Keys you control', text: 'Change a black hole PIN only after proving the current PIN or passkey. An open black hole can make a new recovery key from its menu; the old key stops working and the new one is shown once.' },
+      { title: 'Large files', text: 'Deleting a large note or video, clearing an opened copy and opening a black hole leave the window responsive while the work finishes.' },
+      { title: 'Protected names', text: 'A black hole name is protected in its local metadata and backups. Moving a note into a black hole waits until its encrypted copy is saved and the old plain copies are removed. To take it back out, choose Move to notes from the note menu.' },
+    ],
+  },
   '0.9.6': {
     headline: 'Files in a note, a page that asks first, and a safer app.',
     items: [

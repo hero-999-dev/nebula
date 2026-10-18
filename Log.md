@@ -1,5 +1,39 @@
 # Nebula release log
 
+
+## [2026-10-18 06:15] v0.9.7 - by release-script
+
+
+* Site: rebuilt with the v0.9.6 build repairs
+
+---
+
+## [2026-10-18 04:36] v0.9.6 - by Mistral Vibe (owner round two: trash confirmation for every note, Move to notes, PIN-change proof; not released)
+
+Asked (the owner, 2026-10-18): no "Add a passkey" button under a hole's notes — the ⋯ menu is where it lives; the "Black hole…" note-menu entry should say where the note goes — "Move to notes"; a normal note deleted from the Trash should ask "Delete for good?" as a Blackhole note does; and a PIN change should require the current PIN first — or the passkey when the user does not know it. All four done. The in-body passkey button from earlier today is gone (src/js/black-holes.js); a note inside a hole offers "Move to notes" in its ⋯ menu; every Delete in the Trash drawer arms with the same "Delete for good?" second press, a Blackhole note still labelled "Black hole" there (src/js/note-actions.js); and `changePin` (electron/black-holes.js) now proves the old answer through the same `#answer` path as unlocking — the current PIN, or the passkey from the dialog's "Use the passkey" button — with the fail counting and waits as everywhere, a stale passkey yes refused after the await, and the Windows Hello prompt saying "change the PIN of the black hole". The guide's stale passkey-offer wording is gone and the new behaviors are described in all four languages; docs/BLACKHOLE-TESTS.md follows. No installed app or private vault accessed; no push.
+
+Validation: unit suite 1276/1276 (changePin now tested for no answer, a wrong current PIN, a passkey on a hole without one, hello beside the PIN, and a first-build hello hole taking its PIN); focused Electron black-holes e2e 86/86 (the current-PIN dialog, a wrong current PIN changing nothing, the old PIN dead after a change, no passkey button beside the notes, the Move to notes label); full Electron smoke 1041/1041; build passed; pack:test refreshed Nebula Test.exe (SHA-256 2B835614F0A8D443B5850EB4BE5DF33700A99D6561CE334C5EE004CAFAF92920). The "New in 0.9.6" guide bullet now covers the kept-tight credentials; at push time it moves to the release version's section.
+
+## [2026-10-18 02:50] v0.9.6 - by Mistral Vibe (owner test feedback: Blackhole-note trash confirmation, passkey offer, recovery-key rotation; not released)
+
+Asked: the owner's live test round — tests 1-5 passed and the opened-copy cleanup works; a note deleted out of a Blackhole went from the Trash with one click and no confirmation; adding a passkey should be reachable when a Blackhole without one is open; PIN, recovery-key and passkey management should all work; and the wrong-PIN wait grew from 30 to 60 seconds. Mistral confirmed the growing wait is the designed escalation (`waitAfter` doubles per wrong try after five free ones, capped at 15 minutes) and implemented the rest. A note of a Blackhole in the Trash is now labelled "Black hole" and its Delete asks with the same "Delete for good?" second press as the hole itself (src/js/note-actions.js); an open Blackhole without a passkey shows an "Add a passkey" button beside its notes; and the ⋯ menu of an open hole offers "New recovery key" (electron/black-holes.js newRecovery + IPC), which replaces the sealed recovery wrapper — the old key stops working and the new one is shown once. The rotation is synchronous after the open-key guard, so no pending answer can interleave, and the lock drops the key first as everywhere. The guide gained the two features in all four languages; the released 0.9.6 guide signatures stay reachable under "0.9.6 released" keys so unedited vaults still update. docs/BLACKHOLE-TESTS.md gained the three new owner checks and the wait-escalation note. No installed app or private vault accessed; no push.
+
+Validation: unit suite 1276/1276 (new: recovery rotation replaces the old key, is refused while locked, and the new key is never on disk in the clear); focused Electron black-holes e2e 82/82; full Electron smoke 1037/1037 (two earlier runs each tripped on one load-flaky check outside the changed code — a clipboard read and a pdf click — both passed in the other runs); build passed; pack:test refreshed Nebula Test.exe (SHA-256 96F8E7CE0D33EFBC3533C76A4773518BDBAE2DF8A57C27098ED5DB6ED310D042). At push time the "New in 0.9.6" guide bullets for these features should move to the release version's section.
+
+## [2026-10-17 23:50] v0.9.6 - by Codex + Mistral Vibe (large-file cleanup and race review; not released)
+
+Asked: continue the Blackhole security/performance work together, complete the remaining 176 MB freeze fix, and report tests. Mistral moved Blackhole media shredding to bounded asynchronous I/O and added ordinary note-folder cleanup. Codex wired ordinary note deletion, backup purge and opened-copy cleanup to await asynchronous shredding, and replaced the backup purger's whole-file allocation with the bounded shredder. GPT review found a lock-after-await plaintext return, a remove/write overlap and a passkey confirmation bypass; Mistral repaired those paths. Codex added a second unlock guard after backup cleanup. Whole-hole deletion now blocks concurrent operations and metadata writes; partial disk writes are completed before unlinking. Symlinks and Windows junctions under notes, Blackholes, opened copies and backups are not traversed for shredding. The passkey-only legacy delete dialog keeps its final confirmation. The manual checklist now covers antivirus detection and portable first launch without treating a detection as proof of safety. No installed app or private vault accessed; no push.
+
+Validation: Mistral's final read-only review found no issue in Codex's last two guards and backup junction filter. Focused backup, opened-copy, note-media and Blackhole suites passed 155/155; full unit suite passed 1275/1275; build and browser check passed. Full Electron smoke and root Nebula Test.exe refresh are in progress.
+
+## [2026-10-17 19:00] v0.9.6 - by Codex + GLM-5.3 via Mistral Vibe (owner's Blackhole playback and latency follow-up; not released)
+
+Asked: investigate a playing Blackhole video whose Trash deletion seemed to show no warning, a visible “Dünya Halleri Nebula” name after moving a note into a Blackhole, and delays as files grow. GLM reproduced the deletion path in a throwaway Electron profile: an empty Blackhole bypassed the first “Delete for good?” arm, and a fully buffered video need not retain an active file stream. GLM fixed the empty-hole arm and its Electron regression checks. The destructive PIN dialog now waits for an explicit final button press; typing the PIN alone cannot delete the hole.
+
+Blackhole names now use OS-protected metadata instead of clear `name`; old live labels and accessible local backup labels are protected on migration. Moving an ordinary note into a Blackhole waits for the sealed note write and plain/backup purge before showing success, refuses unresolved media references, and rolls back a failed move. The store withholds old hole-marked plaintext until authenticated recovery. Large-note sidebar snippets skip embedded image data without scanning or copying it all; Blackhole note writes and unlock reads/decryptions run asynchronously to reduce main-process stalls. Active writes and imports prevent Trash/deletion races. Electron upgraded to 44.9.0 after the required browser check. No installed app or private vault accessed; no push.
+
+Validation: unit suite 1260/1260; Blackhole Electron flow passed with explicit deletion confirmation; full smoke 1028/1028 passed twice, including after the rollback race fix. Browser/Electron check passed; production dependency audit has no critical/high entries and three moderate chain entries. `npm run pack:test` refreshed root Nebula Test.exe (SHA-256 4A79894D037EC22DF9DCDC5999E7BA0CFE936A5091B5DF2026537268E4DCBAC4). Manual owner steps: docs/BLACKHOLE-TESTS.md. Limits: a video already fully buffered may have no active stream to trigger `in-use`; an app still displays the Blackhole name while its owner is using it; OS-protected labels are device-bound and show a generic label if moved to another computer until renamed.
+
 One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
@@ -10,6 +44,28 @@ One entry per release. Written by `npm run push`; edit freely afterwards.
 
 
 
+
+## [2026-10-17 06:38] v0.9.6 - by Codex + GLM-5.3 via Mistral Vibe (Blackhole follow-up; not released)
+
+Asked: complete the remaining project security work and finish with a manual test list.
+
+New Blackholes require OS secure key storage; no new six-digit-PIN-only wrapper is written. A legacy unprotected wrapper stays readable and is rewrapped after a valid PIN unlock when OS protection is available; the unlock dialog identifies one still needing protection. That upgrade also replaces the weak key wrapper in accessible local backups; failed backup updates are reported. Recovery reset and PIN changes also refuse an unprotected new wrapper. A paused sealed-media stream now makes note/hole deletion return `in-use` before any file is shredded. Plaintext copies held by another program are retried on window focus and every 30 seconds after the hole locks or the ordinary note is removed.
+
+At authenticated unlock, a markerless plain note with the exact ID of a sealed note is reconciled by `updatedAt`, then sealed before the ordinary file and backup copies are deleted. No matching sealed ID means its origin cannot be inferred safely. Added the owner's checklist in docs/BLACKHOLE-TESTS.md. Updated electron-builder, Vite and Vitest to security-fixed compatible versions; full npm audit now has zero critical/high and ten moderate transitive-chain records. No installed app/private vault accessed; no push.
+
+Validation: unit suite 1253/1253 across 73 files; focused Electron security checks 17/17; full smoke 1023/1023; build, browser/Electron check, and pack:test passed. Refreshed root Nebula Test.exe (SHA-256 FE0F8BF3C895134D671D43EA56F64F830E4E10980BE652C3D7BF91281BAB21FC). No push.
+
+Limits: physical Windows Hello and macOS Touch ID/Keychain cannot be verified in this Windows environment. An external program can retain its own file copy; Windows may prevent deleting Nebula's plaintext copy until that program closes it. A markerless plain note without a matching sealed ID cannot be safely assigned to a hole. Production npm audit retains three moderate chain records without a patched upstream `sprintf-js` release; ten moderate records remain with development tools included.
+
+## [2026-10-17 05:41] v0.9.6 - by Codex + GLM-5.3 via Mistral Vibe (Test Orchestra security audit; not released)
+
+Asked: jointly inspect and improve Nebula Test security, especially Blackholes, and report findings.
+
+Joint Blackhole security audit with GLM-5.3 (Mistral Hosted) through Mistral Vibe in the active Test Orchestra Nebula profile. The model was verified from the session owner's Vibe configuration and startup UI record after an initial incorrect inference from Orchestra's session list. Fixed encrypted-save retry destination and unsafe localStorage fallback; main refuses hole-marked ordinary writes. Historical marked plaintext is withheld and resealed on authenticated unlock before plain/backups deletion, with media preserved. Pending auth and media operations are invalidated by locks/credential changes; zero-key passkey residue is rejected and removed after valid authentication. Trash cleans opened copies; retained copies cannot reopen locked holes. Updated the compatible js-yaml transitive dependency. No installed app/private vault accessed; no push.
+
+Validation: full unit suite 1248/1248 across 73 files; focused Electron security checks 10/10; build and browser/Electron check passed. Full smoke 1016/1016 passed; npm run pack:test completed and refreshed the root Nebula Test.exe. No push.
+
+Limits: physical Hello/macOS untested; historical markerless plaintext cannot be identified; marked plaintext persists until its hole is unlocked; old zero-key media is not silently trusted/recovered. Production audit: 3 moderate chain entries, zero high/critical; full development-inclusive audit: 28 entries (3 critical, 19 high, 6 moderate), major tooling updates deferred. OS-unprotected PIN wraps and Windows-held-copy/deletion limits remain documented in the local report.
 
 ## [2026-10-16 09:00] v0.9.6 - by Claude (the build on GitHub stopped on one check, and a preview could outlive its close; the tag moved to its repair)
 
@@ -1952,3 +2008,7 @@ published app that keeps itself up to date.
   profile and seeds its six notes.
 
 ---
+
+## [2026-10-18 01:02] v0.9.6 - by Mistral Vibe (validation completed; not released)
+
+Full validation completed after Codex's limit ran out. Unit suite 1275/1275 (73 files). Full Electron smoke suite passed end to end (exit 0, ~1030 checks): no page errors, all black-hole deletion, reconciliation, race, junction and passkey-only dialog checks green. `npm run pack:test` refreshed `Nebula Test.exe` in the project root (SHA-256 `724FD1513D63074D0B1007C2F6D26FEF1423F52A6907B3DE7FA07A8A93F8ED58`). The owner runs `docs/BLACKHOLE-TESTS.md` in this build. No push; the installed app and its notes were not accessed.

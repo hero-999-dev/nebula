@@ -613,8 +613,9 @@ try {
     await win.evaluate(() => {
       const item = [...document.querySelectorAll('#drawer-body .drawer-item')]
         .find((el) => el.querySelector('.nr-title')?.textContent === 'Imported title');
-      [...(item?.querySelectorAll('.drawer-actions button') ?? [])]
-        .find((b) => b.textContent === 'Delete')?.click();
+      const del = [...(item?.querySelectorAll('.drawer-actions button') ?? [])].find((b) => b.textContent === 'Delete');
+      // Delete in the Trash asks first: the second press is the "Delete for good?" one.
+      del?.click(); del?.click();
     });
     await win.waitForTimeout(400);
     await press(win, '[data-drawer="trash"]');
@@ -637,8 +638,9 @@ try {
     await win.evaluate(() => {
       const item = [...document.querySelectorAll('#drawer-body .drawer-item')]
         .find((el) => el.querySelector('.nr-title')?.textContent === 'My Report');
-      [...(item?.querySelectorAll('.drawer-actions button') ?? [])]
-        .find((b) => b.textContent === 'Delete')?.click();
+      const del = [...(item?.querySelectorAll('.drawer-actions button') ?? [])].find((b) => b.textContent === 'Delete');
+      // Delete in the Trash asks first: the second press is the "Delete for good?" one.
+      del?.click(); del?.click();
     });
     await win.waitForTimeout(400);
     await press(win, '[data-drawer="trash"]');
@@ -686,8 +688,9 @@ try {
     await win.evaluate(() => {
       const item = [...document.querySelectorAll('#drawer-body .drawer-item')]
         .find((el) => el.querySelector('.nr-title')?.textContent.trim() === 'Untitled');
-      [...(item?.querySelectorAll('.drawer-actions button') ?? [])]
-        .find((b) => b.textContent === 'Delete')?.click();
+      const del = [...(item?.querySelectorAll('.drawer-actions button') ?? [])].find((b) => b.textContent === 'Delete');
+      // Delete in the Trash asks first: the second press is the "Delete for good?" one.
+      del?.click(); del?.click();
     });
     await win.waitForTimeout(400);
     await press(win, '[data-drawer="trash"]');

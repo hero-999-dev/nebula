@@ -34,6 +34,11 @@ export function saveJson(key, value, { changed } = {}) {
   // it on every autosave froze the window for 0.4 s in a vault with two long
   // articles in it (the owner's "Nebula Test is slower", 0.9.3).
   if (taken) return;
+  // A disabled/failed disk hook must never turn encrypted notes into a
+  // plaintext browser cache. Leave the previous cache intact and fail closed.
+  if (key === 'nebula:notes' && Array.isArray(value) && value.some((note) => note?.hole)) {
+    throw new Error('Encrypted notes require black-hole storage');
+  }
   localStorage.setItem(key, JSON.stringify(value));
 }
 

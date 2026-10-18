@@ -304,7 +304,7 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '0.9.6';
+export const GUIDE_VERSION = '0.9.7';
 
 /**
  * The guide's words, without its markup, shapes, code or equations — so a
@@ -492,10 +492,20 @@ export const GUIDE_SIGNATURES = {
   '0.9.6 first test build de': '19e7a4cb',
   '0.9.6 first test build pl': '1a2146c9',
   '0.9.6 first test build tr': 'df783cdb',
-  '0.9.6': '4dde44d2',
-  '0.9.6 de': 'fe1c04a3',
-  '0.9.6 pl': '51e1c07e',
-  '0.9.6 tr': '004c6008',
+  '0.9.6': 'b852fb04',
+  '0.9.6 de': '599b51b8',
+  '0.9.6 pl': '17126f7c',
+  '0.9.6 tr': '3839c6a7',
+  // The 0.9.6 guide as it was released, kept reachable so a vault still
+  // holding it is known to be unedited and may be brought up to date.
+  '0.9.6 released': '4dde44d2',
+  '0.9.6 released de': 'fe1c04a3',
+  '0.9.6 released pl': '51e1c07e',
+  '0.9.6 released tr': '004c6008',
+  '0.9.7': '4697651d',
+  '0.9.7 de': 'ed0067bd',
+  '0.9.7 pl': '6399f8f0',
+  '0.9.7 tr': 'e7e1e1d7',
 };
 
 /** Whether a vault's guide is one we shipped and nobody has typed in. */
@@ -530,6 +540,10 @@ export const GUIDE_NOTE = {
     // Each release adds its features here (features, not fixes) and in the
     // section they belong to. See GUIDE_SIGNATURES before changing any text.
     // A divider closes each section before the next heading (owner, 0.8.9).
+    '<hr class="blk-hr">' +
+    '<h2>New in 0.9.7</h2>' +
+    '<p><strong>Black holes ask before they destroy.</strong> Every note in the Trash needs a second press to delete for good; a black hole also asks for its PIN or passkey. An open black hole can make a new recovery key from its ⋯ menu, showing it once and ending the old key. A PIN change asks for the current PIN or passkey first.</p>' +
+    '<p><strong>Try it:</strong> With a throwaway note, press Delete once in the Trash and read the changed button before you press it again. In an open black hole, look under ⋯ for New recovery key.</p>' +
     '<hr class="blk-hr">' +
     '<h2>New in 0.9.6</h2>' +
     '<ul><li><strong>Files in a note.</strong> Drag any file — a PDF, a spreadsheet, an archive — onto a note, or choose it with /file: a copy stays in the note as a card with the logo of its kind, its name and its size. A click saves a copy wherever you like — section 7.</li><li><strong>A page in a note asks first.</strong> An embedded page that wants your microphone, your camera or notifications asks you, and the answer is forgotten when the page closes — section 10.</li></ul>' +
@@ -606,7 +620,7 @@ export const GUIDE_NOTE = {
     '<hr class="blk-hr">' +
     '<h3>Folders and the order of your notes</h3>' +
     '<p><strong>New folder</strong> — the folder button beside <em>New note</em> — asks for a name and puts the folder in the list, open. A click on a folder shows or hides the notes in it; <strong>+ Add a note</strong>, at the top of an open folder, makes a new note in it. Double-click a folder, or choose its <strong>⋯ → Rename folder</strong>, to rename it. <strong>Delete folder</strong> never deletes a note: the notes in it go back to the list. A right-click on a note or a folder opens the same menu as its ⋯ — with the note list folded, that is the way to it.</p>' +
-    '<p><strong>Drag a note</strong> onto the middle of a folder to put it in, or between two notes or folders to put it there — a line shows where it will land. Dragging never pins or unpins a note: pinned notes stay at the top and can be put in any order among themselves, and a note in a folder can be pinned too (⋯ → Pin to top), staying at the top of that folder. <strong>Folders are dragged the same way</strong>: a new folder comes in at the top, and a note you change afterwards rises above it, as notes do, until you put the folder where you want it. <strong>⋯ → Move to folder</strong> moves a note without dragging. A note you never dragged still moves to the top when you change it; one you placed stays where you put it. A black hole — the round button beside New folder — is for notes that must be safe: everything in it is kept encrypted on the disk (AES-256), title and pictures included, in a folder of its own. It is opened with the 6-digit PIN chosen when it was made — typed twice then, to be sure of it. A passkey — your fingerprint, your face or the computer’s own PIN, which the system asks for in front of Nebula — can be added beside the PIN, when the black hole is made or later from its ⋯ menu, and then either opens it; after five wrong PINs each try has to wait. A hint can be kept with the PIN and is shown when it is asked for — anyone can read it, so it is a reminder and never the PIN itself. Open, it shows its notes like a folder: + Add a note writes one in it, a note dragged onto it or sent there from its ⋯ menu is moved in — and its plain file leaves the vault and every backup. The lock at its left closes it, ten minutes untouched close it too, and every black hole is locked when the app starts. The arrow beside Black holes folds the whole section away. From its ⋯ menu a black hole goes to the Trash whole, locked; there it is restored, or deleted with every note in it — which asks for its PIN or its passkey first. Taking a note out again — from the note’s ⋯ menu, or by dragging it up among the notes — asks for it too. The recovery key shown once when it is made opens it on another computer, or when the PIN is forgotten — without the PIN and without that key, nobody can open it, Nebula included.</p>' +
+    '<p><strong>Drag a note</strong> onto the middle of a folder to put it in, or between two notes or folders to put it there — a line shows where it will land. Dragging never pins or unpins a note: pinned notes stay at the top and can be put in any order among themselves, and a note in a folder can be pinned too (⋯ → Pin to top), staying at the top of that folder. <strong>Folders are dragged the same way</strong>: a new folder comes in at the top, and a note you change afterwards rises above it, as notes do, until you put the folder where you want it. <strong>⋯ → Move to folder</strong> moves a note without dragging. A note you never dragged still moves to the top when you change it; one you placed stays where you put it. A black hole — the round button beside New folder — is for notes that must be safe: everything in it is kept encrypted on the disk (AES-256), title and pictures included, in a folder of its own. It is opened with the 6-digit PIN chosen when it was made — typed twice then, to be sure of it. A passkey — your fingerprint, your face or the computer’s own PIN, which the system asks for in front of Nebula — can be added beside the PIN, when the black hole is made or later from its ⋯ menu, and then either opens it; after five wrong PINs each try has to wait. A hint can be kept with the PIN and is shown when it is asked for — anyone can read it, so it is a reminder and never the PIN itself. Open, it shows its notes like a folder: + Add a note writes one in it, a note dragged onto it or sent there from its ⋯ menu is moved in — and its plain file leaves the vault and every backup. The lock at its left closes it, ten minutes untouched close it too, and every black hole is locked when the app starts. The arrow beside Black holes folds the whole section away. From its ⋯ menu a black hole goes to the Trash whole, locked; there it is restored, or deleted with every note in it — which asks for its PIN or its passkey first. Taking a note out again — from the note’s ⋯ menu, or by dragging it up among the notes — asks for it too. The recovery key shown once when it is made opens it on another computer, or when the PIN is forgotten — without the PIN and without that key, nobody can open it, Nebula included. From the ⋯ menu of an open black hole a new recovery key can be made: the old one stops working at once, and the new one is shown once — write it down.</p>' +
     '<p><strong>Try it:</strong> make a folder called <em>Work</em>, drag a note onto it, then drag another note above the first one in the list.</p>' +
 
     '<hr class="blk-hr">' +
@@ -750,7 +764,7 @@ export const GUIDE_NOTE = {
     '<p>Click the version number at the bottom of the sidebar to see every folder this copy uses. Each note is a folder of its own: in it the note’s JSON file, written atomically, and its pictures and videos as files — a picture is written once, so typing saves only the words. A dated snapshot of the whole vault is kept alongside, one a day, and only the newest is kept: it copies the notes’ own files and shares their pictures and videos with the vault instead of copying them, so a video is on the disk once. On a disk that cannot share a file — a flash drive, a network folder — the copy holds them itself, so they are there twice. Of the copies made before an update and before a repair, the newest of each kind is kept. A note deleted from the Trash takes its folder with it, in every snapshot too. Black holes are beside the notes, in blackholes: one folder each, every note in it one sealed file.</p>' +
     '<p>An update replaces the application folder only. The vault is copied into Backups before anything installs, and <strong>nothing in it is ever deleted</strong>. The installed app, the portable copy, the test build and the dev build each keep their own separate notes.</p>' +
     '<p><strong>File → Open notes folder</strong> shows that folder in Explorer. Pictures taken with F12 go to <em>Pictures\\Nebula</em>, outside the vault.</p>' +
-    '<p><strong>Deleted is deleted.</strong> A note in the Trash can still be restored. Once you delete it there, it leaves the vault and every backup with it — the daily copies, the ones taken before updates and before repairs — so it cannot be brought back from anywhere. A picture or a video taken out of a note goes the same way at the next start: out of the note’s folder and out of every backup. What you take out is gone for good, however much it is. Only where a note has lost pictures that were not taken out in Nebula — a fault, or its file changed outside the app — Nebula asks first and deletes nothing until you answer. They can then be deleted, or put back at the end of the note, from where you move them to their old place. Notes deleted before 0.9.1 are taken out of the backups the first time 0.9.1 starts.</p>' +
+    '<p><strong>Deleted is deleted.</strong> A note in the Trash can still be restored. Deleting from it asks first — one press only arms the “Delete for good?” that does it — and then it leaves the vault and every backup with it — the daily copies, the ones taken before updates and before repairs — so it cannot be brought back from anywhere. A picture or a video taken out of a note goes the same way at the next start: out of the note’s folder and out of every backup. What you take out is gone for good, however much it is. Only where a note has lost pictures that were not taken out in Nebula — a fault, or its file changed outside the app — Nebula asks first and deletes nothing until you answer. They can then be deleted, or put back at the end of the note, from where you move them to their old place. Notes deleted before 0.9.1 are taken out of the backups the first time 0.9.1 starts.</p>' +
     '<p><strong>Older notes are brought up to date.</strong> When a version changes how notes are written, the first start after the update repairs every note you have, a few at a time while the app is idle, after copying the whole vault to <em>Backups\\pre-heal-</em> and the version number. Only how a note is built is repaired: its words, pictures, links, shapes, code and equations stay exactly as they were, and a note that could not be repaired without changing one of them is left as it is. Its date and its place in the list do not change, and opening a note is never counted as editing it.</p>' +
     '<p><strong>Try it:</strong> after the next update, open the Backups folder from the version number: beside the dated copy there is one called <em>pre-heal-</em> with the version it was taken for.</p>' +
 

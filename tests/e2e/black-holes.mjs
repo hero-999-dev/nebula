@@ -90,7 +90,7 @@ export async function runBlackHoleChecks(check) {
       await win.waitForTimeout(300);
     };
     await ready();
-    const until = async (what) => { for (let i = 0; i < 50; i += 1) { if (await what()) return true; await win.waitForTimeout(100); } return !!(await what()); };
+    const until = async (what, tries = 50) => { for (let i = 0; i < tries; i += 1) { if (await what()) return true; await win.waitForTimeout(100); } return !!(await what()); };
     const list = () => win.evaluate(() => [...document.querySelectorAll('#note-list .hole-block')].map((b) => ({
       name: b.querySelector('.fr-name').textContent, open: b.classList.contains('open'), state: b.classList.contains('open') ? String(b.querySelectorAll('.hole-notes .note-row').length) : 'locked', lock: b.querySelector('.hole-lock')?.dataset.state,
       notes: [...b.querySelectorAll('.hole-notes .note-row')].map((r) => r.title),
@@ -118,7 +118,7 @@ export async function runBlackHoleChecks(check) {
       return label;
     };
     /** The black hole's answer, asked in a dialog of its own: what it says, and a PIN typed into it. */
-    const asked = () => win.evaluate(() => { const o = document.getElementById('ov-hole'); return o.hidden ? null : { title: o.querySelector('.dlg-title')?.textContent, note: o.querySelector('.hole-note')?.textContent ?? '', pin: !!o.querySelector('.hole-pin'), passkey: !!o.querySelector('[data-hole-passkey]'), error: o.querySelector('.hole-error')?.textContent ?? '' }; });
+    const asked = () => win.evaluate(() => { const o = document.getElementById('ov-hole'); return o.hidden ? null : { title: o.querySelector('.dlg-title')?.textContent, note: o.querySelector('.hole-note')?.textContent ?? '', pin: !!o.querySelector('.hole-pin'), passkey: !!o.querySelector('[data-hole-passkey]'), confirm: [...o.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Delete for good?'), error: o.querySelector('.hole-error')?.textContent ?? '' }; });
     const answer = async (pin) => {
       await win.waitForSelector('#ov-hole:not([hidden]) .hole-pin', { timeout: 5000 });
       await win.fill('#ov-hole .hole-pin', pin);
@@ -183,8 +183,8 @@ export async function runBlackHoleChecks(check) {
     check('the arrow beside the heading folds the black holes away and brings them back, open as they were', folded.blocks === 0 && folded.head === 'false' && folded.kept === '1'
       && (await list())[0]?.open === true && await win.evaluate(() => document.querySelector('#note-list .holes-head').getAttribute('aria-expanded')) === 'true', JSON.stringify(folded));
     const meta = JSON.parse(fs.readFileSync(path.join(holesDir, safe, 'hole.json'), 'utf8'));
-    check('on the disk it is a folder of its own, its key wrapped by the PIN and by the operating system — neither PIN nor recovery key in it',
-      meta.lock === 'pin' && meta.cipher === 'aes-256-gcm' && meta.kdf.name === 'scrypt' && meta.key.os === true && !!meta.key.salt && !!meta.recovery.box
+    check('on the disk its label and key are OS-protected — neither name, PIN nor recovery key in clear text',
+      meta.lock === 'pin' && meta.cipher === 'aes-256-gcm' && meta.kdf.name === 'scrypt' && meta.key.os === true && !!meta.key.salt && !!meta.recovery.box && !!meta.nameBox && !('name' in meta)
       && whereReadable('482193', recoveryKey, recoveryKey.replace(/-/g, '')).length === 0, JSON.stringify({ ...meta, key: '…', recovery: '…' }));
 
     // ---- A note written in it -----------------------------------------------------
@@ -207,7 +207,7 @@ export async function runBlackHoleChecks(check) {
     const label = await noteHole('Tax papers', 'Safe');
     check('a note’s menu offers “Move into a black hole”', label === 'Move into a black hole', String(label));
     check('moved in, it is sealed — and gone in the clear from the vault, its folder, and every backup',
-      await until(() => sealed(safe).length === 2 && !fs.existsSync(path.join(vault, 'n-plain.json')) && !fs.existsSync(path.join(vault, 'n-plain')) && whereReadable('7700-1234', 'Tax papers').length === 0),
+      await until(() => sealed(safe).length === 2 && !fs.existsSync(path.join(vault, 'n-plain.json')) && !fs.existsSync(path.join(vault, 'n-plain')) && whereReadable('7700-1234', 'Tax papers').length === 0, 200),
       `${sealed(safe)} ${whereReadable('7700-1234', 'Tax papers')} ${fs.existsSync(path.join(vault, 'n-plain'))}`);
     const pngBytes = picture.toString('latin1');
     check('its picture is nowhere on the disk as a picture', everyFile(path.join(profile, 'storage')).concat(everyFile(backups)).every((f) => !bytesOf(f).toString('latin1').includes(pngBytes.slice(40, 200))));
@@ -343,7 +343,7 @@ export async function runBlackHoleChecks(check) {
 
     const out = await noteHole('Tax papers', 'Take out of the black hole');
     await answer('482193');
-    check('a note in a black hole can be taken out: a plain note again, with its folder, and its sealed file gone', out === 'Black hole…'
+    check('a note in a black hole can be taken out: a plain note again, with its folder, and its sealed file gone', out === 'Move to notes'
       && await until(() => fs.existsSync(path.join(vault, 'n-plain', 'n-plain.json')) && fs.readdirSync(path.join(vault, 'n-plain')).length === 2 && sealed(safe).length === 1)
       && (await outside()).includes('Tax papers'), `${out} ${sealed(safe)}`);
 
@@ -368,14 +368,47 @@ export async function runBlackHoleChecks(check) {
     const old = (await list())[0].state;
     await win.fill('#ov-hole .hole-pin', '135790');
     check('from then on the new PIN is the key, and the old one is not', old === 'locked' && await until(async () => (await list())[0]?.open));
-    check('the menu of an open black hole: Lock, Rename, Change PIN, the hint, Add a passkey, Move to trash', (await holeMenu('Safe')).join('|') === 'Lock|Rename black hole|Change PIN|Change hint|Add a passkey|Move to trash');
+    check('the menu of an open black hole: Lock, Rename, Change PIN, the hint, Add a passkey, a new recovery key, Move to trash', (await holeMenu('Safe')).join('|') === 'Lock|Rename black hole|Change PIN|Change hint|Add a passkey|New recovery key|Move to trash');
     await holeMenu('Safe', 'Add a passkey');
     const safeMeta = () => JSON.parse(fs.readFileSync(path.join(holesDir, safe, 'hole.json'), 'utf8'));
     // The passkey is on the disk before the list the menu is made from has heard of it (smoke under load, 0.9.5 and 0.9.6): the menu is waited for too.
     check('a passkey is added beside the PIN of an open black hole — and taken away again from the same menu', await until(() => !!safeMeta().passkey?.box) && safeMeta().lock === 'pin'
-      && await until(async () => (await holeMenu('Safe')).join('|') === 'Lock|Rename black hole|Change PIN|Change hint|Remove the passkey|Move to trash'), JSON.stringify(Object.keys(safeMeta())));
+      && await until(async () => (await holeMenu('Safe')).join('|') === 'Lock|Rename black hole|Change PIN|Change hint|Remove the passkey|New recovery key|Move to trash'), JSON.stringify(Object.keys(safeMeta())));
     await holeMenu('Safe', 'Remove the passkey');
     await until(() => !safeMeta().passkey);
+    // No passkey button beside the notes: the ⋯ menu is where it lives (the owner, 2026-10-18).
+    check('no passkey button beside the notes — the ⋯ menu is where it lives', await win.evaluate(() => document.querySelectorAll('#note-list .hole-block .hole-notes .hole-passkey').length === 0));
+    // A new recovery key: the old one dies, the new one is shown once.
+    const oldRecoveryBox = safeMeta().recovery.box;
+    await holeMenu('Safe', 'New recovery key');
+    await win.waitForFunction(() => !document.getElementById('ov-hole').hidden, null, { polling: 50, timeout: 5000 });
+    check('it says the old recovery key stops working before it makes one', /stops working/.test((await asked())?.note ?? ''), JSON.stringify(await asked()));
+    await press('New key');
+    await win.waitForFunction(() => document.querySelector('#ov-hole .hole-key'), null, { polling: 50, timeout: 5000 });
+    const turned = (await dialog()).key;
+    check('a new recovery key is made and shown once, and the old one is replaced on the disk', /^([A-Z2-7]{4}-){7}[A-Z2-7]{4}$/.test(turned ?? '') && safeMeta().recovery.box !== oldRecoveryBox, JSON.stringify({ turned, boxes: [oldRecoveryBox.slice(0, 12), safeMeta().recovery.box.slice(0, 12)] }));
+    await press('I have written it down');
+    // A new PIN only after the current one — or the passkey (the owner, 2026-10-18).
+    await holeMenu('Safe', 'Change PIN');
+    await win.waitForFunction(() => !document.getElementById('ov-hole').hidden, null, { polling: 50, timeout: 5000 });
+    check('the dialog asks for the current PIN before a new one', (await dialog())?.title === 'New PIN for “Safe”' && !!(await win.evaluate(() => document.querySelector('#ov-hole [data-pin="current"]'))), JSON.stringify(await dialog()));
+    await win.fill('#ov-hole [data-pin="current"]', '000000');
+    await win.fill('#ov-hole [data-pin="new"]', '741852');
+    await win.fill('#ov-hole [data-pin="again"]', '741852');
+    await press('Change');
+    await win.waitForTimeout(600);
+    check('a wrong current PIN changes nothing', /^Wrong/.test((await dialog())?.error ?? ''), JSON.stringify(await dialog()));
+    await win.fill('#ov-hole [data-pin="current"]', '135790');
+    await press('Change');
+    check('the right current PIN changes it', await until(async () => !(await dialog())), JSON.stringify(await dialog()));
+    await win.evaluate(() => [...document.querySelectorAll('#note-list .hole-block')].find((b) => b.querySelector('.hole-row').title === 'Safe').querySelector('.hole-lock').click());
+    await until(async () => (await list())[0]?.state === 'locked');
+    await holeRow('Safe');
+    await answer('135790');
+    await win.waitForTimeout(700);
+    check('the old PIN is no key from then on', (await list())[0]?.state === 'locked' && /Wrong/.test((await dialog())?.error ?? ''), JSON.stringify(await dialog()));
+    await win.fill('#ov-hole .hole-pin', '741852');
+    check('the new one opens it', await until(async () => (await list())[0]?.open), JSON.stringify(await list()));
 
     // ---- A passkey beside the PIN (Windows Hello) ------------------------------------------------
     await win.evaluate(() => document.getElementById('btn-new-hole').click());
@@ -417,7 +450,11 @@ export async function runBlackHoleChecks(check) {
     await win.evaluate(() => document.querySelector('.drawer-tab[data-drawer="trash"]').click());
     await win.waitForFunction(() => [...document.querySelectorAll('.drawer-item')].some((i) => i.textContent.includes('Launch plan')), null, { polling: 50 });
     check('in the Trash a note of a black hole is still sealed in it', sealed(safe).length === 1);
+    const planDrawer = () => win.evaluate(() => { const item = [...document.querySelectorAll('#drawer-body .drawer-item')].find((i) => i.textContent.includes('Launch plan')); return { meta: item?.querySelector('.nr-meta')?.textContent ?? '', buttons: [...(item?.querySelectorAll('.drawer-actions button') ?? [])].map((b) => b.textContent) }; });
+    check('in the Trash a note of a black hole says what it is', (await planDrawer()).meta.startsWith('Black hole ·'), JSON.stringify(await planDrawer()));
     await win.evaluate(() => { const item = [...document.querySelectorAll('.drawer-item')].find((i) => i.textContent.includes('Launch plan')); [...item.querySelectorAll('.drawer-actions button')].find((b) => b.textContent === 'Delete').click(); });
+    check('its Delete asks first: one press only arms it, the sealed note still there', (await planDrawer()).buttons.includes('Delete for good?') && sealed(safe).length === 1, JSON.stringify(await planDrawer()));
+    await win.evaluate(() => { const item = [...document.querySelectorAll('.drawer-item')].find((i) => i.textContent.includes('Launch plan')); [...item.querySelectorAll('.drawer-actions button')].find((b) => b.textContent === 'Delete for good?').click(); });
     check('deleted from the Trash, its sealed file is gone from the black hole and from the backup — its video too', await until(() => sealed(safe).length === 0 && !fs.existsSync(path.join(backups, '2099-01-01', 'blackholes', safe, `${secretId}.bh`))
       && fs.readdirSync(path.join(holesDir, safe)).join() === 'hole.json' && fs.readdirSync(path.join(backups, '2099-01-01', 'blackholes', safe)).join() === 'hole.json'),
       `${fs.readdirSync(path.join(holesDir, safe))} / ${fs.readdirSync(path.join(backups, '2099-01-01', 'blackholes', safe))}`);
@@ -479,9 +516,11 @@ export async function runBlackHoleChecks(check) {
     await trashButton('Delete for good?');
     await win.waitForSelector('#ov-hole:not([hidden]) .hole-pin', { timeout: 5000 });
     const deleting = await asked();
-    check('deleting a black hole asks for its password: its PIN, or its passkey at a press — and says nothing brings it back', deleting?.title === 'Delete the black hole' && deleting.pin && deleting.passkey
+    check('deleting a black hole asks for its password with ONE deliberate press: the PIN in the box, or the passkey the system then asks for — no passkey button of its own, and nothing brings it back', deleting?.title === 'Delete the black hole' && deleting.pin && deleting.confirm && !deleting.passkey
       && deleting.note === '“Finger” and every note in it are deleted for good. Nothing brings them back.' && sealed(finger).join() === fingerNote, JSON.stringify(deleting));
     await answer('000000');
+    check('typing a complete PIN alone does not delete the black hole', sealed(finger).join() === fingerNote && (await inTrash()).length === 1);
+    await press('Delete for good?');
     check('a wrong PIN deletes nothing: the black hole is still in the Trash, its note still sealed, in the backup too', /^Wrong\./.test((await asked())?.error ?? '') && sealed(finger).join() === fingerNote
       && fs.existsSync(path.join(backups, '2099-01-01', 'blackholes', finger, fingerNote)), JSON.stringify(await asked()));
     await press('Cancel');
@@ -492,11 +531,70 @@ export async function runBlackHoleChecks(check) {
     await win.waitForTimeout(200);
     await trashButton('Delete for good?');
     await answer('246810');
+    await press('Delete for good?');
     check('deleted from the Trash it is gone for good: from the Trash, the list, the disk and the backup',
       await until(async () => (await inTrash()).length === 0 && (await list()).length === 1 && !fs.existsSync(path.join(holesDir, finger)) && !fs.existsSync(path.join(backups, '2099-01-01', 'blackholes', finger))),
       `${JSON.stringify(await inTrash())} ${JSON.stringify(await list())} ${fs.existsSync(path.join(holesDir, finger))}`);
     await win.evaluate(() => { const tab = document.querySelector('.drawer-tab[data-drawer="trash"]'); if (tab.getAttribute('aria-expanded') === 'true') tab.click(); });
 
+    // ---- An empty black hole is not deleted without the same second click (the owner, 2026-10-17)
+    await win.evaluate(() => document.getElementById('btn-new-hole').click());
+    await win.fill('#ov-hole .hole-name', 'Nothing yet');
+    await win.fill('#ov-hole .hole-pin[data-pin="new"]', '789456');
+    await win.fill('#ov-hole .hole-pin[data-pin="again"]', '789456');
+    await press('Create');
+    await win.waitForFunction(() => document.querySelector('#ov-hole .hole-key'), null, { polling: 50, timeout: 8000 });
+    await press('I have written it down');
+    await until(async () => (await list()).length === 2 && (await list()).some((h) => h.name === 'Nothing yet'));
+    await holeMenu('Nothing yet', 'Move to trash');
+    await win.evaluate(() => { const tab = document.querySelector('.drawer-tab[data-drawer="trash"]'); if (tab.getAttribute('aria-expanded') !== 'true') tab.click(); });
+    await win.waitForTimeout(250);
+    await until(async () => (await inTrash()).some((h) => h.name === 'Nothing yet'));
+    await trashButton('Delete');
+    await win.waitForTimeout(300);
+    check('an EMPTY black hole arms the same "Delete for good?" — no one-click deletion',
+      (await inTrash())[0]?.buttons.join() === 'Restore,Delete for good?' && (await asked()) === null && holeIds().length === 2,
+      JSON.stringify(await inTrash()));
+    await trashButton('Delete for good?');
+    const emptyAsk = (await until(async () => (await asked()) !== null)) ? await asked() : null;
+    check('its second click asks for its answer, with the same warning as any black hole',
+      emptyAsk?.title === 'Delete the black hole' && /deleted for good/.test(emptyAsk?.note ?? '') && emptyAsk?.pin === true, JSON.stringify(emptyAsk));
+    await answer('789456');
+    await press('Delete for good?');
+    check('and with its PIN the empty hole is gone for good', await until(async () => (await inTrash()).length === 0 && holeIds().length === 1), JSON.stringify(await inTrash()));
+    // ---- A black hole of the first builds, opened by its passkey alone: the delete dialog keeps its final press (Codex, 2026-10-18)
+    await win.evaluate(() => document.getElementById('btn-new-hole').click());
+    await win.fill('#ov-hole .hole-name', 'Only hello');
+    await win.fill('#ov-hole .hole-pin[data-pin="new"]', '314159');
+    await win.fill('#ov-hole .hole-pin[data-pin="again"]', '314159');
+    await win.evaluate(() => { document.getElementById('hole-passkey').click(); });
+    await press('Create');
+    await win.waitForFunction(() => document.querySelector('#ov-hole .hole-key'), null, { polling: 50, timeout: 8000 });
+    await press('I have written it down');
+    await until(async () => (await list()).some((h) => h.name === 'Only hello'));
+    const helloId = (await win.evaluate(async () => (await window.nebula.holes.list()).holes.find((h) => h.name === 'Only hello')?.id));
+    // Rewrite it as the first builds made them: the passkey is the only lock.
+    const pinMeta = JSON.parse(fs.readFileSync(path.join(holesDir, helloId, 'hole.json'), 'utf8'));
+    fs.writeFileSync(path.join(holesDir, helloId, 'hole.json'), JSON.stringify({
+      v: 1, id: pinMeta.id, nameBox: pinMeta.nameBox, createdAt: pinMeta.createdAt,
+      lock: 'hello', cipher: pinMeta.cipher, kdf: pinMeta.kdf,
+      key: { os: true, box: pinMeta.passkey.box }, recovery: pinMeta.recovery,
+    }, null, 2));
+    await holeMenu('Only hello', 'Move to trash');
+    await win.evaluate(() => { const tab = document.querySelector('.drawer-tab[data-drawer="trash"]'); if (tab.getAttribute('aria-expanded') !== 'true') tab.click(); });
+    await win.waitForTimeout(250);
+    await until(async () => (await inTrash()).some((h) => h.name === 'Only hello'));
+    await trashButton('Delete');
+    await win.waitForTimeout(300);
+    check('a PASSKEY-ONLY hole arms the same "Delete for good?" — the fix for the dead dialog',
+      (await inTrash()).find((h) => h.name === 'Only hello')?.buttons.join() === 'Restore,Delete for good?', JSON.stringify(await inTrash()));
+    await trashButton('Delete for good?');
+    const helloAsk = (await until(async () => (await asked()) !== null)) ? await asked() : null;
+    check('its dialog has the final press and no PIN box — the passkey is the credential the press asks for',
+      helloAsk?.title === 'Delete the black hole' && helloAsk?.pin === false && helloAsk?.confirm === true && helloAsk?.passkey === false, JSON.stringify(helloAsk));
+    await press('Delete for good?');
+    check('and the press deletes it through the passkey',
+      await until(async () => !(await inTrash()).some((h) => h.name === 'Only hello') && !fs.existsSync(path.join(holesDir, helloId))), JSON.stringify(await inTrash()));
     // ---- Left alone, it locks itself -------------------------------------------------------
     await win.evaluate(() => localStorage.setItem('nebula:holes-idle-minutes', '0.03'));
     await win.reload();

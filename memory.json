@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.9.6",
-  "lastUpdated": "2026-10-16",
-  "currentPhase": "Consultation round done (2026-10-16), ships as 0.9.6 on the owner-approved push: native dialogs in the app's language (B26), Mark-of-the-Web on opened and saved copies (B27), the guide's section for B25, emoji-safe display cuts. Bug hunt on the 0.9.6 Nebula Test build done (2026-10-16, 00:55-05:xx; Claude, Mistral, GPT Sol until its quota ran out): B1-B24 in test-results/orchestra/hunt/bugs.md, each fixed with a fail-before check and reviewed by another agent. Three were security/privacy: B21 (a link in a note took the app window to a web page with the whole bridge, or handed Windows ms-settings:/file shares - electron/navigation.js, will-navigate), B22 (an embedded page had the microphone and the clipboard - electron/permissions.js on every session), B23 (an embedded page opened windows by itself - denied, a pressed link goes to the browser once). MARKUP_VERSION 0.9.6 (B24: half an emoji in a video card's name). Version stays 0.9.5 until \"push\"; the build ships as 0.9.6. v0.9.5 released 2026-10-12; files in a note (OneNote-style attachments) built into Nebula Test, waiting for the owner's test — ships as 0.9.6 on \"push\". 0.9.5, released 2026-10-12: two bugs from the owner's Ideas note. A highlight or a colour on the words of a picture's caption no longer cuts the picture in two (inline-family.js: a caption is a block the mark's edges stop at), words pasted into a caption come as plain words, and a pasted background gives way to the highlight picked. On Windows the taskbar button wears a logo of the user's: the window takes an app ID of its own while a logo is on (app-logo.js taskbarDetails), because Windows draws the button from the Start-menu shortcut of the app's ID, which an all-users install cannot write. Before it, v0.9.4 (2026-10-12): a folder for each note (pictures and videos as files beside the note's JSON), black holes (notes encrypted with AES-256-GCM behind a 6-digit PIN, an optional passkey and a recovery key), a lock on opening, Settings beside Help (a new note's font, size and page; hiding the AI panel or the black holes; the logo's colours), tables, columns made by pulling a divider sideways, pictures left/centre/right, in a row or in a line of words, toggle headings and toggles in lists, one right-click menu with two ways to paste, a font search with added and pinned fonts, a theme of one's own with named profiles, the guide and What's new in four languages, AI tabs that sleep, Open with Nebula for Word/OpenDocument/Rich Text files, Electron 44.7. B25 (owner's decision, 05:45): an embedded page may ask for the microphone/camera or notifications; Nebula asks, nothing is saved, every reload or reopen asks again.",
-  "next": "The owner tests 0.9.6: an embed asks for the microphone/notifications (note: before Allow, Notification.permission reads \"denied\", so some sites never ask — open them in the browser); dialogs in Turkish/German/Polish; an opened file is marked as from the Internet. Owner follow-up: macOS quarantine for opened/saved copies (B27 is Windows only).",
+  "version": "0.9.7",
+  "lastUpdated": "2026-10-18",
+  "currentPhase": "0.9.7 release candidate authorized by owner: Blackhole deletion confirmation, protected labels, seal-then-purge moves and large-file responsiveness. Blackhole/note/media/backup/opened-copy deletion uses bounded asynchronous shredding; lock/removal/deletion races, short writes and planted links are guarded. Every Trash Delete asks 'Delete for good?' (Blackhole notes labelled 'Black hole'), a note in a hole offers 'Move to notes', and a PIN change proves the current PIN or passkey first; an open hole's menu rotates its recovery key (old key dies, new one shown once). Electron 44.9.0. Unit 1276/1276, focused black-holes e2e 86/86, full smoke 1041/1041, build and pack:test passed. Final Mistral review approved; release gates and push in progress.",
+  "next": "Run npm run push for v0.9.7, including unit, smoke, page rebuild, old-note trials, package and publication; then owner tests the refreshed root Nebula Test.exe per docs/BLACKHOLE-TESTS.md. Physical Windows Hello and macOS behavior require those environments. Report: test-results/orchestra/security-2026-10-17/RAPOR.md.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -31,8 +31,8 @@
     "releasePolicy": "Standing instruction (2026-09-27, replaces 2026-09-07): release ONLY when the owner says \"push\". Until then: make the changes, unit tests for what was touched, npm run pack:test, report. On \"push\": Electron check (npm run check:browsers), all tests, fixes, then npm run push - GitHub, nebula-web, the flash, every MD file. Never ask which platforms to build: the repo is public, Actions is free on both runners."
   },
   "quality": {
-    "unitTests": 1128,
-    "smokeChecks": 924,
+    "unitTests": 1276,
+    "smokeChecks": 1041,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
@@ -88,6 +88,48 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "date": "2026-10-18",
+      "version": "0.9.7",
+      "by": "Codex + Mistral Vibe",
+      "what": "Owner authorized push. Mistral completed a final independent review of Trash confirmation, PIN-change proof, recovery rotation, labels, guide and tracking and approved the product code. Release notes added for 0.9.7; currentPhase names the shipping version; guide moved new Blackhole behavior to its own 0.9.7 section in four languages with signatures recorded and the stale 0.9.6 key bullet removed. Focused guide tests 24/24. Full release gates run during npm run push."
+    },
+    {
+      "date": "2026-10-18",
+      "version": "0.9.6",
+      "by": "Mistral Vibe",
+      "what": "Owner round two. The in-body 'Add a passkey' button removed (the open hole's menu is where it lives); a note inside a black hole is offered 'Move to notes' instead of 'Black hole...'; every Delete in the Trash - plain note or black hole note - arms with the 'Delete for good?' second press, black hole notes still labelled 'Black hole' there; and changePin proves the old answer first - the current PIN, or the passkey - through the same #answer path as unlocking, with fail counting, stale-yes refusal after the await, and the Hello prompt naming the PIN change. Guide updated in four languages; released-0.9.6 signatures preserved. Unit 1276/1276, focused e2e 86/86, full smoke 1041/1041, build and pack:test passed. No installed app/private vault accessed; no push."
+    },
+    {
+      "date": "2026-10-18",
+      "version": "0.9.6",
+      "by": "Mistral Vibe",
+      "what": "Owner test round follow-up. A note belonging to a Blackhole, deleted from the Trash, now asks with the same 'Delete for good?' second press as the hole itself and is labelled 'Black hole' there; an open Blackhole without a passkey shows an 'Add a passkey' button beside its notes; the menu of an open hole offers 'New recovery key', replacing the sealed recovery wrapper synchronously after the open-key guard - the old key stops working, the new one is shown once. Confirmed the wrong-PIN wait doubling (30s to 60s to 15min cap) is designed. Guide updated in four languages with released-0.9.6 signatures preserved under '0.9.6 released' keys. Unit 1276/1276, focused e2e 82/82, full smoke 1037/1037 (two load-flaky non-adjacent failures each passed in another run), build and pack:test passed. No installed app/private vault accessed; no push."
+    },
+    {
+      "date": "2026-10-17",
+      "version": "0.9.6",
+      "by": "Codex + Mistral Vibe with GPT review",
+      "what": "Continued owner's Blackhole large-file and security follow-up. Bounded asynchronous shredding now covers Blackhole removal, ordinary note folders, backup purges and opened copies; backup sync fallback no longer allocates a whole large file. GPT review found lock-after-await plaintext delivery, remove/write overlap and passkey confirmation bypass; fixes and race tests added. Whole-hole deletion/metadata races, short writes, planted links and first-build passkey-only confirmation fixed. Mistral read-only review approved final Codex guards. Unit 1275/1275, build/browser check passed; smoke and pack:test in progress. No installed/private profile accessed; no push."
+    },
+    {
+      "date": "2026-10-17",
+      "version": "0.9.6",
+      "by": "Codex + GLM-5.3 via Mistral Vibe",
+      "what": "Investigated owner's playback deletion, visible Blackhole label and large-file latency report. GLM reproduced and fixed the empty-hole Delete arm; destructive PIN entry now needs a separate final button. New and legacy live/backed-up labels use OS-protected nameBox. Moving a note waits for sealed commit and plain/backup purge, preserving concurrent edits on rollback; snippets skip large image data; Blackhole writes and unlock reads/decryptions are asynchronous and deletion refuses pending writes/imports. Electron 44.9.0. Unit 1260/1260, focused Electron Blackhole, smoke 1028/1028 twice, browser check and pack:test passed. Root Nebula Test.exe SHA-256 4A79894D037EC22DF9DCDC5999E7BA0CFE936A5091B5DF2026537268E4DCBAC4. No installed app/private vault accessed; no push."
+    },
+    {
+      "date": "2026-10-17",
+      "version": "0.9.6",
+      "by": "Codex + GLM-5.3 via Mistral Vibe",
+      "what": "Completed Blackhole security follow-up: require OS secure storage for new PIN wrappers and resets; upgrade legacy unprotected wrappers in live vault and accessible local backups after valid PIN, retrying backups on later unlocks; refuse deletion while sealed media stream is open; retry held opened copies; reconcile exact-ID markerless plain notes by edit time and remove plain/backups after successful seal; updated electron-builder/Vite/Vitest. Added docs/BLACKHOLE-TESTS.md. Unit 1253/1253, focused Electron 17/17, full smoke 1023/1023, build/browser check and pack:test passed. Full npm audit 0 critical/high, 10 moderate; production 0 critical/high, 3 moderate. No installed app/private vault accessed; no push."
+    },
+    {
+      "version": "0.9.6",
+      "date": "2026-10-17",
+      "by": "Codex + GLM-5.3 via Mistral Vibe",
+      "what": "Joint Blackhole security audit with GLM-5.3 (Mistral Hosted) through Mistral Vibe in the active Test Orchestra Nebula profile. Fixed encrypted-save retry destination and unsafe localStorage fallback; main refuses hole-marked ordinary writes. Historical marked plaintext is withheld and resealed on authenticated unlock before plain/backups deletion, with media preserved. Pending auth and media operations are invalidated by locks/credential changes; zero-key passkey residue is rejected and removed after valid authentication. Trash cleans opened copies; retained copies cannot reopen locked holes. Updated the compatible js-yaml transitive dependency. No installed app/private vault accessed; no push. Validation: full unit suite 1248/1248 across 73 files; focused Electron security checks 10/10; build and browser/Electron check passed. Full smoke 1016/1016 passed; npm run pack:test completed and refreshed the root Nebula Test.exe. No push. Limits: physical Hello/macOS untested; historical markerless plaintext cannot be identified; marked plaintext persists until its hole is unlocked; old zero-key media is not silently trusted/recovered. Production audit: 3 moderate chain entries, zero high/critical; full development-inclusive audit: 28 entries (3 critical, 19 high, 6 moderate), major tooling updates deferred. OS-unprotected PIN wraps and Windows-held-copy/deletion limits remain documented in the local report."
+    },
     {
       "version": "0.9.6",
       "date": "2026-10-16",

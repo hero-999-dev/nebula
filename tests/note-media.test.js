@@ -3,12 +3,12 @@
  * A note's pictures and videos as files in its own folder (0.9.4): what the
  * main process does at the disk. Real folders, in the system's temp directory.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  externalize, inlinePictures, referencesOf, rehome, sweepNote, removeNoteFolder, tidyVault, addVideo, noteFile, noteIds, moveNotesIn, snapshotVault, missingMedia, shred, unnamedOf, readReleased, writeReleased, noteReleases, releaseAdded, RELEASED_FILE,
+  externalize, inlinePictures, referencesOf, rehome, sweepNote, removeNoteFolder, removeNoteFolderAsync, shredAsync, tidyVault, addVideo, noteFile, noteIds, moveNotesIn, snapshotVault, missingMedia, shred, unnamedOf, readReleased, writeReleased, noteReleases, releaseAdded, RELEASED_FILE,
   mediaUrl, mediaPath, parseMediaUrl, mimeOf, byteRange, isVideoName, pictureDataUrl, travelWhole, addAttachment, attachmentExt, isAttachmentName, isPicture, isKeptFile, travelFolder, stageTravelled, VIDEO_EXTENSIONS, stageVideos,
 } from '../electron/note-media.js';
 import { readNoteFile } from '../electron/open-file.js';
@@ -89,7 +89,7 @@ describe('what a note’s folder holds', () => {
     expect(files('n1')[0]).toMatch(/\.png$/);
   });
 
-  it('is removed when it holds nothing, and whole when the note is deleted', () => {
+  it('is removed when it holds nothing, and whole when the note is deleted', async () => {
     externalize(note('n1', `<img src="${PNG}">`), 'n1', notes);
     sweepNote(notes, 'n1', note('n1', '<p>no pictures now</p>'));
     expect(files('n1')).toBeNull();
@@ -97,6 +97,87 @@ describe('what a note’s folder holds', () => {
     expect(removeNoteFolder(notes, 'n2')).toBe(2);
     expect(files('n2')).toBeNull();
     expect(removeNoteFolder(notes, '..')).toBe(0);
+    // The same, block by block without holding the event loop (storage:delete, 2026-10-17).
+    externalize(note('n2', `<img src="${PNG}"><img src="${JPG}">`), 'n2', notes);
+    expect(await removeNoteFolderAsync(notes, 'n2')).toBe(2);
+    expect(files('n2')).toBeNull();
+    expect(await removeNoteFolderAsync(notes, '..')).toBe(0);
+  });
+
+  it('shreds every byte even when the disk writes in halves (a partial write must not leave the tail unerased)', async () => {
+    const file = path.join(notes, 'partial.bin');
+    fs.writeFileSync(file, Buffer.alloc(64 * 1024, 0xaa));        // one block, all 0xaa
+    const realOpen = fs.promises.open.bind(fs.promises);
+    const openSpy = vi.spyOn(fs.promises, 'open').mockImplementation(async (...args) => {
+      const handle = await realOpen(...args);
+      const realWrite = handle.write.bind(handle);
+      handle.write = async (buf, off, len, pos) => {              // the disk takes only half of every ask
+        const ask = len ?? buf.length;
+        if (!ask) return realWrite(buf, off, len, pos);
+        return realWrite(buf, off, Math.ceil(ask / 2), pos);
+      };
+      return handle;
+    });
+    let taken = null;
+    const realRm = fs.promises.rm.bind(fs.promises);
+    const rmSpy = vi.spyOn(fs.promises, 'rm').mockImplementation(async (...args) => {
+      try { taken = fs.readFileSync(String(args[0])); } catch { /* already gone */ }
+      return realRm(...args);
+    });
+    try {
+      await removeNoteFolderAsync(notes, '..');                   // a dry pass to satisfy the guard, then the real one below
+      await shredAsync(file);
+      expect(taken).not.toBeNull();
+      expect(taken.length).toBe(64 * 1024);
+      expect(taken.every((b) => b === 0)).toBe(true);             // every byte overwritten, halves included
+    } finally { openSpy.mockRestore(); rmSpy.mockRestore(); }
+    expect(fs.existsSync(file)).toBe(false);
+  });
+
+  it('removes a junction planted where a note’s folder belongs without touching what it points at', async () => {
+    const victim = path.join(notes, '..', 'outside-victim');
+    fs.mkdirSync(victim, { recursive: true });
+    fs.writeFileSync(path.join(victim, 'precious.png'), 'the picture must survive');
+    try {
+      fs.symlinkSync(victim, path.join(notes, 'n-planted'), process.platform === 'win32' ? 'junction' : 'dir');
+    } catch {
+      return;   // this platform needs a privilege to make links
+    }
+    expect(removeNoteFolder(notes, 'n-planted')).toBe(0);
+    expect(fs.existsSync(path.join(notes, 'n-planted'))).toBe(false);
+    fs.symlinkSync(victim, path.join(notes, 'n-planted-2'), process.platform === 'win32' ? 'junction' : 'dir');
+    expect(await removeNoteFolderAsync(notes, 'n-planted-2')).toBe(0);
+    expect(fs.existsSync(path.join(notes, 'n-planted-2'))).toBe(false);
+    expect(fs.readFileSync(path.join(victim, 'precious.png'), 'utf8')).toBe('the picture must survive');
+  });
+
+  it('does not sweep pictures through a junction planted where the note folder belongs', () => {
+    const victim = path.join(notes, '..', 'outside-sweep');
+    fs.mkdirSync(victim, { recursive: true });
+    const picture = path.join(victim, 'precious.png');
+    fs.writeFileSync(picture, 'external picture');
+    const link = path.join(notes, 'n-sweep-link');
+    fs.symlinkSync(victim, link, process.platform === 'win32' ? 'junction' : 'dir');
+    expect(unnamedOf(notes, 'n-sweep-link', '<p>no picture</p>', { videos: true })).toEqual([]);
+    expect(sweepNote(notes, 'n-sweep-link', '<p>no picture</p>', { videos: true })).toBe(0);
+    expect(fs.readFileSync(picture, 'utf8')).toBe('external picture');
+  });
+
+  it('shreds a symbolic link without following it — whatever it points at survives', async () => {
+    const target = path.join(notes, 'the-real-file.txt');
+    fs.writeFileSync(target, 'the words the attacker wants destroyed');
+    const folder = path.join(notes, 'n-link');
+    fs.mkdirSync(folder, { recursive: true });
+    try {
+      fs.symlinkSync(target, path.join(folder, 'planted.txt'));
+      fs.symlinkSync(target, path.join(folder, 'planted-again.txt'));
+    } catch {
+      return;                                     // this platform needs a privilege to make links; the code path is the same elsewhere
+    }
+    await shredAsync(path.join(folder, 'planted.txt'));
+    shred(path.join(folder, 'planted-again.txt'));
+    expect(fs.readdirSync(folder)).toEqual([]);                                 // both links are gone
+    expect(fs.readFileSync(target, 'utf8')).toBe('the words the attacker wants destroyed');   // the target untouched
   });
 
   it('leaves a file it does not know alone', () => {

@@ -5,7 +5,7 @@ that keeps every note in your own profile, as a folder of its own: a plain JSON
 file with the note's pictures and videos beside it. Installed Windows builds
 offer in-app updates; macOS and portable builds offer a download link.
 
-**Version v0.9.6** ·
+**Version v0.9.7** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 
@@ -89,7 +89,14 @@ So this README describes a small app on purpose. What is here is finished.
   divider resizes them, and deleting it makes one flow again.
 - **Black holes**: notes kept encrypted (AES-256-GCM), titles and pictures
   included, opened with a 6-digit PIN or a passkey (Windows Hello / Touch ID),
-  locked again after ten minutes, with a recovery key shown once.
+  locked again after ten minutes, with a recovery key shown once. New holes
+  require the operating system's secure key storage; older PIN-only wrappers
+  are strengthened when opened with their PIN after that storage is available.
+  New hole names are protected on disk too; old names migrate when secure
+  storage is available. Moving a note in waits for encryption and removal
+  of its plain copy. Deletion from Trash requires two clicks, authentication
+  and a final confirmation. Large notes, media and backup copies are removed
+  in small asynchronous blocks so the window stays responsive during cleanup.
 - **A lock on opening** (Settings): a 6-digit PIN, a passkey beside it if
   wanted. It keeps the app shut; a black hole is what encrypts.
 - **Open with Nebula**: a Word, OpenDocument or Rich Text file opens as a new
@@ -277,6 +284,9 @@ Double-click, from the repo root:
 
 None of them touch the installed app's notes.
 
+Before approving a new build, use the [Blackhole test list](docs/BLACKHOLE-TESTS.md)
+with synthetic notes in Nebula Test.
+
 ```bash
 npm run fresh          # reset the DEV notes -> rebuild -> launch
 npm run reset          # reset the dev notes (keeps AI logins)
@@ -285,7 +295,7 @@ npm run kill           # close a running Nebula (frees the exe for packing)
 ```
 
 Every reset copies what it removes to `backups/reset-<timestamp>` first.
-Touching the installed profile needs `npm run reset -- --installed --yes`.
+Never reset or inspect the installed profile; it holds the owner's private notes.
 
 Opening `vite preview` in a plain browser gives a demo banner: in-memory only.
 

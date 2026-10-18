@@ -1,6 +1,6 @@
 {
   "name": "nebula",
-  "version": "0.9.6",
+  "version": "0.9.7",
   "description": "Nebula",
   "tagline": "calm notes with a real editor: movable editing bar, line icons, markdown code blocks with syntax colors, free-floating shapes, AI panel with tabs.",
   "main": "dist-electron/main.js",
@@ -155,12 +155,12 @@
     }
   },
   "devDependencies": {
-    "electron": "^44.8.0",
-    "electron-builder": "^25.1.8",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.17.0",
     "jsdom": "^25.0.1",
     "playwright-core": "^1.49.0",
-    "vite": "^6.0.3",
+    "vite": "^6.4.4",
     "vite-plugin-electron": "^0.28.8",
-    "vitest": "^2.1.8"
+    "vitest": "^5.0.5"
   }
 }

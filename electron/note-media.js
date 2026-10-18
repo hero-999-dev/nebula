@@ -165,20 +165,66 @@ function writeAtomic(file, data) {
   }
 }
 
+/** The same overwrite-then-remove, without holding the event loop: a large
+ * video's overwrite hands the turn back between blocks, so a locked window
+ * stays live while it runs (the freeze on a 176 MB move, and the antivirus
+ * scans that sat on every block). Best effort, as the synchronous one.
+ */
+export async function shredAsync(file) {
+  try {
+    // A planted symbolic link must never be followed: overwriting it would
+    // destroy whatever it points at. The link itself is unlinked, nothing else.
+    const info = await fs.promises.lstat(file);
+    if (info.isSymbolicLink()) { await fs.promises.rm(file, { force: true }); return; }
+    // A file a backup still shares is only taken out of this place (see shred).
+    if (info.nlink > 1) { await fs.promises.rm(file, { force: true }); return; }
+    const handle = await fs.promises.open(file, fs.constants.O_NOFOLLOW ? (fs.constants.O_RDWR | fs.constants.O_NOFOLLOW) : 'r+');
+    try {
+      const block = Buffer.alloc(Math.min(info.size, 4 * 1024 * 1024));
+      for (let at = 0; at < info.size; at += block.length) {
+        // FileHandle.write may write less than asked: the block is done only when
+        // its last byte is on the disk, or the tail would survive the shredding.
+        let done = 0;
+        const len = Math.min(block.length, info.size - at);
+        while (done < len) {
+          const { bytesWritten } = await handle.write(block, done, len - done, at + done);
+          if (!bytesWritten) throw new Error('the disk would not take the block');
+          done += bytesWritten;
+        }
+      }
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+  } catch { /* it is removed below all the same */ }
+  await fs.promises.rm(file, { force: true });
+}
+
 /** Overwritten, then removed (best effort on flash and SSDs — see backup-purge.js). */
 export function shred(file) {
   try {
-    const { size, nlink } = fs.statSync(file);
+    // As the asynchronous one: a symbolic link is unlinked, never followed.
+    const info = fs.lstatSync(file);
+    if (info.isSymbolicLink()) { fs.rmSync(file, { force: true }); return; }
     // A file a backup still shares (snapshotVault) is only taken out of this
     // place: its bytes are that backup's too, until the backup lets go of it
     // — or the note is deleted, when every place it lies in is shredded and
     // the last of them takes the bytes with it.
-    if (nlink > 1) { fs.rmSync(file, { force: true }); return; }
-    const fd = fs.openSync(file, 'r+');
+    if (info.nlink > 1) { fs.rmSync(file, { force: true }); return; }
+    const fd = fs.openSync(file, fs.constants.O_NOFOLLOW ? (fs.constants.O_RDWR | fs.constants.O_NOFOLLOW) : 'r+');
     try {
       // In pieces: a video may be larger than the memory there is to spare.
-      const block = Buffer.alloc(Math.min(size, 4 * 1024 * 1024));
-      for (let at = 0; at < size; at += block.length) fs.writeSync(fd, block, 0, Math.min(block.length, size - at), at);
+      const block = Buffer.alloc(Math.min(info.size, 4 * 1024 * 1024));
+      for (let at = 0; at < info.size; at += block.length) {
+        // writeSync may write less than asked; loop until the block's last byte is on the disk.
+        let done = 0;
+        const len = Math.min(block.length, info.size - at);
+        while (done < len) {
+          const bytesWritten = fs.writeSync(fd, block, done, len - done, at + done);
+          if (!bytesWritten) throw new Error('the disk would not take the block');
+          done += bytesWritten;
+        }
+      }
       fs.fsyncSync(fd);
     } finally {
       fs.closeSync(fd);
@@ -419,8 +465,12 @@ export function rehome(text, id, notesDir) {
  */
 export function unnamedOf(notesDir, id, text, { videos = false } = {}) {
   if (!NOTE_ID.test(String(id))) return [];
+  const folder = noteFolder(notesDir, id);
   let names;
-  try { names = fs.readdirSync(noteFolder(notesDir, id)); } catch { return []; }
+  try {
+    if (!fs.lstatSync(folder).isDirectory()) return [];
+    names = fs.readdirSync(folder);
+  } catch { return []; }
   const { own } = referencesOf(text, id);
   return names.filter((name) => !own.has(name) && !name.includes('.tmp-') && (isPicture(name) || (videos && isKeptFile(name))));
 }
@@ -544,9 +594,27 @@ export function sweepNote(notesDir, id, text, { videos = false, only = null } = 
 }
 
 /** A note's folder and everything in it, gone: the note was deleted. */
+/** The same, without holding the event loop: each file overwritten block by
+ * block (shredAsync), the folder removed after — for the storage:delete
+ * path, where a large video must not freeze the window (main.js awaits it).
+ */
+export async function removeNoteFolderAsync(notesDir, id) {
+  if (!NOTE_ID.test(String(id))) return 0;
+  const folder = noteFolder(notesDir, id);
+  // A planted link or junction in the folder's place is unlinked, never followed.
+  try { if (fs.lstatSync(folder).isSymbolicLink()) { await fs.promises.rm(folder, { force: true }); return 0; } } catch { return 0; }
+  let names;
+  try { names = fs.readdirSync(folder); } catch { return 0; }
+  for (const name of names) await shredAsync(path.join(folder, name));
+  await fs.promises.rm(folder, { recursive: true, force: true });
+  return names.length;
+}
+
 export function removeNoteFolder(notesDir, id) {
   if (!NOTE_ID.test(String(id))) return 0;
   const folder = noteFolder(notesDir, id);
+  // As the asynchronous one: a planted link is unlinked, never followed.
+  try { if (fs.lstatSync(folder).isSymbolicLink()) { fs.rmSync(folder, { force: true }); return 0; } } catch { return 0; }
   let names;
   try { names = fs.readdirSync(folder); } catch { return 0; }
   for (const name of names) shred(path.join(folder, name));

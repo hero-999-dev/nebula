@@ -147,13 +147,64 @@ describe('the disk mirror', () => {
     expect(io.calls).toEqual(['seal h1/a', 'remove notes/a.json']);
   });
 
-  it('a file in the notes folder is a plain note, whatever it says of itself', async () => {
+  it('reconciles a markerless newer plain copy with the same sealed id, then removes the plain file', async () => {
+    localStorage.clear();
+    io = bridges({ 'x.json': noteJson('x', { content: 'newer plain edit', updatedAt: 9 }) });
+    await initDiskStorage();
+    store = new NoteStore({ allowSeed: false });
+    store.addHoleNotes('h9', adoptHoleNotes('h9', [noteJson('x', { content: 'older sealed edit', updatedAt: 2 })]));
+    await flushDisk();
+    expect(store.get('x')).toMatchObject({ hole: 'h9', content: 'newer plain edit' });
+    expect(JSON.parse(io.sealed.get('h9/x')).content).toBe('newer plain edit');
+    expect(io.files['x.json']).toBeUndefined();
+    expect(io.calls).toEqual(['seal h9/x', 'remove notes/x.json']);
+  });
+
+  it('keeps the newer sealed content when a markerless plain copy has the same id', async () => {
+    localStorage.clear();
+    io = bridges({ 'x.json': noteJson('x', { content: 'stale plain copy', updatedAt: 2 }) });
+    await initDiskStorage();
+    store = new NoteStore({ allowSeed: false });
+    store.addHoleNotes('h9', adoptHoleNotes('h9', [noteJson('x', { content: 'new sealed edit', updatedAt: 9 })]));
+    await flushDisk();
+    expect(store.get('x')).toMatchObject({ hole: 'h9', content: 'new sealed edit' });
+    expect(JSON.parse(io.sealed.get('h9/x')).content).toBe('new sealed edit');
+    expect(io.files['x.json']).toBeUndefined();
+  });
+
+  it('withholds a past plaintext retry until authenticated unlock, then seals and removes it', async () => {
     localStorage.clear();
     io = bridges({ 'x.json': noteJson('x', { hole: 'h9' }) });
     await initDiskStorage();
     store = new NoteStore({ allowSeed: false });
-    expect('hole' in store.get('x')).toBe(false);
-    expect(store.live().map((n) => n.id)).toEqual(['x']);
+    expect(store.get('x')).toBeFalsy();
+    expect(store.live()).toEqual([]);
+    expect(localStorage.getItem('nebula:notes')).not.toContain('h9');
+    await flushDisk();
+    expect(io.files['x.json']).toBeTruthy();
+    store.addHoleNotes('h9', adoptHoleNotes('h9', []));
+    await flushDisk();
+    expect(store.get('x')).toMatchObject({ hole: 'h9' });
+    expect(io.calls).toEqual(['seal h9/x', 'remove notes/x.json']);
+    expect(io.files['x.json']).toBeUndefined();
+  });
+
+  it('keeps a residue while sealing fails, retries encrypted, and preserves newer sealed edits', async () => {
+    localStorage.clear();
+    io = bridges({ 'x.json': noteJson('x', { hole: 'h9', content: 'old residue', updatedAt: 1 }) });
+    await initDiskStorage();
+    store = new NoteStore({ allowSeed: false });
+    const write = window.nebula.holes.write;
+    window.nebula.holes.write = async () => ({ ok: false, error: 'disk full' });
+    store.addHoleNotes('h9', adoptHoleNotes('h9', [noteJson('x', { content: 'newer sealed', updatedAt: 2 })]));
+    await expect(flushDisk()).rejects.toThrow('disk full');
+    expect(io.files['x.json']).toContain('old residue');
+    expect(io.calls).toEqual([]);
+    window.nebula.holes.write = write;
+    await flushDisk();
+    expect(io.calls).toEqual(['seal h9/x', 'remove notes/x.json']);
+    expect(JSON.parse(io.sealed.get('h9/x')).content).toBe('newer sealed');
+    expect(io.files['x.json']).toBeUndefined();
   });
 });
 

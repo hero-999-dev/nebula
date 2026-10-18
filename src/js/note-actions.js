@@ -162,8 +162,7 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
     trash: {
       empty: 'Trash is empty',
       notes: () => store.trashed(),
-      // No confirm on Delete: the note is already in the trash, and that was
-      // the confirm.
+      // Delete asks "Delete for good?" first — for every note, as for a black hole (the owner, 2026-10-18); Restore still brings a note back.
       actions: [
         ['Restore', (id) => store.restore(id)],
         ['Delete', (id) => store.destroy(id)],
@@ -171,7 +170,7 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
     },
   };
 
-  function drawerRow(note, actions) {
+  function drawerRow(note, actions, drawer = null) {
     const item = document.createElement('div');
     item.className = 'note-item drawer-item';
 
@@ -181,7 +180,10 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
     const title = note.title || 'Untitled';
     row.children[0].textContent = title;
     row.children[0].dataset.initial = title.trim().charAt(0).toUpperCase() || 'U';
-    row.children[1].textContent = plainSnippet(note.content, 44) || 'Empty';
+    const snippet = plainSnippet(note.content, 44) || 'Empty';
+    // A note of a black hole in the Trash says so: destroying it takes its sealed
+    // file away for good, and its Delete asks before doing it (below).
+    row.children[1].textContent = drawer === 'trash' && note.hole ? `Black hole · ${snippet}` : snippet;
     row.title = title;
 
     // The buttons sit to the RIGHT of the note block, not under it.
@@ -191,7 +193,21 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = label;
-      btn.addEventListener('click', () => { run(note.id); onChanged?.(); });
+      // Every Delete in the Trash asks first — one press only arms the
+      // "Delete for good?" that does it (the owner, 2026-10-18): the move to
+      // the trash is undone with Restore, this one is for good.
+      if (drawer === 'trash' && label === 'Delete') {
+        btn.addEventListener('click', () => {
+          if (!btn.classList.contains('is-sure')) {
+            btn.classList.add('is-sure');
+            btn.textContent = 'Delete for good?';
+            return;
+          }
+          run(note.id); onChanged?.();
+        });
+      } else {
+        btn.addEventListener('click', () => { run(note.id); onChanged?.(); });
+      }
       bar.appendChild(btn);
     }
     item.append(row, bar);
@@ -227,7 +243,9 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
     del.type = 'button';
     del.textContent = 'Delete';
     del.addEventListener('click', () => {
-      if (hole.notes && !del.classList.contains('is-sure')) {
+      // The second click, always — an empty black hole is deleted as little
+      // without "Delete for good?" as one that holds notes (the owner, 2026-10-17).
+      if (!del.classList.contains('is-sure')) {
         del.classList.add('is-sure');
         del.textContent = 'Delete for good?';
         return;
@@ -264,7 +282,7 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
       drawerBody.appendChild(none);
       return;
     }
-    for (const note of notes) drawerBody.appendChild(drawerRow(note, set.actions));
+    for (const note of notes) drawerBody.appendChild(drawerRow(note, set.actions, openDrawer));
     for (const hole of holes) drawerBody.appendChild(holeRow(hole));
   }
 

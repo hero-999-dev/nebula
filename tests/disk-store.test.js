@@ -4,8 +4,8 @@
  * wrong file was targeted (and it threw).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { initDiskStorage, flushDisk, hasDiskStorage, getDiskStatus } from '../src/js/disk-store.js';
-import { saveJson } from '../src/js/storage.js';
+import { initDiskStorage, flushDisk, flushNote, hasDiskStorage, getDiskStatus } from '../src/js/disk-store.js';
+import { saveJson, setSaveHook } from '../src/js/storage.js';
 
 function fakeVault({ writeDelay = () => 0 } = {}) {
   const files = new Map();
@@ -181,6 +181,41 @@ describe('disk mirror', () => {
     expect(vault.api.remove).toHaveBeenCalledTimes(2);
   });
 
+  it('retries a failed black-hole save only through encryption, never the plain vault', async () => {
+    const vault = fakeVault();
+    const holes = { write: vi.fn().mockResolvedValueOnce({ ok: false, error: 'disk full' }).mockResolvedValue({ ok: true }), remove: vi.fn(async () => ({ ok: true })) };
+    window.nebula = { storage: vault.api, holes };
+    await initDiskStorage();
+    saveJson('nebula:notes', [{ ...note('secret', 'confidential'), hole: 'bh-safe' }]);
+    await expect(flushDisk()).rejects.toThrow('disk full');
+    await flushDisk();
+    expect(holes.write).toHaveBeenCalledTimes(2);
+    expect(holes.write.mock.calls[1].slice(0, 2)).toEqual(['bh-safe', 'secret']);
+    expect(vault.api.write).not.toHaveBeenCalled();
+    expect(vault.files.size).toBe(0);
+  });
+
+  it('waits for sealing and plain-file removal before acknowledging a moved note', async () => {
+    const vault = fakeVault();
+    let release;
+    const gate = new Promise((resolve) => { release = resolve; });
+    const holes = { write: vi.fn(async () => { await gate; return { ok: true }; }), remove: vi.fn(async () => ({ ok: true })) };
+    window.nebula = { storage: vault.api, holes };
+    await initDiskStorage();
+    saveJson('nebula:notes', [note('secret', 'plain')]);
+    await flushDisk();
+    saveJson('nebula:notes', [{ ...note('secret', 'private'), hole: 'bh-safe' }]);
+    let settled = false;
+    const moved = flushNote('secret').then(() => { settled = true; });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(settled).toBe(false);
+    expect(vault.files.has('secret.json')).toBe(true);
+    release();
+    await moved;
+    expect(holes.write).toHaveBeenCalledOnce();
+    expect(vault.files.has('secret.json')).toBe(false);
+  });
+
   it('queues a return to the acknowledged value behind an unfinished newer write', async () => {
     const vault = fakeVault({ writeDelay: () => 3 });
     window.nebula = { storage: vault.api };
@@ -198,5 +233,15 @@ describe('disk mirror', () => {
     expect(status).toEqual({ bridge: false, ok: true, empty: true, error: null });
     expect(hasDiskStorage()).toBe(false);
     expect(() => saveJson('nebula:notes', [note('n1', 'x')])).not.toThrow();
+  });
+
+  it('never caches encrypted notes if the disk hook is absent or throws', () => {
+    localStorage.setItem('nebula:notes', '[]');
+    for (const hook of [null, () => { throw new Error('mirror unavailable'); }]) {
+      setSaveHook(hook);
+      expect(() => saveJson('nebula:notes', [{ ...note('secret', 'confidential'), hole: 'bh-safe' }])).toThrow('Encrypted notes require black-hole storage');
+      expect(localStorage.getItem('nebula:notes')).toBe('[]');
+    }
+    setSaveHook(null);
   });
 });
