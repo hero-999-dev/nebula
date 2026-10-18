@@ -304,7 +304,7 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '0.9.8';
+export const GUIDE_VERSION = '0.9.9';
 
 /**
  * The guide's words, without its markup, shapes, code or equations — so a
@@ -510,6 +510,10 @@ export const GUIDE_SIGNATURES = {
   '0.9.8 de': '64589292',
   '0.9.8 pl': '2518e665',
   '0.9.8 tr': '6b8bf964',
+  '0.9.9': 'a72d9cfb',
+  '0.9.9 de': '20d409c3',
+  '0.9.9 pl': '7b616b0e',
+  '0.9.9 tr': 'fc94db91',
 };
 
 /** Whether a vault's guide is one we shipped and nobody has typed in. */
@@ -545,7 +549,7 @@ export const GUIDE_NOTE = {
     // section they belong to. See GUIDE_SIGNATURES before changing any text.
     // A divider closes each section before the next heading (owner, 0.8.9).
     '<hr class="blk-hr">' +
-    '<h2>New in 0.9.8</h2>' +
+    '<h2>New in 0.9.9</h2>' +
     '<p><strong>Black holes ask before they destroy.</strong> Every note in the Trash needs a second press to delete for good; a black hole also asks for its PIN or passkey. An open black hole can make a new recovery key from its ⋯ menu, showing it once and ending the old key. A PIN change asks for the current PIN or passkey first.</p>' +
     '<p><strong>Try it:</strong> With a throwaway note, press Delete once in the Trash and read the changed button before you press it again. In an open black hole, look under ⋯ for New recovery key.</p>' +
     '<hr class="blk-hr">' +

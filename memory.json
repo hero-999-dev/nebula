@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.9.8",
+  "version": "0.9.9",
   "lastUpdated": "2026-10-18",
-  "currentPhase": "v0.9.8 release candidate: Blackhole deletion confirmation, protected labels, seal-then-purge moves and large-file responsiveness. Every Trash Delete asks 'Delete for good?' (Blackhole notes labelled 'Black hole'), a note in a hole offers 'Move to notes', and a PIN change proves the current PIN or passkey first; an open hole's menu rotates its recovery key. Electron 44.9.0. v0.9.7 passed local release gates and was tagged, but its Windows CI job failed on two unrelated timing-sensitive smoke checks, so no combined GitHub release was published. The AI webview probe now waits for attachment and the AI sleep test focuses its input and waits for the draft. Unit 1276/1276, focused AI sleep and prior full smoke 1041/1041 passed locally; v0.9.8 release gates pending.",
-  "next": "Run the full v0.9.8 release chain, confirm both Windows and macOS GitHub jobs and published assets, then owner tests the root Nebula Test.exe per docs/BLACKHOLE-TESTS.md. Physical Windows Hello and macOS behavior require those environments. Report: test-results/orchestra/security-2026-10-17/RAPOR.md.",
+  "currentPhase": "v0.9.9 release candidate: Blackhole deletion confirmation, protected labels, seal-then-purge moves and large-file responsiveness. Electron 44.9.0. v0.9.7 and v0.9.8 passed local release gates but their Windows CI smoke failed on unrelated timing-sensitive checks, so neither combined GitHub release was published. AI guest attachment and draft focus checks now pass in CI. The 0.9.8 Windows run exposed two more race-prone smoke assertions: page metadata baseline before a debounced save, and backup shred before its asynchronous completion. Both tests now wait for the actual disk state. Unit 1276/1276 passed; full v0.9.9 release gates pending.",
+  "next": "Run the full v0.9.9 release chain, confirm both Windows and macOS GitHub jobs and published assets, then owner tests the root Nebula Test.exe per docs/BLACKHOLE-TESTS.md. Physical Windows Hello and macOS behavior require those environments. Report: test-results/orchestra/security-2026-10-17/RAPOR.md.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -88,6 +88,12 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "date": "2026-10-18",
+      "version": "0.9.9",
+      "by": "Codex",
+      "what": "v0.9.8 local release gates passed 1276/1276 and 1041/1041, but Windows CI passed the repaired AI checks and failed two other asynchronous smoke assertions at 1039/1041; macOS packaging passed and combined release was skipped. The page metadata check now waits for the preceding debounced edit to reach disk before comparing timestamps. The markerless plaintext recovery check waits for backup shredding to finish after the plain vault file disappears. The 0.9.9 guide headings and signatures identify the shipping build. Full release gates and both CI packages pending."
+    },
     {
       "date": "2026-10-18",
       "version": "0.9.8",

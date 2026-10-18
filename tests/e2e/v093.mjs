@@ -595,9 +595,12 @@ export async function runV093Checks(check) {
 
     // ---- The page width beside Saved (0.9.3) -----------------------------
     const column = () => win.evaluate(() => Math.round(document.querySelector('#editor p, #editor div, #editor li')?.getBoundingClientRect().width ?? 0));
-    await win.waitForTimeout(700);    // the last edit's save has landed
+    // The preceding editor input is debounced; wait for its dated disk write
+    // before taking the baseline for a page-only change.
     const pageNote = await win.evaluate(() => document.querySelector('#title').value);
-    const datedBefore = JSON.parse(fs.readFileSync(path.join(notes, pageNote, `${pageNote}.json`), 'utf8')).updatedAt;
+    const pageFile = path.join(notes, pageNote, `${pageNote}.json`);
+    for (let i = 0; i < 50 && JSON.parse(fs.readFileSync(pageFile, 'utf8')).updatedAt === 1; i++) await win.waitForTimeout(100);
+    const datedBefore = JSON.parse(fs.readFileSync(pageFile, 'utf8')).updatedAt;
     // 100 % is real size: the line measured on screen, over the page's zoom, is the paper's in CSS pixels.
     const pageZoom = () => win.evaluate(() => Number.parseFloat(document.getElementById('editor').style.zoom || '1'));
     await win.click('#page-modes [data-page="a5"]');

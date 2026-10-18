@@ -1,6 +1,21 @@
 # Nebula release log
 
 
+## [2026-10-18 14:35] v0.9.9 - by release-script
+
+Blackhole safety release with reliable Windows CI checks
+
+* (no commits since the last release)
+
+---
+
+## [2026-10-18 14:05] v0.9.9 - by Codex (Windows CI timing repair; release pending)
+
+The v0.9.8 local gates passed, including 1276/1276 unit and 1041/1041 Electron smoke checks, but Windows CI passed the repaired AI checks and then failed 2/1041 different timing assertions. The page test had taken its timestamp baseline before the preceding debounced editor save reached disk. The Blackhole recovery test saw the plain source removed before asynchronous backup shredding finished. Both checks now wait for the respective disk result. No security behavior was relaxed. The macOS package job passed, but the combined release was skipped. The guide's four language headings and signatures and release notes now target v0.9.9. Unit 1276/1276, build and full smoke 1041/1041 now pass locally. No installed app or private profile was accessed.
+
+---
+
+
 ## [2026-10-18 07:07] v0.9.8 - by release-script
 
 Blackhole safety release with reliable CI smoke checks

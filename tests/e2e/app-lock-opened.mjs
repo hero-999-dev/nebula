@@ -79,6 +79,8 @@ export async function runAppLockOpenedChecks(check) {
     await win.waitForFunction(() => document.querySelector('#note-list').textContent.includes('Newer plain copy'));
     for (let i = 0; i < 50 && fs.existsSync(markerlessFile); i++) await win.waitForTimeout(100);
     check('exact-id markerless copy is resealed and removed after unlock', !fs.existsSync(markerlessFile));
+    // The vault copy can disappear before the backup's bounded async shred finishes.
+    for (let i = 0; i < 50 && fs.existsSync(markerlessBackup); i++) await win.waitForTimeout(100);
     check('reconciled markerless plaintext also leaves the backup', !fs.existsSync(markerlessBackup));
     const reconciled = await win.evaluate((holeId) => window.nebula.holes.unlock(holeId, {}), id);
     check('reconciliation keeps the newer markerless edit', reconciled.notes?.some((raw) => JSON.parse(raw).content === 'markerless secret'));

@@ -14,7 +14,7 @@ export default {
     /* 001 */ `<p>Notlar için sakin bir yer. Her şey kendiliğinden kaydedilir — unutulacak bir kaydet düğmesi yoktur; yine de isterseniz <span class="inline-code">Ctrl+S</span> çalışır.</p>`,
     /* 002 */ `<p>Bu, tek sayfada bütün rehberdir. Her bölümde hemen deneyebileceğiniz bir şey var; okuduğunuz metin sıradan bir nottur — düzenleyin, bozun ya da işiniz bitince silin. Kendi notlarınıza bir güncelleme asla dokunmaz — bu sayfa da yalnızca siz içine yazmadığınız sürece kendini günceller.</p>`,
     /* 003 */ `<p>Bu sayfa <strong>Yalnızca görüntüleme</strong> modunda açılır (başlığının yanındaki 🔒 rozeti), böylece burada hiçbir şey yanlışlıkla değişmez. Üzerinde bir şeyler denemek için rozete tıklayın ya da not listesinde ⋯ → Düzenleme modu’nu seçin — ya da yeni bir notta deneyin.</p>`,
-    /* 004 */ `<h2>0.9.8 ile gelenler</h2>`,
+    /* 004 */ `<h2>0.9.9 ile gelenler</h2>`,
     /* 005 */ `<p><strong>Kara delikler silmeden önce sorar.</strong> Çöp'teki her not kalıcı silme için ikinci basışı ister; kara delik ayrıca PIN veya geçiş anahtarı sorar. Açık kara deliğin ⋯ menüsünden yeni bir kurtarma anahtarı oluşturabilirsiniz: yenisi bir kez gösterilir, eskisi geçersiz olur. PIN değişikliği de önce mevcut PIN'i veya geçiş anahtarını ister.</p>`,
     /* 006 */ `<p><strong>Deneyin:</strong> Deneme notunu Çöp'e atıp Sil'e bir kez basın; ikinci basıştan önce düğmedeki uyarıyı okuyun. Açık kara deliğin ⋯ menüsünde Yeni kurtarma anahtarı seçeneğine bakın.</p>`,
     /* 007 */ `<h2>0.9.6 ile gelenler</h2>`,
