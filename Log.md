@@ -1,5 +1,11 @@
 # Nebula release log
 
+## [2026-10-18 14:40] v0.9.9 - by Codex (release verified)
+
+The full release chain passed: 1276/1276 unit tests, 1041/1041 Electron smoke checks, both Dünya Halleri rebuilds at 100%, and old-note trials on Test-profile copies. GitHub Actions run 39127956630 passed Windows build, macOS build and publish. The public Release contains the Windows installer/portable, macOS DMG/ZIP and both update manifests. The local Nebula Test.exe, docs site and USB mirror were refreshed. Manual owner checks remain in docs/BLACKHOLE-TESTS.md.
+
+---
+
 
 ## [2026-10-18 14:35] v0.9.9 - by release-script
 

@@ -2242,6 +2242,7 @@ an unparseable tag returns null rather than a wrong answer.
 - Full unit suite 1276/1276; focused e2e 86/86; full smoke 1041/1041. `npm run pack:test` refreshed the root Nebula Test.exe.
 ## 2026-10-18 — v0.9.9 Windows CI disk timing (Codex)
 
+- Release verified: `npm run push` passed 1276/1276 unit, 1041/1041 Electron smoke, both Dünya Halleri rebuilds at 100% and old-note trials. GitHub Actions Release run 39127956630 passed build-win, build-mac and publish; v0.9.9 has Windows installer/portable, macOS DMG/ZIP, `latest.yml` and `latest-mac.yml`.
 - v0.9.8 passed local release gates (1276/1276 unit, 1041/1041 smoke, two page rebuilds 100%, old-note trials) and its macOS CI package. Windows CI passed both repaired AI checks but failed 1039/1041 on two different disk timing assertions, so the combined GitHub release was skipped.
 - `tests/e2e/v093.mjs` now waits for the preceding editor edit's debounced disk write before comparing the timestamp around a page-only change. `tests/e2e/app-lock-opened.mjs` waits for backup shredding separately after the live markerless plain file disappears. The checks still prove that page changes do not date a note and reconciled plaintext leaves the backup.
 - `npm test` passed 1276/1276 after the timing edits. `npm run build` and full Electron smoke passed 1041/1041 with both formerly failing disk assertions green. The full v0.9.9 release chain will rerun unit, smoke, old-note trials and page rebuild; GitHub Windows and macOS packaging remain to confirm.
