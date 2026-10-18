@@ -964,17 +964,23 @@ export async function runV093Checks(check) {
       view.id = 'passkey-probe';
       view.setAttribute('partition', 'persist:ai-claude');
       view.setAttribute('src', url);
-      view.style.cssText = 'position:fixed;left:0;top:0;width:200px;height:100px;visibility:hidden';
+      // Keep the guest composited so Electron attaches it on slower CI hosts.
+      // Opacity hides the probe without the visibility state that can defer it.
+      view.style.cssText = 'position:fixed;left:0;top:0;width:200px;height:100px;opacity:0;pointer-events:none';
       document.body.append(view);
     }, origin);
-    await win.waitForTimeout(2500);
-    // Asked in the guest itself, from the main process: what a sign-in page's script would see.
-    const probe = await app.evaluate(async ({ webContents }) => {
-      const guest = webContents.getAllWebContents().find((w) => w.getType() === 'webview' && w.getURL().startsWith('http://127.0.0.1'));
-      if (!guest) return 'no guest';
-      return guest.executeJavaScript(`navigator.credentials.get({ publicKey: { challenge: new Uint8Array(8) } })
-        .then(() => 'offered', (e) => e.name).then((how) => [typeof PublicKeyCredential, how].join(','))`);
-    });
+    // Asked in the guest itself, from the main process: what a sign-in page's
+    // script would see. Attachment is asynchronous and can exceed 2.5 s in CI.
+    let probe = 'no guest';
+    for (let attempt = 0; attempt < 50 && probe === 'no guest'; attempt += 1) {
+      probe = await app.evaluate(async ({ webContents }) => {
+        const guest = webContents.getAllWebContents().find((w) => w.getType() === 'webview' && w.getURL().startsWith('http://127.0.0.1'));
+        if (!guest) return 'no guest';
+        return guest.executeJavaScript(`navigator.credentials.get({ publicKey: { challenge: new Uint8Array(8) } })
+          .then(() => 'offered', (e) => e.name).then((how) => [typeof PublicKeyCredential, how].join(','))`);
+      });
+      if (probe === 'no guest') await win.waitForTimeout(200);
+    }
     await win.evaluate(() => document.getElementById('passkey-probe')?.remove());
     // A service's own tab (here Claude's) is left as the browser made it
     // (0.9.3): passkeys are off in Blink, so the request is refused at once

@@ -1,3 +1,9 @@
+## 2026-10-18 — v0.9.8 CI timing regressions (Codex)
+
+- v0.9.7 local release gates passed, but Windows GitHub Actions smoke failed 1040/1041 in the first attempt: the temporary AI passkey webview had not attached after a fixed 2.5 s wait. The second attempt failed 1039/1041: keyboard events reached the AI sleep guest before its textarea was focused, leaving the draft empty. The failures were in different tests; the macOS package job passed both times, but the combined GitHub release was skipped.
+- `tests/e2e/v093.mjs` keeps the probe composited at zero opacity and polls the main-process webContents for attachment for up to 10 seconds. It still checks the actual credential API result in the guest. `tests/e2e/ai-sleep.mjs` explicitly focuses the guest textarea before real keyboard events and waits for the expected draft before checking it. The focused AI sleep suite and the earlier full local smoke 1041/1041 passed after the first fix; the full v0.9.8 release chain verifies both fixes together.
+- The 0.9.8 guide heading and four signatures identify the actual shipping version; 0.9.7 signatures remain recorded for test profiles that already saw it.
+
 ## 2026-10-18 — v0.9.7 release preparation (Codex + Mistral Vibe)
 
 - Mistral's final independent review approved the trash confirmation, PIN proof, recovery rotation, menu wording, guide and tracking changes. The latest full validation before release was unit 1276/1276, Blackhole Electron e2e 86/86, smoke 1041/1041, build and pack:test passed.

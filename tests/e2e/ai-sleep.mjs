@@ -83,6 +83,9 @@ export async function runAiSleepChecks(check) {
       let w = find();
       for (let i = 0; i < 80 && !w; i += 1) { await new Promise((r) => setTimeout(r, 100)); w = find(); }
       w.focus();
+      // The webview URL can exist before the page's autofocus runs on CI.
+      // Focus the actual input before sending keyboard events into the guest.
+      await w.executeJavaScript('document.getElementById("t")?.focus()');
       for (const key of keys) {
         w.sendInputEvent({ type: 'keyDown', keyCode: key });
         if (key.length === 1) w.sendInputEvent({ type: 'char', keyCode: key });
@@ -98,8 +101,8 @@ export async function runAiSleepChecks(check) {
     await win.waitForTimeout(700);
     // Words typed in "two", and not sent.
     await typeIn('two', [...'draft']);
-    await win.waitForTimeout(200);
-    const draft = await written('two');
+    let draft = await written('two');
+    for (let i = 0; i < 30 && draft !== 'draft'; i += 1) { await win.waitForTimeout(100); draft = await written('two'); }
     await tab('three');
     await win.waitForTimeout(700);
     // A slow machine has not begun "three" in 700 ms (the 0.9.6 release build saw one,two): wait for it.

@@ -14,7 +14,7 @@ export default {
     /* 001 */ `<p>Spokojne miejsce na notatki. Wszystko zapisuje się samo — nie ma przycisku zapisu, o którym można zapomnieć, choć <span class="inline-code">Ctrl+S</span> działa, jeśli go potrzebujesz.</p>`,
     /* 002 */ `<p>To cały przewodnik na jednej stronie. W każdej części jest coś, co można od razu wypróbować; tekst, który czytasz, jest zwykłą notatką — edytuj ją, zepsuj albo usuń, gdy skończysz. Twoich własnych notatek aktualizacja nigdy nie rusza — a ta strona aktualizuje się tylko dopóty, dopóki nic w niej nie napiszesz.</p>`,
     /* 003 */ `<p>Ta strona otwiera się w trybie <strong>Tylko do odczytu</strong> (plakietka 🔒 przy tytule), więc nic tu nie zmieni się przypadkiem. Aby coś na niej wypróbować, kliknij plakietkę albo wybierz na liście notatek ⋯ → Tryb edycji — albo wypróbuj to w nowej notatce.</p>`,
-    /* 004 */ `<h2>Nowości w 0.9.7</h2>`,
+    /* 004 */ `<h2>Nowości w 0.9.8</h2>`,
     /* 005 */ `<p><strong>Czarne dziury pytają przed trwałym usunięciem.</strong> Każda notatka w Koszu wymaga drugiego kliknięcia, aby usunąć ją na stałe; czarna dziura prosi także o PIN lub klucz dostępu. W menu ⋯ otwartej czarnej dziury można utworzyć nowy klucz odzyskiwania: nowy pokazuje się raz, a stary przestaje działać. Zmiana PIN-u wymaga najpierw aktualnego PIN-u lub klucza dostępu.</p>`,
     /* 006 */ `<p><strong>Wypróbuj:</strong> Przenieś próbną notatkę do Kosza i kliknij Usuń raz. Przeczytaj ostrzeżenie na przycisku przed drugim kliknięciem. W menu ⋯ otwartej czarnej dziury znajdź Nowy klucz odzyskiwania.</p>`,
     /* 007 */ `<h2>Nowości w 0.9.6</h2>`,

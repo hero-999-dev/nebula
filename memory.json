@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "lastUpdated": "2026-10-18",
-  "currentPhase": "v0.9.7 released: Blackhole deletion confirmation, protected labels, seal-then-purge moves and large-file responsiveness. Blackhole/note/media/backup/opened-copy deletion uses bounded asynchronous shredding; lock/removal/deletion races, short writes and planted links are guarded. Every Trash Delete asks 'Delete for good?' (Blackhole notes labelled 'Black hole'), a note in a hole offers 'Move to notes', and a PIN change proves the current PIN or passkey first; an open hole's menu rotates its recovery key (old key dies, new one shown once). Electron 44.9.0. Unit 1276/1276, focused black-holes e2e 86/86, full smoke 1041/1041, rebuild 100% on two pages and old-note trials passed. Final Mistral review approved; GitHub tag v0.9.7, Nebula Test.exe, docs site and USB mirror updated.",
-  "next": "Owner tests the refreshed root Nebula Test.exe per docs/BLACKHOLE-TESTS.md. Verify the GitHub Windows release job and physical Windows Hello and macOS behavior in their environments. Report: test-results/orchestra/security-2026-10-17/RAPOR.md.",
+  "currentPhase": "v0.9.8 release candidate: Blackhole deletion confirmation, protected labels, seal-then-purge moves and large-file responsiveness. Every Trash Delete asks 'Delete for good?' (Blackhole notes labelled 'Black hole'), a note in a hole offers 'Move to notes', and a PIN change proves the current PIN or passkey first; an open hole's menu rotates its recovery key. Electron 44.9.0. v0.9.7 passed local release gates and was tagged, but its Windows CI job failed on two unrelated timing-sensitive smoke checks, so no combined GitHub release was published. The AI webview probe now waits for attachment and the AI sleep test focuses its input and waits for the draft. Unit 1276/1276, focused AI sleep and prior full smoke 1041/1041 passed locally; v0.9.8 release gates pending.",
+  "next": "Run the full v0.9.8 release chain, confirm both Windows and macOS GitHub jobs and published assets, then owner tests the root Nebula Test.exe per docs/BLACKHOLE-TESTS.md. Physical Windows Hello and macOS behavior require those environments. Report: test-results/orchestra/security-2026-10-17/RAPOR.md.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -88,6 +88,12 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "date": "2026-10-18",
+      "version": "0.9.8",
+      "by": "Codex",
+      "what": "The v0.9.7 tag passed local release gates but Windows CI failed at 1040/1041 and 1039/1041 on two different AI webview timing checks, leaving the combined release unpublished. Corrected the passkey probe to keep its webview composited and wait for attachment, and the AI sleep keyboard test to focus its textarea and wait for the typed draft. Both had passed locally before the CI failures; focused AI sleep passed after the fix. Release notes and four-language guide heading prepared for the actual shipping v0.9.8. Full release gates and both CI packages pending."
+    },
     {
       "date": "2026-10-18",
       "version": "0.9.7",

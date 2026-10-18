@@ -1,6 +1,23 @@
 # Nebula release log
 
 
+## [2026-10-18 07:07] v0.9.8 - by release-script
+
+Blackhole safety release with reliable CI smoke checks
+
+* Record v0.9.7 release completion
+
+---
+
+## [2026-10-18 06:45] v0.9.8 - by Codex (CI test timing repair; release pending)
+
+v0.9.7 was tagged after all local gates passed, but GitHub's Windows smoke failed in two separate AI guest timing checks on consecutive attempts, so the combined GitHub release and Windows downloads were not published. The passkey probe now waits for its hidden guest to attach while keeping it composited; the AI sleep test focuses its textarea before keyboard input and waits for the draft. The checks still assert the same product behavior. Release notes and the four-language guide heading were prepared for v0.9.8; the old guide signatures remain recognized. No installed app or private profile was accessed.
+
+Validation before the v0.9.8 release chain: 1276/1276 unit tests, full local smoke 1041/1041 after the passkey-probe fix, focused AI sleep passed after the textarea fix. The full v0.9.8 chain will repeat all gates with both test fixes.
+
+---
+
+
 ## [2026-10-18 06:15] v0.9.7 - by Codex + Mistral Vibe
 
 Owner authorized the release after Mistral's final review. Blackhole names are protected in local metadata and backups; note moves commit the sealed copy before removing plain copies; large-file reads, writes and shredding yield so the window stays responsive. All Trash Delete actions require a second press, a Blackhole note is labelled in Trash, PIN changes prove the current PIN or passkey, and an open hole can rotate its recovery key. Release notes and the guide cover the new behavior in four languages. The manual checklist is in `docs/BLACKHOLE-TESTS.md`.
