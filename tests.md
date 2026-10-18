@@ -2,7 +2,7 @@
 
 - Mistral's final independent review approved the trash confirmation, PIN proof, recovery rotation, menu wording, guide and tracking changes. The latest full validation before release was unit 1276/1276, Blackhole Electron e2e 86/86, smoke 1041/1041, build and pack:test passed.
 - The 0.9.7 release notes and guide section were added in English, German, Polish and Turkish. The old key bullet was removed from the 0.9.6 guide list; the new guide signatures were recorded. `tests/seed-guide.test.js` and `tests/guide-i18n.test.js` pass 24/24, proving the translated block order and signatures agree.
-- `npm run push` reruns unit tests, build, full smoke, the page rebuild and old-note trials before committing and publishing. Its result is recorded in the release entry.
+- `npm run push` passed unit 1276/1276, smoke 1041/1041, rebuild 100% on two pages with long-note trials and old-note trials on Nebula Test copies. It pushed v0.9.7, refreshed Nebula Test.exe, published the site and synced the USB mirror.
 
 ## 2026-10-17 06:38 — v0.9.6: Blackhole security follow-up (Codex + GLM-5.3 via Mistral Vibe)
 

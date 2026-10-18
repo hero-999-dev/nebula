@@ -1,10 +1,11 @@
 # Nebula release log
 
 
-## [2026-10-18 06:15] v0.9.7 - by release-script
+## [2026-10-18 06:15] v0.9.7 - by Codex + Mistral Vibe
 
+Owner authorized the release after Mistral's final review. Blackhole names are protected in local metadata and backups; note moves commit the sealed copy before removing plain copies; large-file reads, writes and shredding yield so the window stays responsive. All Trash Delete actions require a second press, a Blackhole note is labelled in Trash, PIN changes prove the current PIN or passkey, and an open hole can rotate its recovery key. Release notes and the guide cover the new behavior in four languages. The manual checklist is in `docs/BLACKHOLE-TESTS.md`.
 
-* Site: rebuilt with the v0.9.6 build repairs
+Release gates passed: 1276/1276 unit tests, 1041/1041 Electron smoke checks, two rebuilt pages at 100% with their long-note trials, and old-note trials on copies from Nebula Test. Electron/browser check passed at Electron 44.9.0. Tag v0.9.7 was pushed; local `Nebula Test.exe`, docs site and USB mirror were refreshed. The test executable SHA-256 is D5A291DD0C8258029C3E2765A483023685AFBFC8F8154B4C41AB2E0F31894F8D. macOS CI package passed; Windows CI package is checked separately. No installed app or private profile was accessed.
 
 ---
 
