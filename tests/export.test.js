@@ -158,6 +158,18 @@ describe('toPrintDocument', () => {
     expect(toHtml(body, 'n')).not.toContain('shape rect');      // a web page cannot place it
   });
 
+  it('fits a table to the paper: each column its share, the table no wider than its place (1.0.0)', () => {
+    const body = '<div class="blk-table"><table><colgroup><col style="width: 600px;"><col style="width: 200px;"></colgroup><tbody><tr><td>a</td><td>b</td></tr></tbody></table></div>';
+    const doc = new DOMParser().parseFromString(toPrintDocument({ body }), 'text/html');
+    const table = doc.querySelector('.blk-table > table');
+    expect(table.getAttribute('style')).toContain('min(800px, 100%)');
+    expect([...doc.querySelectorAll('col')].map((c) => c.style.width)).toEqual(['75%', '25%']);
+    // A column drawn narrower on screen keeps its own width in data-w: the share is of the own widths.
+    const drawn = body.replace('<col style="width: 600px;">', '<col style="width: 300px;" data-w="600">');
+    const again = new DOMParser().parseFromString(toPrintDocument({ body: drawn }), 'text/html');
+    expect(again.querySelector('col').style.width).toBe('75%');
+  });
+
   it('is a complete document', () => {
     const out = toPrintDocument({ title: 'Note', body: '<p>hello</p>' });
     expect(out.startsWith('<!doctype html>')).toBe(true);

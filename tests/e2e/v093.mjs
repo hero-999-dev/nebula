@@ -112,6 +112,8 @@ export async function runV093Checks(check) {
     });
     check('the four languages are always open, right of the version, and fit', row.visible && row.rightOfVersion && row.fits && !row.cut
       && row.names === 'English,Deutsch,Polski,Türkçe', JSON.stringify(row));
+    const spellLangs = () => app.evaluate(({ session }) => session.defaultSession.getSpellCheckerLanguages());
+    const spellBefore = JSON.stringify(await spellLangs());
     await win.evaluate(() => document.querySelector('#lang-row [data-lang="de"]').click());
     const de = await win.evaluate(() => ({
       newNote: document.getElementById('btn-new').textContent.trim(),
@@ -121,8 +123,9 @@ export async function runV093Checks(check) {
       lang: document.documentElement.lang,
     }));
     check('Deutsch: the interface is German', de.newNote === 'Neue Notiz' && de.filter === 'Notizen filtern…' && de.menu === 'Datei' && de.lang === 'de' && de.on === 'de', JSON.stringify(de));
-    check('spelling is checked in the chosen language only', JSON.stringify(await app.evaluate(({ session }) => session.defaultSession.getSpellCheckerLanguages()))
-      === JSON.stringify(['de-DE']) || (await app.evaluate(({ session }) => session.defaultSession.availableSpellCheckerLanguages.includes('de-DE'))) === false);
+    // 1.0.0: spelling follows the languages ticked in Settings (tests/e2e/spelling.mjs), not the interface's.
+    await win.waitForTimeout(200);
+    check('the interface language leaves the spelling languages as Settings has them', JSON.stringify(await spellLangs()) === spellBefore, spellBefore);
     check('a language never changes the note', await html() === noteBefore);
     await win.evaluate(() => document.querySelector('#lang-row [data-lang="tr"]').click());
     check('Türkçe: the menus follow', await win.evaluate(() => document.getElementById('btn-new').textContent.trim() === 'Yeni not'
@@ -873,6 +876,8 @@ export async function runV093Checks(check) {
     check('a note dragged onto a folder goes into it', await win.evaluate(() =>
       !!document.querySelector('#note-list .folder-notes .note-row[title="picture"]')));
     const before = (await listed()).filter((x) => !x.startsWith('[') && x !== 'picture');
+    // 1.0.0: the map below the list leaves it shorter — both rows brought into view first.
+    await win.evaluate((t) => document.querySelector(`#note-list .note-row[title="${t}"]`).scrollIntoView({ block: 'start' }), before[0]);
     await win.dragAndDrop(noteRow(before[3]), noteRow(before[0]), { targetPosition: { x: 20, y: 3 } });
     await win.waitForTimeout(200);
     const after = (await listed()).filter((x) => !x.startsWith('[') && x !== 'picture');

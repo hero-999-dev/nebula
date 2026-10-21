@@ -45,7 +45,7 @@
    (a paper's printed line, or Nebula Narrow), centred, and the paper's own
    edges — the column plus its 12.7 mm print margins — are drawn faintly, so
    the sheet can be seen. The caret wraps where the line will wrap on paper. */
-#editor[data-paper] {
+#editor[data-paper], .split-ghost[data-paper] {
   /* The scroll bar's room comes out of the editor's width too, or the line
      came out 10px short of the paper's (--sb is measured by page-mode.js). */
   scrollbar-gutter: stable;
@@ -77,13 +77,13 @@
   background-position: 0 0, 0 calc(16px - var(--page-title, 0px));
   background-attachment: local, local;
 }
-#editor { --page-break-line: color-mix(in srgb, var(--ink-faint) 38%, transparent); }
+#editor, .split-ghost { --page-break-line: color-mix(in srgb, var(--ink-faint) 38%, transparent); }
 /* Nebula Wide: the writing ends as far from the frame at the right as it
    begins at the left. The scroll bar stood between the two there, so a
    divider — and a table that fills its line — ended its width short: "on the
    right side the divider falls short" (the owner's Ideas note, 0.9.4). Its
    room is kept whether the note scrolls or not, and taken out of the padding. */
-#editor:not([data-paper]) { scrollbar-gutter: stable; padding-right: max(18px, calc(28px - var(--sb, 10px))); }
+#editor:not([data-paper]), .split-ghost:not([data-paper]) { scrollbar-gutter: stable; padding-right: max(18px, calc(28px - var(--sb, 10px))); }
 .page-mode-hint {
   position: fixed;
   z-index: 90;
@@ -97,7 +97,7 @@
   box-shadow: 0 8px 22px var(--shadow);
   pointer-events: none;
 }
-#editor { --page-out: color-mix(in srgb, var(--paper-sunken) 55%, transparent); }
+#editor, .split-ghost { --page-out: color-mix(in srgb, var(--paper-sunken) 55%, transparent); }
 
 
 /* ---------- the editing shell: bar can sit on any side ---------- */
@@ -108,6 +108,12 @@
   padding: 14px 22px 20px;
   gap: 12px;
 }
+/* The ground round the page takes a click as the page does (gap-caret.js), so
+   the pointer says so there too: it stayed an arrow, "pointing at a place
+   where there is room, no text cursor shows" (1.0.0, the owner). What stands
+   on that ground keeps its own. */
+.edit-shell, .editor-frame { cursor: text; }
+.edit-shell > :not(.editor-frame), .editor-frame > * { cursor: auto; }
 .edit-shell.bar-top { flex-direction: column; }
 .edit-shell.bar-bottom { flex-direction: column-reverse; }
 .edit-shell.bar-left { flex-direction: row; }
@@ -793,7 +799,9 @@ body.divider-dragging .link-frame { pointer-events: none; }
    100% here is the editor's padding box — its width less the scroll bar —
    which the paper is centred in. */
 #editor[data-paper] > .shape-layer,
-#editor[data-paper] > .image-layer {
+#editor[data-paper] > .image-layer,
+.split-ghost[data-paper] > .shape-layer,
+.split-ghost[data-paper] > .image-layer {
   left: max(0px, calc((100% - var(--page-col, 100%) - 2 * var(--page-margin, 48px)) / 2));
   right: auto;
   width: calc(var(--page-col, 100%) + 2 * var(--page-margin, 48px));
@@ -1051,6 +1059,44 @@ body.divider-dragging .link-frame { pointer-events: none; }
 body.block-dragging { user-select: none; }
 body.block-dragging, body.block-dragging * { cursor: grabbing !important; }
 body.block-dragging .link-frame { pointer-events: none; }
+
+/* Every block's grip, as in Notion (1.0.0, block-handle.js): it comes up at
+   the left of the block the pointer is on. Pulled, the block goes with the
+   pointer; clicked, the block is picked. */
+.block-grip {
+  position: fixed;
+  z-index: 92;
+  width: 10px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--ink-faint);
+  cursor: grab;
+  user-select: none;
+}
+.block-grip:hover { background: var(--paper-sunken); color: var(--ink-soft); }
+.block-grip[hidden] { display: none; }
+.block-grip svg { width: 4px; height: 16px; fill: currentColor; pointer-events: none; }
+.editor .block-picked { background: color-mix(in srgb, var(--clay-soft) 55%, transparent); border-radius: 4px; box-shadow: 0 0 0 2px color-mix(in srgb, var(--clay-soft) 55%, transparent); }
+.editor .block-lifted { opacity: .35; }
+/* The faint copy that follows the pointer. It is an .editor for the note's
+   look, without the editor's frame. */
+.editor.block-ghost {
+  position: fixed;
+  z-index: 96;
+  flex: none;
+  min-height: 0;
+  max-height: 260px;
+  padding: 0;
+  overflow: hidden;
+  opacity: .55;
+  pointer-events: none;
+  background: transparent;
+  background-image: none;
+}
+.editor.block-ghost .block-ghost-media { min-height: 60px; border-radius: 6px; background: var(--paper-sunken); }
 
 /* ---------- tables (0.9.4, table.js) ----------
    The note holds the table and its cells; the numbering, the grips, the two +,
@@ -2370,4 +2416,154 @@ body.resizing { cursor: col-resize; user-select: none; }
 }
 .label-options input {
   accent-color: var(--clay);
+}
+
+/* Widgets (1.0.0, widgets.js): a calculator, a scientific calculator and a
+   calendar placed like pictures. Everything inside is measured in the widget's
+   own width (cqw), so making it bigger or smaller scales all of it. */
+/* The figure is the container too: the .wg's own padding and gap are in cqw,
+   and an element's cqw is its parent container's — with none above, they
+   followed the window, and a widget made small kept wide margins (owner, 1.0.0). */
+.note-image.note-widget { container-type: inline-size; overflow: hidden; background: var(--paper-raised); border-color: var(--rule); border-radius: 12px; }
+.note-widget > .wg {
+  container-type: inline-size;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 4cqw;
+  gap: 3cqw;
+  color: var(--ink);
+  font-family: var(--sans, Inter, 'Segoe UI', sans-serif);
+  line-height: 1.2;
+  text-align: left;
+  white-space: normal;
+  user-select: none;
+}
+.note-widget > .wg--calc { aspect-ratio: .72; }
+.note-widget > .wg--sci { aspect-ratio: .95; padding: 3cqw; gap: 2.2cqw; }
+.note-widget > .wg--calendar { aspect-ratio: .92; }
+/* The Universe (1.0.0): a title bar and the sky; in the editor the live map
+   (.wg-live, never saved) covers the drawn rings. */
+.note-widget > .wg--universe { aspect-ratio: 1.6; padding: 2.4cqw; gap: 1.8cqw; }
+.wg--universe .wg-head { font-size: 3.4cqw; cursor: grab; }
+.wg-sky { position: relative; flex: 1; min-height: 0; border-radius: 1.8cqw; overflow: hidden; background: color-mix(in srgb, var(--paper-sunken) 70%, #000 30%); }
+.wg-sky-art { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: var(--ink-faint); stroke-width: .5; opacity: .7; }
+.wg-sky-art circle { fill: var(--ink-soft); stroke: none; }
+.wg-sky-art .wg-sky-core { fill: var(--clay); }
+.wg-live { position: absolute; inset: 0; display: block; }
+.wg-live-canvas { display: block; width: 100%; height: 100%; cursor: default; outline: none; }
+.wg-live-canvas.is-grabbing { cursor: grabbing; }
+.wg-live-canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--clay); }
+.note-image.note-widget:not(.note-image--inline) > .wg { height: 100%; aspect-ratio: auto; }
+.wg-head { display: flex; align-items: center; gap: 2cqw; color: var(--ink-soft); font-size: 5cqw; line-height: 1; }
+.wg--sci .wg-head { font-size: 3.6cqw; }
+.wg-head .wg-ic { width: 1.25em; height: 1.25em; color: var(--clay); flex: none; }
+.wg-title { font-family: var(--serif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wg-screen {
+  display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end;
+  padding: 2.5cqw 3.5cqw; border-radius: 3cqw; background: var(--paper-sunken); border: 1px solid var(--rule);
+  min-height: 18cqw; overflow: hidden;
+}
+.wg--sci .wg-screen { min-height: 13cqw; padding: 1.8cqw 2.6cqw; border-radius: 2cqw; }
+.wg-expr { max-width: 100%; color: var(--ink-faint); font-size: 4.6cqw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: right; unicode-bidi: plaintext; }
+.wg-out { max-width: 100%; font-size: 10cqw; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; unicode-bidi: plaintext; }
+.wg--sci .wg-expr { font-size: 3.2cqw; }
+.wg--sci .wg-out { font-size: 6.5cqw; }
+.wg-out--err { color: var(--clay); }
+.wg-keys { flex: 1; display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); gap: 2.2cqw; }
+.wg--sci .wg-keys { gap: 1.4cqw; }
+.wg-key, .wg-nav, .wg-month, .wg-day {
+  min-width: 0; margin: 0; padding: 0; border: 1px solid var(--rule); border-radius: 2.6cqw;
+  background: var(--paper); color: var(--ink); font: inherit; cursor: pointer; line-height: 1;
+}
+.wg-key { font-size: 5.6cqw; }
+.wg--sci .wg-key { font-size: 3.4cqw; border-radius: 1.6cqw; }
+.wg-key:hover, .wg-nav:hover, .wg-month:hover, .wg-day:hover { background: var(--paper-sunken); }
+.wg-key:active, .wg-day:active { transform: translateY(1px); }
+.wg-key--op, .wg-key--clear { color: var(--clay); }
+.wg-key--fn { color: var(--ink-soft); background: var(--paper-sunken); }
+.wg-key--eq { background: var(--clay); border-color: var(--clay); color: var(--paper); }
+.wg-key--eq:hover { background: var(--clay); filter: brightness(1.08); }
+.wg-gap { display: block; }
+.wg-cal-head { display: grid; grid-template-columns: 11cqw 1fr 11cqw; gap: 2cqw; align-items: stretch; }
+.wg-nav { font-size: 6cqw; aspect-ratio: 1; }
+.wg-month { border-color: transparent; background: none; font-family: var(--serif); font-size: 5.4cqw; text-transform: capitalize; }
+.wg-cal { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 1.2cqw; }
+.wg-dow { display: flex; align-items: center; justify-content: center; color: var(--ink-faint); font-size: 3.6cqw; text-transform: capitalize; }
+.wg-day { display: flex; align-items: center; justify-content: center; border-color: transparent; background: none; font-size: 4.2cqw; font-variant-numeric: tabular-nums; border-radius: 50%; }
+.wg-day--out { color: var(--ink-faint); opacity: .45; cursor: default; }
+.wg-day--today { border-color: var(--clay); color: var(--clay); font-weight: 600; }
+.wg-day--mark { background: var(--clay-soft); color: var(--ink); }
+.wg-day--today.wg-day--mark { background: var(--clay); color: var(--paper); }
+
+/* The /widget chooser: the link menu's look, one row of three. */
+.widget-menu__options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-top: 7px; }
+.widget-menu__options button { flex-direction: column; justify-content: center; gap: 5px; padding: 10px 6px; font-size: 12px; text-align: center; white-space: normal; }
+.widget-menu__options button .fm-ic svg { width: 22px; height: 22px; }
+.widget-menu__options button.sel { outline: 2px solid var(--clay); outline-offset: 1px; }
+
+@media print {
+  .note-widget .wg-key, .note-widget .wg-day, .note-widget .wg-nav { cursor: default; }
+  /* "Print without widgets" (Ctrl+P, toolbar.js). */
+  body.print-no-widgets .note-widget { display: none !important; }
+  /* A Universe prints its drawn face, never the live map (Codex 34 #2). */
+  .note-widget .wg-live { display: none !important; }
+}
+
+/* ---------- notes side by side (1.0.0, split-view.js) ----------
+   The page shared among the notes dragged onto it; each pane has
+   its own head (the title, its page, a close), the one written in holds the
+   editor frame, the others show their notes as saved. */
+.split-row { flex: 1; min-height: 0; min-width: 0; display: flex; gap: 0; }
+.split-pane { flex: 1 1 0; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* A hand can give adjacent panes different shares; the centre stroke is the visible edge. */
+.split-divider {
+  flex: 0 0 10px; align-self: stretch; position: relative; cursor: col-resize;
+  background: transparent; color: var(--rule); touch-action: none; outline: none;
+}
+.split-divider::after {
+  content: ''; position: absolute; top: 7px; bottom: 7px; left: 4px; width: 2px;
+  border-radius: 2px; background: currentColor;
+}
+.split-divider:hover, .split-divider.dragging, .split-divider:focus-visible { color: var(--clay); }
+.split-divider:focus-visible { box-shadow: inset 0 0 0 1px var(--clay); }
+.split-head { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 8px 4px; border-bottom: 2px solid transparent; }
+.split-pane.active .split-head { border-bottom-color: var(--clay); }
+.split-head .title-input { font-size: 20px; }
+.split-title {
+  flex: 1; min-width: 0; text-align: left; border: none; background: none; padding: 0; cursor: pointer;
+  font-family: var(--serif); font-size: 20px; font-weight: 600; color: var(--ink-soft);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.split-pane.active .split-title { display: none; }
+.split-page {
+  flex-shrink: 0; font-size: 10.5px; font-weight: 600; letter-spacing: .02em; color: var(--ink-soft);
+  border: 1.4px solid var(--rule); border-radius: 6px; padding: 2px 5px;
+}
+.split-close {
+  flex-shrink: 0; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; cursor: pointer;
+  border: 1.4px solid var(--rule); border-radius: 6px; background: var(--paper-raised); color: var(--ink-soft); font-size: 12px;
+}
+.split-close:hover { border-color: var(--clay); color: var(--clay); }
+.split-pane > .editor-frame, .split-ghost-frame { flex: 1; }
+.split-ghost-frame {
+  min-height: 0; min-width: 0; overflow-x: auto; display: flex; position: relative; cursor: text;
+  background: var(--paper-raised); margin: 5px;
+  border: 1.6px solid var(--rule); outline: 1.6px solid var(--rule); outline-offset: 5px;
+}
+.split-ghost-frame[hidden] { display: none; }
+.split-ghost-frame:hover { border-color: var(--ink-faint); outline-color: var(--ink-faint); }
+/* Shown, not written in: a press opens the editor there (split-view.js). */
+.split-ghost { user-select: none; }
+.split-ghost * { pointer-events: none; }
+/* The title has gone into the pane's head: what stays above stands at the right. */
+body.split-on .page-head { justify-content: flex-end; }
+.split-drop {
+  position: fixed; z-index: 80; pointer-events: none; box-sizing: border-box;
+  border: 2px dashed var(--clay); border-radius: 8px;
+  background: color-mix(in srgb, var(--clay) 14%, transparent);
+}
+@media print {
+  .split-pane:not(.active), .split-head, .split-divider, .split-drop { display: none !important; }
 }

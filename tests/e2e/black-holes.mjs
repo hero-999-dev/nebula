@@ -15,6 +15,8 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
+/** What a locked black hole shows of its name — black-holes.js holeInitials. */
+const holeInitials = (name) => Array.from(String(name ?? '').trim().split(/\s+/).filter(Boolean).map((w) => Array.from(w)[0]).slice(0, 4).join('')).join('').toLocaleUpperCase() || 'B';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -91,16 +93,16 @@ export async function runBlackHoleChecks(check) {
     };
     await ready();
     const until = async (what, tries = 50) => { for (let i = 0; i < tries; i += 1) { if (await what()) return true; await win.waitForTimeout(100); } return !!(await what()); };
-    const list = () => win.evaluate(() => [...document.querySelectorAll('#note-list .hole-block')].map((b) => ({
+    const list = () => win.evaluate(() => [...document.querySelectorAll('#holes-scroll .hole-block')].map((b) => ({
       name: b.querySelector('.fr-name').textContent, open: b.classList.contains('open'), state: b.classList.contains('open') ? String(b.querySelectorAll('.hole-notes .note-row').length) : 'locked', lock: b.querySelector('.hole-lock')?.dataset.state,
       notes: [...b.querySelectorAll('.hole-notes .note-row')].map((r) => r.title),
     })));
     const outside = () => win.evaluate(() => [...document.querySelectorAll('#note-list > .note-item .note-row, #note-list > .folder-block:not(.hole-block) .note-row')].map((r) => r.title));
     const dialog = () => win.evaluate(() => { const o = document.getElementById('ov-hole'); return o.hidden ? null : { title: o.querySelector('.dlg-title')?.textContent, error: o.querySelector('.hole-error')?.textContent ?? '', key: o.querySelector('.hole-key')?.textContent ?? null }; });
     const press = (label, scope = '#ov-hole') => win.evaluate(({ label, scope }) => [...document.querySelectorAll(`${scope} button`)].find((b) => b.textContent.trim() === label)?.click(), { label, scope });
-    const holeRow = (name) => win.evaluate((n) => [...document.querySelectorAll('#note-list .hole-row')].find((r) => r.title === n)?.click(), name);
+    const holeRow = (name) => win.evaluate((n) => [...document.querySelectorAll('#holes-scroll .hole-row')].find((r) => r.title === n[0] || r.title === n[1])?.click(), [name, holeInitials(name)]);
     const holeMenu = async (name, item) => {
-      await win.evaluate((n) => [...document.querySelectorAll('#note-list .hole-block')].find((b) => b.querySelector('.hole-row').title === n).querySelector('.hole-more').click(), name);
+      await win.evaluate((n) => [...document.querySelectorAll('#holes-scroll .hole-block')].find((b) => [n[0], n[1]].includes(b.querySelector('.hole-row').title)).querySelector('.hole-more').click(), [name, holeInitials(name)]);
       const items = await win.evaluate(() => [...document.querySelectorAll('#hole-menu button')].map((b) => b.textContent));
       if (item) await press(item, '#hole-menu');
       else await win.keyboard.press('Escape');
@@ -108,7 +110,7 @@ export async function runBlackHoleChecks(check) {
     };
     /** A note's ⋯ → its black-hole item → the entry asked for. */
     const noteHole = async (title, entry) => {
-      await win.evaluate((t) => [...document.querySelectorAll('#note-list .note-item')].find((i) => i.querySelector('.note-row')?.title === t).querySelector('.nr-more').click(), title);
+      await win.evaluate((t) => [...document.querySelectorAll('#note-list .note-item, #holes-scroll .note-item')].find((i) => i.querySelector('.note-row')?.title === t).querySelector('.nr-more').click(), title);
       const label = await win.evaluate(() => { const b = document.querySelector('#note-menu [data-note-act="hole"]'); return b.hidden ? null : b.textContent; });
       await win.evaluate(() => document.querySelector('#note-menu [data-note-act="hole"]').click());
       // The menu is there when it is there: straight after a build the app is slower, and a press at a fixed 100 ms met no menu.
@@ -125,7 +127,7 @@ export async function runBlackHoleChecks(check) {
       await win.waitForTimeout(350);
     };
     const openNote = async (title) => {
-      await win.evaluate((t) => [...document.querySelectorAll('#note-list .note-row')].find((r) => r.title === t)?.click(), title);
+      await win.evaluate((t) => [...document.querySelectorAll('#note-list .note-row, #holes-scroll .note-row')].find((r) => r.title === t)?.click(), title);
       await win.waitForFunction((t) => document.querySelector('#title').value === t, title, { polling: 50 });
       await win.waitForTimeout(200);
     };
@@ -168,27 +170,27 @@ export async function runBlackHoleChecks(check) {
     check('the black hole stands under the notes, open and empty', shown.length === 1 && shown[0].name === 'Safe' && shown[0].open && shown[0].state === '0' && !(await dialog()), JSON.stringify(shown));
     check('its row has no counter; the lock stands at its left, open, and the three dots at its right',
       await win.evaluate(() => {
-        const head = document.querySelector('#note-list .hole-item');
+        const head = document.querySelector('#holes-scroll .hole-item');
         const [lock, row, more] = head.children;
         const box = (e) => e.getBoundingClientRect();
         return lock.matches('.hole-lock[data-state="open"]') && row.matches('.hole-row') && more.matches('.hole-more') && !head.querySelector('.fr-count, .hole-state')
           && box(lock).right <= box(row).left + 1 && box(lock).right < box(more).left && box(lock).width > 10;
       }));
     // The arrow beside "Black holes" folds the whole section, and it stays folded.
-    await win.evaluate(() => document.querySelector('#note-list .holes-head').click());
+    await win.evaluate(() => document.querySelector('#holes-scroll .holes-head').click());
     await win.waitForTimeout(120);
-    const folded = await win.evaluate(() => ({ blocks: document.querySelectorAll('#note-list .hole-block').length, head: document.querySelector('#note-list .holes-head')?.getAttribute('aria-expanded'), kept: localStorage.getItem('nebula:holes-folded') }));
-    await win.evaluate(() => document.querySelector('#note-list .holes-head').click());
+    const folded = await win.evaluate(() => ({ blocks: document.querySelectorAll('#holes-scroll .hole-block').length, head: document.querySelector('#holes-scroll .holes-head')?.getAttribute('aria-expanded'), kept: localStorage.getItem('nebula:holes-folded') }));
+    await win.evaluate(() => document.querySelector('#holes-scroll .holes-head').click());
     await win.waitForTimeout(120);
     check('the arrow beside the heading folds the black holes away and brings them back, open as they were', folded.blocks === 0 && folded.head === 'false' && folded.kept === '1'
-      && (await list())[0]?.open === true && await win.evaluate(() => document.querySelector('#note-list .holes-head').getAttribute('aria-expanded')) === 'true', JSON.stringify(folded));
+      && (await list())[0]?.open === true && await win.evaluate(() => document.querySelector('#holes-scroll .holes-head').getAttribute('aria-expanded')) === 'true', JSON.stringify(folded));
     const meta = JSON.parse(fs.readFileSync(path.join(holesDir, safe, 'hole.json'), 'utf8'));
     check('on the disk its label and key are OS-protected — neither name, PIN nor recovery key in clear text',
       meta.lock === 'pin' && meta.cipher === 'aes-256-gcm' && meta.kdf.name === 'scrypt' && meta.key.os === true && !!meta.key.salt && !!meta.recovery.box && !!meta.nameBox && !('name' in meta)
       && whereReadable('482193', recoveryKey, recoveryKey.replace(/-/g, '')).length === 0, JSON.stringify({ ...meta, key: '…', recovery: '…' }));
 
     // ---- A note written in it -----------------------------------------------------
-    await win.evaluate(() => document.querySelector('#note-list .hole-add').click());
+    await win.evaluate(() => document.querySelector('#holes-scroll .hole-add').click());
     await win.waitForTimeout(250);
     await win.keyboard.type('Launch plan');
     await win.keyboard.press('Tab');
@@ -215,7 +217,7 @@ export async function runBlackHoleChecks(check) {
 
     // ---- Locked ----------------------------------------------------------------------
     await openNote('Launch plan');
-    await win.evaluate(() => document.querySelector('#note-list .hole-lock').click());
+    await win.evaluate(() => document.querySelector('#holes-scroll .hole-lock').click());
     await win.waitForTimeout(500);
     shown = await list();
     const afterLock = await win.evaluate(() => ({ title: document.getElementById('title').value, page: document.body.innerText }));
@@ -223,10 +225,11 @@ export async function runBlackHoleChecks(check) {
       shown[0].state === 'locked' && shown[0].lock === 'locked' && !shown[0].open && shown[0].notes.length === 0 && !/Launch plan|9911-ZEBRA|Tax papers|7700-1234/.test(afterLock.page) && afterLock.title !== 'Launch plan',
       JSON.stringify({ shown, title: afterLock.title }));
     check('and its files are still there, sealed', sealed(safe).length === 2 && whereReadable('Launch plan', '9911-ZEBRA', '7700-1234').length === 0);
+    check('locked, the list shows only its initials, not its name', shown[0].name === 'S' && !(await win.evaluate(() => [...document.querySelectorAll('#holes-scroll .hole-block')].some((b) => /Safe/.test(b.innerText + b.querySelector('.hole-row').title)))), JSON.stringify(shown[0]));
 
     // ---- The PIN -----------------------------------------------------------------------
     await holeRow('Safe');
-    check('a click on a locked black hole asks for its PIN', (await dialog())?.title === 'Open “Safe”' && await win.evaluate(() => document.activeElement?.classList.contains('hole-pin')));
+    check('a click on a locked black hole asks for its PIN', (await dialog())?.title === 'Open “S”' && await win.evaluate(() => document.activeElement?.classList.contains('hole-pin')));
     check('and shows the hint kept with it, under the PIN', await win.evaluate(() => document.querySelector('#ov-hole .hole-reminder')?.textContent) === 'Hint: the year we moved, twice'
       && JSON.parse(fs.readFileSync(path.join(holesDir, safe, 'hole.json'), 'utf8')).hint === 'the year we moved, twice');
     await win.fill('#ov-hole .hole-pin', '000000');
@@ -272,7 +275,7 @@ export async function runBlackHoleChecks(check) {
     check('nothing of the video is on the disk in the clear — not in the notes folder, not in a backup', clipInClear().length === 0 && !fs.existsSync(path.join(vault, secretId))
       && fs.readFileSync(sealedVideo()).subarray(0, 4).toString() === 'NBV1', clipInClear().join());
     await win.waitForTimeout(700);                    // the note itself is saved with the video's address
-    await win.evaluate(() => document.querySelector('#note-list .hole-lock').click());
+    await win.evaluate(() => document.querySelector('#holes-scroll .hole-lock').click());
     await until(async () => (await list())[0]?.state === 'locked');
     await holeRow('Safe');
     await win.fill('#ov-hole .hole-pin', '482193');
@@ -315,7 +318,7 @@ export async function runBlackHoleChecks(check) {
     // ---- Taken out again -------------------------------------------------------------
     // Dragged up among the notes, as it was dragged in: the same question, and given up it stays where it is.
     const dragOut = () => win.evaluate(() => {
-      const row = [...document.querySelectorAll('#note-list .hole-notes .note-row')].find((r) => r.title === 'Tax papers');
+      const row = [...document.querySelectorAll('#holes-scroll .hole-notes .note-row')].find((r) => r.title === 'Tax papers');
       const target = [...document.querySelectorAll('#note-list > .note-item')].find((i) => i.querySelector('.note-row')?.title === 'Shopping');
       const dt = new DataTransfer();
       const at = target.getBoundingClientRect();
@@ -348,7 +351,7 @@ export async function runBlackHoleChecks(check) {
       && (await outside()).includes('Tax papers'), `${out} ${sealed(safe)}`);
 
     // ---- The recovery key, and a new PIN ------------------------------------------------
-    await win.evaluate(() => document.querySelector('#note-list .hole-lock').click());
+    await win.evaluate(() => document.querySelector('#holes-scroll .hole-lock').click());
     await until(async () => (await list())[0]?.state === 'locked');
     await holeRow('Safe');
     await press('Use the recovery key');
@@ -360,7 +363,7 @@ export async function runBlackHoleChecks(check) {
     await win.fill('#ov-hole .hole-recovery', recoveryKey.toLowerCase());
     await press('Open');
     check('the recovery key opens it, with a new PIN', await until(async () => (await list())[0]?.open));
-    await win.evaluate(() => document.querySelector('#note-list .hole-lock').click());
+    await win.evaluate(() => document.querySelector('#holes-scroll .hole-lock').click());
     await until(async () => (await list())[0]?.state === 'locked');
     await holeRow('Safe');
     await win.fill('#ov-hole .hole-pin', '482193');
@@ -368,16 +371,25 @@ export async function runBlackHoleChecks(check) {
     const old = (await list())[0].state;
     await win.fill('#ov-hole .hole-pin', '135790');
     check('from then on the new PIN is the key, and the old one is not', old === 'locked' && await until(async () => (await list())[0]?.open));
-    check('the menu of an open black hole: Lock, Rename, Change PIN, the hint, Add a passkey, a new recovery key, Move to trash', (await holeMenu('Safe')).join('|') === 'Lock|Rename black hole|Change PIN|Change hint|Add a passkey|New recovery key|Move to trash');
+    check('the menu of an open black hole: Lock, Rename, Change PIN, the hint, Add a passkey, a new recovery key, Move to trash', (await holeMenu('Safe')).join('|') === 'Lock|Pin to top|Rename black hole|Change PIN|Change hint|Add a passkey|New recovery key|Move to trash');
+    await holeMenu('Safe', 'Pin to top');
+    await win.waitForTimeout(200);
+    // At the top of the black holes' own section, not over the whole list (owner, 1.0.0: "karadelik kisminda en üste sabitlensin").
+    const pinned = await win.evaluate(() => { const sec = [...document.querySelectorAll('#holes-scroll > .holes')].find((h) => h.querySelector('.holes-head')); const rows = [...(sec?.querySelectorAll('.hole-row') ?? [])]; return { sections: document.querySelectorAll('.holes').length, overList: !!document.querySelector('#note-list .holes'), names: rows.map((r) => r.querySelector('.fr-name')?.textContent), mark: !!rows[0]?.querySelector('.nr-pin') }; });
+    check('“Pin to top” puts the black hole first in the Black holes section, with a pin, not over the list', pinned.sections === 1 && !pinned.overList && pinned.names[0] === 'Safe' && pinned.mark, JSON.stringify(pinned));
+    check('and its menu then offers “Unpin from top”', (await holeMenu('Safe')).includes('Unpin from top'));
+    await holeMenu('Safe', 'Unpin from top');
+    await win.waitForTimeout(200);
+    check('unpinned, it goes back among the others, without its pin', await win.evaluate(() => !document.querySelector('#holes-scroll .hole-row .nr-pin') && document.querySelectorAll('.holes').length === 1 && !document.querySelector('#note-list .holes')));
     await holeMenu('Safe', 'Add a passkey');
     const safeMeta = () => JSON.parse(fs.readFileSync(path.join(holesDir, safe, 'hole.json'), 'utf8'));
     // The passkey is on the disk before the list the menu is made from has heard of it (smoke under load, 0.9.5 and 0.9.6): the menu is waited for too.
     check('a passkey is added beside the PIN of an open black hole — and taken away again from the same menu', await until(() => !!safeMeta().passkey?.box) && safeMeta().lock === 'pin'
-      && await until(async () => (await holeMenu('Safe')).join('|') === 'Lock|Rename black hole|Change PIN|Change hint|Remove the passkey|New recovery key|Move to trash'), JSON.stringify(Object.keys(safeMeta())));
+      && await until(async () => (await holeMenu('Safe')).join('|') === 'Lock|Pin to top|Rename black hole|Change PIN|Change hint|Remove the passkey|New recovery key|Move to trash'), JSON.stringify(Object.keys(safeMeta())));
     await holeMenu('Safe', 'Remove the passkey');
     await until(() => !safeMeta().passkey);
     // No passkey button beside the notes: the ⋯ menu is where it lives (the owner, 2026-10-18).
-    check('no passkey button beside the notes — the ⋯ menu is where it lives', await win.evaluate(() => document.querySelectorAll('#note-list .hole-block .hole-notes .hole-passkey').length === 0));
+    check('no passkey button beside the notes — the ⋯ menu is where it lives', await win.evaluate(() => document.querySelectorAll('#holes-scroll .hole-block .hole-notes .hole-passkey').length === 0));
     // A new recovery key: the old one dies, the new one is shown once.
     const oldRecoveryBox = safeMeta().recovery.box;
     await holeMenu('Safe', 'New recovery key');
@@ -401,7 +413,7 @@ export async function runBlackHoleChecks(check) {
     await win.fill('#ov-hole [data-pin="current"]', '135790');
     await press('Change');
     check('the right current PIN changes it', await until(async () => !(await dialog())), JSON.stringify(await dialog()));
-    await win.evaluate(() => [...document.querySelectorAll('#note-list .hole-block')].find((b) => b.querySelector('.hole-row').title === 'Safe').querySelector('.hole-lock').click());
+    await win.evaluate(() => [...document.querySelectorAll('#holes-scroll .hole-block')].find((b) => ['Safe', 'S'].includes(b.querySelector('.hole-row').title)).querySelector('.hole-lock').click());
     await until(async () => (await list())[0]?.state === 'locked');
     await holeRow('Safe');
     await answer('135790');
@@ -426,7 +438,7 @@ export async function runBlackHoleChecks(check) {
     const fmeta = JSON.parse(fs.readFileSync(path.join(holesDir, finger, 'hole.json'), 'utf8'));
     check('with the box ticked the black hole has its PIN and, beside it, a passkey: a second copy of its key that the operating system hands over', fmeta.lock === 'pin' && !!fmeta.key.salt && !!fmeta.passkey?.box && fmeta.digits === 6
       && (await list()).map((h) => `${h.name}:${h.open}`).join() === 'Safe:true,Finger:true', JSON.stringify(await list()));
-    await win.evaluate(() => [...document.querySelectorAll('#note-list .hole-block')].find((b) => b.querySelector('.hole-row').title === 'Finger').querySelector('.hole-lock').click());
+    await win.evaluate(() => [...document.querySelectorAll('#holes-scroll .hole-block')].find((b) => ['Finger', 'F'].includes(b.querySelector('.hole-row').title)).querySelector('.hole-lock').click());
     await until(async () => (await list())[1]?.state === 'locked');
     await holeRow('Finger');
     await win.waitForSelector('#ov-hole:not([hidden]) [data-hole-passkey]', { timeout: 5000 });
@@ -435,7 +447,7 @@ export async function runBlackHoleChecks(check) {
     check('locked, a click shows the PIN’s box and a button for the passkey — and asks the passkey for nothing by itself', door?.pin && door.passkey && door.error === '' && (await list())[1]?.state === 'locked', JSON.stringify(door));
     await press('Use the passkey');
     check('a press on the button, and its yes, opens it — no PIN typed', await until(async () => (await list())[1]?.open) && !(await dialog()), JSON.stringify(await list()));
-    await win.evaluate(() => [...document.querySelectorAll('#note-list .hole-block')].find((b) => b.querySelector('.hole-row').title === 'Finger').querySelector('.hole-lock').click());
+    await win.evaluate(() => [...document.querySelectorAll('#holes-scroll .hole-block')].find((b) => ['Finger', 'F'].includes(b.querySelector('.hole-row').title)).querySelector('.hole-lock').click());
     await until(async () => (await list())[1]?.state === 'locked');
     await holeRow('Finger');
     await answer('246810');
@@ -444,7 +456,7 @@ export async function runBlackHoleChecks(check) {
     // ---- Deleted: gone, from the backups too ---------------------------------------------
     fs.cpSync(path.join(profile, 'storage'), path.join(backups, '2099-01-01'), { recursive: true });
     check('a backup holds the black hole as it is on the disk: sealed', fs.existsSync(path.join(backups, '2099-01-01', 'blackholes', safe, `${secretId}.bh`)) && whereReadable('Launch plan', '9911-ZEBRA').length === 0);
-    await win.evaluate((t) => [...document.querySelectorAll('#note-list .note-item')].find((i) => i.querySelector('.note-row')?.title === t).querySelector('.nr-more').click(), 'Launch plan');
+    await win.evaluate((t) => [...document.querySelectorAll('#note-list .note-item, #holes-scroll .note-item')].find((i) => i.querySelector('.note-row')?.title === t).querySelector('.nr-more').click(), 'Launch plan');
     await win.evaluate(() => document.querySelector('#note-menu [data-note-act="trash"]').click());
     await win.waitForTimeout(300);
     await win.evaluate(() => document.querySelector('.drawer-tab[data-drawer="trash"]').click());
@@ -460,7 +472,7 @@ export async function runBlackHoleChecks(check) {
       `${fs.readdirSync(path.join(holesDir, safe))} / ${fs.readdirSync(path.join(backups, '2099-01-01', 'blackholes', safe))}`);
     await win.evaluate(() => document.querySelector('.drawer-tab[data-drawer="trash"]').click());
     // ---- A black hole goes to the Trash whole, and is restored or deleted there -------------
-    await win.evaluate(() => [...document.querySelectorAll('#note-list .hole-block')].find((b) => b.querySelector('.hole-row').title === 'Finger').querySelector('.hole-add').click());
+    await win.evaluate(() => [...document.querySelectorAll('#holes-scroll .hole-block')].find((b) => ['Finger', 'F'].includes(b.querySelector('.hole-row').title)).querySelector('.hole-add').click());
     await win.waitForTimeout(250);
     await win.keyboard.type('Finger note');
     await win.keyboard.press('Tab');
@@ -517,7 +529,7 @@ export async function runBlackHoleChecks(check) {
     await win.waitForSelector('#ov-hole:not([hidden]) .hole-pin', { timeout: 5000 });
     const deleting = await asked();
     check('deleting a black hole asks for its password with ONE deliberate press: the PIN in the box, or the passkey the system then asks for — no passkey button of its own, and nothing brings it back', deleting?.title === 'Delete the black hole' && deleting.pin && deleting.confirm && !deleting.passkey
-      && deleting.note === '“Finger” and every note in it are deleted for good. Nothing brings them back.' && sealed(finger).join() === fingerNote, JSON.stringify(deleting));
+      && deleting.note === '“F” and every note in it are deleted for good. Nothing brings them back.' && sealed(finger).join() === fingerNote, JSON.stringify(deleting));
     await answer('000000');
     check('typing a complete PIN alone does not delete the black hole', sealed(finger).join() === fingerNote && (await inTrash()).length === 1);
     await press('Delete for good?');

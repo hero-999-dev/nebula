@@ -3,11 +3,21 @@ name: Release
 # Pushing a v* tag (npm run push) builds Windows + macOS and publishes one
 # GitHub Release. Installed copies of Nebula read latest.yml from that release,
 # so the release must NOT be a draft.
+#
+# A precheck/* branch runs the very same jobs and publishes nothing. `npm run
+# push` sends the release commit there first and tags it only when this run
+# passes: 0.9.4, 0.9.5, 0.9.6, 0.9.7 and 0.9.8 each passed every gate on the
+# owner's machine and then failed here (a Windows-only path, timings on a slower
+# runner), and 0.9.7 and 0.9.8 were lost as version numbers for it.
 on:
   push:
     tags:
       - 'v*'
+    branches:
+      - 'precheck/**'
   workflow_dispatch:
+
+run-name: ${{ startsWith(github.ref, 'refs/tags/') && format('Release {0}', github.ref_name) || format('Precheck {0}', github.ref_name) }}
 
 permissions:
   contents: write
@@ -37,8 +47,17 @@ jobs:
       - name: Electron binary
         run: npx install-electron --no
 
+      # Exit 2 means the run could not finish (a wait that timed out on a page
+      # that stopped being composited), not that a check failed; the local
+      # release gives that one more attempt and so does this. Exit 1 stops.
       - name: Electron smoke test
-        run: npm run smoke
+        shell: bash
+        run: |
+          npm run smoke && exit 0
+          code=$?
+          if [ "$code" -ne 2 ]; then exit "$code"; fi
+          echo "::warning::smoke could not finish (exit 2), retrying once"
+          npm run smoke
 
       - name: Package installer + portable
         run: npx electron-builder --win nsis portable --publish never
@@ -69,6 +88,7 @@ jobs:
             release/latest.yml
             release/*.blockmap
           if-no-files-found: error
+          retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 3 }}
 
   build-mac:
     runs-on: macos-latest
@@ -114,9 +134,12 @@ jobs:
             release/*-mac.zip
             release/latest-mac.yml
           if-no-files-found: error
+          retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 3 }}
 
   publish:
     needs: [build-win, build-mac]
+    # A precheck branch only proves the build; only a tag publishes.
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

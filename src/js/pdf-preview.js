@@ -19,6 +19,7 @@
  */
 import { getWideOrientation, setWideOrientation, isFluid, pageMode, sheetMm, marginMm } from './page-mode.js';
 import { getVideoMode, setVideoMode } from './export-video.js';
+import { getWidgetPrint, setWidgetPrint } from './widgets.js';
 
 const ORIENTATION_KEY = 'nebula:nw-orientation';
 
@@ -52,7 +53,7 @@ export function paperLine(page, translate = (x) => x) {
  *   `document` makes what the preview prints for that format, as things are now;
  *   `save` writes the export (the PDF's own bytes are saved by token).
  */
-export function initPdfPreview({ overlay, api, page, document: build, save, hasVideos = () => false, onOrientation = () => {}, translate = (x) => x }) {
+export function initPdfPreview({ overlay, api, page, document: build, save, hasVideos = () => false, hasWidgets = () => false, onOrientation = () => {}, translate = (x) => x }) {
   if (!overlay) return null;
   const frame = overlay.querySelector('.pdf-frame');
   const status = overlay.querySelector('.pdf-status');
@@ -60,6 +61,7 @@ export function initPdfPreview({ overlay, api, page, document: build, save, hasV
   const heading = overlay.querySelector('.dlg-title');
   const orient = overlay.querySelector('[data-orient-group]');
   const videos = overlay.querySelector('.pdf-videos');
+  const widgets = overlay.querySelector('.pdf-widgets');
   const exportBtn = overlay.querySelector('[data-pdf="export"]');
   let token = null;
   let format = 'pdf';
@@ -84,6 +86,11 @@ export function initPdfPreview({ overlay, api, page, document: build, save, hasV
     }
     for (const b of videos?.querySelectorAll('button') ?? []) {
       const on = b.dataset.videos === getVideoMode();
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    }
+    for (const b of widgets?.querySelectorAll('button') ?? []) {
+      const on = b.dataset.widgets === getWidgetPrint();
       b.classList.toggle('on', on);
       b.setAttribute('aria-pressed', String(on));
     }
@@ -123,6 +130,7 @@ export function initPdfPreview({ overlay, api, page, document: build, save, hasV
     heading.textContent = translate(PAGED[format]);
     orient.hidden = !isFluid(page());
     if (videos) videos.hidden = !hasVideos();
+    if (widgets) widgets.hidden = !hasWidgets();
     overlay.hidden = false;
     exportBtn.focus();
     void render();
@@ -141,6 +149,13 @@ export function initPdfPreview({ overlay, api, page, document: build, save, hasV
     b.addEventListener('click', () => {
       if (b.dataset.videos === getVideoMode()) return;
       setVideoMode(b.dataset.videos);
+      void render();
+    });
+  }
+  for (const b of widgets?.querySelectorAll('button') ?? []) {
+    b.addEventListener('click', () => {
+      if (b.dataset.widgets === getWidgetPrint()) return;
+      setWidgetPrint(b.dataset.widgets);
       void render();
     });
   }

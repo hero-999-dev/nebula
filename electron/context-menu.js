@@ -45,6 +45,12 @@ export function spellLanguages(lang, available = []) {
   // English is checked as American and British together (the owner, 0.9.4:
   // "only the American spelling is corrected") — "colour" and "color" both pass.
   const english = () => want.en.filter((tag) => available.includes(tag));
+  // 1.0.0: the languages chosen in Settings, all of them at once ("the spell
+  // checker on for every language, and a language taken off it in Settings",
+  // the owner). One with no dictionary here is left out; none chosen is none.
+  if (Array.isArray(lang)) {
+    return [...new Set(lang.flatMap((code) => (code === 'en' ? english() : [pick(code)].filter(Boolean))))];
+  }
   if (lang === 'en') return english();
   const chosen = pick(lang);
   return chosen ? [chosen] : english().slice(0, 1);
@@ -112,11 +118,15 @@ export function registerEditingHandlers(ipcMain, getWindow, ignored = null, pict
   ipcMain.handle('spell:language', (event, lang) => {
     if (!ours(event)) return [];
     const ses = event.sender.session;
-    const langs = spellLanguages(String(lang || ''), ses.availableSpellCheckerLanguages || []);
-    if (langs.length) {
+    const codes = Array.isArray(lang) ? lang.filter((c) => typeof c === 'string').slice(0, 8) : String(lang || '');
+    const langs = spellLanguages(codes, ses.availableSpellCheckerLanguages || []);
+    // Every language taken off: no red lines at all.
+    const on = !Array.isArray(codes) || codes.length > 0;
+    try { ses.setSpellCheckerEnabled(on); } catch { /* an older Electron */ }
+    if (on && langs.length) {
       try { ses.setSpellCheckerLanguages(langs); } catch { /* the OS spellchecker picks its own */ }
     }
-    return langs;
+    return on ? langs : [];
   });
 
   // A picture onto the clipboard as a picture (for Paint, Word, a chat) and as

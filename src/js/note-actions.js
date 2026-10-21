@@ -22,7 +22,7 @@ const LABELS = {
   autoorder: (note) => (note.autoOrder ? 'Auto order page: active' : 'Auto order page: not active'),
 };
 
-export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder, onHole, holeLabel, trashedHoles, onHoleRestore, onHoleDelete }) {
+export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder, onHole, holeLabel, trashedHoles, onHoleRestore, onHoleDelete, canBeside, onBeside }) {
   const menu = document.getElementById('note-menu');
   const drawerBody = document.getElementById('drawer-body');
   const tabs = [...document.querySelectorAll('.drawer-tab')];
@@ -75,6 +75,9 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
     }
     const folder = menu.querySelector('[data-note-act="folder"]');
     if (folder) folder.hidden = !!note.hole;
+    // Notes side by side (1.0.0): beside the one being written in.
+    const beside = menu.querySelector('[data-note-act="beside"]');
+    if (beside) beside.hidden = !canBeside?.(id);
     menu.hidden = false;
     // Below the button, pulled back inside the window if there is no room.
     const r = point
@@ -108,6 +111,7 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
     if (act === 'labels') { onLabels?.(id, button); return; }
     if (act === 'folder') { onFolder?.(id, button); return; }
     if (act === 'hole') { onHole?.(id, button); return; }
+    if (act === 'beside') { onBeside?.(id); return; }
     if (act === 'pin') store.togglePin(id);
     else if (act === 'readonly') store.toggleReadOnly(id);
     else if (act === 'autoorder') store.toggleAutoOrder(id);

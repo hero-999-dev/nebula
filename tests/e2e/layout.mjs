@@ -528,7 +528,7 @@ export async function runLayoutChecks(check) {
       const h3 = await box('#h');
       const e = await box('#e');
       await drag({ x: pg.right - 100, y: h3.cy }, { x: pg.left + (pg.right - pg.left) * 0.33, y: e.cy });
-      check('pulled down and to the left third, the part under it is split, the words at the wider right — and a line to go on with under the columns', await struct() === 'a,b,c,[p | d,e],p'
+      check('pulled down and to the left third, the part under it is split, the short words staying at the left where they stand (owner, 1.0.0) — and a line to go on with under the columns', await struct() === 'a,b,c,[d,e | p],p'
         && await win.evaluate(() => document.querySelector('#editor .blk-cols').dataset.split) === '33', await struct());
     }
 

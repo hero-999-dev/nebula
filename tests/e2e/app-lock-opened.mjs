@@ -53,10 +53,10 @@ export async function runAppLockOpenedChecks(check) {
     fs.writeFileSync(residueFile, JSON.stringify({ id: 'n-lock', hole: id, title: 'Recovered secret', content: `<p>residue sentinel</p><p>${added.url}</p>`, updatedAt: 2 }));
     await win.reload();
     await win.waitForSelector('.hole-lock');
-    check('historical marked plaintext is withheld from the locked note list and cache', await win.evaluate(() => !document.querySelector('#note-list').textContent.includes('Recovered secret') && !localStorage.getItem('nebula:notes')?.includes('residue sentinel')));
+    check('historical marked plaintext is withheld from the locked note list and cache', await win.evaluate(() => !(document.querySelector('#note-list').textContent + (document.querySelector('#holes-scroll')?.textContent ?? '')).includes('Recovered secret') && !localStorage.getItem('nebula:notes')?.includes('residue sentinel')));
     await win.evaluate(() => document.querySelector('.hole-lock').click());
     await win.locator('#ov-hole .hole-pin').fill('482193');
-    await win.waitForFunction(() => document.querySelector('#note-list').textContent.includes('Recovered secret'));
+    await win.waitForFunction(() => (document.querySelector('#note-list').textContent + (document.querySelector('#holes-scroll')?.textContent ?? '')).includes('Recovered secret'));
     for (let i = 0; i < 50 && fs.existsSync(residueFile); i++) await win.waitForTimeout(100);
     check('authenticated unlock reseals the historical retry and removes its plain file', !fs.existsSync(residueFile));
     check('unlock preserves media referenced only by the recovered edit', fs.existsSync(path.join(profile, 'storage', 'blackholes', id, `n-lock~${added.file}.bhv`)));
@@ -76,14 +76,20 @@ export async function runAppLockOpenedChecks(check) {
     check('markerless copy remains untouched until its matching hole is authenticated', fs.existsSync(markerlessFile));
     await win.evaluate(() => document.querySelector('.hole-lock').click());
     await win.locator('#ov-hole .hole-pin').fill('482193');
-    await win.waitForFunction(() => document.querySelector('#note-list').textContent.includes('Newer plain copy'));
+    await win.waitForFunction(() => (document.querySelector('#note-list').textContent + (document.querySelector('#holes-scroll')?.textContent ?? '')).includes('Newer plain copy'));
     for (let i = 0; i < 50 && fs.existsSync(markerlessFile); i++) await win.waitForTimeout(100);
     check('exact-id markerless copy is resealed and removed after unlock', !fs.existsSync(markerlessFile));
     // The vault copy can disappear before the backup's bounded async shred finishes.
     for (let i = 0; i < 50 && fs.existsSync(markerlessBackup); i++) await win.waitForTimeout(100);
     check('reconciled markerless plaintext also leaves the backup', !fs.existsSync(markerlessBackup));
-    const reconciled = await win.evaluate((holeId) => window.nebula.holes.unlock(holeId, {}), id);
-    check('reconciliation keeps the newer markerless edit', reconciled.notes?.some((raw) => JSON.parse(raw).content === 'markerless secret'));
+    // The sealed write can land a moment after the plain file is gone: wait for it.
+    let reconciled = {};
+    for (let i = 0; i < 50; i++) {
+      reconciled = await win.evaluate((holeId) => window.nebula.holes.unlock(holeId, {}), id);
+      if (reconciled.notes?.some((raw) => JSON.parse(raw).content === 'markerless secret')) break;
+      await win.waitForTimeout(100);
+    }
+    check('reconciliation keeps the newer markerless edit', reconciled.notes?.some((raw) => JSON.parse(raw).content === 'markerless secret'), { ok: reconciled.ok, error: reconciled.error, notes: reconciled.notes?.map((raw) => JSON.parse(raw)).map((n) => [n.id, n.content, n.updatedAt]) });
     // A legacy PIN-only wrapper may still exist in both the live vault and
     // backups. The OS-protected migration must reach every local copy.
     await win.evaluate((holeId) => window.nebula.holes.lock(holeId), id);

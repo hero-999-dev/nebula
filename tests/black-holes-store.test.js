@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NoteStore } from '../src/js/notes.js';
 import { initDiskStorage, flushDisk, adoptHoleNotes, forgetNotes } from '../src/js/disk-store.js';
-import { waitWords, refusalWords } from '../src/js/black-holes.js';
+import { waitWords, refusalWords, holeInitials } from '../src/js/black-holes.js';
 
 /** The two bridges the mirror writes through, as the preload gives them: every call on record. */
 function bridges(files = {}) {
@@ -223,5 +223,18 @@ describe('what a refusal says', () => {
     expect(refusalWords({ error: 'wait', waitMs: 61_000 })).toBe('Too many wrong tries. Wait 61 s.');
     expect(refusalWords({ error: 'other-computer' })).toMatch(/recovery key/);
     expect(refusalWords(null, 'hello')).toBe('Not confirmed.');
+  });
+});
+
+describe('a locked black hole shows its initials (1.0.0)', () => {
+  it('takes the first letter of each word, at most four, in capitals', () => {
+    expect(holeInitials('work notes')).toBe('WN');
+    expect(holeInitials('  my   private   diary  ')).toBe('MPD');
+    expect(holeInitials('a b c d e f')).toBe('ABCD');
+    expect(holeInitials('Örnek şifre')).toBe('ÖŞ');
+  });
+  it('gives B (a black hole) when the name is empty', () => {
+    expect(holeInitials('')).toBe('B');
+    expect(holeInitials(null)).toBe('B');
   });
 });

@@ -9,6 +9,7 @@ import { t } from './i18n.js';
 import { makeToggle } from './toggles.js';
 import { blockFromNode, convertBlock, insertDivider, ensureLineBox } from './blocks.js';
 import { fold } from './fold.js';
+import { pickWidget } from './widgets.js';
 
 export const SLASH_ITEMS = [
   // "Paragraph", as the outline dropdown calls it: /paragraph finds it, and /text still does (its id).
@@ -30,6 +31,8 @@ export const SLASH_ITEMS = [
   // Cells to write in, colour, merge and fill (0.9.4, table.js).
   { id: 'table', ic: 'table', label: 'Table' },
   { id: 'shape', ic: 'shapes', label: 'Shape' },
+  // A calculator, a scientific calculator or a calendar (1.0.0, widgets.js): placed like a picture.
+  { id: 'widget', ic: 'widget', label: 'Widget' },
   // A video file from the computer (0.9.4): copied into the note and played there.
   { id: 'video', ic: 'video', label: 'Video' },
   // Any file from the computer (0.9.6): kept in the note as a card with its name and kind.
@@ -117,6 +120,33 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
     }
     if (id === 'file') {
       void links?.pickFiles?.();
+      return;
+    }
+    if (id === 'widget') {
+      // Chosen where the caret is, as a link's kind is; the caret waits for it.
+      const s = window.getSelection();
+      // "/widget" taken off an empty line leaves no box to hold the caret: a
+      // choice cancelled sent the next words to the line below.
+      const line = blockFromNode(s?.anchorNode, editorEl);
+      if (line && ensureLineBox(line)) {
+        const r = document.createRange();
+        r.setStart(line, 0);
+        r.collapse(true);
+        s.removeAllRanges();
+        s.addRange(r);
+      }
+      const at = s?.rangeCount ? s.getRangeAt(0).cloneRange() : null;
+      let rect = at?.getBoundingClientRect();
+      if (!rect || (!rect.width && !rect.height && !rect.top)) {
+        let el = at?.startContainer;
+        if (el && el.nodeType !== Node.ELEMENT_NODE) el = el.parentElement;
+        rect = (el ?? editorEl).getBoundingClientRect();
+      }
+      void pickWidget(rect).then((kind) => {
+        editorEl.focus();
+        if (at && editorEl.contains(at.startContainer)) { s.removeAllRanges(); s.addRange(at); }
+        if (kind) links?.insertWidget?.(kind);
+      });
       return;
     }
     if (links && ['embed', 'bookmark', 'url', 'mention'].includes(id)) {

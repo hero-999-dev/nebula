@@ -15,6 +15,8 @@ import { isVideoFile, isMediaUrl, makeVideoBlock, refreshVideoBlocks, initVideoP
 import { makeAttachBlock, refreshAttachBlocks, initAttachCards, dropKind, isAttachUrl, ownsAttachUrl } from './file-attach.js';
 import { createPictureDrag, alignOf, setAlign, inRow, leaveRow, putBeside, pictureBefore, tidyRows, inWord, putInLine, leaveLine } from './image-place.js';
 import { cleanPastedHtml, cleanNebulaHtml, fromNebula, undressInserted, dressInNoteFont } from './paste-clean.js';
+import { dropTarget, insertBlocks, holdsStructure, caretAfter } from './block-handle.js';
+import { showDropMark, hideDropMark } from './drop-mark.js';
 
 const LINK_KINDS = ['embed', 'bookmark', 'url', 'mention'];
 
@@ -397,15 +399,54 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     anchor.textContent = kind === 'mention' ? `@${new URL(url).hostname}` : url;
     range.deleteContents();
     range.insertNode(anchor);
+    // On a line with nothing written in the note's font yet the link came out in
+    // the app's serif (1.0.0: "a URL pasted with Ctrl+V turns serif though the
+    // note's font is another", the owner). It is written in that font, as typed words are.
+    const font = noteFont?.();
+    if (font && (font.family || font.size) && !inNoteFont(anchor)) {
+      const span = document.createElement('span');
+      if (font.family) span.style.fontFamily = font.family;
+      if (font.size && !anchor.closest('h1, h2, h3, h4, h5, h6')) span.style.fontSize = `${font.size}px`;
+      anchor.before(span);
+      span.appendChild(anchor);
+    }
     placeCaretAfter(anchor);
   }
+
+  /** Whether the words here already stand in a font written on the line. */
+  function inNoteFont(node) {
+    for (let el = node.parentElement; el && el !== editor; el = el.parentElement) {
+      if (el.style?.fontFamily) return true;
+      if (/^(P|LI|H[1-6]|DIV|BLOCKQUOTE)$/.test(el.tagName)) return false;
+    }
+    return false;
+  }
+
+  /**
+   * Links pasted in come back as Nebula's links. Chromium's copy of a few lines
+   * of links kept only their href — no class, no new window — and they showed
+   * as plain words in the ink's colour (1.0.0: "five links copied inside
+   * Nebula, all in Nebula's format, came out not in it", the owner).
+   */
+  function dressPastedLinks() {
+    for (const a of editor.querySelectorAll('a[href]:not([class])')) {
+      if (!/^(https?:|mailto:)/i.test(a.getAttribute('href') || '')) continue;
+      if (a.closest('.code-src, pre, .link-block, .note-mention')) continue;
+      a.className = 'link-url';
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+    }
+  }
+  editor.addEventListener('input', (e) => { if (e.inputType === 'insertFromPaste') dressPastedLinks(); });
 
   function insertBlockLink(url, kind, range) {
     const card = makeLinkBlock(url, kind);
     range.deleteContents();
     let block = directBlock(editor, range.startContainer);
-    // One level under the note, or under the column it stands in (0.9.4).
-    const flow = (el) => el === editor || !!el?.classList.contains('blk-col');
+    // One level under the note, or under the column it stands in (0.9.4), or
+    // in the part of a toggle that folds (1.0.0: an embed or a bookmark made in
+    // a toggle went out under the whole toggle, "not put in the toggle", the owner).
+    const flow = (el) => el === editor || !!el?.classList.contains('blk-col') || !!el?.classList.contains('toggle-body');
     while (block && !flow(block.parentElement)) block = block.parentElement;
     if (block && flow(block.parentElement)) {
       const tail = document.createRange();
@@ -746,6 +787,9 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
         b.classList.toggle('on', b.dataset.image === place);
       }
       lightPlace();
+      // A widget is drawn, not a photo: there is nothing to crop.
+      const cropButton = imageBar.querySelector('[data-image="crop"]');
+      if (cropButton) cropButton.hidden = isWidget(selectedImage);
       // A picture just selected is one the owner wants to see — one pasted at
       // the end of a long note is still below the view — so it comes into view
       // with its bar. Only scrolling away from it afterwards hides the bar.
@@ -793,6 +837,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
       const img = image.querySelector('img');
       if (img) img.draggable = false;
       captionOf(image); // a saved caption is editable again
+      if (isWidget(image)) renderWidget(image);
     }
     // A row whose other picture was deleted, cut or undone away is no row.
     tidyRows(editor);
@@ -820,6 +865,9 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
       // 0.8.5). The image bar can still set it free.
       image = makeImage(src, width, height, null, true);
       placeInText(image, pendingRange || currentRange(editor));
+      // A pasted picture's place is used once: kept, it sent the next widget
+      // or picture back to this line (owner, 1.0.0).
+      if (linkMenu.hidden) pendingRange = null;
     }
     refreshImages();
     selectImage(image);
@@ -914,12 +962,27 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
       return insertImageData(src, dimensions, at);
     } catch {
       return null;
+    } finally {
+      if (linkMenu.hidden) pendingRange = null;
     }
   }
 
   editor.addEventListener('mousedown', (event) => {
     if (editor.dataset.readonly === 'true') return;
     if (event.target.closest('.image-caption')) { selectImage(null); return; }
+    // A drag on a live Universe map pans the map; it never picks the widget up.
+    if (event.target.closest('.wg-live')) return;
+    // A widget's key or day is pressed, not the widget dragged: it is selected
+    // (so the keyboard goes to it) and the click does the rest (widgets.js).
+    const widgetKey = event.target.closest('.note-widget [data-k], .note-widget [data-day]');
+    if (widgetKey) {
+      claimed.add(event);
+      const widget = widgetKey.closest('.note-widget');
+      if (selectedImage !== widget) selectImage(widget);
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const handle = event.target.closest('.image-h');
     let image = event.target.closest('.note-image');
     if (!image && !event.target.closest('.shape, .link-block')) {
@@ -1043,6 +1106,17 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
    * as a PNG, which every program takes, through the main process.
    */
   async function copyImage(figure) {
+    // A widget is copied as the note's own markup, by the note's copy (it has no picture to send).
+    if (isWidget(figure)) {
+      const range = document.createRange();
+      range.selectNode(figure);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(range);
+      const ok = document.execCommand('copy');
+      s.removeAllRanges();
+      return ok;
+    }
     const img = figure?.querySelector('img');
     if (!img) return false;
     const src = img.getAttribute('src') || '';
@@ -1091,7 +1165,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
   editor.addEventListener('dblclick', (event) => {
     if (editor.dataset.readonly === 'true') return;
     const figure = event.target.closest?.('.note-image');
-    if (!figure || inWord(figure) || event.target.closest('.image-caption')) return;
+    if (!figure || inWord(figure) || isWidget(figure) || event.target.closest('.image-caption')) return;
     event.preventDefault();
     editCaption(figure);
   });
@@ -1480,6 +1554,19 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
       return;
     }
     if (event.target.closest('.code-src, .shape-text, .link-block, .note-image')) return;
+    // Files copied in Explorer or Finder (1.0.0): a video, or any file that is
+    // not a picture, goes in as it does when it is dropped — "a video cannot be
+    // pasted, only dropped" (Log, 0.9.4). Pictures keep the picture's way below.
+    const files = [...(event.clipboardData?.files || [])];
+    const kind = dropKind(files, { isImage: (f) => isImageMime(f.type), isVideo: isVideoFile });
+    if ((kind === 'attach' || kind === 'video') && !event.target.closest?.('.blk-table td')) {
+      event.preventDefault();
+      if (editor.dataset.readonly === 'true') return;
+      const at = currentRange(editor);
+      if (kind === 'attach' && window.nebula?.media?.addFile) void insertAttachFiles(files, at);
+      else if (kind === 'video' && window.nebula?.media?.addVideo) void insertVideoFile(files.find(isVideoFile), at);
+      return;
+    }
     const items = [...(event.clipboardData?.items || [])];
     const imageItem = items.find((item) => isImageMime(item.type));
     if (imageItem) {
@@ -1511,6 +1598,24 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     // "Paste original format" keeps the size the words were copied in, beside
     // what every paste keeps (bold, italic, underline, lists, links).
     let clean = ours ? cleanNebulaHtml(html) : cleanPastedHtml(html, { keepSize: mode === 'original' });
+    // A toggle with what folds away, or columns, from a note (1.0.0): the
+    // browser's paste merged the first and last block into the caret's line —
+    // the toggle's title came out as a plain line, its body beside it ("I have
+    // to make a toggle, copy the title, then copy the text", the owner). They
+    // go in whole, between the two halves of the line.
+    if (ours && clean && holdsStructure(clean) && !event.target.closest?.('.blk-table td')) {
+      const at = currentRange(editor);
+      if (at) {
+        event.preventDefault();
+        history?.push();
+        const last = insertBlocks(editor, clean, at);
+        if (last) caretAfter(last);
+        dirty();
+        onGeometry?.();
+        void adoptPastedCards();
+        return;
+      }
+    }
     if (!clean || (ours && !/style=|data-font-family/.test(html))) return;
     // In a note with a writing font the pasted lines are written in it, as
     // typed ones are (0.9.4); a font that came along from another note stays.
@@ -1527,6 +1632,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     const had = new Set(editor.querySelectorAll('[style*="color"]'));
     document.execCommand('insertHTML', false, clean);
     undressInserted(editor, had);
+    dressPastedLinks();
     dirty();
     // A pasted file card names another note's file: the file is copied in here at once.
     void adoptPastedCards();
@@ -1551,17 +1657,48 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     event.preventDefault();
   });
 
+  /**
+   * Files dragged over the note from the computer (1.0.0): the mark shows the
+   * place between two blocks where a file or a video will stand — the same
+   * mark as a block's drag. "The mark that comes up while files are dragged
+   * does not work properly" (the owner): there was none of the note's own, only
+   * the browser's caret, and the card went after the line the caret was in.
+   * Pictures float where they are let go, and get no mark.
+   */
+  const filesOnly = (dt) => [...(dt?.types || [])].includes('Files');
+  const allPictures = (dt) => {
+    const files = [...(dt?.items || [])].filter((item) => item.kind === 'file');
+    return files.length > 0 && files.every((item) => isImageMime(item.type));
+  };
+  let fileGap = null;
+  const forgetGap = () => { if (fileGap) hideDropMark(); fileGap = null; };
   editor.addEventListener('dragover', (event) => {
     const types = [...(event.dataTransfer?.types || [])];
     if (types.includes('Files') || types.includes('text/uri-list') || types.includes('text/plain')) event.preventDefault();
+    if (!filesOnly(event.dataTransfer) || editor.dataset.readonly === 'true' || allPictures(event.dataTransfer)) { forgetGap(); return; }
+    fileGap = dropTarget(editor, null, event.clientX, event.clientY, { sides: false });
+    if (fileGap) showDropMark(fileGap.line); else hideDropMark();
   });
+  editor.addEventListener('dragleave', (event) => {
+    if (!event.relatedTarget || !editor.contains(event.relatedTarget)) forgetGap();
+  });
+  window.addEventListener('dragend', forgetGap);
+
+  /** Cards to the gap the mark showed; false when that gap is gone by now. */
+  function putAtGap(gap, cards) {
+    const parent = gap?.parent;
+    if (!parent?.isConnected || !editor.contains(parent)) return false;
+    const ref = gap.ref?.parentNode === parent ? gap.ref : null;
+    for (const card of cards) parent.insertBefore(card, ref);
+    return true;
+  }
   /**
    * A video file dropped on the note (0.9.4): the main process copies it into
    * the note's own folder, and the note shows it from there (file-video.js).
    * It stands after the line it was dropped on.
    */
   const say = (text) => window.dispatchEvent(new CustomEvent('nebula-toast', { detail: text }));
-  async function insertVideoFile(file, range) {
+  async function insertVideoFile(file, range, gap = null) {
     const id = noteId?.();
     // A file dropped on the note, or the path of one chosen from the computer (/video).
     const source = typeof file === 'string' ? file : (window.nebula?.media?.pathOf?.(file) || '');
@@ -1578,11 +1715,13 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     history?.push();
     const card = makeVideoBlock(res.url, res.name);
     ensureEmbedHandles(card);
-    const block = topBlockOf(range?.startContainer && editor.contains(range.startContainer) ? range : currentRange(editor));
-    const empty = block && !block.textContent.trim() && !block.querySelector('img, hr, .link-block, .note-image, .blk-code, .inline-eq');
-    if (block && empty) block.replaceWith(card);
-    else if (block) block.after(card);
-    else editor.append(card);
+    if (!putAtGap(gap, [card])) {
+      const block = topBlockOf(range?.startContainer && editor.contains(range.startContainer) ? range : currentRange(editor));
+      const empty = block && !block.textContent.trim() && !block.querySelector('img, hr, .link-block, .note-image, .blk-code, .inline-eq');
+      if (block && empty) block.replaceWith(card);
+      else if (block) block.after(card);
+      else editor.append(card);
+    }
     let next = card.nextElementSibling;
     if (!next || next.matches('.note-image, .link-block, hr, .blk-code')) {
       next = document.createElement('p');
@@ -1624,7 +1763,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     window.nebula?.media?.releaseAdded?.(id, res.url)?.catch?.(() => {});
   }
 
-  async function insertAttachFiles(files, range) {
+  async function insertAttachFiles(files, range, gap = null) {
     const id = noteId?.();
     const sources = [...(files ?? [])].map((file) => ({
       path: typeof file === 'string' ? file : (window.nebula?.media?.pathOf?.(file) || ''),
@@ -1652,8 +1791,8 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     const block = topBlockOf(range?.startContainer && editor.contains(range.startContainer) ? range : currentRange(editor));
     const empty = block && !block.textContent.trim() && !block.querySelector('img, hr, .link-block, .note-image, .blk-code, .inline-eq');
     const cards = added.map((res) => makeAttachBlock(res.url, res.name, res.size));
-    let last = null;
-    for (const card of cards) {
+    let last = putAtGap(gap, cards) ? cards.at(-1) : null;
+    for (const card of last ? [] : cards) {
       if (last) last.after(card);
       else if (block && empty) block.replaceWith(card);
       else if (block) block.after(card);
@@ -1719,19 +1858,22 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
   initAttachCards(editor, { say, owner: () => ({ id: noteId?.() ?? null, hole: noteHole?.() ?? null }) });
 
   editor.addEventListener('drop', (event) => {
+    // Where the mark stood, worked out again at the very place it was let go.
+    const gap = filesOnly(event.dataTransfer) ? dropTarget(editor, null, event.clientX, event.clientY, { sides: false }) : null;
+    forgetGap();
     const dropped = [...(event.dataTransfer?.files || [])];
     // Anything that is neither a picture nor a video among them: every file is attached (0.9.6).
     if (dropKind(dropped, { isImage: (f) => isImageMime(f.type), isVideo: isVideoFile }) === 'attach') {
       event.preventDefault();
       if (window.nebula?.media?.addFile && editor.dataset.readonly !== 'true') {
-        void insertAttachFiles(dropped, document.caretRangeFromPoint?.(event.clientX, event.clientY) ?? null);
+        void insertAttachFiles(dropped, document.caretRangeFromPoint?.(event.clientX, event.clientY) ?? null, gap);
       }
       return;
     }
     const video = dropped.find(isVideoFile);
     if (video && window.nebula?.media?.addVideo && editor.dataset.readonly !== 'true') {
       event.preventDefault();
-      void insertVideoFile(video, document.caretRangeFromPoint?.(event.clientX, event.clientY) ?? null);
+      void insertVideoFile(video, document.caretRangeFromPoint?.(event.clientX, event.clientY) ?? null, gap);
       return;
     }
     const file = [...(event.dataTransfer?.files || [])].find((item) => isImageMime(item.type));
@@ -1809,10 +1951,27 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     }
   }
 
+  /** A widget (1.0.0) into the text where the caret is, selected like a pasted picture. */
+  function insertWidget(kind) {
+    if (editor.dataset.readonly === 'true') return null;
+    const widget = makeWidget(kind);
+    if (!widget) return null;
+    history?.push();
+    ensureImageHandles(widget);
+    // Where the caret is now: /widget put it back on its line.
+    placeInText(widget, currentRange(editor));
+    refreshImages();
+    selectImage(widget);
+    dirty();
+    return widget;
+  }
+  initWidgets(editor, { history, selected: () => (isWidget(selectedImage) ? selectedImage : null) });
+
   refreshImages();
 
   return {
     open,
+    insertWidget,
     paste,
     refresh: refreshImages,
     insertVideoFile,
@@ -1828,4 +1987,5 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
   };
 }import { ensureLayer as ensureCanvas } from './shapes.js';
 import { initImageCrop } from './image-crop.js';
+import { makeWidget, isWidget, renderWidget, initWidgets } from './widgets.js';
 

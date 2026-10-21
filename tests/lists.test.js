@@ -17,6 +17,15 @@ const root = (html) => {
 const shape = (el) => el.innerHTML.replace(/\s+</g, '<').replace(/>\s+/g, '>');
 
 describe('normalizeLists', () => {
+  it('leaves a list in a column or a table cell where it is (the owner’s Ideas note, 1.0.0)', () => {
+    const html = '<div class="blk-cols"><div class="blk-col"><p>a</p><ul><li>one</li></ul></div><hr class="blk-vr"><div class="blk-col"><p>b</p></div></div><table><tbody><tr><td><ul><li>x</li></ul></td></tr></tbody></table>';
+    const el = root(html);
+    normalizeLists(el);
+    expect(el.querySelectorAll('.blk-col')).toHaveLength(2);
+    expect(el.querySelector('.blk-col ul')).not.toBeNull();
+    expect(el.querySelector('td ul')).not.toBeNull();
+  });
+
   it('lifts a numbered list out of the bulleted item Chromium buried it in', () => {
     // exactly what insertOrderedList does on the line after a <ul>
     const el = root('<ul><li>one</li><li><ol><li>first</li><li>second</li></ol></li></ul>');

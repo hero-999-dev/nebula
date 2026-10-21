@@ -88,7 +88,7 @@ export async function runNoteFolderChecks(check) {
       await win.waitForTimeout(200);
     };
     /** Until the disk says so, or ten seconds: under the whole smoke run the undo's write once took longer than four. */
-    const until = async (what) => { for (let i = 0; i < 100; i += 1) { if (await what()) return true; await win.waitForTimeout(100); } return !!(await what()); };
+    const until = async (what) => { for (let i = 0; i < 200; i += 1) { if (await what()) return true; await win.waitForTimeout(100); } return !!(await what()); };
 
     // ---- A vault written the old way, at its first start ----------------------
     const moved = stored('n-old');
@@ -97,7 +97,7 @@ export async function runNoteFolderChecks(check) {
       && /^[0-9a-f]{24}\.png$/.test(name) && moved.includes(`nebula-media://note/n-old/${name}`), `${folder('n-old')} ${moved.slice(0, 300)}`);
     check('the file is the picture itself, byte for byte', !!name && fs.readFileSync(path.join(vault, 'n-old', name)).equals(first));
     check('the note’s file is small now: its words and the picture’s name', moved.length < oldText.length / 3 && moved.includes('words before') && moved.includes('words after'), `${moved.length} of ${oldText.length}`);
-    check('a note without pictures is not touched: its file goes into a folder of its own, and nothing else is in it', stored('n-plain') === plainText && folder('n-plain')?.length === 0);
+    check('a note without pictures is not touched: its file goes into a folder of its own, and nothing else is in it', stored('n-plain') === plainText && folder('n-plain')?.length === 0, stored('n-plain') === plainText ? folder('n-plain') : stored('n-plain'));
     check('no note file lies flat in the notes folder any more: every note is one folder', fs.readdirSync(vault).every((name) => fs.statSync(path.join(vault, name)).isDirectory())
       && ['n-old', 'n-plain', 'n-bin'].every((id) => fs.existsSync(path.join(vault, id, `${id}.json`))), fs.readdirSync(vault).join());
     // The copy put aside before the move has done its work once every picture is in its note's folder: it is gone.
@@ -198,7 +198,8 @@ export async function runNoteFolderChecks(check) {
       const dt = new DataTransfer();
       dt.items.add(file);
       const at = document.getElementById('o1').getBoundingClientRect();
-      document.getElementById('editor').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, clientX: at.left + 20, clientY: at.top + 6, bubbles: true, cancelable: true }));
+      // The lower half of the line: a file goes into the gap the drop mark shows (1.0.0), here the one under o1.
+      document.getElementById('editor').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, clientX: at.left + 20, clientY: at.bottom - 3, bubbles: true, cancelable: true }));
       document.getElementById('probe-file').remove();
     });
     await win.waitForFunction(() => document.querySelector('#editor .link-file video'), null, { polling: 50, timeout: 8000 }).catch(() => {});

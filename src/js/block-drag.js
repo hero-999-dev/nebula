@@ -100,9 +100,11 @@ export function placeBlock(block, target) {
 
 /**
  * @param {HTMLElement} editor
- * @param {{history?: {push: () => void}, isLocked?: () => boolean, onGeometry?: () => void}} [opts]
+ * @param {{history?: {push: () => void}, isLocked?: () => boolean, onGeometry?: () => void, mover?: {target: Function, move: Function}|null}} [opts]
+ *   mover: every block's drag (block-handle.js, 1.0.0) — with it a card goes where
+ *   any block goes: into a toggle, beside a block in columns
  */
-export function initBlockDrag(editor, { history, isLocked = () => false, onGeometry } = {}) {
+export function initBlockDrag(editor, { history, isLocked = () => false, onGeometry, mover = null } = {}) {
   if (!editor) return null;
   const dirty = () => editor.dispatchEvent(new Event('input', { bubbles: true }));
   /** @type {null | {block: HTMLElement, x: number, y: number, moved: boolean, target: object|null}} */
@@ -110,6 +112,11 @@ export function initBlockDrag(editor, { history, isLocked = () => false, onGeome
 
   /** What letting go here would do, and the mark that says so. */
   function over(x, y) {
+    if (mover) {
+      const t = mover.target(drag.block, x, y);
+      if (t) showDropMark(t.line); else hideDropMark();
+      return t;
+    }
     const gap = gapAwayFrom(drag.block, flowAt(editor, x, y), y);
     if (!gap) { hideDropMark(); return null; }
     showDropMark(gap.line);
@@ -130,7 +137,15 @@ export function initBlockDrag(editor, { history, isLocked = () => false, onGeome
     document.body.classList.remove('block-dragging');
     if (!d?.moved) return;
     eatClick = held;
-    if (!apply || !d.target || !d.block.isConnected || !spotOf(d.block, d.target)) return;
+    if (!apply || !d.target || !d.block.isConnected) return;
+    if (mover) {
+      history?.push();
+      if (!mover.move(d.block, d.target)) return;
+      onGeometry?.();
+      dirty();
+      return;
+    }
+    if (!spotOf(d.block, d.target)) return;
     history?.push();
     placeBlock(d.block, d.target);
     onGeometry?.();
@@ -140,7 +155,7 @@ export function initBlockDrag(editor, { history, isLocked = () => false, onGeome
   editor.addEventListener('mousedown', (e) => {
     if (e.button !== 0 || isLocked() || editor.dataset.readonly === 'true') return;
     const block = gripOf(e.target, e.clientY);
-    if (!block || !editor.contains(block) || !standsAlone(block, editor)) return;
+    if (!block || !editor.contains(block) || (!mover && !standsAlone(block, editor))) return;
     // A title line is a link, and a link pulled is the browser's own drag of its address.
     if (e.target.closest(GRIP)) e.preventDefault();
     drag = { block, x: e.clientX, y: e.clientY, moved: false, target: null };

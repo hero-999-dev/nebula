@@ -81,6 +81,14 @@ describe('spelling', () => {
     expect(spellLanguages('tr', [])).toEqual([]);
   });
 
+  it('checks every language chosen in Settings at once (1.0.0)', () => {
+    const all = ['en-US', 'en-GB', 'de-DE', 'pl', 'tr'];
+    expect(spellLanguages(['en', 'de', 'pl', 'tr'], all)).toEqual(['en-US', 'en-GB', 'de-DE', 'pl', 'tr']);
+    expect(spellLanguages(['tr', 'de'], all)).toEqual(['tr', 'de-DE']);
+    expect(spellLanguages(['pl', 'tr'], ['en-US', 'pl-PL'])).toEqual(['pl-PL']);
+    expect(spellLanguages([], all)).toEqual([]);
+  });
+
   it('takes the ignored words out of the dictionary again', () => {
     const ses = { removeWordFromSpellCheckerDictionary: vi.fn() };
     forgetIgnoredWords(ses, ['Nebula', 'zorblat']);

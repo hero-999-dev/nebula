@@ -285,6 +285,7 @@ export class NoteStore {
       if (!note?.id) continue;
       note.hole = hole;
       delete note.folder;
+      delete note.project;  // a black hole is its own dimension: no project reaches into it (1.0.0)
       const at = this.notes.findIndex((n) => n.id === note.id);
       if (at < 0) { this.notes.push(note); continue; }
       if (this.notes[at].hole === hole) continue;
@@ -296,6 +297,7 @@ export class NoteStore {
       const newerPlain = !prior.hole && Number(prior.updatedAt || 0) > Number(note.updatedAt || 0);
       const chosen = newerPlain ? { ...prior, hole } : note;
       delete chosen.folder;
+      delete chosen.project;
       this.notes[at] = chosen;
       again.push(note.id);
     }
@@ -326,7 +328,7 @@ export class NoteStore {
   setHole(id, hole, { notify = true } = {}) {
     const note = this.get(id);
     if (!note || (note.hole ?? null) === (hole ?? null)) return note;
-    if (hole) { note.hole = hole; delete note.folder; } else delete note.hole;
+    if (hole) { note.hole = hole; delete note.folder; delete note.project; } else delete note.hole;
     this.save([id]);
     if (notify) emit('note-changed', { id });
     return note;
@@ -356,14 +358,17 @@ export class NoteStore {
    * neighbours it was dropped between). Dragging never pins or unpins a note
    * (the owner, 0.9.3: "moving a note must not pin it"). Not an edit: the date stays.
    * @param {string} id
-   * @param {{folder?: string|null, order?: number}} where
+   * A note goes straight into a project (1.0.0) with `project`; in a folder it
+   * is in the folder's project and carries no project of its own.
+   * @param {{folder?: string|null, project?: string|null, order?: number}} where
    */
-  setPlace(id, { folder = null, order } = {}) {
+  setPlace(id, { folder = null, project = null, order } = {}) {
     const note = this.get(id);
     if (!note) return null;
     const patch = {};
     if (typeof order === 'number' && Number.isFinite(order)) patch.order = order;
     if (folder) patch.folder = folder; else delete note.folder;
+    if (project && !folder && !note.hole) patch.project = project; else delete note.project;
     return this.#mark(id, patch);
   }
 
@@ -383,18 +388,44 @@ export class NoteStore {
     return changed;
   }
 
-  /** Into a folder, or out of every folder with null. Its place is kept. */
+  /** Into a folder, or out of every folder and project with null. Its place is kept. */
   setFolder(id, folder) {
     const note = this.get(id);
     if (!note) return null;
     if (!folder) {
-      if (!note.folder) return note;
+      if (!note.folder && !note.project) return note;
       delete note.folder;
+      delete note.project;
       this.save([id]);
       emit('note-changed', { id });
       return note;
     }
-    return note.folder === folder ? note : this.#mark(id, { folder });
+    if (note.folder === folder) return note;
+    delete note.project;   // in a folder, a note is in the folder's project
+    return this.#mark(id, { folder });
+  }
+
+  /** Straight into a project, out of its folder (1.0.0). Never a black hole's note. */
+  setProject(id, project) {
+    const note = this.get(id);
+    if (!note || note.hole) return note ?? null;
+    if (!project) return this.setFolder(id, null);
+    if (note.project === project && !note.folder) return note;
+    delete note.folder;
+    return this.#mark(id, { project });
+  }
+
+  /** A project was deleted: the notes put straight into it are in the list again. */
+  releaseProject(project) {
+    const changed = [];
+    for (const note of this.notes) {
+      if (note.project === project) { delete note.project; changed.push(note.id); }
+    }
+    if (changed.length) {
+      this.save(changed);
+      for (const id of changed) emit('note-changed', { id });
+    }
+    return changed;
   }
 
   /** A folder was deleted: its notes, archived and trashed ones too, are in the list again. */

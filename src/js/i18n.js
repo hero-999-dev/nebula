@@ -177,6 +177,8 @@ export const STRINGS = {
   'Open this black hole': ['Dieses schwarze Loch öffnen', 'Otwórz tę czarną dziurę', 'Bu kara deliği aç'],
   'Show the black holes': ['Schwarze Löcher zeigen', 'Pokaż czarne dziury', 'Kara delikleri göster'],
   'Hide the black holes': ['Schwarze Löcher ausblenden', 'Ukryj czarne dziury', 'Kara delikleri gizle'],
+  'Spelling': ['Rechtschreibung', 'Pisownia', 'Yazım denetimi'],
+  'Words are checked in every language ticked here. Untick one and it is no longer corrected; with none ticked, nothing is.': ['Wörter werden in jeder hier angehakten Sprache geprüft. Nimm einer den Haken, und sie wird nicht mehr korrigiert; ist keine angehakt, wird nichts korrigiert.', 'Słowa są sprawdzane w każdym zaznaczonym tu języku. Odznacz język, a przestanie być poprawiany; gdy żaden nie jest zaznaczony, nic nie jest poprawiane.', 'Sözcükler burada işaretli her dilde denetlenir. Bir dilin işaretini kaldırırsan o dil artık düzeltilmez; hiçbiri işaretli değilse hiçbir şey düzeltilmez.'],
   'PIN again': ['PIN wiederholen', 'PIN ponownie', 'PIN (tekrar)'],
   'New PIN': ['Neue PIN', 'Nowy PIN', 'Yeni PIN'],
   'Create': ['Erstellen', 'Utwórz', 'Oluştur'],
@@ -234,7 +236,43 @@ export const STRINGS = {
   'No folder': ['Kein Ordner', 'Bez folderu', 'Klasörsüz'],
   'Drag notes here': ['Notizen hierher ziehen', 'Przeciągnij tu notatki', 'Notları buraya sürükle'],
   'Delete the empty folder?': ['Den leeren Ordner löschen?', 'Usunąć pusty folder?', 'Boş klasör silinsin mi?'],
+  // Projects (1.0.0)
+  'New project': ['Neues Projekt', 'Nowy projekt', 'Yeni proje'],
+  'Rename project': ['Projekt umbenennen', 'Zmień nazwę projektu', 'Projeyi yeniden adlandır'],
+  'Delete project': ['Projekt löschen', 'Usuń projekt', 'Projeyi sil'],
+  'Project actions': ['Projektaktionen', 'Działania projektu', 'Proje işlemleri'],
+  'Add a folder': ['Ordner hinzufügen', 'Dodaj folder', 'Klasör ekle'],
+  'Drag folders and notes here': ['Ordner und Notizen hierher ziehen', 'Przeciągnij tu foldery i notatki', 'Klasörleri ve notları buraya sürükle'],
+  'Take out of the project': ['Aus dem Projekt nehmen', 'Wyjmij z projektu', 'Projeden çıkar'],
+  'Delete the project? Its folders and notes stay, back in the list.': ['Das Projekt löschen? Seine Ordner und Notizen bleiben und kommen zurück in die Liste.', 'Usunąć projekt? Jego foldery i notatki zostaną i wrócą na listę.', 'Proje silinsin mi? Klasörleri ve notları kalır, listeye geri döner.'],
+  // The map (1.0.0)
+  'Universe': ['Universe', 'Universe', 'Universe'],
+  'Universe — your notes as a galaxy': ['Universe — deine Notizen als Galaxie', 'Universe — twoje notatki jako galaktyka', 'Universe — notlarının galaksisi'],
+  'Universe over the whole page': ['Universe über die ganze Seite', 'Universe na całą stronę', 'Universe tüm sayfada'],
+  'Resize panes': ['Bereiche anpassen', 'Zmień rozmiar paneli', 'Bölmeleri boyutlandır'],
+  'Drag to resize panes; double-click to make them equal': ['Ziehen, um die Bereiche anzupassen; Doppelklick macht sie gleich breit', 'Przeciągnij, aby zmienić rozmiar paneli; dwuklik wyrównuje je', 'Bölmeleri boyutlandırmak için sürükleyin; çift tıklayınca eşitlenir'],
+  'Close Universe': ['Universe schließen', 'Zamknij Universe', 'Universe’ü kapat'],
+  'Back to main space': ['Zurück in den Hauptraum', 'Powrót do głównej przestrzeni', 'Ana uzaya dön'],
+  'Enter the black hole': ['In das Schwarze Loch', 'Wejdź do czarnej dziury', 'Kara deliğe gir'],
+  'Locked': ['Gesperrt', 'Zablokowana', 'Kilitli'],
+  'Show all of Universe': ['Das ganze Universe zeigen', 'Pokaż całe Universe', 'Universe’ün tamamını göster'],
+  'Fit Universe': ['Universe einpassen', 'Dopasuj Universe', 'Universe’ü sığdır'],
+  'Hide names': ['Namen ausblenden', 'Ukryj nazwy', 'İsimleri gizle'],
+  'Show names': ['Namen einblenden', 'Pokaż nazwy', 'İsimleri göster'],
+  'Search labels and mentions in Universe': ['Labels und Erwähnungen im Universe suchen', 'Szukaj etykiet i wzmianek w Universe', 'Universe’te etiket ve bahsetme ara'],
+  'Labels and mentions…': ['Labels und Erwähnungen…', 'Etykiety i wzmianki…', 'Etiketler ve bahsetmeler…'],
+  'Remove from the search': ['Aus der Suche nehmen', 'Usuń z wyszukiwania', 'Aramadan çıkar'],
+  'No such label or mention in Universe': ['Kein solches Label und keine solche Erwähnung im Universe', 'Brak takiej etykiety ani wzmianki w Universe', 'Universe’te böyle bir etiket ya da bahsetme yok'],
+  // What a body of the map is, in its list for screen readers
+  'map: folder': ['Ordner', 'folder', 'klasör'],
+  'map: note': ['Notiz', 'notatka', 'not'],
+  'map: black hole': ['Schwarzes Loch', 'czarna dziura', 'kara delik'],
+  'map: project': ['Projekt', 'projekt', 'proje'],
+  'map: label': ['Label', 'etykieta', 'etiket'],
   'Pin to top': ['Oben anheften', 'Przypnij na górze', 'En üste sabitle'],
+  'Open side by side': ['Daneben öffnen', 'Otwórz obok', 'Yan yana aç'],
+  'Close this side': ['Diese Seite schließen', 'Zamknij tę stronę', 'Bu tarafı kapat'],
+  'At most four notes side by side': ['Höchstens vier Notizen nebeneinander', 'Najwyżej cztery notatki obok siebie', 'Yan yana en fazla dört not'],
   'Unpin from top': ['Nicht mehr anheften', 'Odepnij z góry', 'Sabitlemeyi kaldır'],
   'Edit mode': ['Bearbeitungsmodus', 'Tryb edycji', 'Düzenleme modu'],
   'Only view mode': ['Nur-Lesen-Modus', 'Tryb tylko do odczytu', 'Yalnızca görüntüleme modu'],
@@ -305,6 +343,20 @@ export const STRINGS = {
   'Links only': ['Nur Links', 'Tylko linki', 'Sadece bağlantılar'],
   'Videos as they show in the note: the picture, linked': ['Videos wie in der Notiz: das Bild, verlinkt', 'Filmy jak w notatce: obraz z linkiem', 'Videolar notta göründüğü gibi: bağlantılı resim'],
   'Videos as their links only': ['Videos nur als Links', 'Filmy tylko jako linki', 'Videolar sadece bağlantı olarak'],
+  // Widgets (1.0.0, widgets.js).
+  'Widget': ['Widget', 'Widżet', 'Widget'],
+  'Widgets': ['Widgets', 'Widżety', "Widget'lar"],
+  'Add a widget': ['Widget hinzufügen', 'Dodaj widżet', 'Widget ekle'],
+  'Calculator': ['Taschenrechner', 'Kalkulator', 'Hesap makinesi'],
+  'Scientific calculator': ['Wissenschaftlicher Rechner', 'Kalkulator naukowy', 'Bilimsel hesap makinesi'],
+  'Calendar': ['Kalender', 'Kalendarz', 'Takvim'],
+  'Previous month': ['Voriger Monat', 'Poprzedni miesiąc', 'Önceki ay'],
+  'Next month': ['Nächster Monat', 'Następny miesiąc', 'Sonraki ay'],
+  'This month': ['Dieser Monat', 'Ten miesiąc', 'Bu ay'],
+  'With widgets': ['Mit Widgets', 'Z widżetami', "Widget'larla"],
+  'Without widgets': ['Ohne Widgets', 'Bez widżetów', "Widget'sız"],
+  'Widgets printed as they are now': ['Widgets so gedruckt, wie sie jetzt sind', 'Widżety drukowane tak, jak wyglądają teraz', "Widget'lar şu anki halleriyle yazdırılır"],
+  'Widgets left out of the page': ['Widgets bleiben weg', 'Widżety pominięte na stronie', "Widget'lar sayfaya konmaz"],
   'Import a note (.md, .html, .docx, .odt, .doc, .rtf or .enex)': ['Notiz importieren (.md, .html, .docx, .odt, .doc, .rtf oder .enex)', 'Importuj notatkę (.md, .html, .docx, .odt, .doc, .rtf lub .enex)', 'Not içe aktar (.md, .html, .docx, .odt, .doc, .rtf veya .enex)'],
   'That file could not be read': ['Diese Datei konnte nicht gelesen werden', 'Nie udało się odczytać pliku', 'Bu dosya okunamadı'],
   'Cut (Ctrl+X)': ['Ausschneiden (Strg+X)', 'Wytnij (Ctrl+X)', 'Kes (Ctrl+X)'],
@@ -570,6 +622,8 @@ export const STRINGS = {
   'Small heading': ['Kleine Überschrift', 'Mały nagłówek', 'Küçük başlık'],
   'Bulleted list — Enter on an empty item leaves it': ['Aufzählung — Enter auf einem leeren Punkt verlässt sie', 'Lista punktowana — Enter na pustym punkcie ją kończy', 'Madde işaretli liste — boş maddede Enter listeden çıkar'],
   'Numbered list — Enter on an empty item leaves it': ['Nummerierte Liste — Enter auf einem leeren Punkt verlässt sie', 'Lista numerowana — Enter na pustym punkcie ją kończy', 'Numaralı liste — boş maddede Enter listeden çıkar'],
+  // Every block's grip (1.0.0, block-handle.js).
+  'Drag to move · click to select': ['Ziehen zum Verschieben · klicken zum Auswählen', 'Przeciągnij, aby przenieść · kliknij, aby zaznaczyć', 'Taşımak için sürükle · seçmek için tıkla'],
   'A line with a checkbox; the button toggles it back': ['Eine Zeile mit Kontrollkästchen; die Schaltfläche macht sie wieder normal', 'Linia z polem wyboru; przycisk przywraca zwykły tekst', 'Onay kutulu bir satır; düğme onu geri çevirir'],
   'Indented quote': ['Eingerücktes Zitat', 'Wcięty cytat', 'Girintili alıntı'],
   'Code block with a language picker and colours': ['Codeblock mit Sprachauswahl und Farben', 'Blok kodu z wyborem języka i kolorami', 'Dil seçicili ve renkli kod bloğu'],
@@ -603,6 +657,8 @@ export const STRINGS = {
   'Add or edit a caption': ['Bildunterschrift hinzufügen oder bearbeiten', 'Dodaj lub edytuj podpis', 'Alt yazı ekle ya da düzenle'],
   'Delete image': ['Bild löschen', 'Usuń obraz', 'Resmi sil'],
   'Copy image': ['Bild kopieren', 'Kopiuj obraz', 'Resmi kopyala'],
+  'Copy widget': ['Widget kopieren', 'Kopiuj widżet', 'Widget’ı kopyala'],
+  'Delete widget': ['Widget löschen', 'Usuń widżet', 'Widget’ı sil'],
   'Add caption': ['Bildunterschrift hinzufügen', 'Dodaj podpis', 'Alt yazı ekle'],
   'Edit caption': ['Bildunterschrift bearbeiten', 'Edytuj podpis', 'Alt yazıyı düzenle'],
   'Picture copied': ['Bild kopiert', 'Obraz skopiowany', 'Resim kopyalandı'],
@@ -880,9 +936,6 @@ function apply() {
   document.documentElement.lang = lang;
   paintCssStrings();
   translateTree(document.body);
-  // Words in the chosen language are not flagged as misspelt (the main process
-  // adds English beside it).
-  void window.nebula?.spell?.language?.(lang)?.catch?.(() => {});
   emit('lang-changed', { lang });
 }
 

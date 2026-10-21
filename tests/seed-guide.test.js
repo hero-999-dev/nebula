@@ -54,16 +54,21 @@ describe('guide order (owner, 0.8.9)', () => {
   const doc = new DOMParser().parseFromString(`<body>${GUIDE_NOTE.content}</body>`, 'text/html');
   const h2 = [...doc.querySelectorAll('h2')].map((h) => h.textContent);
 
-  it('ends with Where your notes live as 11 and Code blocks as 12, the last section', () => {
-    // Your privacy is 9 since 0.9.4, a page that asks 10 since 0.9.6; the last two keep their places at the end.
-    expect(h2.at(-4)).toBe('9 · Your privacy');
-    expect(h2.at(-3)).toBe('10 · A page in a note that asks');
-    expect(h2.at(-2)).toBe('11 · Where your notes live');
-    expect(h2.at(-1)).toBe('12 · Code blocks');
+  it('ends with Where your notes live as 15 and Code blocks as 16, the last section', () => {
+    // Your privacy is 9 since 0.9.4, a page that asks 10 since 0.9.6, projects and the Universe 11 since 1.0.0;
+    // a Universe in a note, panes you can size and the black holes' own scroll are 12–14 since 1.0.0; the last two keep their places at the end.
+    expect(h2.at(-8)).toBe('9 · Your privacy');
+    expect(h2.at(-7)).toBe('10 · A page in a note that asks');
+    expect(h2.at(-6)).toBe('11 · Projects and the Universe');
+    expect(h2.at(-5)).toBe('12 · A Universe of your own');
+    expect(h2.at(-4)).toBe('13 · Panes you can size');
+    expect(h2.at(-3)).toBe('14 · Black holes scroll on their own');
+    expect(h2.at(-2)).toBe('15 · Where your notes live');
+    expect(h2.at(-1)).toBe('16 · Code blocks');
   });
 
   it('opens the code samples with Markdown', () => {
-    const codeHeading = [...doc.querySelectorAll('h2')].find((h) => h.textContent === '12 · Code blocks');
+    const codeHeading = [...doc.querySelectorAll('h2')].find((h) => h.textContent === '16 · Code blocks');
     let el = codeHeading.nextElementSibling;
     while (el && el.tagName !== 'H3') el = el.nextElementSibling;
     expect(el.textContent).toBe('Markdown');

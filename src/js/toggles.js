@@ -16,8 +16,9 @@
  * toggle IN the list — `<li><div class="blk-toggle">…</div></li>`, bullet or
  * number first, then the arrow — where it used to be taken out of the list.
  *
- * Keys: Enter in the title goes into the body (opening it, and taking the
- * words after the caret along) — but at the very start of a title with words
+ * Keys: Enter in the title of an open toggle goes into the body (taking the
+ * words after the caret along); in a folded one it makes a line under the
+ * toggle, which stays folded (1.0.0) — but at the very start of a title with words
  * it puts an empty line ABOVE the toggle, the only way to get a caret before a
  * toggle that begins the note or follows an embed; Enter on an empty last line
  * of the body leaves the toggle; Backspace at the start of the title turns the
@@ -210,6 +211,84 @@ export function initToggles(editorEl, { history, isLocked = () => false } = {}) 
     if (!locked) dirty();
   }, true);
 
+  /**
+   * Backspace and Delete beside a folded toggle. The browser's own join skips
+   * what it does not draw and took it away: Backspace on the line under a
+   * folded toggle deleted everything folded in it, Delete at the end of its
+   * title that and the next toggle's frame — "the notes in the toggle lists
+   * disappear" (the owner, 1.0.0, toggles one under another in columns). Here
+   * the line joins the title, and what is folded stays.
+   */
+  editorEl.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || isLocked() || e.defaultPrevented) return;
+    if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+    const sel = window.getSelection();
+    if (!sel?.rangeCount || !sel.isCollapsed) return;
+    const range = sel.getRangeAt(0);
+    const at = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
+    if (!at || !editorEl.contains(at)) return;
+    const blank = (s) => !s.replace(/​/g, '').length;
+    const side = (el, toEnd) => {
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      if (toEnd) r.setStart(range.startContainer, range.startOffset);
+      else r.setEnd(range.startContainer, range.startOffset);
+      return blank(r.toString()) && !r.cloneContents().querySelector?.('img, hr, .inline-eq, .note-image, .note-mention');
+    };
+    const folded = (el) => !!el?.matches?.(TOGGLE) && !isOpen(el) && !!titleOf(el) && !!bodyOf(el);
+    const plain = (el) => !!el?.matches?.('p, div:not([class]), h1, h2, h3, h4, h5, h6, blockquote');
+    const take = () => { e.preventDefault(); e.stopImmediatePropagation(); handled.add(e); history?.push(); };
+    // The end of `el`'s words, before the line break that holds an empty line open.
+    const endOf = (el) => {
+      const mark = document.createTextNode('');
+      if (el.lastChild?.nodeName === 'BR') el.lastChild.before(mark);
+      else el.appendChild(mark);
+      return mark;
+    };
+    // `line`'s words onto the end of `to`; the line goes. The caret stands at the join.
+    const join = (to, line) => {
+      const mark = endOf(to);
+      if (!blank(line.textContent) || line.querySelector('img, .inline-eq, .note-image, .note-mention')) {
+        if (to.lastChild?.nodeName === 'BR') to.lastChild.remove();
+        for (const n of [...line.childNodes]) if (!(n.nodeName === 'BR' && n === line.lastChild)) to.appendChild(n);
+      }
+      line.remove();
+      caretAt(mark, 0);
+      dirty();
+    };
+    // The line the caret is in, as a block of its flow (the note, a column, a toggle's body).
+    let line = at;
+    while (line && line !== editorEl && !(line.parentElement === editorEl || line.parentElement?.matches('.blk-col, .toggle-body'))) line = line.parentElement;
+    if (!line || line === editorEl) line = null;
+
+    if (e.key === 'Backspace') {
+      if (!plain(line) || !folded(line.previousElementSibling) || !side(line, false)) return;
+      take();
+      join(titleOf(line.previousElementSibling), line);
+      return;
+    }
+    // Delete at the end of a folded toggle's title: the line under the toggle comes up; anything else stays.
+    const title = at.closest('.blk-toggle > :first-child:not(.toggle-body)');
+    const toggle = title?.parentElement;
+    if (toggle && editorEl.contains(toggle) && folded(toggle) && side(title, true)) {
+      take();
+      const outer = toggle.parentElement?.tagName === 'LI' ? null : toggle;
+      const next = outer?.nextElementSibling;
+      if (plain(next)) join(title, next);
+      return;
+    }
+    // Delete at the end of a line over a folded toggle: an empty line goes; words stay as they are.
+    if (plain(line) && folded(line.nextElementSibling) && side(line, true)) {
+      take();
+      if (blank(line.textContent) && !line.querySelector('img, .inline-eq, .note-image')) {
+        const below = line.nextElementSibling;
+        line.remove();
+        caretAt(titleOf(below), 0);
+        dirty();
+      }
+    }
+  }, true);
+
   editorEl.addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey || isLocked()) return;
     if (e.key !== 'Enter' && e.key !== 'Backspace') return;
@@ -260,13 +339,25 @@ export function initToggles(editorEl, { history, isLocked = () => false } = {}) 
         return;
       }
       if (e.key === 'Enter') {
-        // Into the body, open; the words after the caret go with it.
         take();
         const after = document.createRange();
         after.setStart(range.startContainer, range.startOffset);
         after.setEnd(title, title.childNodes.length);
         const moved = after.extractContents();
         if (!title.textContent.replace(/​/g, '') && !title.querySelector('br, img')) title.innerHTML = '<br>';
+        if (!isOpen(toggle)) {
+          // Folded: a line under the toggle, which stays folded — as in Notion.
+          // It used to open the toggle and put the caret at the top of what
+          // was folded: "Enter goes into the note instead of below" (the
+          // owner, 1.0.0, toggles one under another).
+          const line = emptyLine(document, item ? 'li' : 'p');
+          if (moved.textContent.replace(/​/g, '')) { line.textContent = ''; line.appendChild(moved); }
+          (item ?? toggle).after(line);
+          caretAt(line, 0);
+          dirty();
+          return;
+        }
+        // Open: into the body; the words after the caret go with it.
         let host = body;
         if (!host) { host = document.createElement('div'); host.className = 'toggle-body'; toggle.appendChild(host); }
         setOpen(toggle, true);

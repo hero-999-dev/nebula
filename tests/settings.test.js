@@ -18,7 +18,7 @@ beforeEach(() => { localStorage.clear(); document.body.innerHTML = ''; });
 
 describe('the settings store', () => {
   it('is the app as it always was until something is chosen', () => {
-    expect(readSettings()).toEqual({ font: null, size: null, page: 'nw', hideAi: false, hideHoles: false });
+    expect(readSettings()).toEqual({ font: null, size: null, page: 'nw', hideAi: false, hideHoles: false, spell: ['en', 'de', 'pl', 'tr'] });
     expect(readSettings()).toEqual({ ...DEFAULT_SETTINGS });
     expect(newNoteDefaults()).toEqual({ font: null, page: null });
   });
@@ -27,14 +27,23 @@ describe('the settings store', () => {
     expect(cleanSettings(null)).toEqual({ ...DEFAULT_SETTINGS });
     expect(cleanSettings('a string')).toEqual({ ...DEFAULT_SETTINGS });
     expect(cleanSettings({ font: 'Arial, Helvetica, sans-serif', size: '18', page: 'a4', hideAi: true, hideHoles: true }))
-      .toEqual({ font: 'Arial, Helvetica, sans-serif', size: 18, page: 'a4', hideAi: true, hideHoles: true });
+      .toEqual({ font: 'Arial, Helvetica, sans-serif', size: 18, page: 'a4', hideAi: true, hideHoles: true, spell: ['en', 'de', 'pl', 'tr'] });
     // A font that could end a CSS value, a size no line is written in, a page there is none of, a yes that is not one.
     expect(cleanSettings({ font: 'Evil; } body { display: none', size: 2, page: 'a9', hideAi: 'yes', hideHoles: 1 }))
-      .toEqual({ font: 'Evil body display: none', size: null, page: 'nw', hideAi: false, hideHoles: false });
+      .toEqual({ font: 'Evil body display: none', size: null, page: 'nw', hideAi: false, hideHoles: false, spell: ['en', 'de', 'pl', 'tr'] });
     expect(cleanSettings({ font: '   ', size: 'big' })).toMatchObject({ font: null, size: null });
     expect(cleanSettings({ size: 401 }).size).toBeNull();
     expect(cleanSettings({ size: 400 }).size).toBe(400);
     expect(cleanSettings({ size: 6 }).size).toBe(6);
+  });
+
+  it('checks spelling in every language until one is taken off (1.0.0)', () => {
+    expect(cleanSettings({}).spell).toEqual(['en', 'de', 'pl', 'tr']);
+    expect(cleanSettings({ spell: ['tr', 'en', 'tr', 'xx', 3] }).spell).toEqual(['en', 'tr']);
+    expect(cleanSettings({ spell: [] }).spell).toEqual([]);
+    expect(cleanSettings({ spell: 'en' }).spell).toEqual(['en', 'de', 'pl', 'tr']);
+    expect(writeSettings({ spell: ['pl'] }).spell).toEqual(['pl']);
+    expect(readSettings().spell).toEqual(['pl']);
   });
 
   it('writes a change, keeps the rest, and says so', () => {
@@ -43,7 +52,7 @@ describe('the settings store', () => {
     writeSettings({ page: 'a5' });
     const now = writeSettings({ hideAi: true });
     off();
-    expect(now).toEqual({ font: null, size: null, page: 'a5', hideAi: true, hideHoles: false });
+    expect(now).toEqual({ font: null, size: null, page: 'a5', hideAi: true, hideHoles: false, spell: ['en', 'de', 'pl', 'tr'] });
     expect(readSettings()).toEqual(now);
     expect(heard).toHaveLength(2);
     expect(heard[1]).toEqual(now);
@@ -67,7 +76,7 @@ describe('the fonts Settings offers a new note', () => {
     const rows = fontChoices(['Noto Serif', 'arial']);
     // The app's own says what it is — and the serif is "Serif", no longer "Serif (default)":
     // what a new note is written in is what Settings says.
-    expect(rows[0]).toEqual(['', 'Nebula’s own (Serif)']);
+    expect(rows[0]).toEqual(['', 'Serif']);      // 1.0.0: the font's name, no "Nebula’s own"
     expect(FONTS[0][0]).toBe('Serif');
     expect(rows.slice(1, FONTS.length).map(([, label]) => label)).toEqual(FONTS.slice(1).map(([label]) => label));
     expect(rows.at(-1)).toEqual(['"Noto Serif", serif', 'Noto Serif']);

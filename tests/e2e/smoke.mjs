@@ -13,6 +13,17 @@ import { runV093Checks } from './v093.mjs';
 import { runV094Checks } from './v094.mjs';
 import { runV095Checks } from './v095.mjs';
 import { runLayoutChecks } from './layout.mjs';
+import { runBlockHandleChecks } from './block-handle.mjs';
+import { runTablePaperChecks } from './table-paper.mjs';
+import { runToggleKeyChecks } from './toggle-keys.mjs';
+import { runSpellingChecks } from './spelling.mjs';
+import { runTableKeyChecks } from './table-keys.mjs';
+import { runLinkPasteChecks } from './link-paste.mjs';
+import { runWidgetChecks } from './widgets.mjs';
+import { runSplitChecks } from './split-view.mjs';
+import { runGalaxyChecks } from './galaxy.mjs';
+import { runUniverseWidgetChecks } from './universe-widget.mjs';
+import { runSideScrollChecks } from './side-scroll.mjs';
 import { runAiSleepChecks } from './ai-sleep.mjs';
 import { runNoteFolderChecks } from './note-folders.mjs';
 import { runBlackHoleChecks } from './black-holes.mjs';
@@ -444,8 +455,8 @@ try {
         rows: document.querySelectorAll('#blocks-body .blocks-table tr').length,
         icons: document.querySelectorAll('#blocks-body .bl-ic svg').length,
       }));
-      // 16 since the toggle list (0.9.3), 19 with the three toggle headings, 21 with the table and the columns (0.9.4).
-      check('Help -> Blocks lists every block the / menu offers, from the same source', blocks.shown && blocks.rows === 22 && blocks.icons === 22, JSON.stringify(blocks));
+      // 16 since the toggle list (0.9.3), 19 with the three toggle headings, 21 with the table and the columns (0.9.4), 23 with the widget (1.0.0).
+      check('Help -> Blocks lists every block the / menu offers, from the same source', blocks.shown && blocks.rows === 23 && blocks.icons === 23, JSON.stringify(blocks));
     }
     await win.keyboard.press('Escape');
   }
@@ -2417,6 +2428,20 @@ try {
   await runV094Checks(check);
   await runV095Checks(check);
   await runLayoutChecks(check);
+  // 1.0.0: every block taken by the mouse, as in Notion.
+  await runBlockHandleChecks(check);
+  // 1.0.0: a table fitted to paper narrower than where it was made.
+  await runTablePaperChecks(check);
+  // 1.0.0: keys beside folded toggles, and Tab in columns.
+  await runToggleKeyChecks(check);
+  await runSpellingChecks(check);
+  await runTableKeyChecks(check);
+  await runLinkPasteChecks(check);
+  await runWidgetChecks(check);
+  await runSplitChecks(check);
+  await runGalaxyChecks(check);
+  await runUniverseWidgetChecks(check);
+  await runSideScrollChecks(check);
   await runAiSleepChecks(check);
   await runNoteFolderChecks(check);
   await runBlackHoleChecks(check);

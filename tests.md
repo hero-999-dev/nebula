@@ -1,3 +1,138 @@
+## 2026-10-21 — 1.0.0: Universe, third round (Claude + forks)
+
+- `tests/galaxy-even.test.js` (new): 3/4/5 project folders evenly spaced at t=0 and t=900; outer ring and black holes even; a project's loose notes carry its hue; the core is bigger and its first ring clear; no two systems touch.
+- `tests/galaxy.test.js`: core size 3.5 and first ring 11; mentions in the search (`mentions()`, mention keys apart from labels, unknown ones dropped, arrows drawn); `contentMentions`, `galaxyInput` mentions, `mentionLinks`; `mixColor`; a shooting star about once a minute and a rocket at five minutes; a click on the rocket rides the camera along and Fit returns once it is gone; a refresh with nothing changed keeps the scene and its frames.
+- `tests/galaxy-ui.test.js`: a double-click on a locked hole asks for its PIN.
+- `tests/lock-space.test.js` (new): the lock sky is aria-hidden, behind the card, moves over time (reduced motion too), stops on removal.
+- `tests/seed-guide.test.js`, `tests/guide-i18n.test.js`: new 1.0.0 signatures, previous ones kept as "pre-mentions".
+- `tests/table.test.js`: the 120-run table fuzz test gets its own 120 s cap — under a loaded release run it took 58 s against the 30 s default and failed the push, with nothing wrong in the table code.
+- `tests/e2e/only.mjs` (new): runs chosen smoke suites alone (`node tests/e2e/only.mjs note-folders app-lock-opened`), so a check that failed in a full smoke run is re-tried without the other 1,100; `npm run push -- --no-smoke` then skips the local run (GitHub still runs it). `tests/e2e/app-lock-opened.mjs`: "reconciliation keeps the newer markerless edit" waits for the sealed write instead of reading the hole the instant the plain file is gone. `tests/e2e/note-folders.mjs`: the plain-note check prints what the file became when it fails.
+
+## 2026-10-21 — 1.0.0: Universe, empty space deselects (Claude)
+
+- `tests/galaxy.test.js`: a click on the core selects it, a click on empty space lets go (`selected()` null); the canvas carries `is-grabbing` only between press and release. Unit 1491/1491. Smoke 1188/1188.
+
+## 2026-10-21 — 1.0.0: Universe, second round (Claude)
+
+- `tests/galaxy.test.js`: a note's labels share one orbit and speed and never touch each other or their note (2, 4, 7 labels; loose and folder notes); free folders and projects share one ring just outside the holes and never touch (replaces the separate folder/project ring gaps); note systems measured as the farthest moon from the note's centre; the minimap ignores clicks and double-clicks; `setNames(false)` draws no names and `true` brings them back; the minimap glide draws every frame for 1.2 s, then returns to the tick; label size bases 0.42/0.24; wide-pane refit tolerance 0.02.
+- `tests/galaxy-ui.test.js`: the tool row is search … Fit, Hide names, Full screen.
+- `tests/seed-guide.test.js`, `tests/guide-i18n.test.js`: new 1.0.0 signatures, the previous ones kept as "pre-names".
+- Electron 45.0.0 bug check: unit 1490/1490, smoke 1188/1188.
+
+## 2026-10-21 — 1.0.0: Universe, the owner's 2026-10-21 list
+
+- `tests/galaxy.test.js`: GLM's three spacing properties (no two systems on a ring touch, folders/projects nearer the core, a one-body ring); the minimap glides instead of jumping; a click on the core frames its first ring of loose notes.
+- `tests/galaxy-ui.test.js`: the minimap steps aside while the big Universe is open and the name reads Universe; a #label written in the text is a label on the map.
+- `tests/universe-widget.test.js` (new, fork): the widget entry, static face, live engine in main space only, transient layer never saved, cap of three, cleanup on removal/note change, Codex 34 fixes.
+- `tests/split-divider.test.js` (new, Codex): drag, keys, double-click equal, min width, saved weights. `tests/e2e/split-view.mjs` 21/21.
+- `tests/e2e/universe-widget.mjs` (new) 8/8; `tests/e2e/widgets.mjs` 29/29 (four widgets in the chooser).
+- `tests/e2e/black-holes.mjs`: the holes and their notes are found in `#holes-scroll`; pin checks look there.
+- `tests/e2e/side-scroll.mjs` (rewritten by GLM on a temp profile; Mistral's launched a real profile): holes heading visible with 60 notes, two scrolls apart.
+- `tests/seed-guide.test.js`, `tests/e2e/guide.mjs`: sections 9–16, new 1.0.0 signatures, the pre-Universe ones kept.
+- `tests/e2e/universe-widget.mjs`: 10 checks; "a drag on the map leaves the widget where it is" was flaky (1 in 3) until `rich-paste.js` left presses in `.wg-live` alone; now 10/10 three runs running.
+- `tests/e2e/app-lock-opened.mjs`: the unlock waits and the withheld-plaintext check read `#note-list` plus `#holes-scroll` (the timeout that aborted smoke at 1106/1107).
+
+## 2026-10-21 — 1.0.0: map v2 (Claude, GLM, Mistral; reviewed by Codex)
+
+- `tests/galaxy.test.js`: the v2 model (GLM: roles, hues, rings, sizes, outer rings for many loose notes); "map v2 drawing": the pull-in plays under reduced motion (still in main space after 140 ms, inside after); `labels()`/`labelColor()`/`highlight()` drop unknown and repeated labels; a constellation is cleared on entering a hole; `bodies()` names roles; at most six labels lit (Codex 25 #2); "constellation lines and theme colours": the spanning tree has n−1 links, is deterministic and makes a chain of a line; `hueColor` is lighter on dark paper and reads hex and rgb alike; Mistral's 3 (hueColor on white and black, a 10-point circle tree, label hues never 85–150).
+- `tests/galaxy-ui.test.js`: role-based `noteOfBody`; a locked hole offers Open (asks the PIN once, never goes straight in), an open one Enter and Lock; the label search sits left of Fit and Full screen and picks into the engine; inside a hole a right-click, even on empty space, offers Back to main space (Codex 25 #1).
+- `tests/e2e/galaxy.mjs`: folder as planet and its notes as moons (13/13).
+- `tests/seed-guide.test.js`: new 1.0.0 signatures in four languages.
+
+## 2026-10-20 — 1.0.0: the map fills its pane (Claude)
+
+- `tests/galaxy.test.js` (+4, "the map fills its pane"): a 1600×600 pane is filled and a 280-wide one refits smaller, and back; after a wheel zoom a resize leaves the camera alone and `overview()` hands it back; a minimap following a note is nearer than its whole-map view; `restore()` takes a saved view only when it is marked `manual`. The canvas stub now takes a size.
+- Results: unit 1442/1442; e2e galaxy 13/13, split view 19/19. Full smoke not rerun (low memory).
+
+## 2026-10-20 — 1.0.0: the map, after the owner tried it (Claude)
+
+- `tests/galaxy.test.js` (+5): black holes sit close by — outside the core's loose notes, inside every sun and the project ring, side by side (a locked one too); twelve holes never overlap and the sun moves out past them; `sun()` turns with `spin` and stays deterministic; a locked hole stays in `bodies()` and `enterHole` never opens its dimension; under a stubbed reduced-motion `matchMedia` a minimap following a planet still moves (the clocks used to freeze).
+- `tests/galaxy-ui.test.js` (+1): a locked hole's menu has no "Enter the black hole" and a disabled "Locked"; a double-click only focuses it and never asks to unlock.
+- `tests/galaxy.test.js` (+1, from Codex's review): a sun focused for 84 s leaves between 2 and 48 `sun|` frames in the cache (`map.frames()`, a test-only listing). Before the fix it added one frame every 0.14 s.
+- Results: unit 1437/1437, then galaxy suites 71/71 after the review fixes. Smoke 1168/1169 before the review fixes (the failed check's name is unknown); the rerun was stopped for low memory.
+
+## 2026-10-20 — 1.0.0: the map of your notes, projects (Claude, GLM, Mistral; reviewed by Codex)
+
+- `tests/galaxy.test.js` (50, jsdom): the model (suns, planets, moons, projects as clusters, holes, orbits), the ASCII frames, the privacy of a locked hole (initials only) — Mistral's 46 — plus GLM's 3 engine checks after Codex's review: a lock during the pull-in never completes the entry (via the dive's end and via `refresh()`, camera back where it was), and a paused map queues no animation frames while `resume()` queues exactly one; and (Claude, from Codex's recheck) a minimap following its note draws at most 16 times in a second of 60 Hz frames — 60 before the fix.
+- `tests/galaxy-ui.test.js` (14): what the map is built from (no note text, a locked hole its initials, inside an open hole only its notes), the map as a pane of the split page (over the whole page, a note beside it, a second makes three, closing either), the 1.0.0 boot failure (an engine that names its dimension before it is returned), no engine → no map, and a hole locked while the map is inside it → out at once on the refresh the lock calls.
+- `tests/e2e/galaxy.mjs` (13, real Electron; part of smoke): the minimap above Archive and Trash and drawn; ⤢ over the whole page; the list holds titles and kinds, never words; a note opened from the map comes beside it, a second makes three; right-click → Open; closing the map and a note; map controls styled on the dark theme; no page errors.
+- `tests/seed-guide.test.js`, `tests/e2e/guide.mjs`: the new section 11, Where your notes live and Code blocks renumbered 12 and 13.
+- `tests/e2e/smoke.mjs`: Help → Blocks expects 23 rows (the widget). `tests/e2e/v093.mjs`: the spelling check now asserts the interface language leaves the spelling languages alone (1.0.0); the dragged-order check scrolls its rows into view (the minimap shortens the list).
+- Results: unit 1431/1431, v093 138/138, full smoke 1169/1169 (before the one-line minimap fix; galaxy e2e 13/13 after it).
+
+## 2026-10-20 — 1.0.0: notes side by side, black-hole pin in its section (Claude)
+
+- `tests/split-view.test.js` (6): where a note let go over the panes goes (`dropIndex`), and the panes after adding one (`withPane`: no note twice, four at most).
+- `tests/e2e/split-view.mjs` (19, real Electron; part of smoke): notes dragged from the list with the mouse in steps; two, three and four panes in equal widths; the split header and one editing bar; the dropped note not written in as text; an A4 note shown NW beside an NW page while A4 stays on disk; a press on the other pane moves the editor and caret, each note saved on its own; the note menu's "Open side by side" and the four-pane limit; a note opened from the list replaces the pane written in; closing down to one restores the header and the page.
+- `tests/e2e/note-folders.mjs`: the video drop lets go 3 px above the row's bottom (60 checks).
+- `tests/e2e/black-holes.mjs`: a pinned hole at the top of its section (90 checks; the "moved in" checks are timing-flaky, a rerun passes).
+- Results: unit 1359/1359, split-view 19/19 five runs in a row. Full smoke not run.
+
+## 2026-10-20 — 1.0.0: widget right-click, no columns from moving, run-on words (Claude)
+
+- `tests/e2e/widgets.mjs`: a right-click on a widget offers Copy widget and Delete widget only (29 checks).
+- `tests/e2e/block-handle.mjs`: a block let go at a line's right edge gets a flat mark and makes no columns; the column checks after it start from columns built in the page (28 checks).
+- `tests/e2e/ideas-note.mjs` (part of smoke): a divider dropped in the left third of a column whose words run across it leaves them at the left (16 checks).
+- `tests/e2e/layout.mjs`: the left-third split now expects the short words to stay left (128 checks).
+- Results: unit 1353/1353. Full smoke not run.
+
+## 2026-10-20 — 1.0.0: the owner's Ideas note (Claude)
+
+- `tests/lists.test.js`: a list in a column or a table cell stays where it is (fails without the fix).
+- `tests/layout.test.js`: `splitColumn` and `splitAt` keep what a column held on the side it stands on.
+- `tests/e2e/ideas-note.mjs` (part of smoke), three new checks: Tab in a column's list keeps the columns; Backspace on an indented line under a widget outdents first; a divider dropped right of words leaves them in place (fails with `keep` disabled).
+- Results: unit 1353/1353, ideas-note 15/15, widgets 28/28. Full smoke not run.
+
+## 2026-10-19 — 1.0.0: widgets, black hole initials and pins (Claude)
+
+- `tests/widgets.test.js` (22, jsdom) covers:
+  - the calculator: order of operations, powers, %, !, π, e, roots, DEG/RAD, implicit ×, brackets that close themselves, and input that cannot be read;
+  - number formatting, the keys and the keyboard map;
+  - the month grid;
+  - drawing a widget from its state, with text never written as markup;
+  - leaving widgets out of print, and the remembered With/Without choice.
+- `tests/e2e/widgets.mjs` (26, real Electron; part of smoke) covers:
+  - the /widget chooser and the three kinds;
+  - mouse and keyboard keys, and the calendar;
+  - resize, front/behind/in-text, reopen;
+  - Print and Export with and without widgets.
+- `tests/e2e/black-holes.mjs` and `settings.mjs` cover the initials of a locked hole and Pin to top.
+- Results: unit 1351/1351, black-holes 90/90, settings 125/125. Full smoke not run.
+
+## 2026-10-19 — 1.0.0: spelling in every language (Claude)
+
+- `tests/settings.test.js` (+1): `spell` is all four languages until changed, keeps only known codes in Settings' order, and an empty list stays empty.
+- `tests/v094.test.js` (+1): `spellLanguages` with a list gives every available dictionary for it, English as en-US and en-GB; an empty list gives none.
+- `tests/e2e/spelling.mjs` (6, real Electron; part of smoke): every language checked at start, the four boxes in Settings, unticking Türkçe and Deutsch takes them off the session, none ticked turns the checker off, Türkçe alone back on, and the choice kept after a restart.
+- `tests/e2e/settings.mjs`: the sheet's headings include Spelling (en and tr); 125/125.
+
+## 2026-10-19 — 1.0.0: folded toggles and Tab in columns (Claude)
+
+- `tests/toggle-keys.test.js` (11, jsdom): Enter at the end of a folded title makes a line under it (in a list the next item, in a column in that column) and carries the words after the caret; in an open toggle it still goes to the top of the body. Backspace and Delete beside a folded toggle keep every folded line.
+- `tests/layout.test.js` (+1): healColumns takes `data-ind` off a column block, a column and a divider, and leaves the lines' own indent alone.
+- `tests/e2e/toggle-keys.mjs` (9, real Electron, real keys; part of smoke): Enter, Backspace and Delete beside three folded toggles in a column and on the note, and Tab on words loose in a column (the divider stays where it was). All 9 fail on the old code.
+- Unit 1325/1325, block-handle e2e 25/25. Full smoke not run.
+
+## 2026-10-19 — 1.0.0: pasted files and videos, tables on paper, macOS quarantine (Claude)
+
+- `tests/e2e/block-handle.mjs` (now 25): a WebM and a text file put on the real Windows clipboard with `Set-Clipboard -LiteralPath`, pasted with Ctrl+V — the video block and the file card come right after the caret's line.
+- `tests/export.test.js`: the print document gives a table `min(800px, 100%)` and its columns 75% / 25%; with data-w the shares use the own width.
+- `tests/e2e/table-paper.mjs` (4, real Electron, script-free print document at A5's writing width; part of smoke): a 900 px table as wide as the page, one in a column within its column, a 200 px table unchanged, no horizontal overflow. Without the fix 3 of 4 fail.
+- `tests/mark-of-the-web.test.js` (now 7): darwin calls xattr once with `0081;<hex>;Nebula;<UUID>`, never the 0040 flag, nothing on Linux, a failing xattr leaves the copy alone.
+- Unit 1313/1313. Full smoke not run.
+
+## 2026-10-19 — 1.0.0: every block moved by the mouse (Claude)
+
+- `tests/block-handle.test.js` (29): which block is under the pointer in the note, a column, an open toggle and a list; drop targets — a gap by the block's midpoint, no target for a drop that changes nothing or into itself, first in an open toggle from the lower half of its title, a column's flow, the side zones only where there is room and never for a block that holds columns, a non-list block over a list item lands beside the list; moves — a toggle whole, a list item wrapped in a list of its own, an emptied list removed, an emptied toggle body given a blank line, an emptied column dropped, side columns made in the note and in a column (splits 50/75), an Alt copy without ids; a selection from a toggle's title into its body copies as the toggle; pasted blocks replace an empty line, split a line at the caret, and skip the clipboard's comment markers; the picked and lifted classes never reach a saved note.
+- `tests/e2e/block-handle.mjs` (23, real Electron, throwaway profile; part of smoke): the grip at a line, a toggle and a list item; a toggle dragged below a line with the mark and the ghost, undone with Ctrl+Z, Esc cancelling; a line dropped into a toggle; a list item out of its list; side columns and a column removed when emptied; a picked toggle copied and pasted whole; a title-to-body selection pasted as a toggle; Ctrl+D and Delete on a picked block; the owner's divider case (lines above and below stay where they were); an OS file dragged over a note shows the mark, a picture does not; no page errors.
+- Layout checks 128/128 after narrowing the side zones (a card dropped 40 px into a line had made columns). Unit 1309/1309. Full smoke not run.
+
+## 2026-10-18 — precheck on GitHub before the tag (Claude)
+
+- `tests/precheck-ci.test.js` (4): the run is matched to the exact commit SHA, never an older run on the same branch; the Release workflow runs on `precheck/**` and its publish job is gated on a `v*` tag; CI smoke retries once on exit 2 only; `release.js` calls the precheck after the commit and before the tag, and undoes with `reset --mixed`, never `--hard`.
+- The undo path was run for real on a throwaway clone with a local bare `origin` and the gates stubbed: 0.9.9 → 0.9.10 bumped, committed, `precheck/v0.9.10` pushed to the bare origin, no run found on GitHub (read-only `gh run list`), then the commit undone — package.json, memory.json, README, Prompt back to 0.9.9, the Log.md entry gone, no tag, the precheck branch deleted from origin, an untracked file left in place. The `gh` JSON fields were checked read-only against Release run 39127956630 (headSha matched v0.9.9's commit; conclusion success).
+- Not yet run: a real precheck on GitHub. The first `npm run push`, or `npm run precheck:ci`, is the live proof.
+
 ## 2026-10-18 — v0.9.8 CI timing regressions (Codex)
 
 - v0.9.7 local release gates passed, but Windows GitHub Actions smoke failed 1040/1041 in the first attempt: the temporary AI passkey webview had not attached after a fixed 2.5 s wait. The second attempt failed 1039/1041: keyboard events reached the AI sleep guest before its textarea was focused, leaving the draft empty. The failures were in different tests; the macOS package job passed both times, but the combined GitHub release was skipped.

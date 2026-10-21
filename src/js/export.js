@@ -2,7 +2,7 @@ import { cleanTypingMarkers } from './inline-family.js';
 import { fileVideoLines } from './file-video.js';
 
 import { normalizeLabels } from './labels.js';
-import { gridOf, tellHeight } from './table-grid.js';
+import { gridOf, tellHeight, colsOf, widthOf } from './table-grid.js';
 
 /**
  * A note, as Markdown or as a standalone HTML file.
@@ -360,6 +360,24 @@ export function fromNebulaNote(text) {
  *
  * @param {{title?: string, body?: string, css?: string, margin?: string, size?: string}} opts
  */
+/**
+ * A table on paper narrower than the place it was made in (1.0.0; Log, 0.9.4:
+ * "a table printed or exported to PDF on a page narrower than the one it was
+ * made on is not fitted there"). The note keeps each column's own width, and
+ * the screen only draws a table narrower (table.js fitTable); the print window
+ * runs no script to do that. So each column becomes its share of the whole,
+ * and the table is as wide as its columns or as its place, whichever is less —
+ * the page, or the column of the page it stands in.
+ */
+function fitToPaper(table) {
+  const cols = colsOf(table);
+  const own = cols.map(widthOf);
+  const total = own.reduce((sum, w) => sum + w, 0);
+  if (!cols.length || !(total > 0)) return;
+  table.style.width = `min(${Math.round(total * 100) / 100}px, 100%)`;
+  cols.forEach((col, i) => { col.style.width = `${Math.round((own[i] / total) * 1e5) / 1e3}%`; });
+}
+
 export function toPrintDocument({ title = 'Untitled', body = '', css = '', margin = '12.7mm', size = 'A4' } = {}) {
   const doc = parse(body, DROP_PRINT);
   // Nothing executable travels into the print window. It has JavaScript turned
@@ -372,6 +390,7 @@ export function toPrintDocument({ title = 'Untitled', body = '', css = '', margi
     el.removeAttribute('contenteditable');
   });
   doc.body.querySelectorAll('.blk-table tr[style]').forEach(tellHeight);
+  doc.body.querySelectorAll('.blk-table > table').forEach(fitToPaper);
   // The shape layer is positioned against the editor, and the resize grips and
   // code-block buttons are controls, not content.
   doc.body.querySelectorAll('.shape-h, .code-copy, .code-del, .code-hint, .image-h, .link-del').forEach((el) => el.remove());
@@ -421,6 +440,8 @@ export function toPrintDocument({ title = 'Untitled', body = '', css = '', margi
   /* In the text, or in an old image layer: flowed. On the canvas: where it floats, like a shape. */
   .note-image--inline, .image-layer .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; }
   .note-image .image-caption { position: static; margin-top: 4px; font-style: italic; text-align: center; }
+  /* A table as wide as its place at most (fitToPaper): the screen's grid around it, for the numbering and the +, is not on paper. */
+  .blk-table { display: block; width: auto; break-inside: avoid; }
 </style>
 </head>
 <body>

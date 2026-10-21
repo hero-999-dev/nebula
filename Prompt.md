@@ -120,7 +120,7 @@ page on every release.
 
 ---
 
-## Current implementation state (v0.9.9)
+## Current implementation state (v1.0.0)
 
 **Security fixes released in v0.9.9; manual owner checks remain:** Black-hole save retries retain their encrypted destination. Ordinary storage and localStorage refuse hole-marked writes. Historical marked plaintext is withheld at boot, then re-sealed after authenticated unlock before its plain copy and backups are removed; an exact-ID markerless plain copy is reconciled with its sealed note by edit time on unlock. Media referenced by the recovered edit is preserved. New PIN wrappers require OS secure storage; old unprotected wrappers remain readable and are strengthened after a valid PIN unlock when OS protection returns. Accessible local backup wrappers are strengthened too and retried on later unlocks if necessary. Locking invalidates pending authentication and media work. Trashing a hole clears its opened copies; a retained plaintext copy cannot authorize reopening a locked hole, and a copy held open by another program is retried after the program releases it. Note/hole deletion refuses an active sealed media stream before shredding. Acceptance checklist: `docs/BLACKHOLE-TESTS.md`. Tests use synthetic profiles and mocked OS authentication; physical passkey and macOS testing remain separate. This does not promise protection against malware running as the signed-in OS user or erase previously copied plaintext.
 
@@ -237,8 +237,19 @@ Source text has a clear inset from the code panel edge.
 code-hint input, verified by breaking the guards on purpose and watching the
 suite go red).
 
-**Not built yet, by choice:** graph map, mind map, sheets, flashcards, forums,
-calendar, projects, command palette, full-text search. All of these exist
+**In 1.0.0 (not released yet):** projects (a folder dropped on the middle of
+another, `projects.js`) and the map of your notes (`galaxy-model.js` /
+`galaxy-ascii.js` / `galaxy-map.js` engine, `galaxy-ui.js` wiring): an ASCII
+galaxy called Universe in the sidebar (also a widget in a note) where projects are stars, folders planets, a folder's
+notes its moons, loose notes planets round the core and labels moons; every
+project, folder, label and black hole has its own colour; ⤢ puts it over the
+page as a pane of the split view, with a label search that lights a label's
+notes and joins them in thin lines; each open black hole is its own dimension,
+a locked one only its initials (right-click: Open, Lock). The map reads titles,
+folders and labels, never a note's words.
+
+**Not built yet, by choice:** mind map, sheets, flashcards, forums,
+calendar, command palette, full-text search. All of these exist
 in `../Nebula Demo/` and are meant to be ported one at a time through the
 `bus.js` / `disk-store.js` / `storage.js` hooks.
 

@@ -163,6 +163,7 @@ everyone else. Nothing reads the DOM to find out what a note contains.
 | `npm run icons` | Regenerate `build/icon.png` from `build/source-mark.png` (Windows) |
 | `npm run site` | Rebuild `site/index.html` (docs + mind maps) |
 | `npm run push` | Release finished work automatically under the owner's standing instruction in AGENTS.md |
+| `npm run precheck:ci` | Push HEAD to a `precheck/*` branch, wait for GitHub's Windows + macOS build of it (no publish), delete the branch. `npm run push` does this before every tag |
 | `npm run sync-flash` | Mirror the repo to the USB drive if it is plugged in |
 | `npm run reset` | Wipe the **dev** notes (backs them up first) |
 
@@ -533,6 +534,37 @@ Every one of these is silent — the app builds, installs and runs while wrong.
    that function also stages a sealed file for adoption into another note,
    and a mark there would travel into stored note media (B27). macOS
    quarantine is not done.
+70. **The map engine speaks before it is returned.** `createGalaxyMap` calls
+   `onDimension(null)` from its first `refresh()`, while `galaxy-ui.js` is
+   still waiting for `map` to be set; anything in that callback must use
+   `map?.`. A throw there once failed the whole boot (no theme, no notes), so
+   `main.js` wraps `initGalaxy` in a try/catch: the map is a view, never a
+   way in. A lock must reach the map synchronously (`black-holes.js`
+   `onLocked`), not through the list's 250 ms debounce (1.0.0).
+71. **The minimap shortens the note list.** It takes 150 px of the sidebar,
+   so an e2e drag between rows that are not both on screen is cut short by
+   Playwright, not by the app. Scroll the rows into view first
+   (`tests/e2e/v093.mjs`, the dragged-order check).
+72. **Reduced motion is the Windows default for many people.** With
+   "Animation effects" off, Windows asks every app for reduced motion, and the
+   map froze both its clocks, so nothing on it ever turned and the owner saw a
+   dead map. The clocks run at 0.4 pace instead (`galaxy-map.js` `frame()`);
+   a unit test stubs `matchMedia` to keep it so. Text drawn over a black hole
+   must use its own colour: paper-coloured initials vanished on the dark
+   horizon (1.0.0).
+73. **A map body has a kind and a role.** `kind` is how it is drawn
+   (sun/planet/moon/hole), `role` what it is (project/folder/note/label). In
+   map v2 a folder is a planet and a folder's note a moon, so never decide
+   "is this a note" from `kind` — use `role` (`noteOfBody`, `roleOf`). The
+   pull-in into a hole must never be 0 ms, reduced motion included: the owner
+   could not see it happen. Every map that can go into a hole needs a way out
+   (the minimap has no Back button: its right-click menu has one).
+74. **Never let an agent revert a file.** Several CLIs edit this tree at once
+   and 1.0.0 lives only in the working tree. A `git checkout`/`restore` of
+   one file (2026-10-21, Mistral) erased unreleased work; it came back only
+   because `dist/` still held a build. Briefs say: edit by exact replacement,
+   never revert. Black holes are drawn in `#holes-scroll`, not `#note-list`
+   (their own scroll since 1.0.0) — e2e selectors must look there.
 
 ---
 
@@ -708,3 +740,5 @@ Double-click files in the repo root: `Nebula Test.exe` (test build),
 Google redirects in built-in AI webviews are handed to the default browser at the provider root URL. Authentication continues there; cookies are not transferred to Electron. `electron/ai-browser-auth.js` handles redirects and popups, and `src/js/ai-services.js` owns provider URLs. Bookmark title requests are bounded and credential-free in `electron/link-metadata.js`; `src/js/link-preview.js` binds cards after import/history restore. Labels persist as a normalized note array and in native JSON exports. Shape anchors use unrotated geometry plus rotation through `shape-anchor.js`.
 
 Local-only progress and private report references: `test-results/CODEX-DEVIR.md`. Keep owner note text/images out of this public repository. Latest validation checkpoint is in tests.md; do not treat an in-progress entry as a release.
+
+**A smoke check failed in a push?** Re-run only its suite: `env -u ELECTRON_RUN_AS_NODE node tests/e2e/only.mjs <suite-file-name>…`. Once it passes, `npm run push -- … --no-smoke` skips the local 1,100-check run; GitHub's precheck still runs smoke on the commit.

@@ -5,7 +5,7 @@ that keeps every note in your own profile, as a folder of its own: a plain JSON
 file with the note's pictures and videos beside it. Installed Windows builds
 offer in-app updates; macOS and portable builds offer a download link.
 
-**Version v0.9.9** ·
+**Version v1.0.0** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 
@@ -304,11 +304,13 @@ Opening `vite preview` in a plain browser gives a demo banner: in-memory only.
 ## Release
 
 ```bash
-npm run push        # patch;  -- minor | major | 0.5.2 | --notes "…"
+npm run push        # patch;  -- minor | major | 0.5.2 | --notes "…" | --no-precheck
+npm run precheck:ci # GitHub's build of the current HEAD, nothing released
 ```
 
-Tests → smoke → build → doc freshness → version bump → `Log.md` → commit → tag
-→ push. GitHub Actions builds Windows and macOS and publishes one Release; the
+Tests → smoke → build → doc freshness → version bump → `Log.md` → commit →
+GitHub builds that commit on `precheck/vX.Y.Z` → tag → push (a red precheck
+undoes the commit; no tag, the version stays free). GitHub Actions builds Windows and macOS and publishes one Release; the
 docs site is rebuilt and mirrored to `nebula-web`; the USB drive is synced if it
 is plugged in.
 

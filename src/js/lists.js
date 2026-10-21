@@ -272,8 +272,11 @@ function liftOutOfParagraphs(root) {
     // trace that found this started from a heading, so the block the caret was
     // in was a DIV and nothing was lifted at all.
     if (p.tagName === 'LI') continue;
-    // A toggle's body holds whole blocks, lists among them (toggles.js, 0.9.3).
-    if (p.classList?.contains('toggle-body')) continue;
+    // A toggle's body holds whole blocks, lists among them (toggles.js, 0.9.3),
+    // and so do a column and a table cell. Lifted out of its column, a list
+    // split the column, and a Tab on it threw the column beside it out of the
+    // columns (the owner's Ideas note, 1.0.0: "dividerler tab ile gitmemeli").
+    if (p.matches?.('.toggle-body, .blk-col, td, th')) continue;
     // Whatever else the paragraph holds keeps a paragraph of its own, in order.
     const before = [];
     const after = [];

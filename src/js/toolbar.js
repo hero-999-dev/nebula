@@ -10,6 +10,7 @@ import { paperSize, marginMm, getWideOrientation, isFluid, sheetMm } from './pag
 import { toDocx, toOdt, toDoc, toEnex, enexToNotes, previewDocument, docxToHtml, odtToHtml, rtfToHtml, docKind } from './office.js';
 import { prepareVideos, getVideoMode, setVideoMode, hasVideos } from './export-video.js';
 import { initPdfPreview, PAGED } from './pdf-preview.js';
+import { getWidgetPrint, setWidgetPrint, hasWidgets, withoutWidgets } from './widgets.js';
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
 import { pickTableSize } from './table-size.js';
@@ -167,6 +168,9 @@ export function fontRows(query, { custom = [], installed = [], pinned = [], limi
 }
 
 /** The fonts the reader added to the menu, and the ones pinned to its top: names, kept on this computer. */
+/** Blocks that hold lines and are never indented themselves: a Tab is for the line. */
+const HOLDERS = '.blk-cols, .blk-col, hr.blk-vr, .blk-toggle, .toggle-body';
+
 const CUSTOM_FONTS_KEY = 'nebula:fonts';
 const PINNED_FONTS_KEY = 'nebula:fonts-pinned';
 const FONT_STACKS_KEY = 'nebula:font-stacks';
@@ -376,6 +380,30 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       el = el.parentElement;
     }
     return editorEl;
+  }
+
+  /**
+   * Words lying loose in `holder` (a column, a toggle's body) around `node`,
+   * put into a line of their own, which is returned — the run of inline nodes
+   * up to the blocks or line breaks either side. Null when the caret is on the
+   * holder itself: there is no line to take then.
+   */
+  function looseLine(holder, node) {
+    let top = node;
+    while (top && top.parentNode !== holder) top = top.parentNode;
+    if (!top || top === holder) return null;
+    const inline = (n) => n.nodeType === Node.TEXT_NODE
+      || (n.nodeType === Node.ELEMENT_NODE && n.tagName !== 'BR' && ['inline', 'contents'].includes(getComputedStyle(n).display));
+    if (!inline(top)) return null;
+    const run = [top];
+    for (let n = top.previousSibling; n && inline(n); n = n.previousSibling) run.unshift(n);
+    let n = top.nextSibling;
+    for (; n && inline(n); n = n.nextSibling) run.push(n);
+    if (n?.nodeName === 'BR') run.push(n);
+    const p = document.createElement('p');
+    run[0].before(p);
+    p.append(...run);
+    return p;
   }
 
   /**
@@ -908,16 +936,31 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
   function indentBlocks() {
     const range = selectionInEditor();
     if (!range) return [];
+    const ends = [range.startContainer, range.startOffset, range.endContainer, range.endOffset];
+    let wrapped = false;
     const out = new Set();
     const add = (node) => {
-      const el = blockAncestor(node);
+      let el = blockAncestor(node);
+      // Words loose in a column or a toggle are a line of their own first:
+      // the indent went on the column, and the divider beside it moved over
+      // with every Tab (the owner, 1.0.0).
+      if (el?.matches(HOLDERS)) {
+        el = looseLine(el, node);
+        wrapped ||= !!el;
+      }
       if (el && el !== editorEl && !el.closest('.shape-layer, .blk-code')) out.add(el);
     };
-    add(range.startContainer);
+    // Every node first: a line made for loose words moves them, and the range with them.
+    const nodes = [range.startContainer];
     if (!range.collapsed) {
       const walker = document.createTreeWalker(range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
         ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement, NodeFilter.SHOW_TEXT);
-      for (let t = walker.nextNode(); t; t = walker.nextNode()) if (range.intersectsNode(t) && t.nodeValue.trim()) add(t);
+      for (let t = walker.nextNode(); t; t = walker.nextNode()) if (range.intersectsNode(t) && t.nodeValue.trim()) nodes.push(t);
+    }
+    nodes.forEach(add);
+    if (wrapped) {
+      // Moving the words into their line let go of the selection; it comes back where it was.
+      try { window.getSelection().setBaseAndExtent(...ends); } catch { /* an end that is gone */ }
     }
     // An item's list moves as one block when the item itself cannot.
     return [...out].map((el) => (el.tagName === 'LI' ? el.parentElement : el))
@@ -1144,6 +1187,8 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     // The note shows its pictures from their files (0.9.4); a file for another
     // program holds the pictures themselves, so they are written in first.
     let html = serializeNote(editorEl);
+    // Widgets with the note or left out (1.0.0): the same choice as Ctrl+P's.
+    if (getWidgetPrint() === 'without') html = withoutWidgets(html);
     if (window.nebula?.media?.inline && html.includes('nebula-media://note/')) html = await window.nebula.media.inline(html).catch(() => html);
     return prepareVideos(html, getVideoMode(), { poster: (url) => window.nebula?.links?.videoPoster?.(url) });
   }
@@ -1230,6 +1275,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       ? window.nebula.note.pdfSave({ token, suggested: safeFileName(noteTitle?.() || 'Untitled', 'pdf') })
       : writeExport(format)),
     hasVideos: () => hasVideos(serializeNote(editorEl)),
+    hasWidgets: () => hasWidgets(serializeNote(editorEl)),
     onOrientation: () => onWideOrientation?.(),
     translate,
   }) : null;
@@ -1306,6 +1352,23 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     }
     paintVideos();
     menu.appendChild(videos);
+    // Widgets on the page or left out (1.0.0): for every export and for Ctrl+P, remembered.
+    const widgets = document.createElement('div');
+    widgets.className = 'tb-menu__seg';
+    widgets.innerHTML = '<span class="seg-label">Widgets</span><button type="button" data-widgets="with">With</button><button type="button" data-widgets="without">Without</button>';
+    const paintWidgets = () => {
+      for (const b of widgets.querySelectorAll('button')) {
+        const on = b.dataset.widgets === getWidgetPrint();
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', String(on));
+      }
+    };
+    for (const b of widgets.querySelectorAll('button')) {
+      b.title = b.dataset.widgets === 'with' ? 'Widgets printed as they are now' : 'Widgets left out of the page';
+      b.addEventListener('click', (e) => { e.stopPropagation(); setWidgetPrint(b.dataset.widgets); paintWidgets(); });
+    }
+    paintWidgets();
+    menu.appendChild(widgets);
     for (const fmt of FORMATS) {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -1341,7 +1404,12 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     print: () => {
       const api = window.nebula?.note;
       const page = isFluid(pageNow()) && getWideOrientation() === 'portrait' ? 'nw-portrait' : pageNow();
-      if (api?.print) void api.print({ page }); else window.print();
+      // The widgets as they are now, or none of them (the Export menu's Widgets choice).
+      const hide = getWidgetPrint() === 'without';
+      document.body.classList.toggle('print-no-widgets', hide);
+      const done = () => document.body.classList.remove('print-no-widgets');
+      if (api?.print) void Promise.resolve(api.print({ page })).finally(done);
+      else { window.print(); done(); }
     },
     import: () => void importNote(),
     importFile: (res) => takeFile(res),
@@ -2155,6 +2223,28 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       return;
     }
     standInLine();
+    // Backspace at the very start of an indented line takes the indent off
+    // first, a step at a time. It went to the picture or widget above instead
+    // and the line never came back (the owner's Ideas note, 1.0.0: "notu
+    // geriye çekmiyor").
+    if (e.inputType === 'deleteContentBackward') {
+      const sel = window.getSelection();
+      const at = sel?.rangeCount && sel.isCollapsed ? sel.getRangeAt(0) : null;
+      const line = at && lineOf(at.startContainer);
+      if (line?.dataset.ind && !line.matches('li, td, th')) {
+        const head = document.createRange();
+        head.setStart(line, 0);
+        head.setEnd(at.startContainer, at.startOffset);
+        if (!head.toString().replace(/​/g, '') && !head.cloneContents().querySelector('img, .note-image, .inline-eq, .note-mention')) {
+          e.preventDefault();
+          history?.push();
+          const next = stepIndent(line.dataset.ind, -1);
+          if (next === 0) delete line.dataset.ind; else line.dataset.ind = String(next);
+          dirty();
+          return;
+        }
+      }
+    }
     const insideText = (() => {
       if (e.inputType !== 'deleteContentBackward') return false;
       const caret = window.getSelection();

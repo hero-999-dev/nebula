@@ -31,6 +31,9 @@ const CLASS_STATE = [
   ['.blk-table td.sel', 'sel'],
   ['.blk-table td.act', 'act'],
   ['.blk-table td.fill', 'fill'],
+  // A block picked with its grip, or lifted while it is dragged (1.0.0, block-handle.js).
+  ['.block-picked', 'block-picked'],
+  ['.block-lifted', 'block-lifted'],
 ];
 
 /**
@@ -41,7 +44,7 @@ const CLASS_STATE = [
  * and the choices for the selected cells; and an attached file's Open and
  * Save a copy (0.9.6, file-attach.js), in the app's language.
  */
-export const TRANSIENT_NODES = '.shape-angle, .video-bar, .tbl-ui, .attach-bar';
+export const TRANSIENT_NODES = '.shape-angle, .video-bar, .tbl-ui, .attach-bar, .wg-live';
 // (The crop frame and an embed's grip: the frame is on the page, not in the
 // note; the grip is in the note, rebuilt on load like a shape's handles.)
 

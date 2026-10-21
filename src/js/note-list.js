@@ -25,20 +25,27 @@ import { icon } from './icons.js';
 import { t } from './i18n.js';
 import { askText } from './dialog.js';
 import { listGroups } from './folders.js';
+import { listTree } from './projects.js';
 import { sortKey } from './notes.js';
 
 const DRAG_TYPE = 'application/x-nebula-item';
 
-/** "f:<id>:p" -> { folder: id, pinned: true }; "p" / "r" are the list itself. */
+/**
+ * "f:<id>:p" -> { folder: id, pinned: true }; "p" / "r" are the list itself;
+ * "j:<id>:r" the notes and folders put straight into a project (1.0.0).
+ */
 export function parseGroup(key) {
   if (key === 'p') return { folder: null, pinned: true };
   if (key === 'r') return { folder: null, pinned: false };
-  const m = /^f:(.+):([pr])$/.exec(String(key || ''));
-  return m ? { folder: m[1], pinned: m[2] === 'p' } : null;
+  const m = /^([fj]):(.+):([pr])$/.exec(String(key || ''));
+  if (!m) return null;
+  return m[1] === 'f' ? { folder: m[2], pinned: m[3] === 'p' } : { folder: null, project: m[2], pinned: m[3] === 'p' };
 }
 
-export function groupKey(folder, pinned) {
-  return folder ? `f:${folder}:${pinned ? 'p' : 'r'}` : (pinned ? 'p' : 'r');
+export function groupKey(folder, pinned, project = null) {
+  const end = pinned ? 'p' : 'r';
+  if (folder) return `f:${folder}:${end}`;
+  return project ? `j:${project}:${end}` : end;
 }
 
 /**
@@ -70,7 +77,7 @@ export function orderFor(keys, at) {
 export function ownRun(seqKey, pinned) {
   const g = parseGroup(seqKey);
   if (!g || g.pinned === !!pinned) return null;
-  return { seq: groupKey(g.folder, !!pinned), edge: pinned ? 'end' : 'start' };
+  return { seq: groupKey(g.folder, !!pinned, g.project), edge: pinned ? 'end' : 'start' };
 }
 
 /**
@@ -79,7 +86,7 @@ export function ownRun(seqKey, pinned) {
  *   noteItem: (note: object) => HTMLElement, onChanged: () => void,
  *   newNote?: (folderId: string) => void, noteMenu?: (id: string, x: number, y: number) => void}} deps
  */
-export function initNoteList({ listEl, store, folders, noteItem, onChanged, newNote, noteMenu, takeOut }) {
+export function initNoteList({ listEl, store, folders, projects = null, noteItem, onChanged, newNote, noteMenu, takeOut }) {
   // ---- drawing ---------------------------------------------------------
 
   function item(note, seq) {
@@ -119,14 +126,14 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged, newN
     return head;
   }
 
-  function folderBlock(folder, inside) {
+  function folderBlock(folder, inside, seq = 'r') {
     const open = folders.isOpen(folder.id);
     const block = document.createElement('div');
     block.className = `folder-block${open ? ' open' : ''}`;
     block.dataset.folder = folder.id;
     block.dataset.id = folder.id;
     block.dataset.kind = 'folder';
-    block.dataset.seq = 'r';
+    block.dataset.seq = seq;
     block.append(folderHeader(folder, inside.length, open));
     if (open) {
       const body = document.createElement('div');
@@ -163,14 +170,87 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged, newN
    * @returns {number} how many rows were drawn
    */
   function render(notes) {
-    const groups = listGroups(notes, folders, sortKey);
+    const groups = projects ? listTree(notes, folders, projects, sortKey) : listGroups(notes, folders, sortKey);
     let rows = 0;
     for (const note of groups.pinned) { listEl.append(item(note, 'p')); rows += 1; }
     for (const entry of groups.root) {
-      listEl.append(entry.kind === 'folder' ? folderBlock(entry.folder, entry.notes) : item(entry.note, 'r'));
+      if (entry.kind === 'project') listEl.append(projectBlock(entry));
+      else listEl.append(entry.kind === 'folder' ? folderBlock(entry.folder, entry.notes) : item(entry.note, 'r'));
       rows += 1;
     }
     return rows;
+  }
+
+  /**
+   * A project (1.0.0): a row like a folder's, one step up — and, open, its
+   * "+ Add a note" and "+ Add a folder", its pinned notes, then its folders
+   * and the notes put straight into it, each where it stands.
+   */
+  function projectBlock({ project, pinned, items }) {
+    const open = projects.isOpen(project.id);
+    const block = document.createElement('div');
+    block.className = `project-block${open ? ' open' : ''}`;
+    block.dataset.project = project.id;
+    block.dataset.id = project.id;
+    block.dataset.kind = 'project';
+    block.dataset.seq = 'r';
+    const head = document.createElement('div');
+    head.className = 'note-item project-item';
+    head.dataset.project = project.id;
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'folder-row project-row';
+    row.draggable = true;
+    row.setAttribute('aria-expanded', String(open));
+    row.title = project.name;
+    row.innerHTML = `<span class="fr-caret" aria-hidden="true"></span>${icon('project', 'ic fr-icon')}<span class="fr-name" data-no-i18n></span>`;
+    row.querySelector('.fr-name').textContent = project.name;
+    row.dataset.initial = project.name.trim().charAt(0).toUpperCase() || 'P';
+    row.addEventListener('click', () => { projects.toggle(project.id); onChanged(); });
+    row.addEventListener('dblclick', (e) => { e.preventDefault(); void renameProject(project.id); });
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'nr-more fr-more';
+    more.textContent = '⋯';
+    more.title = 'Project actions';
+    more.setAttribute('aria-label', 'Project actions');
+    more.addEventListener('click', (e) => { e.stopPropagation(); projectMenu(project.id, more); });
+    head.append(row, more);
+    block.append(head);
+    if (open) {
+      const body = document.createElement('div');
+      body.className = 'folder-notes project-items';
+      body.setAttribute('role', 'group');
+      body.setAttribute('aria-label', project.name);
+      const adds = document.createElement('div');
+      adds.className = 'project-adds';
+      const addNote = document.createElement('button');
+      addNote.type = 'button';
+      addNote.className = 'folder-add project-add';
+      addNote.dataset.project = project.id;
+      addNote.textContent = `+ ${t('Add a note')}`;
+      addNote.addEventListener('click', () => newNote?.(null, project.id));
+      const addFolder = document.createElement('button');
+      addFolder.type = 'button';
+      addFolder.className = 'folder-add project-add';
+      addFolder.dataset.project = project.id;
+      addFolder.textContent = `+ ${t('Add a folder')}`;
+      addFolder.addEventListener('click', () => { void create(null, project.id); });
+      adds.append(addNote, addFolder);
+      body.append(adds);
+      if (!pinned.length && !items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'folder-empty project-empty';
+        empty.dataset.project = project.id;
+        empty.textContent = t('Drag folders and notes here');
+        body.append(empty);
+      }
+      for (const note of pinned) body.append(item(note, groupKey(null, true, project.id)));
+      const seq = groupKey(null, false, project.id);
+      for (const entry of items) body.append(entry.kind === 'folder' ? folderBlock(entry.folder, entry.notes, seq) : item(entry.note, seq));
+      block.append(body);
+    }
+    return block;
   }
 
   // ---- dragging --------------------------------------------------------
@@ -186,20 +266,72 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged, newN
 
   const half = (el, e) => { const r = el.getBoundingClientRect(); return e.clientY < r.top + r.height / 2 ? 'before' : 'after'; };
 
+  const inList = (el) => !!el && listEl.contains(el);
+
+  /** A project's row (1.0.0): its middle takes the item in, its edges put it above or below the project. */
+  function projectZone(head, e) {
+    const r = head.getBoundingClientRect();
+    const y = e.clientY - r.top;
+    const block = head.closest('.project-block');
+    if (block.dataset.id === dragging.id) return null;
+    if (y < r.height * 0.25) return { el: block, where: 'before' };
+    if (y > r.height * 0.75 && !block.classList.contains('open')) return { el: block, where: 'after' };
+    return dragging.kind === 'project' ? { el: block, where: 'after' } : { el: head, where: 'into' };
+  }
+
+  /** The first item of an unpinned run, for a folder let go among pinned notes. */
+  function firstOf(seq) {
+    return [...listEl.querySelectorAll('[data-seq]')].find((c) => c.dataset.seq === seq) ?? null;
+  }
+
   function targetAt(e) {
     const t0 = e.target;
+    if (dragging.kind === 'project') {
+      // A project moves among the projects, folders and notes of the list —
+      // never into another project (projects do not nest).
+      const block = t0.closest?.('.project-block') ?? t0.closest?.('.folder-block[data-seq="r"]') ?? t0.closest?.('.note-item[data-seq="r"]');
+      if (inList(block)) {
+        if (block.dataset.id === dragging.id) return null;
+        return { el: block, where: half(block.querySelector(':scope > .note-item') || block, e) };
+      }
+      if (t0.closest?.('.note-item[data-seq="p"]')) {
+        const first = firstOf('r');
+        return first ? { el: first, where: 'before' } : { el: listEl, where: 'end' };
+      }
+      return { el: listEl, where: 'end' };
+    }
+    const projectHead = t0.closest?.('.project-item');
+    if (inList(projectHead)) return projectZone(projectHead, e);
     if (dragging.kind === 'folder') {
-      // A folder moves among the folders and notes of the list, nowhere else.
+      // A folder moves among the folders and notes of the list or of a
+      // project; let go on the middle of another folder, the two make a
+      // project — or it joins the project that folder is in (1.0.0).
+      const into = t0.closest?.('.project-add, .project-empty');
+      if (inList(into)) return { el: into, where: 'into' };
+      const head = t0.closest?.('.folder-item');
+      if (inList(head)) {
+        const block = head.closest('.folder-block');
+        if (block.dataset.id === dragging.id) return null;
+        const r = head.getBoundingClientRect();
+        const y = e.clientY - r.top;
+        if (projects && y >= r.height * 0.25 && y <= r.height * 0.75) return { el: head, where: 'into' };
+        return { el: block, where: y < r.height / 2 ? 'before' : 'after' };
+      }
       const block = t0.closest?.('.folder-block');
-      if (block && listEl.contains(block)) {
+      if (inList(block)) {
         if (block.dataset.id === dragging.id) return null;
         return { el: block, where: half(block.querySelector('.folder-item') || block, e) };
       }
-      const note = t0.closest?.('.note-item[data-seq="r"]');
-      if (note && listEl.contains(note)) return { el: note, where: half(note, e) };
-      if (t0.closest?.('.note-item[data-seq="p"]')) {
-        const first = [...listEl.children].find((c) => c.dataset.seq === 'r');
-        return first ? { el: first, where: 'before' } : { el: listEl, where: 'end' };
+      const note = t0.closest?.('.note-item[data-seq]');
+      if (inList(note)) {
+        const g = parseGroup(note.dataset.seq);
+        if (g && !g.folder && !g.pinned) return { el: note, where: half(note, e) };
+        if (g && !g.folder && g.pinned) {
+          const first = firstOf(groupKey(null, false, g.project));
+          if (first) return { el: first, where: 'before' };
+          if (g.project) return { el: note.closest('.project-block').querySelector('.project-item'), where: 'into' };
+          return { el: listEl, where: 'end' };
+        }
       }
       return { el: listEl, where: 'end' };
     }
@@ -225,20 +357,28 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged, newN
     return { el: listEl, where: 'end' };
   }
 
-  listEl.addEventListener('dragstart', (e) => {
-    const folderRow = e.target.closest?.('.folder-row');
+  // The black holes have their own scroll area under the list (1.0.0), so a
+  // note dragged out of one starts there: both are listened to.
+  const holesEl = document.getElementById('holes-scroll');
+  const onDragStart = (e) => {
+    const projectRow = e.target.closest?.('.project-row');
+    const folderRow = projectRow ? null : e.target.closest?.('.folder-row');
     const noteRow = e.target.closest?.('.note-row');
     // A note of an open black hole is dragged too: let go among the notes, it is taken out (0.9.4).
-    const el = folderRow ? folderRow.closest('.folder-block') : (noteRow?.closest('.note-item[data-seq]') ?? noteRow?.closest('.hole-notes .note-item[data-id]'));
+    const el = projectRow ? projectRow.closest('.project-block')
+      : folderRow ? folderRow.closest('.folder-block')
+        : (noteRow?.closest('.note-item[data-seq]') ?? noteRow?.closest('.hole-notes .note-item[data-id]'));
     if (!el) return;
-    dragging = { kind: folderRow ? 'folder' : 'note', id: el.dataset.id };
+    dragging = { kind: projectRow ? 'project' : folderRow ? 'folder' : 'note', id: el.dataset.id };
     e.dataTransfer.setData(DRAG_TYPE, `${dragging.kind}:${dragging.id}`);
-    e.dataTransfer.setData('text/plain', (folderRow || noteRow).title || '');
+    e.dataTransfer.setData('text/plain', (projectRow || folderRow || noteRow).title || '');
     e.dataTransfer.effectAllowed = 'move';
     // A frame later, or the drag image is taken of the faded row.
     requestAnimationFrame(() => el.classList.add('is-dragging'));
     listEl.classList.add('dragging-note');
-  });
+  };
+  listEl.addEventListener('dragstart', onDragStart);
+  holesEl?.addEventListener('dragstart', onDragStart);
 
   listEl.addEventListener('dragover', (e) => {
     if (!dragging) return;
@@ -268,18 +408,19 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged, newN
 
   function finish() {
     clearMark();
-    listEl.querySelectorAll('.is-dragging').forEach((el) => el.classList.remove('is-dragging'));
+    for (const root of [listEl, holesEl]) root?.querySelectorAll('.is-dragging').forEach((el) => el.classList.remove('is-dragging'));
     listEl.classList.remove('dragging-note');
     dragging = null;
   }
   listEl.addEventListener('dragend', finish);
+  holesEl?.addEventListener('dragend', finish);
 
   /** The items of a run as drawn, the dragged one left out. */
   const run = (seq, except) => [...listEl.querySelectorAll('[data-seq]')]
     .filter((el) => el.dataset.seq === seq && el.dataset.id !== except)
     .map((el) => ({ kind: el.dataset.kind, id: el.dataset.id }));
 
-  const keyOf = ({ kind, id }) => (kind === 'folder' ? folders.key(id) : sortKey(store.get(id)));
+  const keyOf = ({ kind, id }) => (kind === 'folder' ? folders.key(id) : kind === 'project' ? projects.key(id) : sortKey(store.get(id)));
 
   /** Put the dragged item where `at` says, and redraw. */
   function drop(what, at) {
@@ -287,6 +428,7 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged, newN
     const note = what.kind === 'note' ? store.get(what.id) : null;
     if (what.kind === 'note' && !note) return;
     if (what.kind === 'folder' && !folders.has(what.id)) return;
+    if (what.kind === 'project' && !projects?.has(what.id)) return;
     // Out of its black hole first — which asks for the black hole's answer
     // (black-holes.js) — and only then to the place it was let go at.
     if (note?.hole) {
@@ -295,17 +437,42 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged, newN
     }
     let seq;
     let list;
-    if (at.where === 'into') {
+    if (at.where === 'into' && at.el.dataset.project) {
+      // Into a project (1.0.0): to the top of its notes and folders.
+      const project = at.el.dataset.project;
+      if (!projects?.has(project)) return;
+      if (what.kind === 'folder') projects.setFolder(me.id, project);
+      seq = groupKey(null, what.kind === 'note' && !!note.pinned, project);
+      list = [me, ...run(seq, me.id)];
+      projects.setOpen(project, true);
+    } else if (at.where === 'into' && what.kind === 'folder') {
+      // A folder on a folder: the two are a project — the one that folder is
+      // in, or a new one, named first (the owner: "folders put inside each
+      // other make a project").
+      const target = at.el.dataset.folder;
+      if (!folders.has(target) || !projects) return;
+      const theirs = projects.of(target);
+      if (!theirs) { void makeProject([target, me.id]); return; }
+      projects.setFolder(me.id, theirs.id);
+      projects.setOpen(theirs.id, true);
+      seq = groupKey(null, false, theirs.id);
+      list = run(seq, me.id);
+      const i = list.findIndex((x) => x.id === target);
+      list.splice(i < 0 ? 0 : i + 1, 0, me);
+    } else if (at.where === 'into') {
       const folder = at.el.dataset.folder;
       if (!folders.has(folder)) return;
       seq = groupKey(folder, !!note.pinned);
       list = [me, ...run(seq, me.id)];
       folders.setOpen(folder, true);
     } else if (at.where === 'end') {
-      seq = what.kind === 'folder' ? 'r' : groupKey(null, !!note.pinned);
+      seq = what.kind === 'note' ? groupKey(null, !!note.pinned) : 'r';
+      if (what.kind === 'folder') projects?.setFolder(me.id, null);
       list = [...run(seq, me.id), me];
     } else {
       seq = at.el.dataset.seq;
+      // A folder let go among a project's items is in that project; among the list's, in none.
+      if (what.kind === 'folder') projects?.setFolder(me.id, parseGroup(seq)?.project ?? null);
       const other = note ? ownRun(seq, note.pinned) : null;
       if (other) {
         seq = other.seq;
@@ -323,12 +490,28 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged, newN
     const placed = orderFor(list.map(keyOf), index);
     if ('renumber' in placed) {
       store.setOrders(list.map((x, i) => [x, placed.renumber[i]]).filter(([x]) => x.kind === 'note' && x.id !== me.id).map(([x, o]) => [x.id, o]));
-      list.forEach((x, i) => { if (x.kind === 'folder') folders.setOrder(x.id, placed.renumber[i]); });
+      list.forEach((x, i) => {
+        if (x.kind === 'folder') folders.setOrder(x.id, placed.renumber[i]);
+        else if (x.kind === 'project') projects?.setOrder(x.id, placed.renumber[i]);
+      });
     }
     const order = 'renumber' in placed ? placed.renumber[index] : placed.order;
-    if (note) store.setPlace(note.id, { folder: where.folder, order });
+    if (note) store.setPlace(note.id, { folder: where.folder, project: where.project ?? null, order });
+    else if (what.kind === 'project') projects.setOrder(me.id, order);
     else folders.setOrder(me.id, order);
     onChanged();
+  }
+
+  /** A new project of these folders, standing where the first of them stood. */
+  async function makeProject(folderIds) {
+    const name = await askText(t('New project'), t('New project'));
+    if (name === null) return null;
+    const at = folders.key(folderIds[0]);
+    const project = projects.create(name, folderIds);
+    if (!project) return null;
+    projects.setOrder(project.id, at);
+    onChanged();
+    return project;
   }
 
   // ---- menus -----------------------------------------------------------
@@ -357,12 +540,14 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged, newN
   // the folded rail it is the only way to it: the ⋯ is hidden there, where it
   // sat on top of the note's initial.
   listEl.addEventListener('contextmenu', (e) => {
-    const folderRow = e.target.closest?.('.folder-item');
-    const noteRow = folderRow ? null : e.target.closest?.('.note-item[data-id]');
-    if (!folderRow && !noteRow) return;
+    const projectRow = e.target.closest?.('.project-item');
+    const folderRow = projectRow ? null : e.target.closest?.('.folder-item');
+    const noteRow = projectRow || folderRow ? null : e.target.closest?.('.note-item[data-id]');
+    if (!projectRow && !folderRow && !noteRow) return;
     e.preventDefault();
     const at = { getBoundingClientRect: () => ({ left: e.clientX, right: e.clientX, top: e.clientY, bottom: e.clientY }) };
-    if (folderRow) folderMenu(folderRow.dataset.folder, at);
+    if (projectRow) projectMenu(projectRow.dataset.project, at);
+    else if (folderRow) folderMenu(folderRow.dataset.folder, at);
     else noteMenu?.(noteRow.dataset.id, e.clientX, e.clientY);
   });
 
@@ -385,14 +570,62 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged, newN
     onChanged();
   }
 
-  async function create(thenMove) {
+  /** A new folder — with a note moved into it, or inside a project (1.0.0) — named first. */
+  async function create(thenMove, inProject = null) {
     const name = await askText(t('New folder'), t('New folder'));
     if (name === null) return null;
     const folder = folders.create(name);
     if (!folder) return null;
+    if (inProject && projects?.has(inProject)) { projects.setFolder(folder.id, inProject); projects.setOpen(inProject, true); }
     if (thenMove) store.setFolder(thenMove, folder.id);
     onChanged();
     return folder;
+  }
+
+  async function renameProject(id) {
+    const project = projects?.get(id);
+    if (!project) return;
+    const name = await askText(t('Rename project'), project.name);
+    if (name === null) return;
+    projects.rename(id, name);
+    onChanged();
+  }
+
+  /** A new project from the toolbar: empty, open, ready for folders and notes. */
+  async function createProject() {
+    if (!projects) return null;
+    const name = await askText(t('New project'), t('New project'));
+    if (name === null) return null;
+    const project = projects.create(name);
+    onChanged();
+    return project;
+  }
+
+  function projectMenu(id, anchor) {
+    closeMenu();
+    const project = projects?.get(id);
+    if (!project) return;
+    const del = button(t('Delete project'), () => {
+      menu.replaceChildren();
+      const what = document.createElement('p');
+      what.className = 'fm-confirm';
+      what.textContent = t('Delete the project? Its folders and notes stay, back in the list.');
+      const yes = button(t('Delete'), () => {
+        closeMenu();
+        store.releaseProject(id);
+        projects.remove(id);
+        onChanged();
+      }, 'fm-delete fm-delete--yes');
+      menu.append(what, yes, button(t('Cancel'), closeMenu));
+      yes.focus();
+    }, 'fm-delete');
+    menu.append(
+      button(t('Add a note'), () => { closeMenu(); newNote?.(null, id); }),
+      button(t('Add a folder'), () => { closeMenu(); void create(null, id); }),
+      button(t('Rename project'), () => { closeMenu(); void renameProject(id); }),
+      del,
+    );
+    place(anchor);
   }
 
   function folderMenu(id, anchor) {
@@ -410,13 +643,16 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged, newN
       const yes = button(t('Delete'), () => {
         closeMenu();
         store.releaseFolder(id);
+        projects?.forgetFolder(id);
         folders.remove(id);
         onChanged();
       }, 'fm-delete fm-delete--yes');
       menu.append(what, yes, button(t('Cancel'), closeMenu));
       yes.focus();
     }, 'fm-delete');
-    menu.append(button(t('Rename folder'), () => { closeMenu(); void rename(id); }), del);
+    menu.append(button(t('Rename folder'), () => { closeMenu(); void rename(id); }));
+    if (projects?.of(id)) menu.append(button(t('Take out of the project'), () => { closeMenu(); projects.setFolder(id, null); onChanged(); }));
+    menu.append(del);
     place(anchor);
   }
 
@@ -438,10 +674,26 @@ export function initNoteList({ listEl, store, folders, noteItem, onChanged, newN
       if (folder.id === current) b.setAttribute('aria-current', 'true');
       menu.append(b);
     }
-    if (current) menu.append(button(t('No folder'), () => { closeMenu(); store.setFolder(noteId, null); onChanged(); }));
+    // Straight into a project (1.0.0) — not for a black hole's note: no project reaches in there.
+    const inProject = !current && projects?.has(note.project) ? note.project : null;
+    if (!note.hole) {
+      for (const project of projects?.all() ?? []) {
+        const b = button('', () => {
+          closeMenu();
+          store.setProject(noteId, project.id);
+          projects.setOpen(project.id, true);
+          onChanged();
+        }, project.id === inProject ? 'sel' : '');
+        b.innerHTML = `<span class="fm-ic">${icon('project')}</span><span data-no-i18n></span>`;
+        b.lastChild.textContent = project.name;
+        if (project.id === inProject) b.setAttribute('aria-current', 'true');
+        menu.append(b);
+      }
+    }
+    if (current || inProject) menu.append(button(t('No folder'), () => { closeMenu(); store.setFolder(noteId, null); onChanged(); }));
     menu.append(button(t('New folder…'), () => { closeMenu(); void create(noteId); }));
     place(anchor);
   }
 
-  return { render, moveMenu, create, rename, closeMenu };
+  return { render, moveMenu, create, createProject, rename, closeMenu };
 }

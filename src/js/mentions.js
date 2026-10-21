@@ -38,6 +38,27 @@ export function contentTags(html) {
 }
 
 /**
+ * The notes a note's text @mentions (note-mention chips), each id once, in
+ * order. Read from the stored markup like contentTags. Pure — tested.
+ */
+const mentionCache = new Map();
+export function contentMentions(html) {
+  const src = String(html ?? '');
+  if (!src.includes('note-mention')) return [];
+  const hit = mentionCache.get(src);
+  if (hit) return hit;
+  const seen = new Set();
+  for (const m of src.matchAll(/<a\b[^>]*\bclass="[^"]*\bnote-mention\b[^"]*"[^>]*>/g)) {
+    const id = m[0].match(/\bdata-note="([^"]+)"/)?.[1];
+    if (id) seen.add(id);
+  }
+  const out = [...seen];
+  if (mentionCache.size > 200) mentionCache.clear();
+  mentionCache.set(src, out);
+  return out;
+}
+
+/**
  * Take the #chips of these labels out of a note's markup, in place: the chip
  * goes, and so does one of the two spaces it leaves side by side. Returns how
  * many went. Case does not matter. Pure DOM — tested.

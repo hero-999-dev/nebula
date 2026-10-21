@@ -14,9 +14,8 @@
  * hears of it (`settings-changed`, settings.js).
  */
 
-import { readSettings, writeSettings } from './settings.js';
+import { readSettings, writeSettings, SPELL_LANGUAGES } from './settings.js';
 import { FONTS, FONT_SIZES, BASE_FONT_SIZE, readCustomFonts, customFontStack, firstFamily } from './toolbar.js';
-import { t } from './i18n.js';
 import { PAGE_MODES } from './page-mode.js';
 import { initAppLockSettings } from './app-lock.js';
 import { initLogoEditor } from './logo-editor.js';
@@ -40,7 +39,9 @@ function option(value, text) {
  * added. [stack, label] — '' is the app's own, and says which it is.
  */
 export function fontChoices(custom = [], current = null) {
-  const out = [['', `Nebula’s own (${FONTS[0][0]})`], ...FONTS.slice(1).map(([label, stack]) => [stack, label])];
+  // The app's own font is shown by its name, as the others are (1.0.0: "stop
+  // writing Nebula's own, just the chosen font and the size number", the owner).
+  const out = [['', FONTS[0][0]], ...FONTS.slice(1).map(([label, stack]) => [stack, label])];
   const have = new Set(out.map(([stack]) => firstFamily(stack).toLowerCase()));
   have.add(firstFamily(FONTS[0][1]).toLowerCase());
   for (const name of custom) {
@@ -107,6 +108,22 @@ export function initSettingsPanel({ overlay, body, closeButton, saveNow }) {
   const hideAi = check(shown, 'set-hide-ai', 'Hide the AI panel', 'Its button and its tabs are put away. Your sign-ins stay as they are.');
   const hideHoles = check(shown, 'set-hide-holes', 'Hide the black holes', 'Their section and their button leave the note list; open ones are locked first. Nothing is deleted, and they are back when this is turned off.');
 
+  // The spell checker's languages (1.0.0): all of them on, each one can be taken off.
+  const spelling = group('Spelling');
+  const spellBoxes = SPELL_LANGUAGES.map(([code, name]) => {
+    const line = el('label', 'set-check');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.id = `set-spell-${code}`;
+    box.value = code;
+    const label = el('span', '', name);
+    label.dataset.noI18n = '';         // each language in its own words
+    line.append(box, label);
+    spelling.append(line);
+    return box;
+  });
+  spelling.append(el('p', 'set-hint', 'Words are checked in every language ticked here. Untick one and it is no longer corrected; with none ticked, nothing is.'));
+
   const locked = group('Lock on opening');
   const lockHost = el('div', 'set-lock');
   lockHost.id = 'set-lock';
@@ -121,22 +138,27 @@ export function initSettingsPanel({ overlay, body, closeButton, saveNow }) {
 
   function paint() {
     const s = readSettings();
-    // Font names are names (the list is not translated); "Nebula’s own (…)" is the app's word, and says what it is.
-    font.replaceChildren(...fontChoices(readCustomFonts(), s.font).map(([stack, label]) => option(stack, stack ? label : t(label))));
+    // Font names are names (the list is not translated).
+    font.replaceChildren(...fontChoices(readCustomFonts(), s.font).map(([stack, label]) => option(stack, label)));
     font.value = s.font ?? '';
-    size.replaceChildren(option('', `Nebula’s own (${BASE_FONT_SIZE})`), ...[...new Set([...FONT_SIZES, ...(s.size ? [s.size] : [])])].sort((a, b) => a - b).map((px) => option(String(px), String(px))));
-    size.value = s.size ? String(s.size) : '';
+    // Sizes are numbers only; the app's own (14) is one of them, and choosing it is choosing nothing.
+    size.replaceChildren(...[...new Set([...FONT_SIZES, BASE_FONT_SIZE, ...(s.size ? [s.size] : [])])].sort((a, b) => a - b).map((px) => option(String(px), String(px))));
+    size.value = String(s.size ?? BASE_FONT_SIZE);
     page.replaceChildren(...PAGE_MODES.map((m) => option(m.id, m.name === m.short ? m.name : `${m.name} (${m.short})`)));
     page.value = s.page;
     hideAi.checked = s.hideAi;
     hideHoles.checked = s.hideHoles;
+    for (const box of spellBoxes) box.checked = s.spell.includes(box.value);
   }
 
   font.addEventListener('change', () => writeSettings({ font: font.value || null }));
-  size.addEventListener('change', () => writeSettings({ size: size.value ? Number(size.value) : null }));
+  size.addEventListener('change', () => writeSettings({ size: Number(size.value) === BASE_FONT_SIZE ? null : Number(size.value) }));
   page.addEventListener('change', () => writeSettings({ page: page.value }));
   hideAi.addEventListener('change', () => writeSettings({ hideAi: hideAi.checked }));
   hideHoles.addEventListener('change', () => writeSettings({ hideHoles: hideHoles.checked }));
+  for (const box of spellBoxes) {
+    box.addEventListener('change', () => writeSettings({ spell: spellBoxes.filter((b) => b.checked).map((b) => b.value) }));
+  }
 
   function close() { overlay.hidden = true; }
   function open() {

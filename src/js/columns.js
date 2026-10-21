@@ -152,6 +152,29 @@ export function sectionOf(hr, where = 'row', from = null) {
   return above.length ? above : below;
 }
 
+/**
+ * The part of the note around a block: everything between the dividers (or
+ * columns) above and below it (1.0.0). The divider being dragged is no bound,
+ * and not part of what is split.
+ *
+ * The owner, 1.0.0: text between a divider above and one below; a third
+ * divider put in and pulled sideways next to that text split "the text beside
+ * the new divider" — the part around the place the divider was put in, not
+ * the part it was dropped on. The part under the pointer is the one split now.
+ * @param {Element} block a block standing on the note
+ * @param {Element|null} [skip] the divider that is dragged
+ */
+export function sectionAround(block, skip = null) {
+  const blocks = blocksOf(block.parentElement).filter((el) => el !== skip);
+  const at = blocks.indexOf(block);
+  if (at < 0 || isBound(block)) return [];
+  let first = at;
+  while (first > 0 && !isBound(blocks[first - 1])) first -= 1;
+  let last = at;
+  while (last < blocks.length - 1 && !isBound(blocks[last + 1])) last += 1;
+  return blocks.slice(first, last + 1);
+}
+
 /** Whether a line holds nothing: it would only be an empty line at the foot of a column. */
 const isBlank = (el) => el.matches('p, div:not([class])') && !el.textContent.replace(/​/g, '').trim()
   && !el.querySelector('img, hr, .inline-eq, .note-image, .link-block, .blk-code');
@@ -162,9 +185,10 @@ const isBlank = (el) => el.matches('p, div:not([class])') && !el.textContent.rep
  * @param {Element[]} blocks neighbours in one flow, in order (may be none)
  * @param {HTMLElement} hr the divider that was dragged; it is taken out of the flow
  * @param {number} pct where the divider stands, as a share of the line
+ * @param {'left'|'right'|null} [keep] the side the words already stand on (contentSide), which they keep
  * @returns {{cols: HTMLElement, empty: HTMLElement}} the block made, and the column to write in
  */
-export function splitAt(blocks, hr, pct) {
+export function splitAt(blocks, hr, pct, keep = null) {
   const doc = hr.ownerDocument;
   const split = cleanSplit(pct);
   const cols = doc.createElement('div');
@@ -183,8 +207,9 @@ export function splitAt(blocks, hr, pct) {
   const taken = [...blocks];
   while (taken.length > 1 && isBlank(taken.at(-1))) taken.pop();
   (taken[0] ?? hr).before(cols);
-  // What was there keeps the wider side; even, it stays at the left.
-  const full = split >= 50 ? left : right;
+  // What was there stays on the side it stands on; when the divider cuts
+  // through it, it keeps the wider side, and even, the left.
+  const full = keep === 'left' ? left : keep === 'right' ? right : split >= 50 ? left : right;
   const empty = full === left ? right : left;
   if (taken.length) full.append(...taken); else full.append(blankLine(doc));
   empty.append(blankLine(doc));
@@ -247,9 +272,10 @@ export function splitPoint(col, pct, least = MIN_COL) {
  * @param {HTMLElement} col @param {number} pct the pointer, as a share of the line
  * @param {HTMLElement|null} [hr] the divider that was dragged there; it is taken out of the flow
  * @param {number} [least] the least share either part may have (leastShare)
+ * @param {'left'|'right'|null} [keep] the side the words already stand on (contentSide), which they keep
  * @returns {{cols: HTMLElement, empty: HTMLElement}|null}
  */
-export function splitColumn(col, pct, hr = null, least = MIN_COL) {
+export function splitColumn(col, pct, hr = null, least = MIN_COL, keep = null) {
   const p = splitPoint(col, pct, least);
   if (p === null) return null;
   const cols = col.parentElement;
@@ -266,11 +292,108 @@ export function splitColumn(col, pct, hr = null, least = MIN_COL) {
   empty.append(blankLine(doc));
   const rule = doc.createElement('hr');
   rule.className = VR;
-  if (p - from >= to - p) col.after(rule, empty); else col.before(empty, rule);
+  const right = keep ? keep === 'left' : p - from >= to - p;
+  if (right) col.after(rule, empty); else col.before(empty, rule);
   splits.splice(k, 0, p);
   setSplits(cols, splits);
   return { cols, empty };
 }
+
+/**
+ * A block dropped at the side of another, as in Notion (1.0.0, block-handle.js):
+ * the two stand in two columns, half and half, where the other one stood.
+ * @param {Element} target a block standing on the note
+ * @param {Element} block the block that was dragged there
+ * @param {'left'|'right'} side where it goes
+ * @returns {HTMLElement} the columns
+ */
+export function columnsBeside(target, block, side) {
+  const doc = target.ownerDocument;
+  const cols = doc.createElement('div');
+  cols.className = COLS;
+  cols.dataset.blockType = 'columns';
+  const left = doc.createElement('div');
+  const right = doc.createElement('div');
+  left.className = COL;
+  right.className = COL;
+  const rule = doc.createElement('hr');
+  rule.className = VR;
+  target.before(cols);
+  cols.append(left, rule, right);
+  if (side === 'left') { left.append(block); right.append(target); } else { left.append(target); right.append(block); }
+  setSplit(cols, 50);
+  const next = cols.nextElementSibling;
+  if (!next || next.matches(LAYER)) cols.after(blankLine(doc));
+  return cols;
+}
+
+/**
+ * A block dropped at the side of a block in a column: a new column beside that
+ * one, which gives it half its room. Null when the line holds no more columns
+ * or that one is too narrow to share.
+ * @param {HTMLElement} col @param {Element} block @param {'left'|'right'} side
+ * @param {number} [least] the least share either part may have (leastShare)
+ * @returns {{cols: HTMLElement, col: HTMLElement}|null}
+ */
+export function columnBeside(col, block, side, least = MIN_COL) {
+  if (!canShare(col, least)) return null;
+  const cols = col.parentElement;
+  const columns = columnsOf(cols);
+  const k = columns.indexOf(col);
+  const splits = cleanSplits(splitsOf(cols), columns.length);
+  const [from, to] = [splits[k - 1] ?? 0, splits[k] ?? 100];
+  const doc = col.ownerDocument;
+  const fresh = doc.createElement('div');
+  fresh.className = COL;
+  fresh.append(block);
+  const rule = doc.createElement('hr');
+  rule.className = VR;
+  if (side === 'left') col.before(fresh, rule); else col.after(rule, fresh);
+  // The new divider's place goes in at its own position among the others.
+  splits.splice(k, 0, Math.round((from + to) / 2));
+  setSplits(cols, splits);
+  return { cols, col: fresh };
+}
+
+/** Whether a column has room to give half of to a new one beside it. */
+export function canShare(col, least = MIN_COL) {
+  const cols = col?.parentElement;
+  if (!cols?.classList.contains(COLS)) return false;
+  const columns = columnsOf(cols);
+  const k = columns.indexOf(col);
+  if (k < 0 || columns.length >= MAX_COLS) return false;
+  const splits = cleanSplits(splitsOf(cols), columns.length);
+  return (splits[k] ?? 100) - (splits[k - 1] ?? 0) >= 2 * Math.max(MIN_COL, least);
+}
+
+/**
+ * A column whose last block was dragged away goes, as in Notion: its room goes
+ * to the column at its left (the first one's to the one at its right), and the
+ * last but one column ends the columns.
+ * @returns {Element|null} the first block of what is left where the columns stood, when they ended
+ */
+export function dropColumn(col) {
+  const cols = col?.parentElement;
+  if (!cols?.classList.contains(COLS)) return null;
+  const columns = columnsOf(cols);
+  const k = columns.indexOf(col);
+  if (k < 0) return null;
+  if (columns.length <= 2) {
+    col.remove();
+    rulesOf(cols).forEach((r) => r.remove());
+    return unsplit(cols);
+  }
+  const splits = cleanSplits(splitsOf(cols), columns.length);
+  const rule = k > 0 ? col.previousElementSibling : col.nextElementSibling;
+  if (rule?.matches(`hr.${VR}`)) rule.remove();
+  col.remove();
+  splits.splice(k > 0 ? k - 1 : 0, 1);
+  setSplits(cols, splits);
+  return null;
+}
+
+/** Whether a column holds nothing but one empty line, or nothing at all. */
+export const columnIsEmpty = (col) => !col.firstElementChild || onlyBlank(col);
 
 /**
  * An upright divider to a new place: only the two columns at its sides change.
@@ -348,6 +471,12 @@ export function healColumns(root) {
     if (stray.matches('hr')) stray.remove(); else stray.replaceWith(...stray.childNodes);
     touched += 1;
   }
+  // An indent is a line's: on a column or a divider it moved the divider over
+  // (a Tab on words loose in a column, before 1.0.0).
+  for (const el of [...root.querySelectorAll(`.${COLS}[data-ind], .${COL}[data-ind], hr.${VR}[data-ind]`)]) {
+    delete el.dataset.ind;
+    touched += 1;
+  }
   for (const cols of [...root.querySelectorAll(`.${COLS}`)]) {
     const columns = columnsOf(cols);
     // Columns do not nest, and one column is no columns.
@@ -419,7 +548,11 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
     const row = hr.getBoundingClientRect();
     const onNote = hr.parentElement === editorEl;
     const box = contentBox(hr.parentElement);
-    const sideways = Math.abs(x - drag.x) >= TURN;
+    // Sideways only when the pull is more across than up or down: a divider
+    // carried a long way up or down drifts aside on the way, and turned into
+    // a split instead of moving (1.0.0: "I cannot drag the lower of two
+    // dividers to places I could", the owner).
+    const sideways = Math.abs(x - drag.x) >= TURN && Math.abs(x - drag.x) >= Math.abs(y - drag.y) * 0.75;
     // Pulled sideways over a column: that column is cut in two where the pointer is.
     const col = sideways ? columnAt(x, y) : null;
     if (col) {
@@ -435,15 +568,17 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
     if (onNote && sideways) {
       // Pulled sideways: it stands up where the pointer is.
       const where = y < row.top - 8 ? 'above' : y > row.bottom + 8 ? 'below' : 'row';
+      // Over a part of the note away from the divider's own: that part (1.0.0).
+      const under = where === 'row' ? null : partUnder(hr, y);
       let from = null;
-      if (where !== 'row') {
+      if (where !== 'row' && !under) {
         const all = sectionOf(hr, where);
         // The block the pointer is over; past the last of them, all of them.
         from = where === 'above'
           ? all.find((el) => el.getBoundingClientRect().bottom > y) ?? null
           : [...all].reverse().find((el) => el.getBoundingClientRect().top < y) ?? null;
       }
-      const blocks = sectionOf(hr, where, from);
+      const blocks = under ?? sectionOf(hr, where, from);
       const pct = cleanSplit(((x - box.left) / Math.max(1, box.right - box.left)) * 100);
       const rects = blocks.map((el) => el.getBoundingClientRect());
       const top = rects.length ? Math.min(row.top, ...rects.map((r) => r.top)) : row.top - 20;
@@ -460,6 +595,24 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
     return { kind: 'move', parent: gap.parent, before: gap.before };
   }
 
+  /**
+   * The part of the note under the pointer, when it is not the divider's own
+   * part (there the split starts at the block the pointer is over, as before).
+   */
+  function partUnder(hr, y) {
+    const all = blocksOf(editorEl);
+    const el = all.find((b) => {
+      if (b === hr) return false;
+      const r = b.getBoundingClientRect();
+      return r.height > 0 && y >= r.top - 6 && y <= r.bottom + 6;
+    });
+    if (!el || isBound(el)) return null;
+    const part = sectionAround(el, hr);
+    const i = all.indexOf(hr);
+    if (part.includes(all[i - 1]) || part.includes(all[i + 1])) return null;
+    return part.length ? part : null;
+  }
+
   /** The column under a point that can be cut in two, if there is one. */
   function columnAt(x, y) {
     const col = flowAt(editorEl, x, y);
@@ -472,6 +625,43 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
     const line = contentBox(cols);
     const zoom = cols.getBoundingClientRect().width / Math.max(1, cols.offsetWidth) || 1;
     return leastShare((line.right - line.left) / zoom);
+  }
+
+  /**
+   * The side of a cut at x the blocks' words and pictures stay on, or null
+   * when there are none. A divider dropped right of a calculator put the
+   * calculator in the wider part, to the right of the cut, and the note moved
+   * sideways (the owner's Ideas note, 1.0.0: "otomatik yana kaydırdı notu").
+   * Words that run on across the cut moved too, so they stay left as well:
+   * only what stands wholly right of the cut goes right ("divider ekledigimde
+   * sol üstteki not saga kayiyor").
+   */
+  function contentSide(blocks, x) {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const b of blocks) {
+      if (!b?.isConnected || b === drag?.hr) continue;
+      const boxes = [];
+      for (const m of b.querySelectorAll?.('figure, img, video, iframe, table, .blk-code, .blk-cols') ?? []) boxes.push(m.getBoundingClientRect());
+      if (b.matches('figure, table, .blk-code, .blk-cols, hr')) boxes.push(b.getBoundingClientRect());
+      else {
+        const r = document.createRange();
+        r.selectNodeContents(b);
+        boxes.push(...r.getClientRects());
+      }
+      for (const box of boxes) {
+        if (box.width < 1) continue;
+        lo = Math.min(lo, box.left);
+        hi = Math.max(hi, box.right);
+      }
+    }
+    if (hi < lo) return null;
+    return lo >= x ? 'right' : 'left';
+  }
+  /** The x on the screen of a share of a block's line. */
+  function xOf(pct, box) {
+    const line = contentBox(box);
+    return line.left + (pct / 100) * (line.right - line.left);
   }
 
   function finish(apply) {
@@ -487,10 +677,16 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
       // A divider at the very end leaves no line to go on with.
       if (!d.hr.nextElementSibling) d.hr.after(blankLine(document));
     } else if (d.target.kind === 'column') {
-      const made = d.target.col.isConnected ? splitColumn(d.target.col, d.target.pct, d.hr, leastOf(d.target.col.parentElement)) : null;
+      const col = d.target.col;
+      const cols = col.parentElement;
+      const p = col.isConnected ? splitPoint(col, d.target.pct, leastOf(cols)) : null;
+      const keep = p === null ? null : contentSide([...col.children], xOf(p, cols));
+      const made = col.isConnected ? splitColumn(col, d.target.pct, d.hr, leastOf(cols), keep) : null;
       if (made) caretIn(made.empty.firstElementChild);
     } else {
-      const { empty } = splitAt(d.target.blocks.filter((el) => el.isConnected), d.hr, d.target.pct);
+      const blocks = d.target.blocks.filter((el) => el.isConnected);
+      const keep = contentSide(blocks, xOf(cleanSplit(d.target.pct), blocks[0]?.parentElement ?? editorEl));
+      const { empty } = splitAt(blocks, d.hr, d.target.pct, keep);
       caretIn(empty.firstElementChild);
     }
     onGeometry?.();

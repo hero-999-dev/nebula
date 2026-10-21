@@ -108,6 +108,16 @@ export function initContextMenu(editorEl, { history, images, miniBarAt, format, 
     const picture = target.closest('.note-image');
     if (picture && !target.closest('.image-caption')) {
       if (!locked) images?.selectImage?.(picture);
+      // A widget is no picture (1.0.0, the owner): it has no caption, and it is copied and deleted as a widget.
+      if (picture.matches('.note-widget')) {
+        item(t('Copy widget'), () => { void images?.copyImage?.(picture); });
+        if (!locked) {
+          rule();
+          item(t('Delete widget'), () => images?.deleteImage?.(picture));
+        }
+        place(x, y);
+        return;
+      }
       item(t('Copy image'), () => { void images?.copyImage?.(picture); });
       if (!locked) {
         const hasCaption = !!picture.querySelector('.image-caption')?.textContent.trim();

@@ -38,10 +38,16 @@
       </div>
       <nav class="note-list" id="note-list" aria-label="Notes"></nav>
 
+      <!-- Black holes section with its own scroll (1.0.0): separate from notes so
+           new notes do not push it down, and it stays visible however many
+           notes there are. -->
+      <div class="holes-scroll" id="holes-scroll"></div>
+
       <!-- Per-note menu: pin, archive, delete. One menu, moved to whichever
            row asked for it, rather than one per row. -->
       <div class="note-menu" id="note-menu" hidden>
         <!-- The owner's order (0.9.2): pin, the view mode, labels, archive, trash last. -->
+        <button type="button" data-note-act="beside" hidden>Open side by side</button>
         <button type="button" data-note-act="pin"></button>
         <button type="button" data-note-act="readonly"></button>
         <button type="button" data-note-act="autoorder"></button>
@@ -61,6 +67,10 @@
              Trash, from the palette button at the right of the themes below.
              Filled by theme-editor.js. -->
         <div class="theme-editor" id="theme-editor" role="group" aria-label="Your own theme" hidden></div>
+        <!-- The map of your notes (1.0.0): folders as suns, notes as planets,
+             labels as moons. Filled by galaxy-ui.js; ⤢ puts it over the page,
+             and its name dragged onto the page puts it beside the notes. -->
+        <div class="galaxy-slot" id="galaxy-slot"></div>
         <div class="drawer-tabs">
           <button type="button" class="btn drawer-tab" data-drawer="archive" aria-expanded="false">
             Archive
@@ -398,6 +408,10 @@
         <div class="pdf-orient pdf-videos" role="group" aria-label="Videos" hidden>
           <button type="button" data-videos="with" title="Videos as they show in the note: the picture, linked">▶ With videos</button>
           <button type="button" data-videos="without" title="Videos as their links only">Links only</button>
+        </div>
+        <div class="pdf-orient pdf-widgets" role="group" aria-label="Widgets" hidden>
+          <button type="button" data-widgets="with" title="Widgets printed as they are now">With widgets</button>
+          <button type="button" data-widgets="without" title="Widgets left out of the page">Without widgets</button>
         </div>
         <div class="pdf-orient" data-orient-group role="group" aria-label="Orientation">
           <button type="button" data-orient="landscape"><span class="pdf-sheet pdf-sheet--across" aria-hidden="true"></span>Landscape</button>

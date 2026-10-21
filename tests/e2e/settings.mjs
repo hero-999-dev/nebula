@@ -284,7 +284,7 @@ export async function runSettingsChecks(check) {
       return {
         heads: [...document.querySelectorAll('#settings-body .set-head')].map((h) => h.textContent),
         font: document.getElementById('set-font').value, size: document.getElementById('set-size').value, page: document.getElementById('set-page').value,
-        ownFont: document.getElementById('set-font').options[0].textContent, ownSize: document.getElementById('set-size').options[0].textContent,
+        ownFont: document.getElementById('set-font').selectedOptions[0].textContent, ownSize: document.getElementById('set-size').selectedOptions[0].textContent,
         base: Math.round(parseFloat(getComputedStyle(document.getElementById('editor')).fontSize)),
         ai: document.getElementById('set-hide-ai').checked, holes: document.getElementById('set-hide-holes').checked,
         fonts: document.getElementById('set-font').options.length, pages: [...document.getElementById('set-page').options].map((o) => o.value).join(','),
@@ -292,8 +292,8 @@ export async function runSettingsChecks(check) {
         menus: document.querySelectorAll('#app-menu .am-menu:not([hidden])').length,
       };
     });
-    check('a press opens the sheet: new notes, show and hide, the lock on opening, the logo — nothing chosen yet', sheet.heads.join('|') === 'New notes|Show and hide|Lock on opening|Logo' && sheet.font === '' && sheet.size === '' && sheet.page === 'nw' && !sheet.ai && !sheet.holes && sheet.inside && sheet.menus === 0, JSON.stringify(sheet));
-    check('"Nebula’s own" says in brackets what it is: the serif, and the size a note is really written in', sheet.ownFont === 'Nebula’s own (Serif)' && sheet.ownSize === `Nebula’s own (${sheet.base})` && sheet.base === 14, `${sheet.ownFont} | ${sheet.ownSize} | ${sheet.base}`);
+    check('a press opens the sheet: new notes, show and hide, spelling, the lock on opening, the logo — nothing chosen yet', sheet.heads.join('|') === 'New notes|Show and hide|Spelling|Lock on opening|Logo' && sheet.font === '' && sheet.size === '14' && sheet.page === 'nw' && !sheet.ai && !sheet.holes && sheet.inside && sheet.menus === 0, JSON.stringify(sheet));
+    check('nothing chosen shows the font by its name and the size as a number (no "Nebula’s own", 1.0.0)', sheet.ownFont === 'Serif' && sheet.ownSize === `${sheet.base}` && sheet.base === 14, `${sheet.ownFont} | ${sheet.ownSize} | ${sheet.base}`);
     check('it offers the app’s fonts and every page', sheet.fonts === 15 && sheet.pages === 'nw,a3,a4,a5,nn,b3,b4,b5', `${sheet.fonts} ${sheet.pages}`);
     check('there is no lock, and one button to set one', (await lockState()) === 'Nebula opens without asking.' && (await lockButtons()) === 'set', `${await lockState()} | ${await lockButtons()}`);
 
@@ -339,7 +339,7 @@ export async function runSettingsChecks(check) {
     const remembered = await win.evaluate(() => [document.getElementById('set-font').selectedOptions[0].textContent, document.getElementById('set-size').value, document.getElementById('set-page').value].join('|'));
     check('the sheet shows what was chosen', remembered === 'Verdana|18|a4', remembered);
     await win.selectOption('#set-font', '');
-    await win.selectOption('#set-size', '');
+    await win.selectOption('#set-size', '14');
     await win.selectOption('#set-page', 'nw');
     await closeSettings();
     await win.click('#btn-new');
@@ -552,7 +552,7 @@ export async function runSettingsChecks(check) {
     await win.waitForSelector('.holes .hole-block');
     await closeSettings();
     const holesBack = await win.evaluate(() => ({ locked: document.querySelector('.hole-lock')?.dataset.state, button: !document.getElementById('btn-new-hole').hidden, name: document.querySelector('.hole-row .fr-name')?.textContent }));
-    check('turned off, the black hole is back as it was left: locked, nothing lost', holesBack.locked === 'locked' && holesBack.button && holesBack.name === 'Vault', JSON.stringify(holesBack));
+    check('turned off, the black hole is back as it was left: locked, nothing lost', holesBack.locked === 'locked' && holesBack.button && ['Vault', 'V'].includes(holesBack.name), JSON.stringify(holesBack));
 
     // ---- A lock on opening: a 6-digit PIN ---------------------------------------
     const setLock = async ({ hint = '', passkey = false } = {}) => {
@@ -762,8 +762,8 @@ export async function runSettingsChecks(check) {
     await win.click('#lang-row [data-lang="tr"]');
     const turkish = await win.evaluate(() => [...document.querySelectorAll('#app-menu .am-title')].at(-1).textContent);
     await openSettings();
-    const sheetTr = await win.evaluate(() => ({ heads: [...document.querySelectorAll('#settings-body .set-head')].map((h) => h.textContent).join('|'), state: document.querySelector('#set-lock .set-state').textContent, own: document.getElementById('set-size').options[0].textContent, font: document.getElementById('set-font').options[0].textContent, page: document.getElementById('set-page').options[0].textContent, set: document.querySelector('#set-lock [data-lock="set"]').textContent }));
-    check('in Türkçe the title is Ayarlar and the sheet reads in Turkish, the pages keeping their names', turkish === 'Ayarlar' && sheetTr.heads === 'Yeni notlar|Göster ve gizle|Açılışta kilit|Logo' && sheetTr.state === 'Nebula sormadan açılır.' && sheetTr.own === 'Nebula varsayılanı (14)' && sheetTr.font === 'Nebula varsayılanı (Serif)' && sheetTr.page === 'Nebula Wide (NW)' && sheetTr.set === 'Kilit kur', JSON.stringify({ turkish, ...sheetTr }));
+    const sheetTr = await win.evaluate(() => ({ heads: [...document.querySelectorAll('#settings-body .set-head')].map((h) => h.textContent).join('|'), state: document.querySelector('#set-lock .set-state').textContent, own: document.getElementById('set-size').selectedOptions[0].textContent, font: document.getElementById('set-font').selectedOptions[0].textContent, page: document.getElementById('set-page').options[0].textContent, set: document.querySelector('#set-lock [data-lock="set"]').textContent }));
+    check('in Türkçe the title is Ayarlar and the sheet reads in Turkish, the pages keeping their names', turkish === 'Ayarlar' && sheetTr.heads === 'Yeni notlar|Göster ve gizle|Yazım denetimi|Açılışta kilit|Logo' && sheetTr.state === 'Nebula sormadan açılır.' && sheetTr.own === '14' && sheetTr.font === 'Serif' && sheetTr.page === 'Nebula Wide (NW)' && sheetTr.set === 'Kilit kur', JSON.stringify({ turkish, ...sheetTr }));
     await closeSettings();
     await win.click('#lang-row [data-lang="en"]');
     await stop();

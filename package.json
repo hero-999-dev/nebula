@@ -1,6 +1,6 @@
 {
   "name": "nebula",
-  "version": "0.9.9",
+  "version": "1.0.0",
   "description": "Nebula",
   "tagline": "calm notes with a real editor: movable editing bar, line icons, markdown code blocks with syntax colors, free-floating shapes, AI panel with tabs.",
   "main": "dist-electron/main.js",
@@ -26,6 +26,7 @@
     "pack:test": "npm run kill && npm run build && electron-builder --config build-test.json --publish never && node scripts/place-test-exe.js",
     "fresh": "npm run reset && npm run pack:win",
     "push": "node scripts/release.js",
+    "precheck:ci": "node scripts/precheck-ci.js",
     "sync-flash": "node scripts/sync-flash.js"
   },
   "author": "hero-999-dev",
@@ -155,7 +156,7 @@
     }
   },
   "devDependencies": {
-    "electron": "^44.9.0",
+    "electron": "^45.0.0",
     "electron-builder": "^26.17.0",
     "jsdom": "^25.0.1",
     "playwright-core": "^1.49.0",

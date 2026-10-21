@@ -9,6 +9,8 @@ Her satırın sonucunu **Geçti / Kaldı** ve varsa kısa açıklama olarak kayd
 - [ ] **PIN değiştir** mevcut PIN'i istemeli: yanlış mevcut PIN girilince değişmemeli; doğru girilince yeni PIN devreye girmeli, eski PIN artık açmamalı. Geçiş anahtarı olan kasada **Geçiş anahtarını kullan** düğmesi mevcut PIN yerine onay istemeli.
 - [ ] Kara deliğindeki bir notun ⋯ menüsündeki seçenek **Move to notes** (notlara taşı) olmalı; basınca PIN/passkey sorulup not düz notlar arasına dönmeli.
 - [ ] Açık bir kara delikteki bir notu silip Çöp'e atın. Çöp listesinde o not **Kara delik** olarak etiketlenmiş olmalı. **Normal bir notu** da silip Çöp'e atın: ikisinde de **Delete** düğmesine bir kez basınca yalnızca **Delete for good?** görünmeli, ikinci basışta silinmeli.
+- [ ] Bir kara deliği kilitleyin: listede, not menüsündeki “Move into a black hole” listesinde ve PIN penceresinin başlığında tam adı değil yalnızca **baş harfleri** görünmeli (ör. “Gizli Kasa” → “GK”). Açınca tam ad geri gelmeli.
+- [ ] İki kara delik yapın; alttakinin ⋯ menüsünden **En üste sabitle** deyin: en üste çıkmalı, kilitleyip açınca ve Nebula Test’i yeniden başlatınca yerinde kalmalı. **Sabitlemeyi kaldır** eski sırasına döndürmeli.
 - [ ] Yanlış PIN bekleme süreleri: 5 yanlış denemeden sonra ilk bekleme 30 saniyedir; her yeni yanlış denemede süre ikiye katlanır (60 sn, 2 dk, … en çok 15 dk). Bu tasarım gereğidir, hata değildir.
 
 - [ ] Yeni bir Blackhole oluşturun. Altı haneli PIN ve gösterilen kurtarma anahtarıyla oluşturma tamamlanmalı; kurtarma anahtarını bu deneme boyunca saklayın.

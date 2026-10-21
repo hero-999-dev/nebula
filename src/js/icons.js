@@ -10,6 +10,12 @@
 const S = (body, vb = '0 0 24 24') =>
   `<svg viewBox="${vb}" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision" aria-hidden="true">${body}</svg>`;
 
+// Saturn, for the Universe (minimap head and widget alike; owner, 2026-10-21:
+// "the ring does not close"). The ring is one closed ellipse (rx 10, ry 3.4,
+// tilted -22°) drawn as a single arc: only its back stretch behind the globe
+// (within 1.3 of its edge) is left out, the front passes across the globe.
+const SATURN = S('<circle cx="12" cy="12" r="5.2"/><path d="M16.43 7.25A10 3.4 -22 1 1 5.51 11.66"/>');
+
 export const ICONS = {
   undo: S('<path d="M9 14 4 9l5-5"/><path d="M4 9h9a7 7 0 0 1 0 14h-3"/>'),
   redo: S('<path d="m15 14 5-5-5-5"/><path d="M20 9h-9a7 7 0 0 0 0 14h3"/>'),
@@ -42,6 +48,10 @@ export const ICONS = {
   palette: S('<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8h2.3a3.6 3.6 0 0 0 3.6-3.6C20.5 6.8 16.7 3.5 12 3.5z"/><circle cx="7.9" cy="11.6" r="1.1"/><circle cx="10.4" cy="7.9" r="1.1"/><circle cx="14.8" cy="8" r="1.1"/>'),
   /** A folder in the note list (0.9.3): a tab on the left, the body under it. */
   folder: S('<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>'),
+  /** A project (1.0.0): a folder with a second one standing behind it — folders in a folder. */
+  project: S('<path d="M6 5.5V5a1.5 1.5 0 0 1 1.5-1.5h3l1.5 1.5h6A1.5 1.5 0 0 1 19.5 6.5v8"/><path d="M3.5 9.5a2 2 0 0 1 2-2h3.5l2 2h5.5a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2z"/>'),
+  /** The map (1.0.0): a planet with its ring, and a small moon. */
+  galaxy: SATURN,
 
   /**
    * The app's own mark: a crescent and a sparkle, filled rather than stroked.
@@ -96,6 +106,13 @@ export const ICONS = {
   bookmark: S('<path d="M6 4.5h12v15l-6-4-6 4z"/>'),
   /** A video file (0.9.4): a screen with a play mark. */
   video: S('<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m10.5 9.2 4.6 2.8-4.6 2.8z"/>'),
+  /** The widgets (1.0.0): a calculator, a scientific one, a calendar, and the four tiles of /widget. */
+  calculator: S('<rect x="5" y="3" width="14" height="18" rx="2.5"/><rect x="8" y="6" width="8" height="3.5" rx=".8"/><path d="M8.5 13h.01"/><path d="M12 13h.01"/><path d="M15.5 13h.01"/><path d="M8.5 17h.01"/><path d="M12 17h.01"/><path d="M15.5 17h.01"/>'),
+  sciCalc: S('<rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M7.5 7h9"/><path d="M7.5 11.5h3"/><path d="M9 10v3"/><path d="M13.5 11.5h3"/><path d="m7.8 15.3 2.4 2.4"/><path d="m10.2 15.3-2.4 2.4"/><path d="M13.5 16.5h3"/>'),
+  calendar: S('<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M8 13h.01"/><path d="M12 13h.01"/><path d="M16 13h.01"/><path d="M8 16.5h.01"/><path d="M12 16.5h.01"/>'),
+  // The Universe widget (1.0.0): the same Saturn as the minimap.
+  universe: SATURN,
+  widget: S('<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><path d="M17 13.5v7"/><path d="M13.5 17h7"/>'),
   search: S('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>'),
   spell: S('<path d="M3 16 7 6l4 10"/><path d="M4.4 13h5.2"/><path d="m13.5 15 2.5 2.5 5-5.5"/>'),
   preview: S('<path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8z"/><path d="M14 3.5V10h5"/><circle cx="12" cy="14.5" r="2"/><path d="M8 14.5c1.4-2 6.6-2 8 0-1.4 2-6.6 2-8 0z"/>'),

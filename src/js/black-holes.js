@@ -35,8 +35,19 @@ const IDLE_KEY = 'nebula:holes-idle-minutes';
 const IDLE_MINUTES = 10;
 /** Whether the section is folded: its black holes are still there, open or locked, only not drawn. */
 const FOLDED_KEY = 'nebula:holes-folded';
+/** The black holes pinned to the top of the list (1.0.0): their ids, on this computer. */
+const PINNED_KEY = 'nebula:holes-pinned';
 /** A new PIN's length; a black hole made by the first build says its own (four). */
 const PIN_DIGITS = 6;
+
+/**
+ * What a locked black hole shows of its name (1.0.0: "when a black hole is
+ * locked, its initials instead of the whole title", the owner): the first
+ * letter of each word, at most four. Pure — tested.
+ */
+export function holeInitials(name) {
+  return String(name ?? '').trim().split(/\s+/).filter(Boolean).map((w) => Array.from(w)[0]).slice(0, 4).join('').toLocaleUpperCase() || 'B';
+}
 
 export const el = (tag, cls, text) => {
   const node = document.createElement(tag);
@@ -101,7 +112,7 @@ export function refusalWords(res, lock = 'pin') {
     case 'in-use': return t('This black hole has a file open. Close it and try again.');
     case 'locked': return t('The black hole is locked.');
     case 'name': return t('Give it a name.');
-    default: return lock === 'hello' ? t('Not confirmed.') : t('That did not work.');
+    default: return t(lock === 'hello' ? 'Not confirmed.' : 'That did not work.');
   }
 }
 
@@ -111,12 +122,13 @@ export function refusalWords(res, lock = 'pin') {
  * @param {import('./notes.js').NoteStore} deps.store
  * @param {(note: object) => HTMLElement} deps.noteItem a note's row, as the list draws it
  * @param {() => void} deps.onChanged draw the list again
+ * @param {(id: string) => void} [deps.onLocked] told the moment a black hole locks, before the list is drawn again
  * @param {(id: string|null) => void} deps.openNote
  * @param {(holeId: string) => void} deps.newNote a new note in a black hole
  * @param {() => Promise<void>} deps.saveNow everything typed, on the disk
  * @param {HTMLElement} [deps.addButton] "New black hole", beside New folder
  */
-export function initBlackHoles({ listEl, store, noteItem, onChanged, openNote, newNote, saveNow, addButton }) {
+export function initBlackHoles({ listEl, store, noteItem, onChanged, onLocked, openNote, newNote, saveNow, addButton }) {
   const api = window.nebula?.holes;
   if (!api || !listEl) { addButton?.remove(); return null; }
 
@@ -130,8 +142,20 @@ export function initBlackHoles({ listEl, store, noteItem, onChanged, openNote, n
   if (addButton) addButton.hidden = away;
   const say = (text) => window.dispatchEvent(new CustomEvent('nebula-toast', { detail: text }));
   const holeOf = (id) => holes.find((h) => h.id === id) ?? null;
+  // Pinned to the top (1.0.0): drawn above the notes, the rest stay under them.
+  const readPinned = () => { try { const v = JSON.parse(localStorage.getItem(PINNED_KEY) || '[]'); return Array.isArray(v) ? v.filter((id) => typeof id === 'string') : []; } catch { return []; } };
+  let pinned = readPinned();
+  const isPinned = (id) => pinned.includes(id);
+  function setPinned(id, on) {
+    pinned = on ? [...pinned.filter((x) => x !== id), id] : pinned.filter((x) => x !== id);
+    try { localStorage.setItem(PINNED_KEY, JSON.stringify(pinned)); } catch { /* until the app closes */ }
+    onChanged();
+  }
+  // What the list may say of a black hole: its name while open, its initials while locked.
+  const shownName = (hole) => (hole.open ? hole.name : holeInitials(hole.name));
   // The owner's word for it, on every system: the fingerprint, the face or the computer's own PIN.
   const helloName = () => t('Passkey');
+  const holesEl = document.getElementById("holes-scroll") || listEl;
 
   // Left alone, they lock themselves: ten minutes without a key, a click or the wheel.
   const stored = Number(localStorage.getItem(IDLE_KEY));
@@ -267,7 +291,7 @@ export function initBlackHoles({ listEl, store, noteItem, onChanged, openNote, n
   function unlockDialog(id, { recovery = false } = {}) {
     const hole = holeOf(id);
     if (!hole) return;
-    const d = dialog(t(`Open “${hole.name}”`));
+    const d = dialog(t(`Open “${shownName(hole)}”`));
     if (hole.needsProtection) modal.append(el('p', 'hole-note', t('This black hole uses an older key wrapper. Opening it with its PIN while secure storage is available will strengthen it.')));
     let busy = false;
     const finish = async (by) => {
@@ -520,6 +544,7 @@ export function initBlackHoles({ listEl, store, noteItem, onChanged, openNote, n
     forgetNotes(ids);
     try { await api.lock(id); } catch { /* its key goes when the app closes */ }
     hole.open = false;
+    onLocked?.(id);
     if (wasActive) openNote(store.activeId);
     await refresh();
     return true;
@@ -666,6 +691,7 @@ export function initBlackHoles({ listEl, store, noteItem, onChanged, openNote, n
     if (!hole) return;
     if (hole.open) menu.append(button(t('Lock'), '', () => { closeMenu(); void lock(id); }));
     else menu.append(button(t('Open'), '', () => { closeMenu(); unlockDialog(id); }));
+    menu.append(button(t(isPinned(id) ? 'Unpin from top' : 'Pin to top'), '', () => { closeMenu(); setPinned(id, !isPinned(id)); }));
     menu.append(button(t('Rename black hole'), '', () => { closeMenu(); void rename(id); }));
     // One of the first builds, opened by a passkey alone, is given its PIN here.
     if (hole.open) menu.append(button(t(hole.lock === 'pin' ? 'Change PIN' : 'Set a PIN'), '', () => { closeMenu(); changePinDialog(id); }));
@@ -715,7 +741,7 @@ export function initBlackHoles({ listEl, store, noteItem, onChanged, openNote, n
     const hole = binned.find((h) => h.id === id) ?? holeOf(id);
     if (!hole) return false;
     const res = await askAnswer(hole, t('Delete the black hole'),
-      t(`“${hole.name}” and every note in it are deleted for good. Nothing brings them back.`),
+      t(`“${shownName(hole)}” and every note in it are deleted for good. Nothing brings them back.`),
       (by) => api.delete(id, by), { confirm: t('Delete for good?') });
     await refresh();
     if (res?.ok) say('Black hole deleted');
@@ -732,7 +758,7 @@ export function initBlackHoles({ listEl, store, noteItem, onChanged, openNote, n
       if (hole.id === note.hole) continue;
       const b = button('', '', () => { closeMenu(); void moveIn(noteId, hole.id); });
       b.innerHTML = '<span class="fm-ic"><span class="hole-disc"></span></span><span data-no-i18n></span>';
-      b.lastChild.textContent = hole.name;
+      b.lastChild.textContent = shownName(hole);
       if (!hole.open) b.classList.add('is-locked');
       menu.append(b);
     }
@@ -751,15 +777,21 @@ export function initBlackHoles({ listEl, store, noteItem, onChanged, openNote, n
 
   // ---- drawing -----------------------------------------------------------------
   function holeBlock(hole) {
-    const block = el('div', `folder-block hole-block${hole.open ? ' open' : ''}`);
+    const block = el('div', `folder-block hole-block${hole.open ? ' open' : ''}${isPinned(hole.id) ? ' pinned' : ''}`);
     block.dataset.hole = hole.id;
     const head = el('div', 'note-item folder-item hole-item');
     const row = button('', 'folder-row hole-row');
     row.setAttribute('aria-expanded', String(hole.open));
-    row.title = hole.name;
+    row.title = shownName(hole);
     row.dataset.initial = hole.name.trim().charAt(0).toUpperCase() || 'B';
     row.innerHTML = '<span class="hole-disc" aria-hidden="true"></span><span class="fr-name" data-no-i18n></span>';
-    row.querySelector('.fr-name').textContent = hole.name;
+    row.querySelector('.fr-name').textContent = shownName(hole);
+    if (isPinned(hole.id)) {
+      const mark = el('span', 'nr-pin');
+      mark.innerHTML = icon('pin', 'ic');
+      mark.title = 'Pinned';
+      row.prepend(mark);
+    }
     const inside = hole.open ? store.inHole(hole.id) : [];
     row.addEventListener('click', () => { if (!hole.open) unlockDialog(hole.id); });
     // The lock stands at the left, before the name: shut on a locked one (a
@@ -819,8 +851,10 @@ export function initBlackHoles({ listEl, store, noteItem, onChanged, openNote, n
 
   /** Drawn at the end of the list, when nothing filters it. @returns {number} rows drawn */
   function render() {
-    listEl.querySelector(':scope > .holes')?.remove();
+    holesEl.querySelector(':scope > .holes')?.remove();
     if (away || !holes.length) return 0;
+    const top = holes.filter((h) => isPinned(h.id)).sort((a, b) => pinned.indexOf(a.id) - pinned.indexOf(b.id));
+    const rest = holes.filter((h) => !isPinned(h.id));
     let folded = false;
     try { folded = localStorage.getItem(FOLDED_KEY) === '1'; } catch { /* drawn open */ }
     const section = el('div', `holes${folded ? ' folded' : ''}`);
@@ -834,8 +868,8 @@ export function initBlackHoles({ listEl, store, noteItem, onChanged, openNote, n
     head.setAttribute('aria-expanded', String(!folded));
     head.title = folded ? 'Show the black holes' : 'Hide the black holes';
     section.append(head);
-    if (!folded) for (const hole of holes) section.append(holeBlock(hole));
-    listEl.append(section);
+    if (!folded) for (const hole of [...top, ...rest]) section.append(holeBlock(hole));
+    holesEl.append(section);
     return folded ? 0 : holes.length;
   }
 
@@ -859,5 +893,5 @@ export function initBlackHoles({ listEl, store, noteItem, onChanged, openNote, n
   // Every black hole is locked when the app starts: a page loaded again holds no notes of one.
   void Promise.resolve(api.lockAll()).catch(() => {}).then(refresh);
 
-  return { render, refresh, lock, lockAll, holeMenu, noteHoleMenu, noteMenuLabel, moveIn, moveOut, list: () => holes, create: createDialog, unlock: unlockDialog, toTrash, restore, destroy, trashed: () => (away ? [] : binned) };
+  return { render, refresh, lock, lockAll, holeMenu, setPinned, noteHoleMenu, noteMenuLabel, moveIn, moveOut, list: () => holes, create: createDialog, unlock: unlockDialog, toTrash, restore, destroy, trashed: () => (away ? [] : binned) };
 }

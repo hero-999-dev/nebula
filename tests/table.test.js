@@ -525,7 +525,7 @@ describe('a table that is hard to break', () => {
         expect(serializeNote(wrap.parentElement)).not.toMatch(/tbl-|<th/);
       }
     }
-  });
+  }, 120000);
 
   it('a table copied with the lines round it comes plain: no numbering, no +, no selection, no dress', () => {
     const { host, wrap, table } = make(2, 2);

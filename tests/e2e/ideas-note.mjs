@@ -23,6 +23,7 @@ export async function runIdeasChecks(check) {
   const seed = (id, title, content) => fs.writeFileSync(path.join(notes, `${id}.json`),
     JSON.stringify({ id, title, content, createdAt: Date.now(), updatedAt: Date.now() }));
   seed('i-typed', 'Ideas typed', '<p><br></p>');
+  seed('i-cols', 'Ideas columns', '<div class="blk-cols" data-block-type="columns" data-split="40,75" style="--split: 40%;"><div class="blk-col"><p>left words</p></div><hr class="blk-vr"><div class="blk-col" style="--w: 35%;"><ul><li>deneme</li><li id="tabme">simdi tab</li></ul></div><hr class="blk-vr"><div class="blk-col"><figure class="note-image note-image--inline note-widget" contenteditable="false" data-block-type="image" data-widget="calc" data-ratio="0.72" style="width: 160px;"></figure><p data-ind="1" id="ind">scientific buglu</p></div></div><hr class="blk-hr" id="dv"><p><br></p>');
   seed('i-shape', 'Ideas shape', `<p>x</p>${'<p><br></p>'.repeat(12)}`);
   let app;
   try {
@@ -123,6 +124,48 @@ export async function runIdeasChecks(check) {
     await win.keyboard.press('Delete');
     check('Delete removes the selected arrow', await win.locator('#editor .note-arrow').count() === 0);
     check('deleting the arrow did not touch the text', await win.evaluate(() => document.getElementById('editor').textContent) === before);
+
+    /* 1.0.0, the owner's Ideas note: Tab in a column's list, Backspace on an indented line under a widget, a divider dropped beside words. */
+    await open('Ideas columns');
+    await win.waitForFunction(() => document.getElementById('tabme'), null, { polling: 50 });
+    const colShape = () => win.evaluate(() => { const c = document.querySelector('#editor .blk-cols'); return c ? [...c.children].map((k) => k.tagName).join(',') + '|' + c.dataset.split : 'none'; });
+    const caretStart = (id) => win.evaluate((i) => { const el = document.getElementById(i); const t = document.createTreeWalker(el, NodeFilter.SHOW_TEXT).nextNode(); const r = document.createRange(); r.setStart(t, 0); r.collapse(true); document.getElementById('editor').focus(); getSelection().removeAllRanges(); getSelection().addRange(r); }, id);
+    const colsBefore = await colShape();
+    await caretStart('tabme');
+    await win.keyboard.press('Tab');
+    await win.waitForTimeout(200);
+    check('Tab on a list item in a column indents it and leaves every column and divider where it was',
+      await colShape() === colsBefore && await win.evaluate(() => !!document.querySelector('#editor .blk-col li ul #tabme, #editor .blk-col li ul li#tabme') && !!document.querySelector('#editor .blk-col [data-widget=calc]')), await colShape());
+    await caretStart('ind');
+    await win.keyboard.press('Backspace');
+    await win.waitForTimeout(150);
+    check('Backspace at the start of an indented line under a widget takes the indent off first',
+      await win.evaluate(() => !document.getElementById('ind').dataset.ind && !document.querySelector('#editor .sel') && document.getElementById('ind').textContent === 'scientific buglu'));
+    const g = await win.evaluate(() => { const c = document.querySelector('#editor .blk-cols').getBoundingClientRect(); const h = document.getElementById('dv').getBoundingClientRect(); const cols = [...document.querySelectorAll('#editor .blk-col')]; const w = cols[0].querySelector('p'); const r = document.createRange(); r.selectNodeContents(w); const t = r.getBoundingClientRect(); return { c: [c.left, c.right, c.top, c.bottom], h: [h.left + h.width / 2, h.top + h.height / 2], col: cols[0].getBoundingClientRect(), words: t.right }; });
+    // Pulled sideways over the left column, just right of its words: the narrower part, where
+    // the words went before 1.0.0 and the note moved sideways.
+    const tx = Math.max(g.words + 20, g.col.left + (g.col.right - g.col.left) * 0.25);
+    const ty = g.col.top + 10;
+    await win.mouse.move(g.h[0], g.h[1]); await win.mouse.down();
+    for (let i = 1; i <= 15; i += 1) { await win.mouse.move(g.h[0] + (tx - g.h[0]) * i / 15, g.h[1] + (ty - g.h[1]) * i / 15); await win.waitForTimeout(16); }
+    await win.mouse.up();
+    await win.waitForTimeout(250);
+    const dropped = await win.evaluate(() => [...document.querySelectorAll('#editor .blk-cols > .blk-col')].map((c) => c.textContent.trim().slice(0, 12)));
+    check('a divider dropped right of the words in a column leaves the words where they stand, the new column at their right',
+      dropped.length === 4 && dropped[0] === 'left words' && dropped[1] === '', JSON.stringify(dropped));
+    // Words that run on across the cut stay too ("divider ekledigimde sol üssteki not saga kayiyor", after the first fix).
+    await win.keyboard.press('Control+z');
+    await win.waitForTimeout(250);
+    await win.evaluate(() => { document.querySelector('#editor .blk-col p').textContent = 'scientific calculator buglu (s harfinden önceye geri basinca direk calculatora gidiyor notu geriye cekmiyor'; });
+    const g2 = await win.evaluate(() => { const h = document.getElementById('dv').getBoundingClientRect(); const col = document.querySelector('#editor .blk-col').getBoundingClientRect(); return { h: [h.left + h.width / 2, h.top + h.height / 2], col: { left: col.left, right: col.right, top: col.top } }; });
+    const tx2 = g2.col.left + (g2.col.right - g2.col.left) * 0.3;
+    await win.mouse.move(g2.h[0], g2.h[1]); await win.mouse.down();
+    for (let i = 1; i <= 15; i += 1) { await win.mouse.move(g2.h[0] + (tx2 - g2.h[0]) * i / 15, g2.h[1] + (g2.col.top + 10 - g2.h[1]) * i / 15); await win.waitForTimeout(16); }
+    await win.mouse.up();
+    await win.waitForTimeout(250);
+    const runOn = await win.evaluate(() => [...document.querySelectorAll('#editor .blk-cols > .blk-col')].map((c) => c.textContent.trim().slice(0, 12)));
+    check('a divider dropped in the left third of a column whose words run across it leaves them at the left, the new column at their right',
+      runOn.length === 4 && runOn[0] === 'scientific c' && runOn[1] === '', JSON.stringify(runOn));
 
     /* Import: a crafted .nebula.json runs nothing; a raw vault file opens as a note. */
     const evil = path.join(profile, 'evil.nebula.json');

@@ -1,4 +1,263 @@
+
+## [2026-10-21 15:09] v1.0.0 - by release-script
+
+
+* Record verified v0.9.9 release
+
+---
+
+## [2026-10-21 13:30] v1.0.0 in progress - by Claude (Universe third round: mentions, rocket, even rings, lock-screen sky; not released)
+
+Asked (the owner, Turkish): "Labels…" becomes "Labels and mentions" — search mentions and show which note links to which; check the map and the minimap for FPS drops; a project's loose notes in the project's colour; bodies on a ring evenly spread (3 → 120°, 4 → 90°, 5 → 72°); the loose notes round the white core a shade darker, the core a bit bigger; a double-click opens a black hole; a fast shooting star every minute; a small rocket every five minutes that leaves a planet slowly, which a click follows and which sends the camera back to Fit once gone; the lock screen with a moving ASCII sky behind it, the menu untouched; the Universe icon a real Saturn with a closed ring (widget chooser and minimap head). Delegation allowed: four forks (model, lock sky, icon, perf audit), one for the guide translations.
+
+- `galaxy-model.js` (fork): core 3 → 3.5, first loose ring 11; `evenRing(n, need)`; project folders, the outer ring (free folders and suns) and black holes at even angles TAU·i/n, the ring growing instead of bunching; a project's loose notes take its hue. Note bodies carry `mentions`; `mentionLinks(scene)` lists [from, to] where both notes are on the map.
+- `mentions.js`: `contentMentions(html)` reads the `note-mention` chips of the stored markup. `galaxy-ui.js` gives each note its mentions; the search is "Labels and mentions…", lists `@Title` for every note in a link, chips show `@Title`; a double-click on a locked hole asks for its PIN and goes in.
+- `galaxy-map.js`: `MENTION_KEY` keys a mention apart from labels; a picked mention lights the note and every note it links to or from, joined by arrows from → to; `mentions()` in the API. Loose notes drawn `mixColor(ink, paper, 0.3)`, the core stays ink. Events: a shooting star every ~60 s (900 ms), a world-space rocket every 5 min from a planet or sun, easing up to speed, 0.7 world units tall (under a moon); a click on it rides the camera along, any other click/drag/focus/Fit lets go, and when it passes the map's edge a riding camera goes back to Fit; none in the minimap or under reduced motion. `refresh()` skips the rebuild when the input is unchanged (perf audit finding 1).
+- `lock-space.js` (fork, new) + `app-lock.js` + `app.css`: an aria-hidden ASCII sky (twinkling stars, a slowly turning ringed planet) behind the lock card, pointer-events none, ~14 fps, stops when the lock goes.
+- `icons.js` (fork): one shared `SATURN` (closed tilted ring, back arc cut behind the globe) for `universe` and `galaxy`.
+- Perf audit (`test-results/orchestra/galaxy-2026-10-20/39-perf-audit.md`): no FPS loss or slowdown over time — minimap and big map at 59–60 fps, memory flat; one ~250 ms frame per big-map run, likely GC (per-draw allocations, left for later); the rebuild on every note click fixed.
+- i18n: four new strings in de/pl/tr. Guide (4 languages): mentions in the search, the rocket, even rings, project colours, the double-click on holes, the lock-screen sky; signatures recorded, previous ones kept as "pre-mentions".
+
 # Nebula release log
+
+## [2026-10-21 11:00] v1.0.0 in progress - by Claude (Universe: empty space deselects, the hand only while held; not released)
+
+Asked (the owner, Turkish): after clicking the core, a click on empty space should take its rings away, and it did not; the mouse shows the drag hand all the time — it should become the hand only while held down.
+
+- `galaxy-map.js`: a click on empty space clears the selection (the dashed ring and the system circle go, the camera stays); the canvas gets `is-grabbing` from press to release (and on cancel); `selected()` added to the engine API.
+- `app.css`, `editor.css`: the big Universe and the widget's live map show the ordinary arrow; `grabbing` only while held.
+- Old notes: nothing written into notes; MARKUP_VERSION unchanged. No guide change (a fix, not a feature).
+
+## [2026-10-21 10:30] v1.0.0 in progress - by Claude (Universe, second round: projects nearer, labels on one ring, Hide names, a watching minimap; not released)
+
+Asked (the owner, Turkish): projects are still much too far away; labels cut into each other — tiny in one row before a planet is clicked, then too big when a note (hhhh, in the chech folder) is clicked — make them smaller and never overlapping; a *Hide names* toggle beside Fit that hides the names and shows them again; no clicking on the small map at the bottom left; and that small map does not glide smoothly — it catches when another note is opened, and goes too fast.
+
+- **Projects nearer** (`galaxy-model.js`): free folders and project suns now share ONE ring just outside the black holes (each at its own extent, the ring widened only until it closes), instead of projects on a ring outside every folder. On the Nebula Test notes Kontrol went from r 83.8 to 54.6.
+- **Labels** (`galaxy-model.js`): a note's label moons share one orbit (`labelRing`), evenly spaced, one speed, far enough apart that they never touch and clear of the note; moon sizes 0.6 → 0.42 (0.35 → 0.24 round a moon note). hhhh's labels: sizes 0.20–0.26, all at r 1.67.
+- **Focusing a note** (`galaxy-map.js`): a note's frame is 1.7× wider (`NOTE_FRAME`), so its labels no longer fill the screen.
+- **Hide names** (`galaxy-ui.js`, `galaxy-map.js`, `i18n.js`, `app.css`): a button between Fit and Full screen; slashed while names are hidden; remembered (`nebula:map-names`); engine `setNames` / `names`.
+- **Minimap**: takes no clicks or double-clicks (dragging still pans); cursor default. The glide counted as "not moving", so it drew at the 70 ms tick — the catch; it now draws every frame while gliding, over 1200 ms instead of 650.
+- Guide (four languages): Hide names and the watching minimap in the Universe section; signatures recorded, the previous 1.0.0 ones kept as "pre-names".
+- Old notes: nothing written into notes; MARKUP_VERSION unchanged.
+
+- **Electron 44.9.3 → 45.0.0** (Chromium 156, Node 24.22; Electron-first rule). Breaking changes read: the sandboxed preload imports only `electron` (no Buffer/events/timers/url in the bundle); screen capture now arrives as `display-capture`, which no handler grants (it was never meant to be allowed); x64/universal builds only; no contentTracing, requestStorageAccessFor or ASAR file descriptors. Still to do before Electron 46: the sync `safeStorage` calls in `electron/main.js` (black-hole key wrapping) are deprecated and must move to the async ones.
+
+Validation: on 44.9.3 unit 1490/1490 (the table fuzz test timed out once while smoke ran in parallel, passed alone), smoke 1187/1188 (the miss not captured; a full rerun was stopped for low memory). On 45.0.0: unit 1490/1490, build ok, smoke 1188/1188, `check:browsers` all ok. `npm run pack:test` done. No installed app touched; nothing pushed.
+
+## [2026-10-21 07:30] v1.0.0 in progress - by Claude (Universe: the 2026-10-21 list; GLM, Codex, Mistral, a fork; not released)
+
+Asked (the owner, Turkish): clicking the core should come close to its first ring of loose notes, the whole ring still seen; folders and projects sit too far out; bodies on the second ring touch — more room on every ring; labels are not on the map nor in its search; the minimap jumps from note to note — glide; the minimap goes while the big map is open and comes back after; a Universe widget, the live map in a note; new notes push Black holes down — one scroll for notes, one for black holes; split panes dragged to any width, not only equal; the map is called Universe everywhere. And: "you are the team lead, you need not do every job yourself".
+
+- **Spacing** (GLM, `galaxy-model.js`): ring radii clear each body's whole system, label moons included; folders/projects pulled in; a one-body ring no longer blows up.
+- **Engine** (Claude, `galaxy-map.js`): a click on the core frames its first ring of loose notes (`coreFocus`); the minimap glides (easeInOutCubic, 650 ms, 260 under reduced motion); label moons drawn down to half a pixel.
+- **Labels** (Claude, `galaxy-ui.js`): `#chips` in the text (`contentTags`) count as labels beside `note.labels`, so they are moons and searchable.
+- **Minimap** steps aside (hidden, paused) while the big Universe is open, resumes and follows the open note after.
+- **Universe widget** (a fork, `widgets.js`): /widget → Universe, a live main-space map in the note (at most three per note), double-click opens a note, the note keeps a static picture (`.wg-live` is transient). Codex review (34) fixes: lock refreshes the widgets, print hides the live layer, copy holds no canvas.
+- **Separate scroll** (Mistral, Claude): black holes live in `#holes-scroll` under `#note-list`, max 35vh, its own scroll; drag out of a hole and filter hiding kept working (Claude).
+- **Pane dividers** (Codex, `split-view.js`): drag, arrow keys, double-click for equal; min 240 px; weights per pane count in localStorage.
+- **Rename**: Map → Universe in every string, the guide (GLM, four languages; new sections 12–14) and the 1.0.0 release notes.
+- **Incident**: Mistral reset `src/js/black-holes.js` and `src/index.html` to HEAD before its edit, erasing unreleased 1.0.0 work (hole pins, initials, onLocked, galaxy-slot, the side-by-side button, PDF widget choice). Restored from the 05:38 build (`dist/`), checked by a normalised diff of the minified module. HANDOVER trap 74.
+- Old notes: nothing written into notes (`.wg-live` never saved); MARKUP_VERSION unchanged.
+- **Flaky map drag** (Codex 38 diagnosis, Claude fix): the editor's capture-phase `mousedown` in `rich-paste.js` started a picture drag on the live map's canvas, so a pan could drop the widget elsewhere (1 run in 3). A press inside `.wg-live` is now left to the map. universe-widget e2e 10/10 three runs in a row.
+- `tests/e2e/app-lock-opened.mjs` still looked for hole notes in `#note-list` and timed out smoke; it reads `#holes-scroll` too.
+- **Electron 44.9.2 → 44.9.3** (`check:browsers`, Electron-first rule); `npx install-electron --no` done.
+
+## [2026-10-21 03:30] v1.0.0 in progress - by Claude (map v2: stars, planets, moons, colours, label constellations; GLM, Codex, Mistral; not released)
+
+Asked (the owner, Turkish, long list): projects are stars, folders planets, notes the moons of their folder (loose notes are planets), labels moons; the project green does not suit the theme; a black hole's right-click should offer Open and Lock; inside a hole nothing of the map around it is seen; loose notes round the core, and past a number of them new ones orbit farther out; a colour for every project, folder and hole; the same label the same colour; the project nebula looked odd; the pull-in was not visible and the initials vanished when a hole opened; a second circle round a selected body's system; folder names missing; loose notes stay one colour; everything slowly turns round the middle; a label search on the map that lights the labels' notes and joins them in thin lines (Obsidian's grouping in a space theme — ask the other CLIs); Fit and Full screen at the top right looked broken, the search left of them; ring tilt 0–45° per planet; sizes 0.85–1.15×.
+
+- **Model** (GLM, `galaxy-model.js`): roles beside kinds (core/project/folder/note/label/hole/singularity); projects are suns, folders planets (round their project's star or on their own), a folder's notes its moons, loose notes planets round the core in rings that widen once full; labels moons of their note; `hue` per project/folder/label/hole (labels skip the green band), loose notes `null` (theme ink); `ringed` and `roll` 0–45°; size jitter 0.85–1.15; everything turns slowly round the middle (`GALAXY_PERIOD`).
+- **Engine** (Claude, `galaxy-map.js`): `hueColor` (lighter on dark paper); names for projects, folders and open holes; hole initials open or locked, in the hole's hue; the dashed selection ring plus an outer circle over the body's whole system; label constellations (`highlight`, `labels`, `labelColor`): halos on member notes, a Prim spanning tree per label in thin lines, the rest at 35%; the pull-in is never 0 ms (1100 ms, 700 under reduced motion) and draws closing rings; inside a hole main space is a faint, unclickable backdrop centred on the hole.
+- **UI** (`galaxy-ui.js`, `app.css`): label search (chips, suggestions, Enter/Backspace) left of Fit and Full screen as aligned icon buttons; a locked hole's menu offers Open (PIN, then in), an open one Enter and Lock; project colour in the sidebar is `--clay`, not green.
+- **Codex review** (`25-codex-review.md`): CHANGES NEEDED, all three fixed: (1) a minimap that went into a hole had no way out — every map's right-click inside a hole (also on empty space) now offers *Back to main space*, Escape over the whole map leaves the hole, and a waiting Open is dropped at the next map choice (60 s at most); (2) constellations: at most 6 labels lit, the trees made in world space and rebuilt at most once a second; (3) the tiny-body buckets are kept between frames.
+- **Mistral** (`26-mistral-tests.md`): 3 extra unit tests (hueColor, a 10-point tree, label hues off the green band).
+- Guide (four languages) and release notes describe map v2; guide signatures recorded, the earlier 1.0.0 ones kept as "1.0.0 map v1".
+- Old notes: nothing written into notes; MARKUP_VERSION unchanged.
+- **Electron 44.9.1 → 44.9.2** (`check:browsers`, Electron-first rule); `npx install-electron --no` done, check now all ok.
+
+Validation (on Electron 44.9.1): unit 1468/1468, galaxy suites 101/101, full smoke 1169/1169. On Electron 44.9.2: unit 1468/1468, build ok; smoke 1158/1169 with 0.6–3 GB free memory: the 11 misses were editor-typing and block-grip pointer checks (grip null, shape off screen), none on the map, and `tests/e2e/block-handle.mjs` alone passed twice in a row; a second smoke stopped at its 23rd check on a 5 s selector timeout with 0.6 GB free. With Brave closed (2.9 GB free): smoke 1168/1169, the one miss note-folders "and Ctrl+Z brings the picture back" (known timing miss, 0.9.5), which passed with `tests/e2e/note-folders.mjs` alone. `npm run pack:test` done: Nebula Test.exe rebuilt (04:53). No installed app touched; nothing pushed.
+
+## [2026-10-20 16:23] v1.0.0 in progress - by Claude (the map fills its pane, the minimap comes closer; Nebula Test rebuilt; not released)
+
+Asked (the owner, Turkish): still no turning and nothing in the background in Nebula Test; the map should fit the whole screen, or the side pane when it is moved there; bring the notes a bit closer; the black hole sits far away in empty space.
+
+- Why nothing had changed for the owner: `Nebula Test.exe` had not been rebuilt since 14:04 — the stars, the turning and the near black holes were only in the source. Rebuilt now (`npm run pack:test`).
+- **Fit** — `galaxy-map.js`: the camera is the map's own (`auto`) until a hand moves it (drag, wheel, arrow or +/- keys, a click on a body). While it is, the big map fills its pane in both directions (`overviewCam` uses width and height, 47% margins each) and refits on every resize: over the whole page, beside one note, beside two. A note opened from the map no longer drags the camera away. "Show the whole map" and Escape give the camera back. A remembered view is restored only if a hand had chosen it (`manual` in the saved view); `galaxy-ui.js` calls `fit()` when the pane is shown.
+- **Closer** — the minimap frames the open note's sun system across about 60% of its shorter side (never farther out than the whole map).
+- A dive cancelled by a lock keeps the camera exactly where the dive started (the automatic camera does not glide after it).
+
+Validation: unit 1442/1442 (galaxy +4: a wide and a narrow pane, a resize refits; a hand's zoom survives a resize, Show the whole map gives it back; the minimap comes close; a remembered view only if manual). `tests/e2e/galaxy.mjs` 13/13, `tests/e2e/split-view.mjs` 19/19. Screenshot probe on a throwaway profile: full pane filled, the narrow pane beside a note refitted, the minimap on the note's sun. Full smoke not rerun: the machine has about 2 GB free and the last run was stopped for low memory. No installed app touched; nothing pushed.
+
+## [2026-10-20 15:27] v1.0.0 in progress - by Claude (the map: stars, turning bodies, black holes close by and kept when locked; not released)
+
+Asked (the owner, Turkish, after trying the map): no small stars behind it like on the website; planets and suns do not turn; black holes should sit close by on the map, not far off to the sides; a locked black hole must not vanish from the map, only entering it must be blocked.
+
+- **Stars** — `drawStars` draws a field of small `*` in the mono face and the ink colour, like the website, gently twinkling; about one per 7000 px² (20–180).
+- **Turning** — the cause: under reduced motion (Windows "Animation effects" off asks every app for it) both clocks were frozen, so nothing ever moved. They now run at 0.4 pace instead. Suns and planets turn on their own axes (`spinRate`: a planet in 10–20 s, a sun slower); `sun()` in `galaxy-ascii.js` is now a rotating globe with granulation and dark spots and a corona rim. A body under the pointer turns faster (`HOVER_SPIN`, a 60 ms throttled hit test). Small bodies (from 5 px) stay turning globes drawn in a smaller face, not dots: up to 28 art bodies on the big map, 10 on the minimap; names only from 10 px.
+- **Black holes close by** — `galaxy-model.js`: the holes sit on an inner ring just outside the core's loose notes; the suns move out past it, and the ring grows with the number of holes so none overlap.
+- **Locked holes stay** — a locked hole stays on the map with its initials (now in the hole's colour; in the paper's they were invisible). A click or double-click on it only flies to it, `enterHole` refuses it, and its right-click menu shows a disabled "Locked" (Gesperrt / Zablokowana / Kilitli) instead of "Enter the black hole". No unlock dialog is opened from the map: the map is a view, never a way in.
+- **Codex review** (`test-results/orchestra/galaxy-2026-10-20/16`–`18`): CHANGES NEEDED, both fixed: (1) a turning sun keyed its frames on the ever-growing corona clock and churned the shared 400-frame cache; suns now key on their 48 turn frames and the corona flickers in step with the turn; (2) the hover boost is kept modulo 2π. Codex's recheck (19) was not received: the waiting job was stopped for low memory.
+- Old notes: nothing written into notes; MARKUP_VERSION stays.
+
+Validation: unit 1437/1437 before the review fixes, galaxy suites 71/71 after them. Screenshot probe on a throwaway profile (folders, labels, a hole, locked, relaunched): stars visible, suns and planets turning, hole beside the core, the locked hole drawn and listed after relaunch. Full smoke before the review fixes: 1168/1169, exit 0; the one failed check's name was lost because the output was cut to its last 40 lines. The rerun with a full log was stopped by Claude Code for low system memory (2.2 GB free of 15.8 GB): Electron failed to launch after 110 checks, all of which had passed. No leftover test Electron processes. Smoke still to be rerun; `pack:test` not yet run. No installed app touched; nothing pushed.
+
+## [2026-10-20 13:27] v1.0.0 in progress - by Claude (the map of your notes, projects; not released)
+
+Asked (the owner, Turkish; in short): an Obsidian-style ASCII galaxy map in the spirit of the Hero Constellation repo — folders are suns, notes planets orbiting them, labels moons; slow living space with tiny far dots, a rare small shooting star or rocket every 5–10 minutes; bottom left in the sidebar among Archive, Trash and Black hole; the camera follows the open note, roams with the mouse, zooms with the wheel or touchpad; a click flies to a body (a planet turns with its moons); right-click → Open; ⤢ fills the note area, a note opened then comes beside the map, another makes three, the map can be dragged onto a note; each black hole its own dimension with a pull-in; a folder dropped into a folder makes a project one level up with Add note / Add folder and loose notes, none in black holes. Teamwork through Test Orchestra, in English: Claude chief architect, GLM main coder, Mistral simple tests, Codex reviews.
+
+- **Engine (GLM)** — `galaxy-model.js` (scene from titles, folders, labels, projects, holes; orbits), `galaxy-ascii.js` (memoised ASCII art frames), `galaxy-map.js` (canvas, camera, glide, pull-in, rare events, mini mode, keyboard). After Codex's final review: a lock during the pull-in cancels the entry (`refresh` and the dive's `finish` both re-check), and a paused, hidden or off-screen map queues no animation frames (`wake()`). Codex's recheck: a minimap following its note drew at ~60 fps forever (`followId` counted as movement); it now draws at the ~14 fps tick (Claude).
+- **UI and wiring (Claude)** — `galaxy-ui.js`: minimap in `.side-foot` above the drawer tabs, the big map as a pane of `split-view.js` (`MAP = '@map'`, `body.map-full`, `.split-park`), the right-click menu (Open / Enter the black hole / Zoom in / Show the whole map), a list of bodies for screen readers. `main.js`: a map that cannot start leaves the app as it was (the first smoke run found a boot failure: the engine named its dimension before `createMap` returned; fixed with `map?.view?.()` plus the try/catch). `black-holes.js` `onLocked`: a lock refreshes the map in the same turn, not after the list's 250 ms pause (Codex finding 1).
+- **Projects** — `projects.js`, `note-list.js` (project block, drop zones, + Add a note / + Add a folder).
+- **Privacy** — the map is given titles, folders and labels only; a locked hole is its id and initials; inside an open hole only its notes (`galaxyInput`).
+- Guide: "New in 1.0.0" two paragraphs and section "11 · Projects and the map of your notes" with a Try it, before "12 · Where your notes live" and "13 · Code blocks", in four languages; signatures replaced. Release notes: Projects and The map of your notes, item for item in four languages.
+- Electron 44.9.0 → 44.9.1 (`npm run check:browsers`); stale Playwright Electron processes from this repo had locked the binary (EBUSY) and were closed.
+- Stale e2e expectations: Help → Blocks has 23 rows (the widget); `v093` spelling check now asserts the interface language leaves the spelling languages alone (1.0.0 spelling follows Settings); the `v093` dragged-order check scrolls both rows into view first (the minimap makes the list shorter; the drag itself works, probed with and without the map).
+- Old notes: nothing written into notes; MARKUP_VERSION stays.
+
+Validation: unit 1431/1431 (galaxy 50, galaxy-ui 14). `tests/e2e/galaxy.mjs` 13/13 (part of smoke). v093 138/138. Full smoke: 1169/1169 (after the fixes). Codex: CHANGES NEEDED → findings 1–3 fixed; recheck confirmed 1 and 2 and found the minimap's idle 60 fps, fixed after the full smoke (galaxy e2e 13/13 again). A visible idle map still runs a cheap RAF callback each frame that draws only on the tick — accepted. `npm run pack:test`: Nebula Test.exe SHA-256 daef788799e240368a188ffabb97ac6396a30253cd0c615f69957216c54aabaf. No installed app touched; nothing pushed.
+
+---
+
+## [2026-10-20 18:00] v1.0.0 in progress - by Claude (notes side by side, black-hole pin inside its section; not released)
+
+Asked (the owner): "birden fazla not acma olsun mesela ekrani ikiye bölelim falan üce sürükledigim not sayisina göre ekran esit bölünsün, ai paneli ve editör ayni olsun yukardaki header bölünsün mesela, nw de ise sayfa ekledigim de nw formatinda gelsin, birde karadelikte sabitleme en üste degil karadelik kisminda en üste sabitlensin, note kismi ile ayni mantikla calissin".
+
+- **Black-hole pin** (`black-holes.js`, `app.css`): a pinned hole goes to the top of the Black holes section, not above the whole list, like pinned notes.
+- **Notes side by side** (new `split-view.js`; `main.js`, `note-actions.js`, `index.html`, `editor.css`, `i18n.js`): a note dragged from the list onto the page opens beside the one written in, before or after the pane by the half it is let go in; up to four, equal widths. There is still one editor: the pane written in holds the real `#editor-frame` and the title box in its own head; the others show their saved content (`.split-ghost`) and a press opens the editor there with the caret at the press. Each pane head has its title, its page's short name and a ✕. The note menu gained "Open side by side" (hidden when it cannot). A note opened from the list replaces the pane written in; closing down to one puts the title and frame back.
+- **"nw de ise … nw formatinda gelsin"**, read as display only: a note added while the page in use is Nebula Wide is shown in Nebula Wide; its saved page is not changed and comes back when it leaves the split, or when a page size is chosen for it.
+- Guide paragraph "Notes side by side" and the release note in four languages; 1.0.0 signatures replaced.
+- `tests/e2e/note-folders.mjs`: the video drop now lets go 3 px above the row's bottom (the drop gap); this check failed before the split view too.
+- Old notes: nothing to migrate; MARKUP_VERSION stays '0.9.6'.
+
+Validation: unit 1359/1359 (new `tests/split-view.test.js`, 6). `tests/e2e/split-view.mjs` 19/19, five runs in a row after the drag was made step by step (one fast `dragAndDrop` jump sometimes started no drag). black-holes 90/90 (the "moved in" checks are timing-flaky; a rerun passes). note-folders 60/60. `npm run pack:test`: Nebula Test.exe SHA-256 50AAA9F1F0F21E7CB880FF3A62773DC5BC23B2BA1DABFC9092A4D74B267A1F10. No installed app accessed; nothing pushed. The split-view to-dos are not yet in the Nebula Test manual-test note: Nebula Test was running, so its vault was not written.
+
+---
+
+## [2026-10-20 15:00] v1.0.0 in progress - by Claude (widget right-click menu, no columns from moving a block, divider keeps run-on words left; not released)
+
+Asked (the owner): "widgetlere sag tik yapinca copy image, add caption, delete image cikiyor hata bu, birde birseyleri hareket ettirince otomatik divider ekleniyor onu da kaldiralim, ideas for nebulaya bak eklemeler var". The Ideas note gained a screenshot made on the 06:36 test build: "divider ekledigimde sol üssteki not saga kayiyor".
+
+- **Right-click on a widget** (`context-menu.js`, `i18n.js`): Copy widget and Delete widget, no picture or caption items. Copy uses the widget's markup copy that Ctrl+C already used.
+- **Moving a block makes no columns** (`block-handle.js`): the grip drag and the card/code drag (`block-drag.js` through `mover.target`) call `dropTarget` with `sides: false`, so a block let go at a line's edge lands above or below it and no upright divider is added. Blocks still go into columns made with a divider, and out of them. Guide paragraph 005 and the 093 "Try it" changed in four languages (1.0.0 signatures replaced); the "Columns by dragging" release note is gone in four languages.
+- **Divider over words that run across the cut** (`columns.js` `contentSide`): the first fix kept content only when it stood wholly on one side, so wrapped text across the cut still fell back to "the wider side" and moved right. Content now stays left unless it stands wholly right of the cut.
+- Old notes: behaviour only; nothing to migrate. The owner's Ideas note keeps the five columns it has.
+
+Validation: unit 1353/1353. Ideas checks 16/16 (new: run-on words stay left; both divider checks fail with `contentSide` off). widgets e2e 29/29 (new: the right-click menu). block-handle 28/28 (side-drop checks rewritten: a flat mark, no columns). layout 128/128 (the left-third split now expects the short words left). toggle-keys 9/9, card-keys 14/14. `npm run pack:test`: Nebula Test.exe SHA-256 1070897EAF816ECAB040C89BD50E6ABD68CB4B5293CA502DEFB913D4A2796660. No installed app accessed; nothing pushed.
+
+---
+
+## [2026-10-20 13:00] v1.0.0 in progress - by Claude (Ideas note: Tab in a column list, Backspace outdent, divider keeps the content's side; not released)
+
+Asked (the owner): "bozuk not örnekleri nebula test icinde ideas ve buraya bakda var" (the broken notes are Ideas and Buraya bak in Nebula Test). Read from Nebula Test's vault only, on copies.
+
+- **Tab in a column's list threw the next column out** (`lists.js` `liftOutOfParagraphs`): a list inside `.blk-col`, `td` or `th` was lifted out of its parent, which split the column. It now stays, like a list in a toggle body. ("dividerler tab ile gitmemeli")
+- **Backspace at the start of an indented line** (`toolbar.js` beforeinput): it first takes one indent step off (`data-ind`), and only on a line with no indent does it join or pick the widget above.
+- **A divider dropped beside words in a column** (`columns.js`): `splitColumn` and `splitAt` take a `keep` side; `finish()` measures where the content stands (`contentSide`) against the drop point, so words left of the drop stay left and the new empty column opens on the other side.
+- Old notes: the saved Ideas and Buraya bak markup has no lasting damage (the columns are whole). The empty middle column the divider bug made cannot be told from one made on purpose, so no migrate step was added and MARKUP_VERSION stays '0.9.6'.
+
+Validation: unit 1353/1353 (new cases in `tests/lists.test.js` and `tests/layout.test.js`; the lists one fails without the fix). `tests/e2e/ideas-note.mjs` gained three checks (part of smoke), 15/15; the divider check was confirmed to fail with `keep` disabled. widgets 28/28, block-handle and toggle-keys pass. `npm run pack:test`: Nebula Test.exe SHA-256 0DA4823172D9D5C07ABBCE164AB0D0CE75C445F1C3E095C6FEF1035C1154BE37. No installed app accessed; nothing pushed. Electron 44.9.1 still to update before the push.
+
+---
+
+## [2026-10-20 10:00] v1.0.0 in progress - by Claude (widgets shrink in proportion; not released)
+
+Asked (the owner, note "Buraya bak düzelme olmamis" in Nebula Test): "widgetlerin kücülmesine bakarsak, kücülürken her parca, mesafe ayni oranda kücülmüyor" (when a widget shrinks, its parts and spaces don't shrink by the same amount).
+
+- Cause: `.note-widget > .wg` sets its padding and gap in cqw while being a container itself. An element's cqw comes from its parent container, and there was none, so the margins followed the window.
+- Fix (`editor.css`): the figure `.note-image.note-widget` is an inline-size container too. CSS only, so saved notes are untouched and need no migrate step; the owner's note looks right on the new build.
+- Old notes: the other 1.0.0 fixes added no repair steps either, and MARKUP_VERSION stays '0.9.6'. A repair step is still to do for any damage the owner shows (memory.json `next`).
+- `tests/check-browsers.test.js`: three cases asked npm for the latest Electron and broke when 44.9.1 came out; they now pass `installed: null`. The real check (`npm run check:browsers`) still says 44.9.1 is out; update it before the push.
+
+Validation: `tests/e2e/widgets.mjs` 28/28, with a new check that the widget's keys keep the same share of its width at 400px and 160px (it fails without the fix). block-handle 27/27. Unit 1350/1351: the table fuzz test timed out under load and passes alone (46/46). `npm run pack:test`: Nebula Test.exe SHA-256 C3018C450390CC8C528F3E873239AE9A25FEDAA4C3D1EEF1DFEEE772FDDB239B. No installed app accessed; nothing pushed.
+
+---
+
+## [2026-10-19 07:00] v1.0.0 in progress - by Claude (three-dot grip, widget lands on its line; not released)
+
+Asked (the owner): "6 dots instead 3 dots, narrower — the 6 dots go outside the divider"; "when I add a widget it puts it somewhere else on the page, not from the line I want".
+
+- **Grip** (`block-handle.js`, `editor.css`): three dots in a column, 10 px wide, 12 px left of the block (was six dots, 18 px, 22 px). In a right column it stands between the divider and the line. Guide, release notes: "three dots", four languages; 1.0.0 signatures replaced.
+- **Widget on the wrong line** (`rich-paste.js`): a pasted picture kept its place in `pendingRange`, which was never cleared, and every later widget (and pasted picture) went back to that line. Now the place is cleared once used; insertWidget uses the caret, which /widget puts back on its line.
+- `docs/MANUAL-TESTS-1.0.0.md`: the owner's manual test list (widgets, grip, black holes, fixes).
+
+Validation: unit 1351/1351; widgets e2e 27/27 (+1: after a pasted picture /widget lands on its line, failed before); block-handle e2e 27/27 (+1: three dots, clear of the divider). pack:test SHA-256 071397C7DF2A4EEDBFDA41142EF0CC78F099A41EEAF952EC4D8C5611C0D5F45B. No installed app accessed; nothing pushed.
+
+---
+
+## [2026-10-19 06:00] v1.0.0 in progress - by Claude (widgets, black hole initials and pins, Settings font, editor fixes; not released)
+
+Asked (the owner): "/widget … calculator, scientific calculator, calendar … moved like photos … expanded and smalled … above, or behind of the text … in print page add a option to hide widgets or not"; "when black holes are locked, their initials instead of the whole title; pinning a black hole to the top"; Settings shows only the chosen font and size; embeds and bookmarks stay inside toggles; the pointer on blank space, divider drag, table arrow keys, a pasted URL turning serif, five links copied together losing the Nebula format.
+
+- **Widgets** (new `src/js/widgets.js`; `slash-menu.js`, `rich-paste.js`, `toolbar.js`, `pdf-preview.js`, `index.html`, `editor.css`, `icons.js`, `import.js`, `i18n.js`): `/widget` opens a chooser (calculator, scientific calculator, calendar, each with an icon in Nebula's style). A widget is a `figure.note-image.note-widget[data-widget]`, so the picture code moves it, resizes it and puts it in the text, in front or behind. Its state is in `data-wg-*`, and it is drawn from that as spans (a div inside a p split it on reparse). Keys take mouse clicks, or the keyboard when picked, on a window capture listener ahead of the picture keys. The calculator is a recursive-descent parser: implicit ×, brackets that close themselves, DEG/RAD, a 12-digit display. The calendar has month steps, today ringed and days marked by a click. Print, the PDF preview and Export have a With/Without widgets choice, kept in `nebula:print-widgets`.
+- **Black holes** (`black-holes.js`): a locked hole shows its initials in the list, the menus and its dialog. Pin to top / Unpin from top sits in its ⋯ menu (`nebula:holes-pinned`).
+- Settings font, toggle embeds and the editor fixes are as asked. The divider bug was not reproduced exactly.
+
+Guide: two blocks in "New in 1.0.0" (widgets; black hole initials and pins) in four languages; 1.0.0 signatures replaced. RELEASE_NOTES['1.0.0'] gained four items in four languages.
+
+Validation: unit 1351/1351 (new `tests/widgets.test.js` 22). New Electron `tests/e2e/widgets.mjs` 26/26 (part of smoke). black-holes e2e 90/90 four runs in a row; settings 125/125 (accepts the initials); link-paste 4/4; table-keys 8/8. One unit flake was seen once under load: the table.test fuzz test, which passes alone and in the next full run. Full smoke not run (no long tests until push). `npm run pack:test` refreshed Nebula Test.exe (SHA-256 BA3E3637B091E270EC546F730325B39BB4C553FFE1BB3A87E17CB7615B83990E). No installed app accessed; nothing pushed.
+
+---
+
+## [2026-10-19 03:20] v1.0.0 in progress - by Claude (spelling in every language; not released)
+
+Asked (the owner): "the word corrector active for all languages, and in Settings a way to change it, to take a language off the corrector".
+
+- **Every language at once** (`electron/context-menu.js`): `spellLanguages` takes a list of codes and gives back every dictionary this machine has for them (English still as en-US and en-GB). The `spell:language` handler turns the checker off when the list is empty (`setSpellCheckerEnabled(false)`) and on with those languages otherwise. The spell checker no longer follows the app's language (the call left `i18n.js apply()`).
+- **Settings → Spelling** (`src/js/settings.js` `spell`, `SPELL_LANGUAGES`, `initSpelling`; `src/js/settings-panel.js`): four boxes, English, Deutsch, Polski, Türkçe (each in its own words, not translated), all ticked by default. Unticking one takes it off at once; none ticked, nothing is marked. Kept with the other settings and sent to the main process at start and on every change.
+
+Guide: section 2's language paragraph, the Spelling section and the Settings paragraph (now five parts) in four languages; 1.0.0 signatures replaced (a3fef6c3 / aa490e01 / fde89727 / 537a1c15). RELEASE_NOTES['1.0.0'] gained one item in four languages.
+
+Validation: unit 1327/1327 (settings +1, v094 spelling +1); new Electron `tests/e2e/spelling.mjs` 6/6 (part of smoke; this machine has en-US, en-GB, de-DE, pl, tr); settings e2e 125/125 (the sheet's headings now include Spelling). Full smoke not run. `npm run pack:test` refreshed Nebula Test.exe. No installed app accessed; nothing pushed.
+
+---
+
+## [2026-10-19 02:50] v1.0.0 in progress - by Claude (folded toggles, Tab in columns; not released)
+
+Asked (the owner): "with many toggles one under another, Enter on a closed one goes into the note and starts at its top instead of going below", "toggles one under another inside a page split by a divider: the notes inside the toggles disappear", "a divider on the right splits the page; Tab anywhere moves the divider — Tab must not move it".
+
+- **Enter on a folded toggle** (`src/js/toggles.js`): Enter in the title of a folded toggle opened it and put the caret at the top of its body. Now it makes a line under the toggle (the next item in a list), takes the words after the caret along, and the toggle stays folded, as in Notion. An open toggle is unchanged.
+- **Folded lines deleted** (`src/js/toggles.js`, a new keydown listener): Chromium's own join skips what it does not draw, and took it away. Backspace on the line under a folded toggle deleted everything folded in it; Delete at the end of a folded title deleted its body and the next toggle's frame. This happened in columns and on the note, measured in Electron. Now Backspace joins the line's words to the title (an empty line just goes). Delete at the end of a folded title brings up a plain line under it and touches nothing else. Delete on an empty line over a folded toggle takes the line.
+- **Tab moved the divider** (`src/js/toolbar.js` indentBlocks + `looseLine`, `src/js/columns.js` healColumns): words lying loose in a column (not yet in a line) had the column itself as their nearest block, so Tab put `data-ind` on `.blk-col` and the divider moved 26 px with every press. The loose words are made a line first, and only that line is indented. Columns, toggle bodies and dividers are never indented. healColumns (on load and on input) takes an indent off a column, a column block or a divider that an older build left there.
+
+Guide: section 4's toggle keys sentence says what Enter does in an open and a folded toggle, in four languages; 1.0.0 signatures replaced. RELEASE_NOTES['1.0.0'] gained two items in four languages.
+
+Validation: unit 1325/1325 (new `tests/toggle-keys.test.js` 11, layout +1); new Electron `tests/e2e/toggle-keys.mjs` 9/9 (all 9 fail on the old code; part of smoke); block-handle e2e 25/25. Full smoke not run (no long tests until push). `npm run pack:test` refreshed Nebula Test.exe (SHA-256 FBFE661780AD6608325888B0F0035C1B1EB933782AC1E7E681C24225A51C1225). No installed app accessed; nothing pushed.
+
+---
+
+## [2026-10-19 01:50] v1.0.0 in progress - by Claude (pasted files and videos, tables on paper, macOS quarantine; not released)
+
+Asked (the owner, choosing the 1.0.0 areas): picture and video gaps, table gaps, the macOS quarantine mark, then "finish all of it, I will look afterwards". Of the gaps the plan listed, four were already done in 0.9.3/0.9.4 and only checked: a picture inside a line of words (a▫a), three or more columns (up to 20), videos in an export (With / Without), a row's height pulled by its y line.
+
+- **Paste a file or a video** (`src/js/rich-paste.js`): a video, or any file that is not a picture, copied in Explorer or Finder arrives in `clipboardData.files`; Ctrl+V now puts it under the caret's line the way a drop does — a video block or a file card ("a video cannot be pasted, only dropped", 0.9.4). Pictures keep the picture's way; nothing goes into a table cell.
+- **Tables on paper** (`src/js/export.js` `fitToPaper`): the print/PDF document gives each column its share of the table's own widths (data-w where the screen drew it narrower) and the table `min(own width, 100%)`, with `.blk-table` a block there — a 900 px table on A5 is as wide as the page's writing, one in a column as wide as the column, a narrow one keeps its width (Log 0.9.4 gap).
+- **macOS quarantine** (`electron/mark-of-the-web.js`): Open and Save a copy now write `com.apple.quarantine` = `0081;<hex time>;Nebula;<id>` with `/usr/bin/xattr` on darwin, as Windows gets Zone.Identifier ZoneId=3 (B27 follow-up). Never the 0040 "already allowed" flag; a disk without extended attributes keeps the copy unmarked and usable. Not run on a Mac.
+
+Guide: the 1.0.0 intro, section 4 Tables and section 7 Files say it in four languages (blocks extended in place, 169 blocks); 1.0.0 signatures replaced. RELEASE_NOTES['1.0.0'] gained three items in four languages. No migration: old notes have nothing to change.
+
+Validation: unit 1313/1313; Electron block-handle checks 25/25 (with a real Explorer clipboard: a WebM and a text file pasted under the caret's line); new `tests/e2e/table-paper.mjs` 4/4 (fails 3/4 without the fix; part of smoke); Electron 44.9.0 is current. Full smoke not run (no long tests until push). `npm run pack:test` refreshed Nebula Test.exe (SHA-256 2538AC697F76FF6110268AC67DB12969A41153D705339EA139EF4064BBA83362). No installed app accessed; nothing pushed.
+
+---
+
+## [2026-10-19 01:10] v1.0.0 in progress - by Claude (every block moved by the mouse; not released)
+
+Asked (the owner, after 0.9.9): toggle lists cannot be dragged; a divider put up beside text that has lines above and below it moved the text to the new column; the mark shown while files are dragged did not work; copying a toggle with what is inside it meant making a toggle and copying title and text apart; "I want every element to be movable with the mouse", as Notion does it. Built from Notion's observable behaviour (the six-dot grip, the drop line, picking a block, side drops making columns), not from its code.
+
+`src/js/block-handle.js` (new): a grip at the left of whatever block is under the mouse — lines, headings, list items, toggles, tables, cards — in the note, in columns, in open toggle bodies and in lists. Dragging shows the drop line and a ghost; it lands between blocks, first inside an open toggle (lower half of its title), or at a line's left/right edge as columns. Alt drops a copy, Esc cancels, an li dragged out becomes its own list, emptied lists, columns and toggle bodies are tidied. A click picks the block: Ctrl+C/X/D, Delete, ↑/↓, Esc; Ctrl+Shift+↑/↓ steps a block or the caret's line. Copy from a toggle's title into its body and the clipboard carries the toggle; pasted Nebula blocks go in as blocks instead of Chromium merging them into the line. `block-drag.js` (cards, videos, code) uses the same targets. The divider split takes the part under the pointer (`columns.js`). An OS file dragged over a note shows the mark, and the card lands at it (`rich-paste.js`). Guide: "New in 1.0.0" and section 4 "Moving blocks", in four languages, GUIDE_VERSION 1.0.0 with signatures; RELEASE_NOTES['1.0.0'] in four languages. No migration: old notes have nothing to change.
+
+Validation: unit 1309/1309 (block-handle 29), Electron block-handle checks 23/23, layout 128/128; full smoke not run (no long tests until push). `npm run pack:test` refreshed Nebula Test.exe. No installed app accessed; nothing pushed.
+
+---
+
+## [2026-10-18 23:55] v0.9.9 - by Claude (precheck on GitHub before every tag; not released)
+
+Asked (the owner): review 0.9.6–0.9.9, then "apply your suggestions". The suggestion was that the release commit is built on GitHub before it gets a tag, because 0.9.4 to 0.9.8 each passed every local gate and then failed on GitHub's runners, and 0.9.7 and 0.9.8 were lost as versions. `npm run push` now pushes the release commit to `precheck/vX.Y.Z`; `.github/workflows/release.yml` runs there with every job but publish (gated on a `v*` tag) and `scripts/precheck-ci.js` waits with `gh run watch`. Green: tag and push as before. Red or no run: the commit is undone with `reset --mixed`, only the script's own changes are taken back, the version stays free. CI smoke now gets the local release's one retry on exit 2. `npm run precheck:ci` runs the same check on HEAD alone; `--no-precheck` skips it. App code unchanged, so no new Nebula Test.exe. No installed app accessed; nothing pushed.
+
+Validation: the four new unit checks pass; the undo path ran on a throwaway clone against a local bare origin (see tests.md); `gh` fields verified read-only against run 39127956630. A real GitHub precheck has not run yet.
+
+The owner, 2026-10-19: the next release is **1.0.0**, not 0.9.10 (`npm run push -- 1.0.0`); no push for now, keep developing Nebula Test.
+
+---
 
 ## [2026-10-18 14:40] v0.9.9 - by Codex (release verified)
 

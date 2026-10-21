@@ -12,7 +12,7 @@
  * process's to keep and to enforce (electron/app-lock.js).
  */
 
-import { emit } from './bus.js';
+import { emit, on } from './bus.js';
 import { PAGE_MODES, DEFAULT_PAGE } from './page-mode.js';
 
 const KEY = 'nebula:settings';
@@ -29,7 +29,12 @@ export const DEFAULT_SETTINGS = Object.freeze({
   hideAi: false,
   /** The black holes — their section, their button, their menu items — put away. */
   hideHoles: false,
+  /** The languages the spell checker knows (1.0.0): every language of the app unless one is taken off. */
+  spell: Object.freeze(['en', 'de', 'pl', 'tr']),
 });
+
+/** The languages the spell checker can be given, in the order Settings shows them. */
+export const SPELL_LANGUAGES = [['en', 'English'], ['de', 'Deutsch'], ['pl', 'Polski'], ['tr', 'Türkçe']];
 
 /**
  * Whatever was stored, as settings: every field of a kind and in a range the
@@ -46,6 +51,9 @@ export function cleanSettings(raw) {
     page: PAGE_MODES.some((m) => m.id === from.page) ? from.page : DEFAULT_PAGE,
     hideAi: from.hideAi === true,
     hideHoles: from.hideHoles === true,
+    spell: Array.isArray(from.spell)
+      ? SPELL_LANGUAGES.map(([code]) => code).filter((code) => from.spell.includes(code))
+      : [...DEFAULT_SETTINGS.spell],
   };
 }
 
@@ -77,4 +85,15 @@ export function newNoteDefaults(settings = readSettings()) {
     font: Object.keys(font).length ? font : null,
     page: s.page !== DEFAULT_PAGE ? s.page : null,
   };
+}
+
+/**
+ * Hands the spell checker the languages ticked in Settings, now and whenever
+ * they change (1.0.0). It no longer follows the app's language: every language
+ * is checked unless it is taken off.
+ */
+export function initSpelling() {
+  const send = () => { void window.nebula?.spell?.language?.(readSettings().spell)?.catch?.(() => {}); };
+  send();
+  on('settings-changed', send);
 }

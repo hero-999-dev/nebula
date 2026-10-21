@@ -252,6 +252,14 @@ describe('columns put right', () => {
     expect(healColumns(root)).toBe(0);                          // and once is enough
   });
 
+  it('takes an indent off a column and its divider, leaving the lines theirs (1.0.0)', () => {
+    note('<div class="blk-cols" data-ind="2" data-split="40" style="--split: 40%;"><div class="blk-col" data-ind="1"><p id="l" data-ind="1">left</p></div><hr class="blk-vr" data-ind="1"><div class="blk-col"><p id="r">right</p></div></div>');
+    expect(healColumns(root)).toBeGreaterThan(0);
+    expect(root.querySelectorAll('.blk-cols[data-ind], .blk-col[data-ind], .blk-vr[data-ind]')).toHaveLength(0);
+    expect(root.querySelector('#l').dataset.ind).toBe('1');
+    expect(healColumns(root)).toBe(0);
+  });
+
   it('puts a block that lost a column back into one flow, losing no word', () => {
     note('<p>a</p><div class="blk-cols"><div class="blk-col"><p>only</p><p>one</p></div><hr class="blk-vr"></div><p>b</p>');
     healColumns(root);
@@ -361,6 +369,18 @@ describe('more than two columns', () => {
     expect(cleanSplits([], 4)).toEqual([25, 50, 75]);
     expect(cleanSplits([2, 3], 3)).toEqual([MIN_COL, 2 * MIN_COL]);
     expect(cleanSplits([95, 99], 3)).toEqual([100 - 2 * MIN_COL, 100 - MIN_COL]);
+  });
+
+  it('keeps what a column held on the side it stands on, when the divider is dropped beside it (the owner, 1.0.0)', () => {
+    two();
+    const made = splitColumn($('R'), 60, $('in'), MIN_COL, 'left');   // dropped right of the words: they stay put
+    expect(made.empty).toBe(made.cols.lastElementChild);
+    note('<hr class="blk-hr" id="h"><p id="b">b</p>');
+    const { cols, empty } = splitAt([$('b')], $('h'), 70, 'left');
+    expect(empty).toBe(cols.children[2]);
+    expect(cols.children[0].firstElementChild.id).toBe('b');
+    note('<hr class="blk-hr" id="h"><p id="b">b</p>');
+    expect(splitAt([$('b')], $('h'), 30, 'right').empty).toBe(root.querySelector('.blk-cols').children[0]);
   });
 
   it('cuts a column in two where the pointer is: what it held keeps the wider part', () => {

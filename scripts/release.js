@@ -1,7 +1,8 @@
 /**
  * The release ritual: `npm run push`.
  *
- * Tests -> build -> version bump -> Log.md -> commit -> tag -> push, then the
+ * Tests -> build -> version bump -> Log.md -> commit -> precheck on GitHub ->
+ * tag -> push, then the
  * three things that must not fall behind the tag: the local `Nebula Test.exe`,
  * the docs site, and the USB mirror.
  *
@@ -22,6 +23,8 @@
  *   npm run push -- --no-rebuild  skip the page rebuild (tests/e2e/rebuild-page.mjs)
  *   npm run push -- --no-old-notes skip the trials on Nebula Test's notes
  *   npm run push -- --no-browser-check  release although the browser the app tells Google it is has fallen behind
+ *   npm run push -- --no-smoke    skip the local smoke run, once the suites that failed passed alone (node tests/e2e/only.mjs <suite>…)
+ *   npm run push -- --no-precheck  tag without first building the commit on GitHub (scripts/precheck-ci.js)
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -29,10 +32,12 @@ import path from 'node:path';
 import { ROOT } from './paths.js';
 import { stampVersions, checkVersions } from './versions.js';
 import { checkBrowsers, printBrowsers } from './check-browsers.js';
+import { precheckOnCi } from './precheck-ci.js';
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
 const skipFlash = args.includes('--no-flash');
+const skipPrecheck = args.includes('--no-precheck');
 const notesIdx = args.indexOf('--notes');
 const headline = notesIdx >= 0 ? args[notesIdx + 1] : null;
 const bumpArg = args.find((a) => !a.startsWith('--') && a !== headline) ?? 'patch';
@@ -125,6 +130,7 @@ if (branch !== 'main' && !args.includes('--any-branch')) {
 
 const pkgPath = path.join(ROOT, 'package.json');
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+const previousVersion = pkg.version;
 const version = nextVersion(pkg.version, bumpArg);
 const tag = `v${version}`;
 
@@ -215,7 +221,9 @@ runLoud('npm', ['run', 'build']);
 // a full build. That says nothing about the code, so it gets one more attempt.
 // Exit 1 is a check that actually failed, and stops the release immediately.
 console.log('\n> npm run smoke');
-{
+if (args.includes('--no-smoke')) {
+  console.log('  skipped (--no-smoke): GitHub runs it on the commit before the tag.');
+} else {
   const first = runSoft('npm', ['run', 'smoke']);
   if (first === 1) fail('Smoke checks failed. Nothing was committed.');
   if (first !== 0) {
@@ -338,8 +346,44 @@ if (dryRun) {
 
 /* ------------------------------------------------------- commit, tag, push */
 
+/**
+ * Take back the release commit after a failed precheck, and only what this
+ * script wrote into it: the version, the stamped surfaces, the Log.md entry and
+ * the site. A hard reset would also throw away whatever uncommitted work
+ * `git add -A` swept into the commit — Log.md notes written for this release
+ * among them — so the commit is unwound with --mixed and the rest kept.
+ */
+function undoReleaseCommit() {
+  git('reset', '--mixed', 'HEAD~1');
+  const current = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  current.version = previousVersion;
+  fs.writeFileSync(pkgPath, `${JSON.stringify(current, null, 2)}\n`, 'utf8');
+  stampVersions(previousVersion);
+  const log = fs.readFileSync(logPath, 'utf8');
+  fs.writeFileSync(logPath, log.replace(`\n${entry}`, ''), 'utf8');
+  runSoft('npm', ['run', 'site']);
+}
+
 git('add', '-A');
 git('commit', '-m', `Nebula ${tag}`);
+
+// GitHub builds the commit before it gets a tag (scripts/precheck-ci.js): the
+// gates above run on this machine, and five releases in a row failed only on
+// GitHub's slower Windows runner after their tag was already out.
+if (!skipPrecheck) {
+  const result = await precheckOnCi({ sha: git('rev-parse', 'HEAD'), label: tag });
+  if (!result.ok) {
+    undoReleaseCommit();
+    fail([
+      `GitHub's build did not pass (${result.conclusion}). Nothing was tagged or pushed to ${branch}.`,
+      result.url ? `  ${result.url}` : '  (no run found — is `gh` signed in?)',
+      `  The release commit was undone and ${version} is still free: repair, then run npm run push again.`,
+      '  Your uncommitted work is back in the working tree, unstaged.',
+    ].join('\n'));
+  }
+  console.log(`  precheck passed: ${result.url}`);
+}
+
 git('tag', '-a', tag, '-m', `Nebula ${tag}`);
 git('push', 'origin', branch, '--follow-tags');
 

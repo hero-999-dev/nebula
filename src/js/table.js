@@ -898,18 +898,90 @@ export function initTables(editor, { history, isLocked = () => false, onGeometry
     return bare(before) && bare(after);
   }
 
+  /**
+   * Where the caret is drawn. A collapsed range at the very start of a text
+   * (or between elements) has no box in Chromium, and then the arrows were
+   * left to Chromium, which walked into the cell beside instead of the one
+   * under (1.0.0: "up, down, left and right in a table go mad", the owner).
+   * The character beside it says which line it stands on.
+   */
+  function caretRect(range) {
+    const own = range.getClientRects()[0];
+    if (own && own.height) return own;
+    let node = range.startContainer;
+    let at = range.startOffset;
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const next = node.childNodes[at] ?? null;
+      const prev = node.childNodes[at - 1] ?? null;
+      if (next?.nodeType === Node.TEXT_NODE && next.length) { node = next; at = 0; } else if (prev?.nodeType === Node.TEXT_NODE && prev.length) { node = prev; at = prev.length; } else return null;
+    }
+    if (node.nodeType !== Node.TEXT_NODE || !node.length) return null;
+    const probe = doc.createRange();
+    if (at < node.length) { probe.setStart(node, at); probe.setEnd(node, at + 1); } else { probe.setStart(node, at - 1); probe.setEnd(node, at); }
+    const rects = probe.getClientRects();
+    const box = (at < node.length ? rects[0] : rects[rects.length - 1]) ?? null;
+    if (!box || !box.height) return null;
+    // The caret stands at the side of that character it touches.
+    const x = at < node.length ? box.left : box.right;
+    return { top: box.top, bottom: box.bottom, height: box.height, left: x, right: x };
+  }
+
   /** Whether the caret stands on the cell's first line (or its last). */
   function onEdgeLine(td, first) {
     const s = win.getSelection();
     if (!s?.rangeCount || !td.contains(s.anchorNode)) return false;
     if (atEdge(td, first)) return true;
-    const rect = s.getRangeAt(0).getClientRects()[0];
-    if (!rect || !rect.height) return isBlank(td);
-    const box = td.getBoundingClientRect();
-    const style = win.getComputedStyle(td);
-    return first
-      ? rect.top - (box.top + (Number.parseFloat(style.paddingTop) || 0)) < rect.height * 0.6
-      : (box.bottom - (Number.parseFloat(style.paddingBottom) || 0)) - rect.bottom < rect.height * 0.6;
+    const rect = caretRect(s.getRangeAt(0));
+    if (!rect || !rect.height) return isBlank(td) || lineTops(td).length <= 1;
+    // Against the cell's own lines, not its box: a row is as tall as its
+    // tallest cell, and a short cell beside a long one had empty room under its
+    // one line, so Down never left it and Chromium walked to the cell beside.
+    const tops = lineTops(td);
+    if (!tops.length) return true;
+    const mid = rect.top + rect.height / 2;
+    const edge = first ? tops[0] : tops[tops.length - 1];
+    return first ? mid < edge.bottom : mid > edge.top;
+  }
+
+  /** The cell's lines from top to bottom, as { top, bottom }. */
+  function lineTops(td) {
+    const r = doc.createRange();
+    r.selectNodeContents(td);
+    const lines = [];
+    for (const b of r.getClientRects()) {
+      if (!b.height) continue;
+      const same = lines.find((l) => Math.abs(l.top - b.top) < 2);
+      if (same) same.bottom = Math.max(same.bottom, b.bottom);
+      else lines.push({ top: b.top, bottom: b.bottom });
+    }
+    return lines.sort((x, y) => x.top - y.top);
+  }
+
+  /**
+   * Into the cell over or under by an arrow, at the same place across as the
+   * caret was — on its last line going up, its first going down — as a line of
+   * words does; at its end or start where nothing stands there.
+   */
+  function caretAcross(to, x, up) {
+    if (x === null || !doc.caretRangeFromPoint) { caretIn(to, up); return; }
+    to.focus({ preventScroll: true });
+    to.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    const box = to.getBoundingClientRect();
+    const style = win.getComputedStyle(to);
+    const padL = Number.parseFloat(style.paddingLeft) || 0;
+    const padR = Number.parseFloat(style.paddingRight) || 0;
+    const all = doc.createRange();
+    all.selectNodeContents(to);
+    const lines = [...all.getClientRects()].filter((b) => b.height);
+    const line = up ? lines[lines.length - 1] : lines[0];
+    if (!line) { caretIn(to, up); return; }
+    const px = Math.max(box.left + padL + 1, Math.min(x, box.right - padR - 1));
+    const at = doc.caretRangeFromPoint(px, line.top + line.height / 2);
+    if (!at || !to.contains(at.startContainer)) { caretIn(to, up); return; }
+    at.collapse(true);
+    const s = win.getSelection();
+    s.removeAllRanges();
+    s.addRange(at);
   }
 
   /**
@@ -970,6 +1042,39 @@ export function initTables(editor, { history, isLocked = () => false, onGeometry
     for (const td of cells) setCellText(td, '');
     dirty();
   }
+
+  // Up from the line under a table, or Down from the line over it: into the
+  // cell straight above or below the caret. Chromium's own went to the last
+  // cell from under and the first from over, whatever column the caret was in.
+  editor.addEventListener('keydown', (e) => {
+    if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+    if (cellOf(e.target)) return;
+    const s = win.getSelection();
+    if (!s?.rangeCount || !s.isCollapsed) return;
+    const up = e.key === 'ArrowUp';
+    let line = s.anchorNode?.nodeType === Node.ELEMENT_NODE ? s.anchorNode : s.anchorNode?.parentElement;
+    while (line && line.parentElement && line.parentElement !== editor
+      && !line.parentElement.classList.contains('blk-col') && !line.parentElement.classList.contains('toggle-body')) line = line.parentElement;
+    if (!line || line === editor || !editor.contains(line) || line.closest(TABLE)) return;
+    const wrap = up ? line.previousElementSibling : line.nextElementSibling;
+    if (!wrap?.matches(TABLE)) return;
+    const rect = caretRect(s.getRangeAt(0));
+    const tops = lineTops(line);
+    if (rect && tops.length > 1) {
+      const mid = rect.top + rect.height / 2;
+      if (up ? mid > tops[0].bottom : mid < tops[tops.length - 1].top) return;
+    }
+    const grid = gridOf(tableOf(wrap));
+    const row = grid.matrix[up ? grid.rows - 1 : 0] ?? [];
+    const x = rect ? rect.left : line.getBoundingClientRect().left;
+    const cells = [...new Set(row.filter(Boolean))];
+    if (!cells.length) return;
+    const to = cells.find((c) => { const b = c.getBoundingClientRect(); return x >= b.left && x < b.right; })
+      ?? (x < cells[0].getBoundingClientRect().left ? cells[0] : cells[cells.length - 1]);
+    e.preventDefault();
+    e.stopPropagation();
+    caretAcross(to, x, up);
+  }, true);
 
   editor.addEventListener('keydown', (e) => {
     const td = cellOf(e.target);
@@ -1032,12 +1137,23 @@ export function initTables(editor, { history, isLocked = () => false, onGeometry
       if (!out) return;
       const r = dr < 0 ? w.r - 1 : dr > 0 ? w.r + w.rs : w.r;
       const c = dc < 0 ? w.c - 1 : dc > 0 ? w.c + w.cs : w.c;
-      const to = grid.matrix[r]?.[c];
+      let to = grid.matrix[r]?.[c];
+      // Left at a row's first cell goes to the end of the row above, right at
+      // its last to the start of the row under: the order the cells are read in.
+      if (!to && dc) {
+        const all = cellsIn(grid, { r0: 0, c0: 0, r1: grid.rows - 1, c1: grid.cols - 1 });
+        to = all[all.indexOf(td) + (dc < 0 ? -1 : 1)] ?? null;
+      }
       e.stopPropagation();
       if (to) {
         e.preventDefault();
-        caretIn(to, dr < 0 || dc < 0);
+        if (dr) {
+          const s = win.getSelection();
+          const rect = s?.rangeCount ? caretRect(s.getRangeAt(0)) : null;
+          caretAcross(to, rect ? rect.left : null, dr < 0);
+        } else caretIn(to, dc < 0);
       } else if (dr && leave(wrap, dr < 0)) e.preventDefault();
+      else e.preventDefault();          // the first cell's start, the last cell's end: the caret stays
       return;
     }
     if (e.key === 'Tab') {

@@ -1073,6 +1073,21 @@ body {
 #app.side-collapsed .folder-add { display: none; }
 .note-list.drop-end { box-shadow: inset 0 -2px 0 var(--clay); }
 
+/* Black holes scroll container (1.0.0): separate scroll from the note list,
+   capped height so it is always visible. */
+.holes-scroll {
+  flex: none;
+  max-height: 35vh;
+  min-height: min-content;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0 -4px;
+  padding: 0 4px;
+  border-top: 1px solid var(--rule);
+}
+#app.side-collapsed .holes-scroll { margin: 0; padding: 0; border-top: 0; }
+.holes-scroll:empty { display: none; }   /* no black holes, no stray line */
+
 .folder-menu { min-width: 190px; max-width: 260px; }
 .folder-menu .fm-confirm { margin: 4px 8px 6px; font-size: 12.5px; color: var(--ink-soft); }
 .folder-menu .fm-delete { color: var(--c-red, #c0392b); }
@@ -1106,6 +1121,37 @@ body {
 }
 .folder-block.drop-before::before { top: -1px; }
 .folder-block.drop-after::after { bottom: -1px; }
+
+/* Projects (1.0.0): a folder row one step up — a little bolder, its icon in
+   the theme's own accent so it reads apart from the folders inside it (the
+   owner, 2026-10-21: the fern green did not fit the themes). */
+.project-block { position: relative; margin: 1px 0; }
+.project-block.is-dragging { opacity: .45; }
+.project-row { font-size: 14px; }
+.project-row .fr-icon { color: var(--clay); width: 16px; height: 16px; }
+.project-row .fr-name { font-weight: 700; letter-spacing: .01em; }
+.project-items { border-left-color: color-mix(in srgb, var(--clay) 45%, var(--rule)); }
+.project-adds { display: flex; gap: 2px; }
+.project-adds .folder-add { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-item.drop-into .project-row,
+.project-add.drop-into,
+.project-empty.drop-into { background: var(--clay-soft); border-color: var(--clay); color: var(--ink); }
+.project-block.drop-before::before,
+.project-block.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--clay);
+  pointer-events: none;
+  z-index: 1;
+}
+.project-block.drop-before::before { top: -1px; }
+.project-block.drop-after::after { bottom: -1px; }
+#app.side-collapsed .project-adds { display: none; }
+#app.side-collapsed .project-items { margin-left: 0; padding-left: 0; border-left: 0; }
 
 /* ---------- a theme of one's own (0.9.4, theme-editor.js) ----------
    The palette button stands at the right of the four themes, the way New
@@ -1398,6 +1444,11 @@ button.te-chip { padding: 3px 10px; cursor: pointer; }
 .app-lock { position: fixed; inset: 38px 0 0 0; z-index: 400; display: grid; place-items: center; background: var(--paper); }
 .app-lock__card { text-align: center; }
 .app-lock__card .dlg-title { font-size: 15px; }
+/* The moving sky behind the lock (lock-space.js): a faint ASCII field in the
+   theme's ink, out of the flow and taking no click, under the card. */
+.app-lock { overflow: hidden; }
+.lock-space { position: absolute; inset: 0; z-index: 0; margin: 0; padding: 0; overflow: hidden; pointer-events: none; user-select: none; white-space: pre; font-family: var(--mono, monospace); font-size: 12px; line-height: 14px; color: var(--ink); background: transparent; opacity: .2; }
+.app-lock__card { position: relative; z-index: 1; }
 .app-lock__mark { display: grid; place-items: center; width: 40px; height: 40px; margin: 2px auto 8px; border-radius: 50%; background: var(--paper-sunken); color: var(--clay); }
 .app-lock__mark .ic { width: 20px; height: 20px; }
 .app-lock__card .dlg-actions { justify-content: center; }
@@ -1426,3 +1477,120 @@ button.te-chip { padding: 3px 10px; cursor: pointer; }
 .logo-themes .logo-add { min-width: 26px; padding: 3px 9px; font-weight: 600; color: var(--clay); }
 .logo-shortcut { font-size: 12.5px; padding: 6px 11px; margin-top: 2px; }
 .logo-shortcut:disabled { opacity: .5; cursor: default; }
+
+/* A black hole pinned to the top of its section (1.0.0) carries a pin, as a pinned note does. */
+.hole-row .nr-pin { flex: none; margin-right: 2px; }
+
+/* ---------- the map of your notes (1.0.0, galaxy-ui.js / galaxy-map.js) ----------
+   A small window on the galaxy at the foot of the list; ⤢ puts it over the
+   page, its name dragged onto the page puts it beside the notes. Every control
+   coloured from the theme — never the browser's grey default. */
+.galaxy-mini {
+  display: flex; flex-direction: column; border: 1.4px solid var(--rule); border-radius: 10px;
+  background: color-mix(in srgb, var(--paper-sunken) 70%, #000 30%); overflow: hidden;
+}
+.galaxy-mini[hidden] { display: none; }   /* steps aside while the big map is open */
+.galaxy-mini-head { display: flex; align-items: center; gap: 6px; padding: 3px 4px 3px 8px; }
+.galaxy-grip {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; cursor: grab;
+  color: var(--ink-soft); font-size: 12px; font-weight: 600; user-select: none;
+}
+.galaxy-grip:active { cursor: grabbing; }
+.galaxy-grip .ic { width: 15px; height: 15px; color: var(--clay); }
+.galaxy-full {
+  flex-shrink: 0; width: 24px; height: 22px; display: grid; place-items: center; padding: 0; cursor: pointer;
+  border: 1.4px solid var(--rule); border-radius: 6px; background: var(--paper-raised); color: var(--ink-soft);
+}
+.galaxy-full svg { width: 13px; height: 13px; }
+.galaxy-full:hover, .galaxy-full.on { border-color: var(--clay); color: var(--clay); }
+.galaxy-mini .galaxy-canvas { display: block; width: 100%; height: 120px; cursor: default; outline: none; }
+.galaxy-canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--clay); }
+#app.side-collapsed .galaxy-slot { display: none; }
+
+/* The map as a pane: the canvas fills it, its few buttons over it at the top. */
+.split-map .split-title { cursor: default; display: block; }
+.split-map .galaxy-pane {
+  flex: 1; min-height: 0; position: relative; margin: 5px; border: 1.6px solid var(--rule); border-radius: 4px;
+  background: color-mix(in srgb, var(--paper-sunken) 55%, #000 45%); overflow: hidden;
+}
+.galaxy-pane .galaxy-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: default; outline: none; }
+.galaxy-canvas.is-grabbing { cursor: grabbing; }
+/* Top right: the label search, then Fit and Full screen — every control one
+   height (28px) on one line, so nothing sits askew (owner, 2026-10-21). */
+.galaxy-tools {
+  position: absolute; top: 8px; right: 8px; left: 8px; z-index: 2;
+  display: flex; justify-content: flex-end; align-items: flex-start; gap: 6px; pointer-events: none;
+}
+.galaxy-tools > * { pointer-events: auto; }
+.galaxy-tools .btn {
+  height: 28px; box-sizing: border-box; font-size: 12px; padding: 0 10px; line-height: 1;
+  background: var(--paper-raised); color: var(--ink); border: 1.4px solid var(--rule); border-radius: 7px; cursor: pointer;
+}
+.galaxy-tools .btn:hover { border-color: var(--clay); color: var(--clay); }
+.galaxy-tool {
+  flex-shrink: 0; width: 28px; height: 28px; box-sizing: border-box; display: grid; place-items: center;
+  padding: 0; margin: 0; cursor: pointer; border: 1.4px solid var(--rule); border-radius: 7px;
+  background: var(--paper-raised); color: var(--ink-soft);
+}
+.galaxy-tool svg { width: 14px; height: 14px; display: block; }
+.galaxy-tool:hover, .galaxy-tool.on, .galaxy-tool:focus-visible { border-color: var(--clay); color: var(--clay); outline: none; }
+.galaxy-names-off { display: none; }
+.galaxy-tool.on .galaxy-names-off { display: inline; }
+.galaxy-back { border-color: var(--clay) !important; }
+.galaxy-back[hidden] { display: none; }
+
+/* The label search: chips of the picked labels and a field, one 28px pill. */
+.galaxy-search {
+  position: relative; min-width: 0; max-width: min(420px, 100%); flex: 0 1 auto;
+  display: flex; align-items: center; gap: 4px; min-height: 28px; box-sizing: border-box; padding: 2px 4px 2px 8px;
+  border: 1.4px solid var(--rule); border-radius: 7px; background: var(--paper-raised); color: var(--ink);
+}
+.galaxy-search:focus-within { border-color: var(--clay); }
+.galaxy-chips { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.galaxy-chip {
+  display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 2px 0 6px; border-radius: 10px;
+  font-size: 11.5px; color: var(--ink); white-space: nowrap;
+  background: color-mix(in srgb, var(--chip) 22%, transparent); border: 1px solid color-mix(in srgb, var(--chip) 60%, transparent);
+}
+.galaxy-chip-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--chip); flex-shrink: 0; }
+.galaxy-chip-x {
+  width: 16px; height: 16px; padding: 0; border: none; border-radius: 50%; background: transparent;
+  color: var(--ink-soft); font: inherit; font-size: 12px; line-height: 1; cursor: pointer;
+}
+.galaxy-chip-x:hover { color: var(--ink); background: color-mix(in srgb, var(--chip) 30%, transparent); }
+.galaxy-search-input {
+  flex: 1 1 90px; min-width: 70px; width: 110px; height: 22px; padding: 0; border: none; outline: none;
+  background: transparent; color: var(--ink); font: inherit; font-size: 12px;
+}
+.galaxy-search-input::placeholder { color: var(--ink-faint); }
+.galaxy-search-input::-webkit-search-cancel-button { display: none; }
+.galaxy-suggest {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; min-width: 160px; margin: 0; padding: 4px;
+  list-style: none; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper-raised);
+  box-shadow: 0 10px 26px var(--shadow); max-height: 240px; overflow: auto;
+}
+.galaxy-suggest[hidden] { display: none; }
+.galaxy-suggest li {
+  display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 6px;
+  font-size: 12.5px; color: var(--ink); cursor: pointer;
+}
+.galaxy-suggest li.on, .galaxy-suggest li:hover { background: var(--paper-sunken); }
+.galaxy-suggest .galaxy-suggest-none { color: var(--ink-faint); cursor: default; }
+/* The map over the whole page: the note's own head and bar are not what is shown. */
+body.map-full .page-head, body.map-full #toolbar { display: none; }
+.split-park { display: none; }
+
+.galaxy-menu {
+  position: fixed; z-index: 90; min-width: 168px; padding: 5px; border: 1px solid var(--rule);
+  border-radius: 10px; background: var(--paper-raised); box-shadow: 0 12px 30px var(--shadow);
+}
+.galaxy-menu[hidden] { display: none; }
+.galaxy-menu button {
+  display: block; width: 100%; text-align: left; padding: 7px 9px; border: none; border-radius: 6px;
+  background: transparent; color: var(--ink); font: inherit; font-size: 13px; cursor: pointer;
+}
+.galaxy-menu button:hover, .galaxy-menu button:focus-visible { background: var(--paper-sunken); outline: none; }
+.sr-only {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}

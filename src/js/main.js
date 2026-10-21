@@ -30,9 +30,13 @@ import { initLabelFilter, initLabelHits } from './label-filter.js';
 import { initDividerSelect } from './dividers.js';
 import { initColumns } from './columns.js';
 import { initBlockDrag } from './block-drag.js';
+import { initBlockHandles } from './block-handle.js';
 import { initGapCaret } from './gap-caret.js';
 import { initTables } from './table.js';
-import { initBlackHoles } from './black-holes.js';
+import { initBlackHoles, holeInitials } from './black-holes.js';
+import { initGalaxy } from './galaxy-ui.js';
+import { createGalaxyMap } from './galaxy-map.js';
+import { setUniverse, refreshUniverses } from './widgets.js';
 import { askAboutHeldMedia } from './held-media.js';
 import { initI18n, initLanguagePicker, t, getLang } from './i18n.js';
 import { initContextMenu } from './context-menu.js';
@@ -41,14 +45,16 @@ import { initAutoArrows } from './auto-arrows.js';
 import { initMentions, refreshMentions, removeTagChips } from './mentions.js';
 import { initNoteActions } from './note-actions.js';
 import { FolderStore } from './folders.js';
-import { initPageModes, opensFitted, sheetPx, isFluid, usesRealSize } from './page-mode.js';
+import { ProjectStore } from './projects.js';
+import { initPageModes, applyPageMode, opensFitted, sheetPx, isFluid, usesRealSize } from './page-mode.js';
+import { initSplitView } from './split-view.js';
 import { restoreWideOrientation } from './pdf-preview.js';
 import { orderPage } from './page-order.js';
 import { initZoomControl, setRealScale, normalizeZoom, FIT, DEFAULT_ZOOM } from './page-zoom.js';
 import { initNoteList } from './note-list.js';
 import { initAppMenu } from './app-menu.js';
 import { initPalette, initShortcuts, initBlocks } from './palette.js';
-import { newNoteDefaults, readSettings } from './settings.js';
+import { newNoteDefaults, readSettings, initSpelling } from './settings.js';
 import { initSettingsPanel } from './settings-panel.js';
 import { appLockGate, appLockIsOn } from './app-lock.js';
 
@@ -80,6 +86,7 @@ async function boot() {
   injectIcons();
   // The interface in the chosen language (i18n.js): translated as it reaches the page.
   initI18n();
+  initSpelling();
   // The lock on opening (0.9.4, app-lock.js): where one is set, nothing is read
   // and nothing is started until it has been answered — in the theme and the
   // language of the app, which is why those two come first.
@@ -102,6 +109,8 @@ async function boot() {
   const store = new NoteStore({ allowSeed: firstRun });
   // Folders in the list (0.9.3): folders.json in the vault, beside the notes.
   const folders = await FolderStore.load();
+  // Projects (1.0.0): folders in a folder — projects.json, beside folders.json.
+  const projects = await ProjectStore.load();
   // When the guide is genuinely new to this vault, open it — otherwise the one
   // note the user was told to look at is the one they never see.
   // The guide is in the language of the app (0.9.4, guide-i18n.js).
@@ -326,7 +335,9 @@ async function boot() {
   // A divider pulled sideways splits the page into two columns (0.9.4).
   columns = initColumns(editorEl, { history, isLocked: isReadOnly, onGeometry: () => arrows?.reflow() });
   // A card, a video or a code block is moved as a picture is (0.9.4).
-  initBlockDrag(editorEl, { history, isLocked: isReadOnly, onGeometry: () => arrows?.reflow() });
+  // Every block — a line, a list item, a toggle, columns — has a grip at its left and goes where it is pulled, as in Notion (1.0.0).
+  const blockHandles = initBlockHandles(editorEl, { history, isLocked: isReadOnly, onGeometry: () => arrows?.reflow(), label: t('Drag to move · click to select') });
+  initBlockDrag(editorEl, { history, isLocked: isReadOnly, onGeometry: () => arrows?.reflow(), mover: blockHandles });
   // A click between, under or beside blocks that take no caret finds a line, or makes one (0.9.4).
   initGapCaret(editorEl, { history, isLocked: isReadOnly, onGeometry: () => arrows?.reflow() });
   // A table: cells to write in, colour, merge and fill; its numbering and grips are drawn here (0.9.4).
@@ -419,9 +430,16 @@ async function boot() {
   let noteList = null;
   // Black holes (0.9.4): notes kept encrypted, drawn under the notes.
   let blackHoles = null;
+  let galaxy = null;
+  let galaxyTimer = 0;
+  // The map follows the notes, not every keystroke: rebuilt once typing settles.
+  const refreshGalaxy = () => { clearTimeout(galaxyTimer); galaxyTimer = setTimeout(() => { galaxy?.refresh(); refreshUniverses(); }, 250); };
   let pageModes = null;
   let zoomControl = null;
-  const defaultZoom = () => (opensFitted(store.active()?.page ?? 'nw') ? FIT : DEFAULT_ZOOM);
+  let splitView = null;
+  // The page the note being written in is shown in: its own, or Nebula Wide beside a Nebula Wide one (split-view.js).
+  const activePage = () => splitView?.pageOf(store.activeId) ?? store.active()?.page ?? 'nw';
+  const defaultZoom = () => (opensFitted(activePage()) ? FIT : DEFAULT_ZOOM);
 
   function renderList() {
     labelFilter?.render();
@@ -431,6 +449,9 @@ async function boot() {
     listEl.classList.toggle('filtered', filtering);
     // Unfiltered, the list is drawn with its folders, and notes can be dragged
     // about in it (note-list.js). A filter shows one flat list of what matches.
+    // The black holes live in their own scroll area (1.0.0); a filter hides
+    // them as it did when they were drawn at the list's end.
+    if (filtering) $('holes-scroll')?.replaceChildren();
     const drawn = (!filtering && noteList ? noteList.render(notes) : 0) + (!filtering && blackHoles ? blackHoles.render() : 0);
     if (!notes.length && !drawn) {
       // NOT an early return: the archive and trash counts have to be redrawn
@@ -445,6 +466,8 @@ async function boot() {
     }
     if (filtering || !noteList) for (const note of notes) listEl.appendChild(noteItem(note));
     noteActions?.renderDrawers();
+    splitView?.sync();
+    refreshGalaxy();
   }
 
   function openNote(id) {
@@ -488,6 +511,8 @@ async function boot() {
     paintOrder();
     autoOrder(400);              // pictures have their size by then
     showLabelHits({ scroll: true });
+    splitView?.sync();           // side by side: the editor goes to this note's pane
+    galaxy?.follow(store.activeId); // the map's camera goes to it
   }
 
   /**
@@ -573,13 +598,14 @@ async function boot() {
     renderList();
   });
 
-  /** A new note, in a folder when one is named ("+ Add a note" in an empty folder, 0.9.4) — or in an open black hole. */
-  function newNote(folderId = null, { hole = null } = {}) {
+  /** A new note, in a folder when one is named ("+ Add a note" in an empty folder, 0.9.4), in a project (1.0.0) — or in an open black hole. */
+  function newNote(folderId = null, { hole = null, project = null } = {}) {
     flushTitle();
     editor.flush();
     // Named in the language in use; it is the note's title from then on.
     const note = store.createNote(t('Untitled'), hole ? { hole } : {});
     if (folderId && note) store.setFolder(note.id, folderId);
+    else if (project && note && !hole) store.setProject(note.id, project);
     // What Settings says a new note starts with (0.9.4): its font and size, and its page.
     const start = note ? newNoteDefaults() : { font: null, page: null };
     if (start.font) store.setFont(note.id, start.font);
@@ -602,15 +628,17 @@ async function boot() {
     trashedHoles: () => blackHoles?.trashed() ?? [],
     onHoleRestore: (id) => blackHoles?.restore(id),
     onHoleDelete: (id) => blackHoles?.destroy(id),
+    canBeside: (id) => splitView?.canAdd(id) ?? false,
+    onBeside: (id) => splitView?.add(id),
     store,
     onChanged: () => { renderList(); openNote(store.activeId); },
     openNote: (id) => openNote(id),
   });
 
   noteList = initNoteList({
-    listEl, store, folders, noteItem,
+    listEl, store, folders, projects, noteItem,
     onChanged: () => renderList(),
-    newNote: (folderId) => newNote(folderId),
+    newNote: (folderId, project = null) => newNote(folderId, { project }),
     noteMenu: (id, x, y) => noteActions?.openAt(id, x, y),
     // A note of an open black hole dragged up among the notes: taken out, with the black hole's answer.
     takeOut: (id) => blackHoles?.moveOut(id) ?? Promise.resolve(false),
@@ -621,8 +649,8 @@ async function boot() {
   pageModes = initPageModes({
     group: $('page-modes'),
     editorEl,
-    current: () => store.active()?.page ?? 'nw',
-    choose: (id) => { if (store.activeId) store.setPage(store.activeId, id); zoomControl?.paint(); arrows?.reflow(); paintOrder(); autoOrder(); },
+    current: activePage,
+    choose: (id) => { if (store.activeId) { store.setPage(store.activeId, id); splitView?.choosePage(store.activeId); } zoomControl?.paint(); arrows?.reflow(); paintOrder(); autoOrder(); },
     title: () => titleEl.value,
     translate: t,
   });
@@ -635,8 +663,8 @@ async function boot() {
     // size), A4 and the smaller papers at their real size (100 %), the wider
     // ones fitted to the window (0.9.3).
     current: () => normalizeZoom(store.active()?.zoom ?? defaultZoom()),
-    sheet: () => (isFluid(store.active()?.page ?? 'nw') ? 0 : sheetPx(store.active()?.page ?? 'nw')),
-    realSized: () => usesRealSize(store.active()?.page ?? 'nw'),
+    sheet: () => (isFluid(activePage()) ? 0 : sheetPx(activePage())),
+    realSized: () => usesRealSize(activePage()),
     windowZoom: () => window.nebula?.display?.windowZoom?.() ?? 1,
     choose: (v) => {
       if (store.activeId) store.setZoom(store.activeId, v === defaultZoom() ? null : v);
@@ -648,10 +676,50 @@ async function boot() {
   });
   // How big a real millimetre is on this screen, asked once.
   void window.nebula?.display?.realScale?.().then((f) => { setRealScale(f); zoomControl?.paint(); arrows?.reflow(); }).catch(() => {});
+  // The map of your notes (1.0.0): its minimap at the foot of the list, and a pane of the split page.
+  // The map is a view of the notes, never a way in: one that cannot start leaves the app as it was.
+  try { galaxy = initGalaxy({
+    mount: $('galaxy-slot'),
+    createMap: createGalaxyMap,
+    store, folders, projects, holeInitials, icon,
+    blackHoles: { list: () => blackHoles?.list() ?? [], unlock: (id) => blackHoles?.unlock(id), lock: (id) => blackHoles?.lock(id) },
+    openNote: (id) => openNote(id),
+    split: {
+      add: (id) => splitView?.add(id),
+      mapShown: () => !!splitView?.mapShown(),
+      isMapFull: () => !!splitView?.isMapFull(),
+      mapFull: (on) => splitView?.mapFull(on),
+    },
+    translate: t,
+  }); } catch (err) { console.error('[nebula] the map could not start', err); galaxy = null; $('galaxy-slot')?.replaceChildren(); }
+  // The Universe widget (1.0.0): the same map, live in a note — main space only.
+  if (galaxy?.input) setUniverse({ createMap: createGalaxyMap, getInput: galaxy.input, colors: galaxy.colors, openNote: (id) => openNote(id) });
+  // Notes side by side (1.0.0): a note dragged from the list onto the page opens beside it.
+  splitView = initSplitView({
+    map: galaxy?.pane ?? null,
+    shell: $('edit-shell'),
+    frame: $('editor-frame'),
+    titleEl,
+    store,
+    openNote: (id) => openNote(id),
+    translate: t,
+    say: (text) => window.dispatchEvent(new CustomEvent('nebula-toast', { detail: text })),
+    // A pane shown as saved: its page, and its code and equations drawn from their source.
+    render: (ghost, page, title) => {
+      applyPageMode(ghost, page, document, title);
+      paintAllCode(ghost);
+      paintAllEquations(ghost);
+      pageModes?.paint();        // the print sheet is the note being written in
+    },
+    // The editor is wider or narrower now: its page, zoom and arrows measured again.
+    onLayout: () => requestAnimationFrame(() => { pageModes?.paint(); zoomControl?.paint(); arrows?.reflow(); columns?.refresh?.(); }),
+  });
   $('btn-new-folder')?.addEventListener('click', () => { void noteList.create(); });
   blackHoles = initBlackHoles({
     listEl, store, noteItem,
     onChanged: () => renderList(),
+    // Locked: the map lets go of it in the same turn, not after the list's pause (1.0.0).
+    onLocked: () => { clearTimeout(galaxyTimer); galaxy?.refresh(); refreshUniverses(); },
     openNote: (id) => openNote(id),
     newNote: (hole) => newNote(null, { hole }),
     saveNow: () => saveCurrent(),

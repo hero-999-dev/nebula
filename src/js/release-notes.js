@@ -13,6 +13,29 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '1.0.0': {
+    headline: 'Every block moves with the mouse, and a toggle copies whole.',
+    items: [
+      { title: 'Drag any block', text: 'A grip of three dots appears at the left of the line, heading, list item, toggle or table under the mouse. Drag it and a mark shows where the block will land — between two lines, inside an open toggle, or out of a list. Hold Alt as you let go to drop a copy; Esc stops the drag.' },
+      { title: 'Picked blocks', text: 'A click on the grip picks the block: Ctrl+C, Ctrl+X, Ctrl+D and Delete work on all of it, the arrow keys pick the next one, and Ctrl+Shift+↑ and ↓ move it a place up or down.' },
+      { title: 'Toggles copy whole', text: 'A toggle copied with its grip, or words selected from its title into its body, paste as a toggle with everything inside it — no more making the toggle first and copying title and text apart.' },
+      { title: 'Files show where they land', text: 'A file dragged over a note shows a mark between the lines, and its card lands there.' },
+      { title: 'Paste files and videos', text: 'A video or any other file copied in Explorer or Finder pastes with Ctrl+V under the line the caret is in — the video as a video, the file as its card. Before, a video could only be dropped.' },
+      { title: 'Tables on paper', text: 'A table printed or exported to PDF on paper narrower than the page it was made on is fitted to the paper, each column keeping its share, instead of running off the edge.' },
+      { title: 'Copies marked on macOS', text: 'A file saved or opened from a note on a Mac now carries the mark of a download, as it already did on Windows, so the Mac asks before a copied program or script runs.' },
+      { title: 'Folded toggles keep what they hold', text: 'Enter in the title of a folded toggle makes a line under it instead of opening it. Backspace on the line under a folded toggle, or Delete at the end of its title, no longer deletes the lines folded inside it.' },
+      { title: 'Tab beside a divider', text: 'Tab in a column moves the line, never the divider between the columns.' },
+      { title: 'Spelling in every language', text: 'English, German, Polish and Turkish are checked together, whatever the app’s language. Settings → Spelling takes a language off; with none ticked nothing is marked.' },
+      { title: 'Widgets', text: 'Type /widget and choose a calculator, a scientific calculator or a calendar. It moves and resizes like a picture, stands in the text, in front of the words or behind them, and takes its keys from the mouse or the keyboard. Print and Export as PDF can leave the widgets out.' },
+      { title: 'Black holes: initials and pins', text: 'A locked black hole shows only its initials in the list, and Pin to top in its ⋯ menu keeps one above the others.' },
+      { title: 'Notes side by side', text: 'Drag a note from the list onto the page and it opens beside the one you are writing in, up to four, the page shared out equally. Each has its own title and ✕; the editing bar and the AI panel serve the one you click in. Beside a Nebula Wide page a note is shown in Nebula Wide.' },
+      { title: 'Projects', text: 'Drag a folder onto the middle of another folder and the two become a project, one step above folders. A project has + Add a note and + Add a folder, and holds loose notes beside its folders.' },
+      { title: 'Universe', text: 'Above Archive and Trash your notes are a small galaxy: projects are stars, folders planets, a folder’s notes its moons and labels the moons of their notes, each project, folder, label and black hole in a colour of its own. ⤢ spreads it over the page, with a label search that rings the notes sharing a label and joins them in thin lines, Fit and Full screen. Right-click a planet to open its note; right-click a black hole to open or lock it.' },
+      { title: 'Settings shows the font', text: 'The font in Settings shows only the chosen font and its size.' },
+      { title: 'Fixes', text: 'Arrow keys move between table cells; a pasted address keeps the note’s font; links copied together keep the Nebula format; embeds and bookmarks stay inside toggles; the pointer is right over blank space.' },
+      { title: 'Dividers', text: 'A divider pulled up beside a line that has text above and below it splits only that part of the page, and the text stays where it was.' },
+    ],
+  },
   '0.9.9': {
     headline: 'Black holes ask clearly before deleting and stay responsive with large files.',
     items: [
@@ -600,6 +623,77 @@ export const RELEASE_NOTES = {
  * a version or a language that is not here is shown in English.
  */
 export const RELEASE_NOTES_I18N = {
+  '1.0.0': {
+    de: {
+      headline: 'Jeder Block lässt sich mit der Maus verschieben, und eine Aufklappliste wird ganz kopiert.',
+      items: [
+        { title: 'Jeden Block ziehen', text: 'Links von der Zeile, Überschrift, dem Listenpunkt, der Aufklappliste oder Tabelle unter der Maus erscheint ein Griff aus drei Punkten. Zieh ihn, und eine Markierung zeigt, wo der Block landet — zwischen zwei Zeilen, in einer offenen Aufklappliste oder außerhalb einer Liste. Halte beim Loslassen Alt gedrückt, um eine Kopie abzulegen; Esc bricht das Ziehen ab.' },
+        { title: 'Ausgewählte Blöcke', text: 'Ein Klick auf den Griff wählt den Block aus: Strg+C, Strg+X, Strg+D und Entf wirken auf den ganzen Block, die Pfeiltasten wählen den nächsten, und Strg+Umschalt+↑ und ↓ verschieben ihn um eine Stelle.' },
+        { title: 'Aufklapplisten ganz kopieren', text: 'Eine mit ihrem Griff kopierte Aufklappliste, oder Wörter, die vom Titel bis in ihren Inhalt markiert sind, werden als Aufklappliste mit allem eingefügt, was in ihr steht — kein Anlegen der Aufklappliste mehr und getrenntes Kopieren von Titel und Text.' },
+        { title: 'Dateien zeigen, wo sie landen', text: 'Eine Datei, die über eine Notiz gezogen wird, zeigt eine Markierung zwischen den Zeilen, und ihre Karte landet dort.' },
+        { title: 'Dateien und Videos einfügen', text: 'Ein Video oder jede andere im Explorer oder Finder kopierte Datei wird mit Strg+V unter der Zeile eingefügt, in der der Cursor steht — das Video als Video, die Datei als ihre Karte. Vorher ließ sich ein Video nur ablegen.' },
+        { title: 'Tabellen auf Papier', text: 'Eine Tabelle, die auf Papier gedruckt oder als PDF exportiert wird, das schmaler ist als die Seite, auf der sie entstand, wird dem Papier angepasst; jede Spalte behält ihren Anteil, statt über den Rand zu laufen.' },
+        { title: 'Kopien auf dem Mac markiert', text: 'Eine Datei, die auf einem Mac aus einer Notiz gespeichert oder geöffnet wird, trägt jetzt die Markierung eines Downloads, wie schon unter Windows; so fragt der Mac, bevor ein kopiertes Programm oder Skript läuft.' },
+        { title: 'Zugeklappte Listen behalten ihren Inhalt', text: 'Enter im Titel einer zugeklappten Aufklappliste macht eine Zeile darunter, statt sie aufzuklappen. Die Rücktaste in der Zeile unter einer zugeklappten Aufklappliste oder Entf am Ende ihres Titels löscht die darin zugeklappten Zeilen nicht mehr.' },
+        { title: 'Tab neben einem Trenner', text: 'Tab in einer Spalte rückt die Zeile ein, nie den Trenner zwischen den Spalten.' },
+        { title: 'Rechtschreibung in jeder Sprache', text: 'Englisch, Deutsch, Polnisch und Türkisch werden zusammen geprüft, gleich in welcher Sprache die App ist. Unter Einstellungen → Rechtschreibung lässt sich eine Sprache abwählen; ist keine angehakt, wird nichts markiert.' },
+        { title: 'Widgets', text: 'Tippe /widget und wähle einen Taschenrechner, einen wissenschaftlichen Rechner oder einen Kalender. Er lässt sich wie ein Bild verschieben und in der Größe ändern, steht im Text, vor den Wörtern oder dahinter, und nimmt seine Tasten von der Maus oder der Tastatur. Drucken und Als PDF exportieren können die Widgets weglassen.' },
+        { title: 'Schwarze Löcher: Initialen und Anheften', text: 'Ein gesperrtes Schwarzes Loch zeigt in der Liste nur seine Initialen, und Oben anheften in seinem ⋯-Menü hält eines über den anderen.' },
+        { title: 'Notizen nebeneinander', text: 'Ziehen Sie eine Notiz aus der Liste auf die Seite, und sie öffnet sich neben der, in der Sie schreiben – bis zu vier, die Seite gleichmäßig aufgeteilt. Jede hat ihren eigenen Titel und ein ✕; Bearbeitungsleiste und KI-Panel gelten für die Notiz, in die Sie klicken. Neben einer Nebula-Wide-Seite wird eine Notiz in Nebula Wide gezeigt.' },
+        { title: 'Projekte', text: 'Ziehen Sie einen Ordner auf die Mitte eines anderen, und beide werden ein Projekt, eine Stufe über den Ordnern. Ein Projekt hat + Notiz hinzufügen und + Ordner hinzufügen und hält lose Notizen neben seinen Ordnern.' },
+        { title: 'Universe', text: 'Über Archiv und Papierkorb sind Ihre Notizen eine kleine Galaxie: Projekte sind Sterne, Ordner Planeten, die Notizen eines Ordners seine Monde und Labels die Monde ihrer Notizen, jedes Projekt, jeder Ordner, jedes Label und jedes Schwarze Loch in einer eigenen Farbe. ⤢ breitet sie über die Seite aus, mit einer Label-Suche, die die Notizen mit einem gemeinsamen Label umringt und durch dünne Linien verbindet, Einpassen und Vollbild. Ein Rechtsklick auf einen Planeten öffnet seine Notiz, einer auf ein Schwarzes Loch öffnet oder sperrt es.' },
+        { title: 'Einstellungen zeigen die Schrift', text: 'Die Schrift in den Einstellungen zeigt nur die gewählte Schrift und ihre Größe.' },
+        { title: 'Korrekturen', text: 'Die Pfeiltasten wechseln zwischen Tabellenzellen; eine eingefügte Adresse behält die Schrift der Notiz; zusammen kopierte Links behalten das Nebula-Format; Einbettungen und Lesezeichen bleiben in Aufklapplisten; der Mauszeiger stimmt über leerem Raum.' },
+        { title: 'Trennlinien', text: 'Eine neben einer Zeile aufgerichtete Trennlinie, über und unter der Text steht, teilt nur diesen Teil der Seite, und der Text bleibt, wo er war.' },
+      ],
+    },
+    pl: {
+      headline: 'Każdy blok można przesunąć myszą, a lista rozwijana kopiuje się w całości.',
+      items: [
+        { title: 'Przeciągnij dowolny blok', text: 'Po lewej stronie linii, nagłówka, punktu listy, listy rozwijanej lub tabeli pod myszą pojawia się uchwyt z trzech kropek. Przeciągnij go, a znacznik pokaże, gdzie blok wyląduje — między dwiema liniami, w otwartej liście rozwijanej albo poza listą. Przytrzymaj Alt, puszczając, aby upuścić kopię; Esc przerywa przeciąganie.' },
+        { title: 'Zaznaczone bloki', text: 'Kliknięcie uchwytu zaznacza blok: Ctrl+C, Ctrl+X, Ctrl+D i Delete działają na cały blok, strzałki zaznaczają następny, a Ctrl+Shift+↑ i ↓ przesuwają go o jedno miejsce.' },
+        { title: 'Listy rozwijane kopiują się w całości', text: 'Lista rozwijana skopiowana uchwytem albo słowa zaznaczone od jej tytułu do wnętrza wklejają się jako lista rozwijana ze wszystkim, co w niej jest — bez tworzenia jej najpierw i osobnego kopiowania tytułu i tekstu.' },
+        { title: 'Pliki pokazują, gdzie wylądują', text: 'Plik przeciągany nad notatką pokazuje znacznik między liniami, a jego karta ląduje właśnie tam.' },
+        { title: 'Wklejanie plików i filmów', text: 'Film lub każdy inny plik skopiowany w Eksploratorze lub Finderze wkleja się przez Ctrl+V pod linią, w której stoi kursor — film jako film, plik jako jego karta. Wcześniej film można było tylko upuścić.' },
+        { title: 'Tabele na papierze', text: 'Tabela drukowana lub eksportowana do PDF na papierze węższym niż strona, na której powstała, jest dopasowywana do papieru, a każda kolumna zachowuje swoją część, zamiast wychodzić poza krawędź.' },
+        { title: 'Kopie oznaczone na macOS', text: 'Plik zapisany lub otwarty z notatki na Macu nosi teraz znak pobranego pliku, tak jak już w Windows, więc Mac pyta, zanim uruchomi skopiowany program lub skrypt.' },
+        { title: 'Zwinięte listy zachowują zawartość', text: 'Enter w tytule zwiniętej listy rozwijanej wstawia linię pod nią, zamiast ją rozwijać. Backspace w linii pod zwiniętą listą albo Delete na końcu jej tytułu nie usuwa już zwiniętych w niej linii.' },
+        { title: 'Tab obok separatora', text: 'Tab w kolumnie przesuwa linię, nigdy separator między kolumnami.' },
+        { title: 'Pisownia w każdym języku', text: 'Angielski, niemiecki, polski i turecki są sprawdzane razem, bez względu na język aplikacji. W Ustawienia → Pisownia można odznaczyć język; gdy żaden nie jest zaznaczony, nic nie jest zaznaczane.' },
+        { title: 'Widżety', text: 'Wpisz /widget i wybierz kalkulator, kalkulator naukowy albo kalendarz. Przesuwa się i zmienia rozmiar jak obraz, stoi w tekście, przed słowami albo za nimi, i przyjmuje klawisze z myszy lub klawiatury. Drukuj i Eksportuj jako PDF mogą pominąć widżety.' },
+        { title: 'Czarne dziury: inicjały i przypinanie', text: 'Zablokowana czarna dziura pokazuje na liście tylko swoje inicjały, a Przypnij na górze w jej menu ⋯ trzyma ją nad innymi.' },
+        { title: 'Notatki obok siebie', text: 'Przeciągnij notatkę z listy na stronę, a otworzy się obok tej, w której piszesz – do czterech, strona podzielona po równo. Każda ma własny tytuł i ✕; pasek edycji i panel AI działają dla notatki, w którą klikniesz. Obok strony Nebula Wide notatka jest pokazana w Nebula Wide.' },
+        { title: 'Projekty', text: 'Przeciągnij folder na środek innego folderu, a oba staną się projektem, o stopień wyżej niż foldery. Projekt ma + Dodaj notatkę i + Dodaj folder i trzyma luźne notatki obok swoich folderów.' },
+        { title: 'Universe', text: 'Nad Archiwum i Koszem twoje notatki są małą galaktyką: projekty to gwiazdy, foldery to planety, notatki folderu to jego księżyce, a etykiety to księżyce swoich notatek, każdy projekt, folder, etykieta i czarna dziura we własnym kolorze. ⤢ rozkłada ją na całą stronę, z wyszukiwaniem etykiet, które otacza pierścieniem notatki o wspólnej etykiecie i łączy je cienkimi liniami, z Dopasuj i Pełnym ekranem. Prawy klik na planecie otwiera jej notatkę, na czarnej dziurze ją otwiera albo blokuje.' },
+        { title: 'Ustawienia pokazują czcionkę', text: 'Czcionka w Ustawieniach pokazuje tylko wybraną czcionkę i jej rozmiar.' },
+        { title: 'Poprawki', text: 'Strzałki przechodzą między komórkami tabeli; wklejony adres zachowuje czcionkę notatki; linki skopiowane razem zachowują format Nebula; osadzenia i zakładki zostają w listach rozwijanych; wskaźnik jest właściwy nad pustym miejscem.' },
+        { title: 'Separatory', text: 'Separator postawiony pionowo obok linii, nad i pod którą jest tekst, dzieli tylko tę część strony, a tekst zostaje na swoim miejscu.' },
+      ],
+    },
+    tr: {
+      headline: 'Her blok fareyle taşınır, açılır liste de bütünüyle kopyalanır.',
+      items: [
+        { title: 'Her bloğu sürükleyin', text: 'Farenin altındaki satırın, başlığın, liste maddesinin, açılır listenin ya da tablonun solunda üç noktalı bir tutamak belirir. Onu sürükleyin, bir işaret bloğun nereye ineceğini gösterir — iki satırın arasına, açık bir açılır listenin içine ya da listenin dışına. Kopya bırakmak için bırakırken Alt’a basılı tutun; Esc sürüklemeyi durdurur.' },
+        { title: 'Seçili bloklar', text: 'Tutamağa tıklamak bloğu seçer: Ctrl+C, Ctrl+X, Ctrl+D ve Delete bloğun tamamına uygulanır, ok tuşları sonrakini seçer, Ctrl+Shift+↑ ve ↓ onu bir yer taşır.' },
+        { title: 'Açılır listeler bütünüyle kopyalanır', text: 'Tutamağıyla kopyalanan bir açılır liste ya da başlığından içine kadar seçilen sözcükler, içindeki her şeyle birlikte açılır liste olarak yapışır — önce açılır listeyi oluşturup başlığı ve metni ayrı ayrı kopyalamak yok.' },
+        { title: 'Dosyalar nereye ineceğini gösterir', text: 'Bir notun üzerine sürüklenen dosya satırların arasında bir işaret gösterir ve kartı oraya iner.' },
+        { title: 'Dosya ve video yapıştırma', text: 'Gezgin’de ya da Finder’da kopyalanan bir video ya da başka herhangi bir dosya, Ctrl+V ile imlecin bulunduğu satırın altına yapışır — video video olarak, dosya kartı olarak. Önceden bir video yalnızca sürükleyip bırakılabiliyordu.' },
+        { title: 'Kâğıtta tablolar', text: 'Yapıldığı sayfadan daha dar bir kâğıda yazdırılan ya da PDF olarak dışa aktarılan tablo kâğıda sığdırılır; her sütun payını korur, kenardan taşmaz.' },
+        { title: 'macOS’ta işaretli kopyalar', text: 'Mac’te bir nottan kaydedilen ya da açılan dosya artık Windows’ta olduğu gibi indirilmiş dosya işaretini taşır; böylece Mac, kopyalanan bir program ya da betik çalışmadan önce sorar.' },
+        { title: 'Katlı listeler içindekini korur', text: 'Katlı bir açılır listenin başlığında Enter artık listeyi açmak yerine altına bir satır açar. Katlı bir listenin altındaki satırda Backspace ya da başlığının sonunda Delete, içinde katlı duran satırları artık silmez.' },
+        { title: 'Ayırıcının yanında Tab', text: 'Bir sütunda Tab satırı kaydırır, sütunlar arasındaki ayırıcıyı asla kaydırmaz.' },
+        { title: 'Her dilde yazım denetimi', text: 'Uygulamanın dili ne olursa olsun İngilizce, Almanca, Lehçe ve Türkçe birlikte denetlenir. Ayarlar → Yazım denetimi’nden bir dil çıkarılabilir; hiçbiri işaretli değilse hiçbir şey işaretlenmez.' },
+        { title: 'Widget’lar', text: '/widget yazın ve hesap makinesi, bilimsel hesap makinesi ya da takvim seçin. Resim gibi taşınır ve boyutlanır; metnin içinde, yazının önünde ya da arkasında durur, tuşlarını fareden ya da klavyeden alır. Yazdır ve PDF olarak dışa aktar widget’ları dışarıda bırakabilir.' },
+        { title: 'Kara delikler: baş harfler ve sabitleme', text: 'Kilitli bir kara delik listede yalnızca baş harflerini gösterir; ⋯ menüsündeki En üste sabitle onu diğerlerinin üstünde tutar.' },
+        { title: 'Notlar yan yana', text: 'Listeden bir notu sayfaya sürükleyin; yazdığınız notun yanında açılır. En fazla dört not olur, sayfa eşit bölünür. Her birinin kendi başlığı ve ✕ düğmesi vardır; düzenleme çubuğu ve AI paneli tıkladığınız not için çalışır. Nebula Wide bir sayfanın yanına gelen not Nebula Wide gösterilir.' },
+        { title: 'Projeler', text: 'Bir klasörü başka bir klasörün ortasına sürükleyin, ikisi bir proje olur, klasörlerin bir üst basamağı. Projede + Not ekle ve + Klasör ekle vardır; klasörlerinin yanında serbest notlar da tutar.' },
+        { title: 'Universe', text: 'Arşiv ve Çöp Kutusu’nun üstünde notlarınız küçük bir galaksidir: projeler yıldız, klasörler gezegen, bir klasörün notları onun uyduları, etiketler de notlarının uydularıdır; her proje, klasör, etiket ve kara deliğin kendi rengi vardır. ⤢ onu sayfaya yayar; orada aynı etiketi taşıyan notları halkayla çevirip ince çizgilerle bağlayan bir etiket araması, Sığdır ve Tam ekran durur. Bir gezegene sağ tıklayınca notu açılır, bir kara deliğe sağ tıklayınca açılır ya da kilitlenir.' },
+        { title: 'Ayarlar yazı tipini gösterir', text: 'Ayarlar’daki yazı tipi yalnızca seçilen yazı tipini ve boyutunu gösterir.' },
+        { title: 'Düzeltmeler', text: 'Ok tuşları tablo hücreleri arasında gezer; yapıştırılan adres notun yazı tipini korur; birlikte kopyalanan bağlantılar Nebula biçimini korur; gömülü öğeler ve yer imleri açılır listelerin içinde kalır; imleç boş alanda doğru görünür.' },
+        { title: 'Ayırıcılar', text: 'Üstünde ve altında metin olan bir satırın yanına dikilen ayırıcı sayfanın yalnızca o kısmını böler; metin olduğu yerde kalır.' },
+      ],
+    },
+  },
   '0.9.6': {
     de: {
       headline: 'Dateien in einer Notiz, eine Seite, die zuerst fragt, und eine sicherere App.',

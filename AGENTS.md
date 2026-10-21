@@ -95,7 +95,8 @@ npm run push                 # patch;  -- minor | major | 0.5.2 | --notes "…"
 ```
 
 The chain: tests → smoke → build → doc freshness → version bump → `Log.md` →
-commit → tag → push → GitHub Actions builds Windows **and** macOS and publishes
+commit → **precheck: GitHub builds that commit on `precheck/vX.Y.Z` and only a
+green run goes on** (a red one undoes the commit; see docs/RELEASE.md) → tag → push → GitHub Actions builds Windows **and** macOS and publishes
 one Release → **`Nebula Test.exe` in the project root rebuilt** → local docs
 site rebuilt → `nebula-web` mirror updated → USB drive mirrored if plugged in.
 

@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "0.9.9",
-  "lastUpdated": "2026-10-18",
-  "currentPhase": "v0.9.9 released: Blackhole deletion confirmation, OS-protected labels, seal-then-purge moves, PIN/recovery safety and large-file responsiveness. Electron 44.9.0. Unit 1276/1276, Electron smoke 1041/1041, two Dünya Halleri rebuilds 100%, old-note trials, and both Windows/macOS GitHub package jobs passed. The combined public Release includes the update manifests, Windows installer/portable and macOS DMG/ZIP. Manual owner checks remain.",
-  "next": "Owner tests the root Nebula Test.exe with docs/BLACKHOLE-TESTS.md, especially 150-200 MB responsiveness, Trash confirmation, encrypted labels and Windows Hello on physical hardware. macOS behavior needs a physical Mac check. Report: test-results/orchestra/security-2026-10-17/RAPOR.md.",
+  "version": "1.0.0",
+  "lastUpdated": "2026-10-21",
+  "currentPhase": "v1.0.0: the Universe (galaxy map of notes, folders, projects, labels and black holes; minimap, full-pane map, Universe widget, label and mention search, rockets), projects, split view, block handles, the lock-screen sky, Electron 45.",
+  "next": "Owner tests v1.0.0 from the installed update. Later: move electron/main.js safeStorage sync calls to the async API before Electron 46; the ~250 ms GC frame in the big map (perf audit 39, findings 4-5).",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -28,10 +28,11 @@
     "recreate": "Prompt.md",
     "testLog": "tests.md",
     "changelog": "Log.md",
-    "releasePolicy": "Standing instruction (2026-09-27, replaces 2026-09-07): release ONLY when the owner says \"push\". Until then: make the changes, unit tests for what was touched, npm run pack:test, report. On \"push\": Electron check (npm run check:browsers), all tests, fixes, then npm run push - GitHub, nebula-web, the flash, every MD file. Never ask which platforms to build: the repo is public, Actions is free on both runners."
+    "releasePolicy": "Standing instruction (2026-09-27, replaces 2026-09-07): release ONLY when the owner says \"push\". Until then: make the changes, unit tests for what was touched, npm run pack:test, report. On \"push\": Electron check (npm run check:browsers), all tests, fixes, then npm run push - GitHub, nebula-web, the flash, every MD file. Never ask which platforms to build: the repo is public, Actions is free on both runners.",
+    "precheck": "npm run push builds the release commit on GitHub (precheck/vX.Y.Z, scripts/precheck-ci.js) before tagging; npm run precheck:ci does it for HEAD; --no-precheck skips"
   },
   "quality": {
-    "unitTests": 1276,
+    "unitTests": 1280,
     "smokeChecks": 1041,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
@@ -88,6 +89,108 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "date": "2026-10-21",
+      "version": "1.0.0",
+      "by": "Claude",
+      "what": "Universe third round: Labels and mentions search (arrows from → to); evenly spread rings; project loose notes in the project colour; darker loose notes, bigger core; double-click opens a locked hole; shooting star each minute, followable rocket each five; ASCII sky behind the lock screen; Saturn icon closed; perf audit (no FPS loss) and no rebuild on unchanged refresh."
+    },
+    {
+      "date": "2026-10-21",
+      "version": "1.0.0",
+      "by": "Claude",
+      "what": "Universe: a click on empty space clears the selection rings; the grab cursor only while the map is held (big map and widget). Unit 1491/1491."
+    },
+    {
+      "date": "2026-10-21",
+      "version": "1.0.0",
+      "by": "Claude",
+      "what": "Universe second round: free folders and projects on one ring just outside the holes (projects nearer); a note's labels on one evenly spaced orbit, smaller (0.42/0.24); a focused note framed 1.7x wider; Hide names button beside Fit; minimap takes no clicks and glides smoothly over 1.2 s (drew at the tick before). Guide updated in four languages. Unit 1490/1490. Electron 45.0.0: unit 1490/1490, smoke 1188/1188. Before Electron 46: move the sync safeStorage calls (main.js, black holes) to the async API."
+    },
+    {
+      "date": "2026-10-21",
+      "version": "1.0.0",
+      "by": "Claude (GLM spacing+guide, Codex dividers+review, Mistral holes scroll, a fork the widget)",
+      "what": "Universe: renamed from the map; core click frames its first ring; rings clear whole systems; #labels in text are labels; minimap glides and hides while the big one is open; Universe widget (live map in a note, picture saved); black holes scroll on their own; pane dividers draggable. Restored 1.0.0 black-holes.js/index.html content after a git revert by Mistral. Map drag no longer moves the Universe widget (rich-paste leaves .wg-live alone); Electron 44.9.3. Unit 1487/1487, smoke 1188/1188."
+    },
+    {
+      "date": "2026-10-21",
+      "version": "1.0.0",
+      "by": "Claude (GLM model, Codex review, Mistral tests)",
+      "what": "Map v2: projects stars, folders planets, notes their moons, loose notes planets in widening rings round the core, labels moons; hues per project/folder/label/hole; label search with halos and spanning-tree lines; Open/Lock on holes; visible pull-in under reduced motion; faint main-space backdrop inside a hole; outer system circle; ring tilt and size jitter. Codex fixes: a way out of a hole on every map, at most 6 lit labels with cached trees, no per-frame tiny-body allocation."
+    },
+    {
+      "date": "2026-10-20",
+      "version": "1.0.0",
+      "by": "Claude (Codex reviewed the turning/hole fixes)",
+      "what": "The map fills its pane and refits on every resize (whole page, beside one or two notes) until a hand moves the camera; the minimap frames the open note's sun system; suns cached by turn frame, hover boost modulo 2π (Codex). Nebula Test.exe rebuilt — the owner had been testing the 14:04 build. Unit 1442/1442, e2e galaxy 13/13, split view 19/19; full smoke not rerun (low memory)."
+    },
+    {
+      "date": "2026-10-20",
+      "version": "1.0.0",
+      "by": "Claude",
+      "what": "The map after the owner tried it: a small star field like the website; suns and planets turn on their axes (faster under the pointer) and the map moves under reduced motion too (it was frozen); black holes on an inner ring right beside the core; a locked hole stays on the map with its initials, menu says Locked, cannot be entered. Unit 1437/1437."
+    },
+    {
+      "date": "2026-10-20",
+      "version": "1.0.0",
+      "by": "Claude (chief architect) with GLM (engine), Mistral (model tests), Codex (review) via Test Orchestra",
+      "what": "The map of your notes: galaxy-model/ascii/map engine (GLM) and galaxy-ui wiring (Claude) — folders suns, notes planets, labels moons, slow orbits, rare shooting star or rocket; minimap above Archive/Trash follows the open note; ⤢ puts it over the page as a split pane, a note opened from it comes beside it, a second makes three; right-click Open; each open black hole a dimension with a pull-in, a locked one only initials, a lock purges at once. Projects: a folder dropped on a folder, + Add a note / + Add a folder. Guide section 11 and release notes in four languages. Electron 44.9.1. Boot failure (onDimension before createMap returned) fixed and guarded. Codex findings (lock purge, lock during pull-in, no frames while paused, minimap idle 60 fps) fixed. Unit 1431/1431, smoke 1169/1169, galaxy e2e 13/13. Not released."
+    },
+    {
+      "date": "2026-10-20",
+      "version": "1.0.0",
+      "by": "Claude",
+      "what": "Notes side by side (split-view.js): a note dragged from the list onto the page, or ⋯ → Open side by side, opens beside the one written in; up to four, equal widths; one real editor and toolbar, the active pane holds #editor-frame and the title box, the others show saved content and a press moves the editor there. Beside an NW page an added note is shown NW only (its saved page unchanged). Black-hole pin goes to the top of the Black holes section. Guide + release notes in four languages, signatures replaced. Unit 1359/1359, split-view 19/19 (in smoke), black-holes 90/90, note-folders 60/60. Not released."
+    },
+    {
+      "date": "2026-10-20",
+      "version": "1.0.0",
+      "by": "Claude",
+      "what": "Widget right-click: Copy widget / Delete widget only. Moving a block (grip, card/code drag) never makes columns: dropTarget sides:false; guide 005/093 and the 'Columns by dragging' release note changed in four languages, 1.0.0 signatures replaced. Divider contentSide: content stays left unless wholly right of the cut (wrapped text moved right before). Unit 1353/1353, ideas 16/16, widgets 29/29, block-handle 28/28, layout 128/128, pack:test. Not released."
+    },
+    {
+      "date": "2026-10-20",
+      "version": "1.0.0",
+      "by": "Claude",
+      "what": "Owner's Ideas note: a list in .blk-col/td/th is no longer lifted out (Tab split the columns); Backspace at the start of an indented line outdents first; a divider dropped in a column keeps the content on its side (splitColumn/splitAt keep, contentSide in finish). Widgets shrink in proportion (figure is a container). No markup damage in saved notes, so no migrate step; MARKUP_VERSION stays 0.9.6. Unit 1353/1353, ideas-note 15/15, widgets 28/28, pack:test. Not released."
+    },
+    {
+      "date": "2026-10-19",
+      "version": "1.0.0",
+      "by": "Claude",
+      "what": "Widgets (/widget: calculator, scientific, calendar; src/js/widgets.js; figure.note-image.note-widget, state in data-wg-*, spans only, window-capture keys; Print/PDF/Export With/Without widgets). Locked black holes show initials; Pin to top for holes. Settings font shows only font + size; embeds/bookmarks stay inside toggles; table arrows, pasted URL font, bulk link copy, pointer fixes. Guide 2 blocks + RELEASE_NOTES 4 items in four languages. Unit 1351/1351, widgets e2e 26/26, black-holes 90/90, settings 125/125, pack:test. Divider bug not reproduced exactly. Not released."
+    },
+    {
+      "date": "2026-10-19",
+      "version": "1.0.0",
+      "by": "Claude",
+      "what": "Spell checker on for every language (en, de, pl, tr together) instead of following the app's language; Settings -> Spelling has a box per language (all on), none ticked turns it off (settings.js spell + initSpelling, context-menu.js spellLanguages(list) + setSpellCheckerEnabled). Guide and RELEASE_NOTES['1.0.0'] in four languages. Unit 1327/1327, spelling e2e 6/6, settings e2e 125/125, pack:test. Not released."
+    },
+    {
+      "date": "2026-10-19",
+      "version": "1.0.0",
+      "by": "Claude",
+      "what": "Owner's toggle and column bugs: Enter in a folded toggle's title makes a line under it (it opened the toggle); Backspace/Delete beside a folded toggle no longer delete its folded lines (Chromium's own join did); Tab in a column indents the line, never the column, so the divider stays (toolbar.js looseLine, healColumns strips data-ind from columns). Guide sentence and RELEASE_NOTES['1.0.0'] in four languages. Unit 1325/1325, toggle-keys e2e 9/9, block-handle e2e 25/25, pack:test. Not released."
+    },
+    {
+      "date": "2026-10-19",
+      "version": "1.0.0",
+      "by": "Claude",
+      "what": "Files and videos copied in Explorer/Finder paste with Ctrl+V (rich-paste.js); tables fitted to narrower paper in print/PDF (export.js fitToPaper); macOS com.apple.quarantine on Open/Save a copy (mark-of-the-web.js). Guide blocks and RELEASE_NOTES['1.0.0'] extended in four languages. Unit 1313/1313, block-handle e2e 25/25, table-paper e2e 4/4, pack:test. Not released."
+    },
+    {
+      "date": "2026-10-19",
+      "version": "1.0.0",
+      "by": "Claude",
+      "what": "Every block moved by the mouse, after Notion's observable behaviour: block-handle.js grip, drag with drop line and ghost, side drop makes columns, Alt copy, picked-block keys (Ctrl+C/X/D, Delete, arrows, Ctrl+Shift+arrows), toggle copied and pasted whole, OS file drag mark, divider split keeps the text. Guide 1.0.0 + RELEASE_NOTES['1.0.0'] in four languages. Unit 1309/1309, block-handle e2e 23/23, layout 128/128, pack:test. Not released."
+    },
+    {
+      "date": "2026-10-18",
+      "version": "0.9.9",
+      "by": "Claude",
+      "what": "Precheck on GitHub before every tag: npm run push pushes the release commit to precheck/vX.Y.Z, release.yml runs there without publish, scripts/precheck-ci.js waits; red undoes the commit (reset --mixed) and keeps the version free. CI smoke retries once on exit 2. npm run precheck:ci. Not released."
+    },
     {
       "date": "2026-10-18",
       "version": "0.9.9",

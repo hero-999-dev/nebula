@@ -26,6 +26,7 @@
 import { t } from './i18n.js';
 import { icon } from './icons.js';
 import { el, button, pinField, isPin, newPinFields, refusalWords } from './black-holes.js';
+import { mount as mountSpace } from './lock-space.js';
 
 const api = () => window.nebula?.lock ?? null;
 const say = (text) => window.dispatchEvent(new CustomEvent('nebula-toast', { detail: text }));
@@ -66,12 +67,15 @@ export async function appLockGate() {
   screen.setAttribute('role', 'dialog');
   screen.setAttribute('aria-modal', 'true');
   screen.setAttribute('aria-label', t('Nebula is locked'));
+  // The faint ASCII sky behind the card (lock-space.js); it stops when the screen goes.
+  const space = mountSpace(screen);
   const card = el('div', 'modal hole-modal app-lock__card');
   screen.append(card);
   document.body.append(screen);
 
   return new Promise((resolve) => {
     const done = (res) => {
+      space.stop();
       screen.remove();
       if (app) app.inert = false;
       if (res.cleared) known = { ...known, set: false, on: false, pin: false, passkey: false };

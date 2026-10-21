@@ -13,10 +13,14 @@ That is the release. It:
    installed apps try to update to;
 2. bumps the version in `package.json` (patch by default);
 3. writes an entry in `Log.md` from the commit subjects since the last tag;
-4. commits, tags `vX.Y.Z`, and pushes to `main` with the tag;
-5. rebuilds `Nebula Test.exe` in the project root so the build you click carries
+4. commits, then pushes that commit to a `precheck/vX.Y.Z` branch and waits
+   for GitHub's own build of it (the same Release workflow, nothing published —
+   see **Precheck on GitHub** below). Only a green run continues; a red one
+   undoes the commit and stops, with no tag and nothing on `main`;
+5. tags `vX.Y.Z` and pushes to `main` with the tag;
+6. rebuilds `Nebula Test.exe` in the project root so the build you click carries
    the version that was just released (a running copy is closed first);
-6. publishes the docs site and mirrors the project to the USB drive if it is
+7. publishes the docs site and mirrors the project to the USB drive if it is
    plugged in.
 
 Pushing the tag starts [`.github/workflows/release.yml`](../.github/workflows/release.yml),
@@ -37,7 +41,34 @@ npm run push -- 0.5.2              # exact version
 npm run push -- --notes "Editor v4, faster search"
 npm run push -- --dry-run          # everything except commit/tag/push
 npm run push -- --no-flash         # skip the USB mirror
+npm run push -- --no-precheck      # tag without building the commit on GitHub first
+npm run precheck:ci                # the GitHub build of the current HEAD, no release
 ```
+
+### Precheck on GitHub
+
+0.9.4 to 0.9.8 each passed every gate here and then failed on GitHub's
+runners — a path that held on Windows only, then timing checks a slower
+Windows machine did not meet. The tag was already out each time, so every
+repair cost a version: 0.9.7 and 0.9.8 were never published.
+
+So the release commit is built on GitHub before it is tagged
+([`scripts/precheck-ci.js`](../scripts/precheck-ci.js)). It goes to
+`precheck/vX.Y.Z`, which runs `.github/workflows/release.yml` with every job —
+Windows tests, build, smoke and package; macOS tests and package — except
+publish (`if: startsWith(github.ref, 'refs/tags/v')`). `gh run watch` follows
+it (~10–15 minutes). The branch is deleted afterwards either way.
+
+- **Green:** the tag is pushed and the same workflow runs again on it, this time
+  publishing. A failure there now is a flake, not a bug: re-run the failed job
+  (`gh run rerun <id> --failed`); the tag does not need to move.
+- **Red, or no run found:** the release commit is unwound with `git reset
+  --mixed` and only what the script wrote is taken back (version, stamped
+  surfaces, the `Log.md` entry, the site). Uncommitted work swept into the
+  commit stays in the working tree, unstaged. The version number is still free.
+
+On CI the smoke suite gets the same one retry as here when it exits 2 (the run
+could not finish); exit 1, a failed check, stops at once.
 
 A dry run can leave generated/version-stamped files modified. Review `git diff`
 and preserve pre-existing work; do not blindly discard whole files.
