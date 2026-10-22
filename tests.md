@@ -1,3 +1,23 @@
+## 2026-10-21 — 1.0.1: the owner's note (Claude)
+
+- `tests/v101.test.js` (new): `dashFor` only in German and only between words; `englishOf` brings the label field back to English; `twinkle` stays in its characters and under its alpha; `splitPart` gives three rows, the part in three columns, nothing to heal.
+- `tests/e2e/v101.mjs` (new): no Zoom in on right-click; the label field in Turkish and back; the minimap Fit button; the German dash typed; a divider in a toggle makes two columns; the lower of two dividers in a column cuts only the part under it (the owner's note structure).
+- `tests/e2e/settle.mjs` (new): `until`, `steady`, `steadyDrag`. `tests/e2e/v093.mjs`: the folder drags wait for still rows and each check for its state; the fold check says whether the note was still in the folder; the vault file is polled, not read after 600 ms. `tests/e2e/v094.mjs`: the arrow click measured still again and the fold waited for.
+- `tests/e2e/smoke.mjs`: suites run from a named list, each check filed under its file, failures written to `test-results/smoke-failed.json`; `v101` added. `tests/e2e/only.mjs`: dense runs on the old note as in smoke. v093 + v094 + v101 alone 261/261.
+- `tests/e2e/smoke.mjs`: a suite that throws (not a timeout) is a failed check "<suite> ran to its end", and the rest run. `tests/e2e/black-holes.mjs`: `noteHole` waits for both menus (5 s, 10 s) and tries again up to three times; 90/90 alone.
+- `tests/e2e/dense.mjs`: the saved-note check leaves out the Universe's live map layer (`.wg-live`, kept out of saved notes by note-markup.js) and says where saved and opened first differ; it failed on an old note holding a Universe.
+- `tests/e2e/ai-sleep.mjs`: each AI page is looked for as its tab opens; GitHub's Windows build took longer than the 4 s sleep time from "one" to "three", and "one" was rightly asleep at the check (1199/1200).
+- Guide signatures (`seed-notes.js`): 1.0.1 added, the previous ones kept as "1.0.0 review fixes"; `seed-guide` and `guide-i18n` tests pass on them. Unit 1522/1522.
+
+## 2026-10-21 — 1.0.0: fixes from three cloud reviews (Claude)
+
+- `tests/import.test.js`: an imported widget keeps its data-wg-* state and loses the exported drawing, so the app draws it once.
+- `tests/heal.test.js`: museum exhibit "up to 1.0.0: an imported widget kept the exported drawing" — `figure.note-widget > :not(.wg)` gone, `.wg` kept.
+- `tests/migrate.test.js`: MARKUP_VERSION 1.0.1 (dropStaleWidgetDrawings).
+- `tests/precheck-ci.test.js`: a run of the same commit from before the push is skipped; the tag names `releaseSha`; `--no-smoke` with `--no-precheck` is refused; one REPO.
+- `tests/seed-guide.test.js`, `tests/guide-i18n.test.js`: new 1.0.0 signatures (paragraph 091), the shipped ones kept as "1.0.0 release".
+- Unit 1516/1516.
+
 ## 2026-10-21 — 1.0.0: Universe, third round (Claude + forks)
 
 - `tests/galaxy-even.test.js` (new): 3/4/5 project folders evenly spaced at t=0 and t=900; outer ring and black holes even; a project's loose notes carry its hue; the core is bigger and its first ring clear; no two systems touch.
@@ -133,6 +153,13 @@
 - The undo path was run for real on a throwaway clone with a local bare `origin` and the gates stubbed: 0.9.9 → 0.9.10 bumped, committed, `precheck/v0.9.10` pushed to the bare origin, no run found on GitHub (read-only `gh run list`), then the commit undone — package.json, memory.json, README, Prompt back to 0.9.9, the Log.md entry gone, no tag, the precheck branch deleted from origin, an untracked file left in place. The `gh` JSON fields were checked read-only against Release run 39127956630 (headSha matched v0.9.9's commit; conclusion success).
 - Not yet run: a real precheck on GitHub. The first `npm run push`, or `npm run precheck:ci`, is the live proof.
 
+## 2026-10-18 — v0.9.9 Windows CI disk timing (Codex)
+
+- Release verified: `npm run push` passed 1276/1276 unit, 1041/1041 Electron smoke, both Dünya Halleri rebuilds at 100% and old-note trials. GitHub Actions Release run 39127956630 passed build-win, build-mac and publish; v0.9.9 has Windows installer/portable, macOS DMG/ZIP, `latest.yml` and `latest-mac.yml`.
+- v0.9.8 passed local release gates (1276/1276 unit, 1041/1041 smoke, two page rebuilds 100%, old-note trials) and its macOS CI package. Windows CI passed both repaired AI checks but failed 1039/1041 on two different disk timing assertions, so the combined GitHub release was skipped.
+- `tests/e2e/v093.mjs` now waits for the preceding editor edit's debounced disk write before comparing the timestamp around a page-only change. `tests/e2e/app-lock-opened.mjs` waits for backup shredding separately after the live markerless plain file disappears. The checks still prove that page changes do not date a note and reconciled plaintext leaves the backup.
+- `npm test` passed 1276/1276 after the timing edits. `npm run build` and full Electron smoke passed 1041/1041 with both formerly failing disk assertions green. The full v0.9.9 release chain will rerun unit, smoke, old-note trials and page rebuild; GitHub Windows and macOS packaging remain to confirm.
+
 ## 2026-10-18 — v0.9.8 CI timing regressions (Codex)
 
 - v0.9.7 local release gates passed, but Windows GitHub Actions smoke failed 1040/1041 in the first attempt: the temporary AI passkey webview had not attached after a fixed 2.5 s wait. The second attempt failed 1039/1041: keyboard events reached the AI sleep guest before its textarea was focused, leaving the draft empty. The failures were in different tests; the macOS package job passed both times, but the combined GitHub release was skipped.
@@ -144,6 +171,43 @@
 - Mistral's final independent review approved the trash confirmation, PIN proof, recovery rotation, menu wording, guide and tracking changes. The latest full validation before release was unit 1276/1276, Blackhole Electron e2e 86/86, smoke 1041/1041, build and pack:test passed.
 - The 0.9.7 release notes and guide section were added in English, German, Polish and Turkish. The old key bullet was removed from the 0.9.6 guide list; the new guide signatures were recorded. `tests/seed-guide.test.js` and `tests/guide-i18n.test.js` pass 24/24, proving the translated block order and signatures agree.
 - `npm run push` passed unit 1276/1276, smoke 1041/1041, rebuild 100% on two pages with long-note trials and old-note trials on Nebula Test copies. It pushed v0.9.7, refreshed Nebula Test.exe, published the site and synced the USB mirror.
+
+## 2026-10-18 04:36 — v0.9.6: owner round two (Mistral Vibe)
+
+- `tests/black-holes.test.js`: `changePin` proves the old answer first — no answer is `pin`, a wrong current PIN is `wrong` (counted), a passkey on a hole without one is refused, hello beside the PIN works, a first-build hello hole takes its PIN through the passkey; still `locked` while shut, `storage-unavailable` for a legacy os:false wrapper.
+- `tests/e2e/black-holes.mjs`: the Change PIN dialog asks for the current PIN before the new one; a wrong current PIN changes nothing; the right one changes it and the old PIN is no key from then on; no passkey button beside an open hole's notes (the ⋯ menu is where it lives); a note in a hole is offered "Move to notes".
+- `tests/e2e/deleted.mjs`, `note-folders.mjs`, `smoke.mjs`: Trash Delete presses are two — the first arms "Delete for good?", the second destroys — matching note-actions.js, which now arms every Trash Delete, Blackhole note or plain note.
+- Guide (`seed-notes.js`, `guide-de/pl/tr.js`): the stale passkey-offer wording removed; the kept-tight credentials (recovery rotation, PIN change after the current answer) and the asking Trash described in four languages; `GUIDE_SIGNATURES` updated (released 0.9.6 keys still preserved).
+- Full unit suite 1276/1276; focused e2e 86/86; full smoke 1041/1041. `npm run pack:test` refreshed the root Nebula Test.exe.
+
+## 2026-10-18 02:50 — v0.9.6: owner test round fixes (Mistral Vibe)
+
+- `tests/black-holes.test.js`: `newRecovery` replaces the sealed recovery wrapper — the old key no longer opens (with the new-PIN flow), the new key does; refused `locked` while the hole is closed; the new key never appears in the clear on the disk.
+- `tests/e2e/black-holes.mjs`: the open-hole menu lists New recovery key; the rotation dialog warns that the old key stops working before making one, shows the new key once, and swaps the on-disk box; a passkey-less open hole offers Add a passkey beside its notes and the offer adds it; a Blackhole note in the Trash is marked "Black hole", its Delete arms with "Delete for good?" while the sealed file stays, and the second press destroys it from the hole and the backup.
+- Guide (`src/js/seed-notes.js`, `guide-de/pl/tr.js`): the two features in four languages; `GUIDE_SIGNATURES` keeps the released 0.9.6 guide reachable under "0.9.6 released" keys so unedited vaults still update.
+- Full unit suite 1276/1276; focused Electron black-holes e2e 82/82; full smoke 1037/1037 in a clean run (two earlier runs each tripped on one load-flaky check outside the changed code — a clipboard read and a pdf click — each passed in the other runs). `npm run pack:test` refreshed the root Nebula Test.exe.
+
+## 2026-10-18 01:02 — v0.9.6: Final validation round (Mistral Vibe)
+
+- Full unit suite 1275/1275 (73 files): the race/deletion-guard suite now covers nine mid-deletion attempts; junction and short-write shredding are pinned; the passkey-only delete dialog regression (the hoisted confirm button) is exercised in the focused e2e and the full smoke.
+- Full Electron smoke passed end to end: black-hole flows, opened-copy clearing, backup label migration, removal/lock races, the four-step delete, markerless reconciliation, the guide, the dense long-note trials and the canvas all green.
+- `npm run pack:test` refreshed `Nebula Test.exe` (106.8 MB, SHA-256 `724FD1513D63074D0B1007C2F6D26FEF1423F52A6907B3DE7FA07A8A93F8ED58`). Owner tests next per `docs/BLACKHOLE-TESTS.md`.
+
+## 2026-10-17 23:50 — v0.9.6: large-media deletion and GPT race review (Codex + Mistral Vibe)
+
+- `tests/backup-purge.test.js`: asynchronous purge removes a 16 MiB ordinary-note backup and sealed Blackhole note/media copies; invalid IDs cannot select another folder. The same path removes a whole Blackhole from backups.
+- `tests/opened-files.test.js`: a 16 MiB opened attachment copy is removed asynchronously with its note while another note's copy remains.
+- `tests/note-media.test.js` and `tests/black-holes.test.js`: asynchronous folder removal; lock during unlock cleanup; write/import during note removal; concurrent whole-hole deletion, restore, rename, prove and a second wrong-PIN delete; short-write shredding; symbolic links and junctions. The wrong-PIN attempt proves no metadata can be written mid-shred. `tests/e2e/black-holes.mjs` checks the explicit final confirmation for PIN, passkey and a synthetic first-build passkey-only hole.
+- `tests/backup-purge.test.js` and `tests/opened-files.test.js`: Windows junctions at purge roots and a backup notes ancestor leave outside targets untouched.
+- Focused suites passed 155/155; full unit suite passed 1275/1275; build and browser check passed. Full smoke and test package are in progress. No installed/private profile was accessed.
+
+## 2026-10-17 19:00 — v0.9.6: owner's Blackhole playback, label and latency follow-up (Codex + GLM-5.3)
+
+- GLM's throwaway Electron probe found the empty Blackhole deletion arm was skipped; `tests/e2e/black-holes.mjs` covers empty and populated holes, both clicks, PIN prompt and final button. Typing a complete PIN alone leaves the hole intact.
+- `tests/black-holes.test.js` covers encrypted labels and legacy live metadata migration, async large-note writes, latest-write ordering, lock during async reads and active-import deletion refusal. `tests/backup-purge.test.js` checks local backup label migration.
+- `tests/disk-store.test.js` checks that moving a note waits for the encrypted write and ordinary-file purge. `tests/notes.test.js` checks a large embedded image does not make the sidebar scan its full contents. `tests/e2e/app-lock-opened.mjs` checks old live and backup labels are migrated in the real app.
+- Full unit suite: 1260/1260; Blackhole Electron flow passed. Build and browser/Electron check passed. Full smoke: 1028/1028 twice, the second run after the move rollback race fix. `npm run pack:test` passed; root Nebula Test.exe refreshed (SHA-256 `4A79894D037EC22DF9DCDC5999E7BA0CFE936A5091B5DF2026537268E4DCBAC4`).
+- No HTML markup changed, so no note migration or guide update is needed. Manual Windows timing, actual Windows Hello and macOS remain owner/platform tests.
 
 ## 2026-10-17 06:38 — v0.9.6: Blackhole security follow-up (Codex + GLM-5.3 via Mistral Vibe)
 
@@ -2340,44 +2404,3 @@ an unparseable tag returns null rather than a wrong answer.
 - **Update rollback.** There is no downgrade path; the backup is the answer.
 
 - Local report-copy verification: H3 changes only the reported paragraph; Backspace removes the slash beside its divider; the source note remains byte-identical. Private fixtures and the probe stay under test-results/.
-## 2026-10-17 19:00 — v0.9.6: owner's Blackhole playback, label and latency follow-up (Codex + GLM-5.3)
-
-- GLM's throwaway Electron probe found the empty Blackhole deletion arm was skipped; `tests/e2e/black-holes.mjs` covers empty and populated holes, both clicks, PIN prompt and final button. Typing a complete PIN alone leaves the hole intact.
-- `tests/black-holes.test.js` covers encrypted labels and legacy live metadata migration, async large-note writes, latest-write ordering, lock during async reads and active-import deletion refusal. `tests/backup-purge.test.js` checks local backup label migration.
-- `tests/disk-store.test.js` checks that moving a note waits for the encrypted write and ordinary-file purge. `tests/notes.test.js` checks a large embedded image does not make the sidebar scan its full contents. `tests/e2e/app-lock-opened.mjs` checks old live and backup labels are migrated in the real app.
-- Full unit suite: 1260/1260; Blackhole Electron flow passed. Build and browser/Electron check passed. Full smoke: 1028/1028 twice, the second run after the move rollback race fix. `npm run pack:test` passed; root Nebula Test.exe refreshed (SHA-256 `4A79894D037EC22DF9DCDC5999E7BA0CFE936A5091B5DF2026537268E4DCBAC4`).
-- No HTML markup changed, so no note migration or guide update is needed. Manual Windows timing, actual Windows Hello and macOS remain owner/platform tests.
-## 2026-10-17 23:50 — v0.9.6: large-media deletion and GPT race review (Codex + Mistral Vibe)
-
-- `tests/backup-purge.test.js`: asynchronous purge removes a 16 MiB ordinary-note backup and sealed Blackhole note/media copies; invalid IDs cannot select another folder. The same path removes a whole Blackhole from backups.
-- `tests/opened-files.test.js`: a 16 MiB opened attachment copy is removed asynchronously with its note while another note's copy remains.
-- `tests/note-media.test.js` and `tests/black-holes.test.js`: asynchronous folder removal; lock during unlock cleanup; write/import during note removal; concurrent whole-hole deletion, restore, rename, prove and a second wrong-PIN delete; short-write shredding; symbolic links and junctions. The wrong-PIN attempt proves no metadata can be written mid-shred. `tests/e2e/black-holes.mjs` checks the explicit final confirmation for PIN, passkey and a synthetic first-build passkey-only hole.
-- `tests/backup-purge.test.js` and `tests/opened-files.test.js`: Windows junctions at purge roots and a backup notes ancestor leave outside targets untouched.
-- Focused suites passed 155/155; full unit suite passed 1275/1275; build and browser check passed. Full smoke and test package are in progress. No installed/private profile was accessed.
-
-## 2026-10-18 01:02 — v0.9.6: Final validation round (Mistral Vibe)
-
-- Full unit suite 1275/1275 (73 files): the race/deletion-guard suite now covers nine mid-deletion attempts; junction and short-write shredding are pinned; the passkey-only delete dialog regression (the hoisted confirm button) is exercised in the focused e2e and the full smoke.
-- Full Electron smoke passed end to end: black-hole flows, opened-copy clearing, backup label migration, removal/lock races, the four-step delete, markerless reconciliation, the guide, the dense long-note trials and the canvas all green.
-- `npm run pack:test` refreshed `Nebula Test.exe` (106.8 MB, SHA-256 `724FD1513D63074D0B1007C2F6D26FEF1423F52A6907B3DE7FA07A8A93F8ED58`). Owner tests next per `docs/BLACKHOLE-TESTS.md`.
-
-## 2026-10-18 02:50 — v0.9.6: owner test round fixes (Mistral Vibe)
-
-- `tests/black-holes.test.js`: `newRecovery` replaces the sealed recovery wrapper — the old key no longer opens (with the new-PIN flow), the new key does; refused `locked` while the hole is closed; the new key never appears in the clear on the disk.
-- `tests/e2e/black-holes.mjs`: the open-hole menu lists New recovery key; the rotation dialog warns that the old key stops working before making one, shows the new key once, and swaps the on-disk box; a passkey-less open hole offers Add a passkey beside its notes and the offer adds it; a Blackhole note in the Trash is marked "Black hole", its Delete arms with "Delete for good?" while the sealed file stays, and the second press destroys it from the hole and the backup.
-- Guide (`src/js/seed-notes.js`, `guide-de/pl/tr.js`): the two features in four languages; `GUIDE_SIGNATURES` keeps the released 0.9.6 guide reachable under "0.9.6 released" keys so unedited vaults still update.
-- Full unit suite 1276/1276; focused Electron black-holes e2e 82/82; full smoke 1037/1037 in a clean run (two earlier runs each tripped on one load-flaky check outside the changed code — a clipboard read and a pdf click — each passed in the other runs). `npm run pack:test` refreshed the root Nebula Test.exe.
-
-## 2026-10-18 04:36 — v0.9.6: owner round two (Mistral Vibe)
-
-- `tests/black-holes.test.js`: `changePin` proves the old answer first — no answer is `pin`, a wrong current PIN is `wrong` (counted), a passkey on a hole without one is refused, hello beside the PIN works, a first-build hello hole takes its PIN through the passkey; still `locked` while shut, `storage-unavailable` for a legacy os:false wrapper.
-- `tests/e2e/black-holes.mjs`: the Change PIN dialog asks for the current PIN before the new one; a wrong current PIN changes nothing; the right one changes it and the old PIN is no key from then on; no passkey button beside an open hole's notes (the ⋯ menu is where it lives); a note in a hole is offered "Move to notes".
-- `tests/e2e/deleted.mjs`, `note-folders.mjs`, `smoke.mjs`: Trash Delete presses are two — the first arms "Delete for good?", the second destroys — matching note-actions.js, which now arms every Trash Delete, Blackhole note or plain note.
-- Guide (`seed-notes.js`, `guide-de/pl/tr.js`): the stale passkey-offer wording removed; the kept-tight credentials (recovery rotation, PIN change after the current answer) and the asking Trash described in four languages; `GUIDE_SIGNATURES` updated (released 0.9.6 keys still preserved).
-- Full unit suite 1276/1276; focused e2e 86/86; full smoke 1041/1041. `npm run pack:test` refreshed the root Nebula Test.exe.
-## 2026-10-18 — v0.9.9 Windows CI disk timing (Codex)
-
-- Release verified: `npm run push` passed 1276/1276 unit, 1041/1041 Electron smoke, both Dünya Halleri rebuilds at 100% and old-note trials. GitHub Actions Release run 39127956630 passed build-win, build-mac and publish; v0.9.9 has Windows installer/portable, macOS DMG/ZIP, `latest.yml` and `latest-mac.yml`.
-- v0.9.8 passed local release gates (1276/1276 unit, 1041/1041 smoke, two page rebuilds 100%, old-note trials) and its macOS CI package. Windows CI passed both repaired AI checks but failed 1039/1041 on two different disk timing assertions, so the combined GitHub release was skipped.
-- `tests/e2e/v093.mjs` now waits for the preceding editor edit's debounced disk write before comparing the timestamp around a page-only change. `tests/e2e/app-lock-opened.mjs` waits for backup shredding separately after the live markerless plain file disappears. The checks still prove that page changes do not date a note and reconciled plaintext leaves the backup.
-- `npm test` passed 1276/1276 after the timing edits. `npm run build` and full Electron smoke passed 1041/1041 with both formerly failing disk assertions green. The full v0.9.9 release chain will rerun unit, smoke, old-note trials and page rebuild; GitHub Windows and macOS packaging remain to confirm.

@@ -47,6 +47,15 @@
  *
  * Taking one of several upright dividers away joins the two columns at its
  * sides; the last one taken away ends the columns.
+ *
+ * A part of a column (1.0.1): a divider in a column, pulled sideways and up or
+ * down over its own column, cuts only its part of it — what lies between it
+ * and the next divider, or the part the pointer is over — the way it does on
+ * the note; pulled level with itself, it still cuts the whole column
+ * (the owner: "I want to split this part with the divider above, into small
+ * pieces"). Columns do not nest, so the block is cut across into the rows
+ * above that part, the part, and the rows under it; only the part's row gets
+ * the new column.
  */
 
 import { showDropMark, hideDropMark } from './drop-mark.js';
@@ -127,6 +136,7 @@ const blankLine = (doc) => {
 };
 
 /** The blocks of a flow that take part in the text. */
+const BODY = 'toggle-body';
 const blocksOf = (parent) => [...parent.children].filter((el) => !el.matches(LAYER));
 const isBound = (el) => el.matches(`${HR}, .${COLS}`);
 
@@ -297,6 +307,80 @@ export function splitColumn(col, pct, hr = null, least = MIN_COL, keep = null) {
   splits.splice(k, 0, p);
   setSplits(cols, splits);
   return { cols, empty };
+}
+
+/**
+ * A part of a column cut in two (1.0.1): the columns are cut across, above and
+ * under the part, so it has a row of its own, and that row's column is split
+ * (splitColumn). The other columns' blocks go to the row they stand beside.
+ * @param {HTMLElement} col the column the part is in
+ * @param {Element[]} blocks the part: neighbours in `col`, in order
+ * @param {number} pct the pointer, as a share of the line
+ * @param {HTMLElement|null} [hr] the divider that was dragged; it is taken out of the flow
+ * @param {number} [least] @param {'left'|'right'|null} [keep] as for splitColumn
+ * @returns {{cols: HTMLElement, empty: HTMLElement}|null}
+ */
+export function splitPart(col, blocks, pct, hr = null, least = MIN_COL, keep = null) {
+  const cols = col?.parentElement;
+  if (!cols?.classList.contains(COLS) || !blocks.length || splitPoint(col, pct, least) === null) return null;
+  const doc = col.ownerDocument;
+  const columns = columnsOf(cols);
+  const ci = columns.indexOf(col);
+  const rects = blocks.map((el) => el.getBoundingClientRect());
+  const top = Math.min(...rects.map((r) => r.top));
+  const bottom = Math.max(...rects.map((r) => r.bottom));
+  hr?.remove();
+  const own = [...col.children];
+  const a = own.indexOf(blocks[0]);
+  const b = own.indexOf(blocks.at(-1));
+  if (a < 0 || b < a) return null;
+  // Per row (above, the part, under), per column, the blocks that go there.
+  const rows = [0, 1, 2].map(() => columns.map(() => []));
+  columns.forEach((c, i) => {
+    for (const el of [...c.children]) {
+      let k = 1;
+      if (c === col) { const j = own.indexOf(el); k = j < a ? 0 : j > b ? 2 : 1; }
+      else if (!el.matches(LAYER)) {
+        const r = el.getBoundingClientRect();
+        const mid = (r.top + r.bottom) / 2;
+        k = mid < top ? 0 : mid > bottom ? 2 : 1;
+      }
+      rows[k][i].push(el);
+    }
+  });
+  // A row of nothing but empty lines is no row: its lines stay with the part.
+  for (const k of [0, 2]) {
+    if (!rows[k].every((list) => list.every(isBlank))) continue;
+    rows[k].forEach((list, i) => { if (k) rows[1][i].push(...list); else rows[1][i].unshift(...list); });
+    rows[k] = columns.map(() => []);
+  }
+  const rules = rulesOf(cols);
+  // A row that ends on a divider or a picture keeps a line to write on.
+  const fill = (c, list) => {
+    c.append(...list);
+    if (!c.firstElementChild || c.lastElementChild.matches(NO_CARET_UNDER)) c.append(blankLine(doc));
+  };
+  // The rows above and under are new blocks; the part's row is the block itself,
+  // so its columns keep what they carry (an id, a width).
+  const row = (k) => {
+    if (rows[k].every((list) => !list.length)) return null;
+    const block = cols.cloneNode(false);
+    block.removeAttribute('id');
+    rows[k].forEach((list, i) => {
+      if (i) block.append(rules[i - 1]?.cloneNode(false) ?? Object.assign(doc.createElement('hr'), { className: VR }));
+      const c = columns[i].cloneNode(false);
+      c.removeAttribute('id');
+      fill(c, list);
+      block.append(c);
+    });
+    return block;
+  };
+  const above = row(0);
+  const under = row(2);
+  rows[1].forEach((list, i) => { columns[i].replaceChildren(); fill(columns[i], list); });
+  if (above) cols.before(above);
+  if (under) cols.after(under);
+  return splitColumn(columns[ci], pct, null, least, keep);
 }
 
 /**
@@ -546,13 +630,34 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
   function over(x, y) {
     const hr = drag.hr;
     const row = hr.getBoundingClientRect();
-    const onNote = hr.parentElement === editorEl;
+    // A toggle's body is a flow of its own, like the note (1.0.1: "pictures in
+    // toggles cannot be put side by side with dividers", the owner) — but not
+    // in a column, where columns would nest.
+    const onNote = flat(hr.parentElement);
     const box = contentBox(hr.parentElement);
     // Sideways only when the pull is more across than up or down: a divider
     // carried a long way up or down drifts aside on the way, and turned into
     // a split instead of moving (1.0.0: "I cannot drag the lower of two
     // dividers to places I could", the owner).
     const sideways = Math.abs(x - drag.x) >= TURN && Math.abs(x - drag.x) >= Math.abs(y - drag.y) * 0.75;
+    // Pulled sideways over its own column: only its part of it (1.0.1).
+    const home = hr.parentElement.classList.contains(COL) ? hr.parentElement : null;
+    if (sideways && home && flowAt(editorEl, x, y) === home) {
+      const blocks = partIn(hr, home, y, row);
+      const cols = home.parentElement;
+      const line = contentBox(cols);
+      const pct = ((x - line.left) / Math.max(1, line.right - line.left)) * 100;
+      const p = blocks ? splitPoint(home, pct, leastOf(cols)) : null;
+      if (p !== null) {
+        const at = line.left + ((line.right - line.left) * p) / 100;
+        const rects = blocks.map((el) => el.getBoundingClientRect());
+        const top = Math.min(...rects.map((r) => r.top));
+        const bottom = Math.max(...rects.map((r) => r.bottom));
+        const part = home.getBoundingClientRect();
+        showDropMark({ left: at - 1.5, top, width: 3, height: bottom - top }, { left: part.left, top, width: part.width, height: bottom - top });
+        return { kind: 'part', col: home, blocks, pct };
+      }
+    }
     // Pulled sideways over a column: that column is cut in two where the pointer is.
     const col = sideways ? columnAt(x, y) : null;
     if (col) {
@@ -569,7 +674,7 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
       // Pulled sideways: it stands up where the pointer is.
       const where = y < row.top - 8 ? 'above' : y > row.bottom + 8 ? 'below' : 'row';
       // Over a part of the note away from the divider's own: that part (1.0.0).
-      const under = where === 'row' ? null : partUnder(hr, y);
+      const under = where === 'row' ? null : partUnder(hr, y, hr.parentElement);
       let from = null;
       if (where !== 'row' && !under) {
         const all = sectionOf(hr, where);
@@ -588,7 +693,9 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
       return { kind: 'split', blocks, pct };
     }
     // Pulled up or down: to another place between two blocks.
-    const gap = gapAt(flowAt(editorEl, x, y), y);
+    const body = hr.parentElement.classList.contains(BODY) ? hr.parentElement.getBoundingClientRect() : null;
+    const inBody = body && x >= body.left && x <= body.right && y >= body.top - 8 && y <= body.bottom + 8;
+    const gap = gapAt(inBody ? hr.parentElement : flowAt(editorEl, x, y), y);
     const mine = gap.units.findIndex((u) => u.els.includes(hr));
     if (mine >= 0 && (gap.slot === mine || gap.slot === mine + 1)) { hideDropMark(); return null; }
     showDropMark(gap.line);
@@ -599,8 +706,13 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
    * The part of the note under the pointer, when it is not the divider's own
    * part (there the split starts at the block the pointer is over, as before).
    */
-  function partUnder(hr, y) {
-    const all = blocksOf(editorEl);
+  /** A flow a divider stands up in: the note, or a toggle's body that is in no column. */
+  function flat(parent) {
+    return parent === editorEl || (!!parent?.classList.contains(BODY) && !parent.closest(`.${COL}`));
+  }
+
+  function partUnder(hr, y, flow = editorEl) {
+    const all = blocksOf(flow);
     const el = all.find((b) => {
       if (b === hr) return false;
       const r = b.getBoundingClientRect();
@@ -611,6 +723,28 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
     const i = all.indexOf(hr);
     if (part.includes(all[i - 1]) || part.includes(all[i + 1])) return null;
     return part.length ? part : null;
+  }
+
+  /**
+   * The part of its column a divider pulled sideways would cut, when the
+   * pointer is above or under it: as on the note, its own part or the part
+   * the pointer is over. Null when it stays level with the divider, or the
+   * part is the whole column — then the column is cut, as before.
+   */
+  function partIn(hr, col, y, row) {
+    const where = y < row.top - 8 ? 'above' : y > row.bottom + 8 ? 'below' : 'row';
+    if (where === 'row') return null;
+    const under = partUnder(hr, y, col);
+    let from = null;
+    if (!under) {
+      const all = sectionOf(hr, where);
+      from = where === 'above'
+        ? all.find((el) => el.getBoundingClientRect().bottom > y) ?? null
+        : [...all].reverse().find((el) => el.getBoundingClientRect().top < y) ?? null;
+    }
+    const blocks = under ?? sectionOf(hr, where, from);
+    const rest = blocksOf(col).filter((el) => el !== hr && !blocks.includes(el) && !isBlank(el));
+    return blocks.length && rest.length ? blocks : null;
   }
 
   /** The column under a point that can be cut in two, if there is one. */
@@ -676,6 +810,14 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
       if (d.target.before?.isConnected) d.target.before.before(d.hr); else d.target.parent.append(d.hr);
       // A divider at the very end leaves no line to go on with.
       if (!d.hr.nextElementSibling) d.hr.after(blankLine(document));
+    } else if (d.target.kind === 'part') {
+      const { col, blocks: part } = d.target;
+      const cols = col.parentElement;
+      const live = part.filter((el) => el.isConnected && el.parentElement === col);
+      const p = live.length && cols ? splitPoint(col, d.target.pct, leastOf(cols)) : null;
+      const keep = p === null ? null : contentSide(live, xOf(p, cols));
+      const made = p === null ? null : splitPart(col, live, d.target.pct, d.hr, leastOf(cols), keep);
+      if (made) caretIn(made.empty.firstElementChild);
     } else if (d.target.kind === 'column') {
       const col = d.target.col;
       const cols = col.parentElement;
@@ -697,7 +839,7 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
     const hr = e.target.closest?.(HR);
     if (!hr || e.button !== 0 || isLocked() || !editorEl.contains(hr)) return;
     // Only where blocks stand in a row of their own: on the note, or in a column.
-    if (hr.parentElement !== editorEl && !hr.parentElement?.classList.contains(COL)) return;
+    if (hr.parentElement !== editorEl && !hr.parentElement?.classList.contains(COL) && !hr.parentElement?.classList.contains(BODY)) return;
     drag = { hr, x: e.clientX, y: e.clientY, moved: false, target: null };
   }, true);
 

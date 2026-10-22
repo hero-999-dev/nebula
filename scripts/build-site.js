@@ -63,7 +63,7 @@ const overview = `
 </div>
 <div class="cards">
   <div class="card"><h3>What it is</h3><p>An Electron note app for Windows and macOS. One window: a list of notes, a title, an editor. Everything else serves the editor.</p></div>
-  <div class="card"><h3>Where your notes are</h3><p>One JSON file per note in your user profile, written atomically. Not beside the app — an update or an uninstall cannot touch them.</p></div>
+  <div class="card"><h3>Where your notes are</h3><p>A folder per note in your user profile: its JSON, written atomically, with its pictures and videos beside it. Not beside the app — an update or an uninstall cannot touch them.</p></div>
   <div class="card"><h3>How it updates</h3><p>The installed Windows app sees a new release, downloads it when you press Update, and installs silently. macOS is unsigned, so it points you at the download instead.</p></div>
   <div class="card"><h3>Quality</h3><p>${esc(String(memory.quality?.unitTests ?? '—'))} unit tests and ${esc(String(memory.quality?.smokeChecks ?? '—'))} Electron checks that drive the real app on throwaway profiles.</p></div>
 </div>

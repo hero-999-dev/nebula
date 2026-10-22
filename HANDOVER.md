@@ -45,8 +45,8 @@ GitHub Releases, and updates itself in place on Windows.
 | Stack | Electron 44 (Chromium 152, Node 24) · Vite 6 · vanilla ES modules · Vitest · playwright-core |
 | Renderer | `src/` — no framework, no build magic beyond Vite |
 | Main | `electron/main.js` + `electron/preload.js` — the only place with disk access |
-| Storage | `<userData>/storage/notes/<id>.json`, mirrored from `localStorage`; `storage/folders.json` holds the list's folders |
-| Tests | `npm test` (370 unit) · `npm run smoke` (231 Electron checks against the real app) |
+| Storage | `<userData>/storage/notes/<id>/<id>.json` (a folder per note, its pictures and videos beside it), mirrored from `localStorage`; `storage/folders.json` holds the list's folders |
+| Tests | `npm test` (1522 unit) · `npm run smoke` (1200 Electron checks against the real app) |
 
 It is a deliberate rewrite of `../Nebula Demo/` (v0.5.7, feature-complete but
 sprawling), pairing that project's plumbing with `../Ember/`'s visual language.
@@ -611,7 +611,7 @@ Every one of these is silent — the app builds, installs and runs while wrong.
 | **Portable** — `Nebula-portable-*.exe` from a release | `portable` | `<folder of the exe>\Nebula-data` |
 | **Dev** — `npm run dev` | `dev` | `<repo>\.dev-profile` (via `NEBULA_USER_DATA`) |
 
-Inside any of them: `storage\notes\<id>.json`, `storage\meta.json`, `storage\folders.json`, `backups\`.
+Inside any of them: `storage\notes\<id>\<id>.json`, `storage\meta.json`, `storage\folders.json`, `backups\`.
 
 Electron derives `userData` from the package name, so **all four would be the
 same directory** if nothing intervened — and for a while the portable build in

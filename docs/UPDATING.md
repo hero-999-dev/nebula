@@ -85,10 +85,10 @@ Inside it:
 
 ```
 storage/
-  notes/<id>.json     one file per note
+  notes/<id>/         one folder per note: <id>.json, its pictures and videos
   meta.json           which version last opened this vault
 backups/
-  YYYY-MM-DD/         a daily copy, newest 7 kept
+  YYYY-MM-DD/         a daily copy, the newest kept
   pre-update-<v>-<t>/ Windows in-app installer snapshot (not manual Mac updates)
   reset-<t>/          only if you ran the developer reset script
 Local Storage/        note list, layout and theme

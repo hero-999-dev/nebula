@@ -1497,12 +1497,12 @@ button.te-chip { padding: 3px 10px; cursor: pointer; }
 }
 .galaxy-grip:active { cursor: grabbing; }
 .galaxy-grip .ic { width: 15px; height: 15px; color: var(--clay); }
-.galaxy-full {
+.galaxy-full, .galaxy-mini-fit {
   flex-shrink: 0; width: 24px; height: 22px; display: grid; place-items: center; padding: 0; cursor: pointer;
   border: 1.4px solid var(--rule); border-radius: 6px; background: var(--paper-raised); color: var(--ink-soft);
 }
-.galaxy-full svg { width: 13px; height: 13px; }
-.galaxy-full:hover, .galaxy-full.on { border-color: var(--clay); color: var(--clay); }
+.galaxy-full svg, .galaxy-mini-fit svg { width: 13px; height: 13px; }
+.galaxy-full:hover, .galaxy-full.on, .galaxy-mini-fit:hover { border-color: var(--clay); color: var(--clay); }
 .galaxy-mini .galaxy-canvas { display: block; width: 100%; height: 120px; cursor: default; outline: none; }
 .galaxy-canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--clay); }
 #app.side-collapsed .galaxy-slot { display: none; }
@@ -1547,6 +1547,11 @@ button.te-chip { padding: 3px 10px; cursor: pointer; }
 }
 .galaxy-search:focus-within { border-color: var(--clay); }
 .galaxy-chips { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+/* With chips the field takes a line of its own when the row is full, so its
+   placeholder is never squeezed or cut (owner, 1.0.1). */
+.galaxy-search.has-chips { flex-wrap: wrap; padding-top: 3px; padding-bottom: 3px; }
+.galaxy-search.has-chips .galaxy-search-input { flex: 1 0 150px; }
+.galaxy-chip.gone { opacity: 0.45; }
 .galaxy-chip {
   display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 2px 0 6px; border-radius: 10px;
   font-size: 11.5px; color: var(--ink); white-space: nowrap;

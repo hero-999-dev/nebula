@@ -837,6 +837,23 @@ const ATTRS = ['title', 'placeholder', 'aria-label', 'data-placeholder'];
 const textSource = new WeakMap();   // Text -> {en, shown}
 const attrSource = new WeakMap();   // Element -> {attr: {en, shown}}
 
+/* Text the app made with t() while another language was chosen came in
+   already translated, so no English was kept for it, and a change of
+   language left it as it was: the map's search kept its Turkish placeholder
+   in English (owner, 1.0.1). Such text is read back to its English here. */
+let fromShown = null;                // translation -> English, every language
+function englishOf(value) {
+  if (typeof value !== 'string') return value;
+  const core = value.trim();
+  if (!core || STRINGS[core]) return value;
+  if (!fromShown) {
+    fromShown = new Map();
+    for (const [en, row] of Object.entries(STRINGS)) for (const x of row) if (x && x !== en && !fromShown.has(x)) fromShown.set(x, en);
+  }
+  const en = fromShown.get(core);
+  return en ? value.replace(core, en) : value;
+}
+
 function excluded(el) {
   return !el || !!el.closest?.(NEVER);
 }
@@ -844,9 +861,9 @@ function excluded(el) {
 function translateText(node) {
   const known = textSource.get(node);
   // Written by us: nothing to do. Written by the app since: it is English again.
-  const en = known && node.nodeValue === known.shown ? known.en : node.nodeValue;
+  const en = known && node.nodeValue === known.shown ? known.en : englishOf(node.nodeValue);
   const shown = t(en);
-  if (shown === en && !known) return;
+  if (shown === en && !known && en === node.nodeValue) return;
   textSource.set(node, { en, shown });
   if (node.nodeValue !== shown) node.nodeValue = shown;
 }
@@ -860,9 +877,9 @@ function translateAttrs(el) {
     const value = el.getAttribute(name);
     let rec = attrSource.get(el);
     const known = rec?.[name];
-    const en = known && value === known.shown ? known.en : value;
+    const en = known && value === known.shown ? known.en : englishOf(value);
     const shown = t(en);
-    if (shown === en && !known) continue;
+    if (shown === en && !known && en === value) continue;
     if (!rec) { rec = {}; attrSource.set(el, rec); }
     rec[name] = { en, shown };
     if (value !== shown) el.setAttribute(name, shown);

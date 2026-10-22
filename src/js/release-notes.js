@@ -13,6 +13,17 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '1.0.1': {
+    headline: 'Dividers cut smaller parts, and the Universe twinkles.',
+    items: [
+      { title: 'Pictures side by side in toggles', text: 'In an open toggle, a divider pulled sideways puts the toggle’s lines and pictures side by side in two columns.' },
+      { title: 'A part of a column', text: 'A divider in a column, pulled sideways and down or up over a part of it, cuts only that part in two. Pulled level with itself it still cuts the whole column.' },
+      { title: 'Fit on the small Universe', text: 'Beside ⤢ the small Universe has a Fit button: after zooming in or out, it glides back to the view around the open note.' },
+      { title: 'Twinkling stars', text: 'The Universe’s stars twinkle like the ones behind the lock screen, and the lock screen’s planet turns smoothly.' },
+      { title: 'The German dash', text: 'With the app in Deutsch, two hyphens typed between words become a dash (–) when you type the space after them.' },
+      { title: 'Fixes', text: 'Labels picked in the Universe search stay picked when you click elsewhere, and the search field makes room for them; the search field follows the language back to English; right-click on the Universe no longer offers Zoom in; a locked black hole on the Universe asks for its PIN; a re-imported widget is drawn once.' },
+    ],
+  },
   '1.0.0': {
     headline: 'Every block moves with the mouse, and a toggle copies whole.',
     items: [
@@ -623,6 +634,41 @@ export const RELEASE_NOTES = {
  * a version or a language that is not here is shown in English.
  */
 export const RELEASE_NOTES_I18N = {
+  '1.0.1': {
+    de: {
+      headline: 'Trennlinien teilen kleinere Teile, und das Universe funkelt.',
+      items: [
+        { title: 'Bilder nebeneinander in Aufklapplisten', text: 'In einer geöffneten Aufklappliste stellt eine zur Seite gezogene Trennlinie deren Zeilen und Bilder in zwei Spalten nebeneinander.' },
+        { title: 'Ein Teil einer Spalte', text: 'Eine Trennlinie in einer Spalte, zur Seite und nach unten oder oben über einen Teil davon gezogen, teilt nur diesen Teil. Auf ihrer eigenen Höhe gezogen teilt sie weiter die ganze Spalte.' },
+        { title: 'Anpassen im kleinen Universe', text: 'Neben ⤢ hat das kleine Universe einen Knopf Anpassen: Nach dem Hinein- oder Herauszoomen gleitet es zurück zur Ansicht um die offene Notiz.' },
+        { title: 'Funkelnde Sterne', text: 'Die Sterne des Universe funkeln wie die hinter dem Sperrbildschirm, und der Planet des Sperrbildschirms dreht sich flüssig.' },
+        { title: 'Der Gedankenstrich', text: 'Ist die App auf Deutsch, werden zwei zwischen Wörtern getippte Bindestriche zu einem Gedankenstrich (–), sobald du das Leerzeichen danach tippst.' },
+        { title: 'Fehlerbehebungen', text: 'In der Universe-Suche ausgewählte Labels bleiben ausgewählt, wenn du woanders klickst, und das Suchfeld macht ihnen Platz; das Suchfeld folgt der Sprache zurück ins Englische; ein Rechtsklick auf das Universe bietet kein Vergrößern mehr an; ein gesperrtes Schwarzes Loch im Universe fragt nach seiner PIN; ein erneut importiertes Widget wird einmal gezeichnet.' },
+      ],
+    },
+    pl: {
+      headline: 'Separatory dzielą mniejsze części, a Universe migocze.',
+      items: [
+        { title: 'Obrazy obok siebie w listach rozwijanych', text: 'W otwartej liście rozwijanej separator pociągnięty w bok stawia jej linie i obrazy obok siebie w dwóch kolumnach.' },
+        { title: 'Część kolumny', text: 'Separator w kolumnie, pociągnięty w bok i w dół albo w górę nad jej część, dzieli na dwie tylko tę część. Pociągnięty na swojej wysokości nadal dzieli całą kolumnę.' },
+        { title: 'Dopasuj w małym Universe', text: 'Obok ⤢ mały Universe ma przycisk Dopasuj: po przybliżeniu lub oddaleniu płynnie wraca do widoku wokół otwartej notatki.' },
+        { title: 'Migoczące gwiazdy', text: 'Gwiazdy Universe migoczą jak te za ekranem blokady, a planeta ekranu blokady obraca się płynnie.' },
+        { title: 'Niemiecka pauza', text: 'Gdy aplikacja jest po niemiecku, dwa łączniki wpisane między słowami stają się pauzą (–), gdy wpiszesz po nich spację.' },
+        { title: 'Poprawki', text: 'Etykiety wybrane w wyszukiwaniu Universe zostają wybrane po kliknięciu gdzie indziej, a pole wyszukiwania robi im miejsce; pole wyszukiwania wraca z językiem do angielskiego; prawy klik na Universe nie proponuje już Przybliż; zablokowana czarna dziura w Universe pyta o PIN; ponownie zaimportowany widżet jest rysowany raz.' },
+      ],
+    },
+    tr: {
+      headline: 'Ayırıcı çizgiler daha küçük parçaları böler, Universe parıldar.',
+      items: [
+        { title: 'Açılır listelerde yan yana resimler', text: 'Açık bir açılır listede yana çekilen ayırıcı çizgi listenin satırlarını ve resimlerini iki sütunda yan yana koyar.' },
+        { title: 'Bir sütunun bir parçası', text: 'Bir sütundaki ayırıcı çizgi yana ve aşağı ya da yukarı, sütunun bir parçasının üzerine çekilirse yalnızca o parçayı ikiye böler. Kendi hizasında çekilirse yine bütün sütunu böler.' },
+        { title: 'Küçük Universe’te Sığdır', text: 'Küçük Universe’te ⤢ düğmesinin yanında bir Sığdır düğmesi var: yakınlaştırıp uzaklaştırdıktan sonra açık notun çevresindeki görünüme süzülerek döner.' },
+        { title: 'Parıldayan yıldızlar', text: 'Universe’ün yıldızları kilit ekranının arkasındakiler gibi parıldar, kilit ekranındaki gezegen de akıcı döner.' },
+        { title: 'Almanca uzun çizgi', text: 'Uygulama Deutsch iken sözcükler arasına yazılan iki kısa çizgi, ardından boşluk yazınca uzun çizgiye (–) dönüşür.' },
+        { title: 'Düzeltmeler', text: 'Universe aramasında seçilen etiketler başka yere tıklayınca seçili kalır ve arama alanı onlara yer açar; arama alanı dil İngilizceye dönünce o da döner; Universe’e sağ tık artık Yakınlaştır sunmuyor; Universe’teki kilitli kara delik PIN’ini sorar; yeniden içe aktarılan bir widget bir kez çizilir.' },
+      ],
+    },
+  },
   '1.0.0': {
     de: {
       headline: 'Jeder Block lässt sich mit der Maus verschieben, und eine Aufklappliste wird ganz kopiert.',

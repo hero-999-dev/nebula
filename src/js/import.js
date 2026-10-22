@@ -38,6 +38,10 @@ const esc = (s) => String(s ?? '')
 export function sanitize(html) {
   const doc = new DOMParser().parseFromString(String(html ?? ''), 'text/html');
   doc.body.querySelectorAll(FORBIDDEN).forEach((el) => el.remove());
+  // A widget is drawn again from its data-wg-* state (widgets.js). The drawing an
+  // export carries would lose its .wg class below and stay in the note, beside
+  // the one drawn when the note opens — so it goes here, whole.
+  for (const fig of doc.body.querySelectorAll('figure.note-widget')) fig.replaceChildren();
 
   for (const el of Array.from(doc.body.querySelectorAll('*'))) {
     // Image geometry is the only imported style we retain: numeric pixels,

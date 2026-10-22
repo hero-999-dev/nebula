@@ -77,22 +77,25 @@ function figure({ id, title, blurb, width, height, body }) {
 /* ------------------------------------------------------------- 1. features */
 
 function featureMap() {
-  const W = 900, H = 530;
-  const store = node(W / 2, 210, 'NoteStore', ['the only note state', 'notes.js'], { tone: 'accent' });
+  const W = 1000, H = 640;
+  const cy = 260;
+  const store = node(W / 2, cy, 'NoteStore', ['the only note state', 'notes.js'], { tone: 'accent' });
 
   const ring = [
-    { t: 'Editor', s: ['contenteditable', 'debounced autosave'], a: -150 },
-    { t: 'Toolbar + dock pad', s: ['two rows, four sides'], a: -95 },
-    { t: 'Slash menu', s: ['/ inserts blocks'], a: -40 },
-    { t: 'Shapes layer', s: ['floats over the note'], a: 20 },
-    { t: 'Code blocks', s: ['language + colours'], a: 75 },
-    { t: 'Disk mirror', s: ['one JSON per note'], a: 140 },
-    { t: 'Update + About', s: ['version, folders'], a: 180 },
+    { t: 'Editor', s: ['blocks, columns, toggles', 'debounced autosave'], a: -162 },
+    { t: 'Slash menu + toolbar', s: ['/ inserts every block'], a: -126 },
+    { t: 'Tables', s: ['cells, rows, sizes'], a: -90 },
+    { t: 'Pictures, videos, files', s: ['kept beside the note'], a: -54 },
+    { t: 'Shapes + arrows', s: ['float over the note'], a: -18 },
+    { t: 'Folders, labels, projects', s: ['the note list'], a: 18 },
+    { t: 'Black holes', s: ['notes behind a password'], a: 54 },
+    { t: 'Universe', s: ['the map of your notes'], a: 90 },
+    { t: 'Split view + mentions', s: ['notes side by side'], a: 126 },
+    { t: 'Disk mirror', s: ['a folder per note'], a: 162 },
   ];
 
   let body = '';
-  const rx = 330, ry = 155;
-  const cy = 210;
+  const rx = 375, ry = 205;
   const nodes = ring.map(({ t, s, a }) => {
     const rad = (a * Math.PI) / 180;
     return { n: node(Math.round(W / 2 + rx * Math.cos(rad)), Math.round(cy + ry * Math.sin(rad)), t, s), a };
@@ -107,7 +110,7 @@ function featureMap() {
   body += store.svg;
 
   // Drawn well below the ring and with no line to the hub: the gap IS the point.
-  const ai = node(W / 2, H - 76, 'AI panel', ['embedded chat webviews'], { dashed: true, tone: 'muted' });
+  const ai = node(W / 2, H - 76, 'AI panel', ['embedded chat tabs that sleep when idle'], { dashed: true, tone: 'muted' });
   body += ai.svg;
   body += caption(W / 2, H - 28, 'deliberately not connected - it reads and writes no note data', 'middle');
 
@@ -122,14 +125,15 @@ function featureMap() {
 /* --------------------------------------------------------- 2. combinations */
 
 function combinations() {
-  const W = 1000, H = 420;
+  const W = 1000, H = 480;
   const rows = [
     [['Shapes layer', 'wrap: through'], 'annotate a paragraph without reflowing a word'],
     [['Code block', 'language picker'], 'a snippet stays readable inside prose'],
     [['Dock pad', 'AI panel'], 'text on the left, the chat you borrow from on the right'],
-    [['Six seed notes', 'manual check'], 'every feature ships with a page that exercises it'],
+    [['@mentions', 'Universe'], 'the links between notes are drawn as the map of them'],
+    [['Black holes', 'app lock'], 'one PIN and passkey dialog, met the same way in both'],
+    [['The guide', 'every release'], 'each new feature ships with a page that shows it, in four languages'],
     [['Disk mirror', 'pre-update snapshot'], 'an update cannot be the last thing to touch a note'],
-    [['Dev profile split', 'reset scripts'], 'development cannot reach the notes you keep'],
   ];
 
   // Fixed column widths: ragged boxes would put the "+" off-centre on every row.
@@ -185,13 +189,13 @@ function processMap() {
 
   const guard = node(210, 306, 'resolveInStorage', ['rejects anything', 'outside the vault']);
   const write = node(430, 306, 'atomic write', ['temp file, then rename']);
-  const snap = node(650, 306, 'snapshots', ['daily ×7 + pre-update']);
+  const snap = node(650, 306, 'snapshots', ['the last day + pre-update']);
   body += guard.svg + write.svg + snap.svg;
   body += arrow({ x: bridge.cx - 120, y: bridge.cy + bridge.h / 2 }, guard.top);
   body += arrow(guard.right, write.left);
   body += arrow(write.right, snap.left);
 
-  const disk = node(W / 2, 392, 'storage/notes/<id>.json', ['in the user profile — never beside the app'], { tone: 'accent' });
+  const disk = node(W / 2, 392, 'storage/notes/<id>/<id>.json', ['its pictures and videos beside it, in the user profile — never beside the app'], { tone: 'accent' });
   body += disk.svg;
   body += arrow(write.bottom, { x: disk.cx - 60, y: disk.cy - disk.h / 2 });
   body += arrow(snap.bottom, { x: disk.cx + 120, y: disk.cy - disk.h / 2 });
@@ -220,15 +224,18 @@ function autosave() {
     ['storage:write', ['temp → rename']],
   ];
 
-  let x = 78;
+  // Each box is placed by its own width and the one before it: stepping by one
+  // half-width let a wider box run into its neighbour.
   const y = 96;
+  const GAP = 14;
   let prev = null;
   for (const [t, s] of steps) {
+    const w = node(0, y, t, s).w;
+    const x = prev ? prev.right.x + GAP + Math.round(w / 2) : 24 + Math.round(w / 2);
     const n = node(x, y, t, s);
     body += n.svg;
     if (prev) body += arrow(prev.right, n.left);
     prev = n;
-    x += Math.round(n.w / 2) + 62;
   }
 
   const bus = node(300, 196, 'bus: note-changed', ['sidebar row, snippet, time'], { tone: 'muted' });
@@ -248,16 +255,16 @@ function autosave() {
 /* --------------------------------------------------------------- 5. release */
 
 function releaseFlow() {
-  const W = 900, H = 400;
+  const W = 1000, H = 400;
   let body = '';
 
-  const push = node(110, 50, 'you say "push"', ['npm run push'], { tone: 'accent' });
-  const gates = node(330, 50, 'gates', ['tests · smoke · build · docs']);
-  const tag = node(540, 50, 'version + tag', ['Log.md, memory.json']);
-  const gh = node(760, 50, 'git push', ['main + vX.Y.Z']);
-  body += push.svg + gates.svg + tag.svg + gh.svg;
-  body += arrow(push.right, gates.left) + arrow(gates.right, tag.left) + arrow(tag.right, gh.left);
-  body += caption(330, 92, 'a failure here releases nothing', 'middle');
+  const push = node(90, 50, 'you say "push"', ['npm run push'], { tone: 'accent' });
+  const gates = node(290, 50, 'gates', ['unit · smoke · build', 'page rebuild · old notes']);
+  const pre = node(520, 50, 'precheck', ['GitHub builds the commit', 'on precheck/vX.Y.Z']);
+  const gh = node(780, 50, 'tag + git push', ['main + vX.Y.Z']);
+  body += push.svg + gates.svg + pre.svg + gh.svg;
+  body += arrow(push.right, gates.left) + arrow(gates.right, pre.left) + arrow(pre.right, gh.left);
+  body += caption(405, 104, 'a failure in either releases nothing — a red precheck undoes the commit', 'middle');
 
   const win = node(250, 165, 'Windows runner', ['NSIS + portable', 'asserts latest.yml']);
   const mac = node(560, 165, 'macOS runner', ['universal DMG + ZIP', 'unsigned, on purpose']);
@@ -292,9 +299,9 @@ function safetyLadder() {
   const rungs = [
     ['Separate profiles', 'dev runs on .dev-profile', 'always'],
     ['Seed guard', 'an unreadable vault seeds nothing', 'always'],
-    ['Pre-update snapshot', 'backups/pre-update-<version>', 'kept until you delete it'],
-    ['Daily snapshot', 'backups/YYYY-MM-DD', 'newest 7'],
-    ['The files themselves', 'plain JSON in your profile', 'forever'],
+    ['Pre-update snapshot', 'backups/pre-update-<version>-<time>', 'the newest one'],
+    ['Daily snapshot', 'backups/YYYY-MM-DD', 'the last day'],
+    ['The files themselves', 'a folder of plain JSON per note in your profile', 'forever'],
   ];
 
   const rowH = 54;
@@ -307,7 +314,7 @@ function safetyLadder() {
   });
 
   body += caption(18, 28, 'Five independent layers. Losing a note needs all five to fail at once.');
-  body += caption(18, H - 14, 'An update replaces the application folder only; the profile is never touched, not even by uninstalling.');
+  body += caption(18, H - 14, 'An update replaces the application folder only. A note deleted from the Trash leaves the backups too: what you delete stays deleted.');
 
   return figure({
     id: 'map-safety',

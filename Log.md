@@ -1,4 +1,41 @@
 
+## [2026-10-22 06:33] v1.0.1 - by release-script
+
+
+
+* (no commits since the last release)
+
+---
+
+## [2026-10-21 22:30] v1.0.1 - by Claude (the owner's note "Ideas For Nebula and Testing For Nebula")
+
+Asked (the owner, Turkish): solve the ideas and bugs in the note, then share 1.0.1; the three review branches may be deleted (done).
+
+- **Dividers** (`columns.js`): a divider in an open toggle pulled sideways puts the toggle's lines and pictures side by side (`flat()` takes a toggle body outside a column); a divider in a column pulled sideways and down or up over a part of it cuts only that part (`splitPart`, `partIn`): the rows above and under stay columns, all-blank rows join the part, ids stay on the part's row. Pulled level it still cuts the whole column.
+- **Universe** (`galaxy-ui.js`, `galaxy-map.js`, `galaxy-ascii.js`, `lock-space.js`): a Fit button beside ⤢ on the minimap glides back to the fitted view; stars twinkle like the lock-screen sky (`twinkle`, `TWINKLE`); the lock-screen planet turns smoothly (TICK 40, 360 frames); right-click has no Zoom in; picked label chips stay when clicking elsewhere and the field makes room; the field follows the language back to English (`englishOf` in `i18n.js`).
+- **German dash** (`auto-arrows.js` `dashFor`): in Deutsch, word -- space becomes word – space.
+- Guide: "New in 1.0.1" plus the divider sentence, four languages; GUIDE_VERSION 1.0.1.
+- **Tests that waited a fixed time** (the owner: "lately the tests keep failing on timeouts"): the first 1.0.1 push stopped on two v093 folder checks that pass alone. `tests/e2e/settle.mjs` waits for what a check needs (`until`, polled by timer, not rAF) and drags once both rows stand still (`steadyDrag`); v093's folder and list-order drags and v094's arrow fold use them. `npm run push`: a smoke run that finished with checks failing in at most three suite files runs those files alone once (`only.mjs`), goes on if they pass and says so in Log.md; a failing check of smoke.mjs itself, a run that did not finish, or a file failing alone too still stops. smoke.mjs files each check under its suite (`test-results/smoke-failed.json`); v101 joins smoke. A suite that throws is now a failed check of its own and the suites after it still run (the second push lost twenty suites to one TypeError in black-holes); black-holes' "move into a black hole" waits up to 10 s for its menu and opens it again if the entry never came (a missed menu cost 11 checks).
+
+---
+
+## [2026-10-21 18:40] v1.0.0 - by Claude (fixes from three cloud reviews of 1.0.0; not released)
+
+Asked (the owner): three ultra reviews of the 1.0.0 commit, on review/1.0.0-galaxy, -app and -tests-tooling; "fix the problems on main". Findings that named missing files (split-view.js, widgets.js, galaxy wiring) were the review's own split of the commit — every file is on main. The rest:
+
+- **Universe** (`galaxy-map.js`, `galaxy-ui.js`): a locked black hole on the map now asks for its PIN (`bodies()` kept `locked` and `initials`); a note's moon in a folder selects the note, not the folder; locking or leaving a hole forgets what was drawn of its inside (`forgetHole`); the rocket stops (`boundsOf` given the time); a label written two ways ("Work", "work") is one label, spelled as first seen; closing or hiding the map mid-dive cancels the dive (`cancelDive`), so it does not land inside the hole later; following a body that is gone stops the minimap redrawing forever.
+- **Black holes** (`black-holes.js`, `note-list.js`, `note-actions.js`): "Hide the black holes" hides them on the map too (`list()` is empty while away); right-click and ⋯ work on a note in `#holes-scroll`; a move into a hole that fails puts the note's project back.
+- **Widgets on import** (`import.js`, `heal.js`, `migrate.js`): a re-imported widget kept its exported drawing beside the one the app draws — two calculators. Import keeps the state, drops the drawing; `dropStaleWidgetDrawings` repairs notes already imported (MARKUP_VERSION 1.0.1, exhibit in heal.test.js); heal ignores widget insides.
+- **Pasted links** (`rich-paste.js`): only the links a paste brought become Nebula links; a plain link already in the note is left as it is.
+- **Guide** paragraph 091 still said a block dropped at a line's edge makes two columns; moving makes none since 1.0.0 (`sides: false`). Four languages; GUIDE_VERSION stays 1.0.0, the shipped 1.0.0 signatures kept as "1.0.0 release".
+- **Doc comments** back over their own code (`export.js` fitToPaper, `toolbar.js` HOLDERS).
+- **Release** (`release.js`, `precheck-ci.js`): the tag names the commit GitHub built, and nothing is tagged or reset if HEAD moved during the precheck; Ctrl+C during the precheck stops it, removes the branch and undoes the release commit; a run of the same commit from before the push is not taken for this one; `--no-smoke` with `--no-precheck` is refused; REPO and the credential chain live once, in precheck-ci.js.
+
+Unit 1516/1516. No smoke, rebuild or old-notes (not asked). Test build only.
+
+---
+
+
 ## [2026-10-21 15:09] v1.0.0 - by release-script
 
 

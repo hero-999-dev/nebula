@@ -5,7 +5,7 @@ that keeps every note in your own profile, as a folder of its own: a plain JSON
 file with the note's pictures and videos beside it. Installed Windows builds
 offer in-app updates; macOS and portable builds offer a download link.
 
-**Version v1.0.0** ·
+**Version v1.0.1** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 
@@ -168,11 +168,13 @@ they are not a substitute for a backup or a guarantee against hardware failure:
    *successfully* and came back *empty*. An unreadable vault disables the disk
    mirror entirely, shows a red bar, and offers to open the folder.
 3. **A Windows in-app pre-update snapshot** into `backups/pre-update-<version>-<time>`,
-   taken before the installer runs and never rotated away. Manual Mac and portable
+   taken before the installer runs; the newest one is kept. Manual Mac and portable
    upgrades do not trigger it; make a profile copy first.
-4. **A daily snapshot** into `backups/YYYY-MM-DD`, newest seven kept.
-5. **The files themselves** — plain JSON in your profile, not beside the app.
-   Uninstalling leaves them.
+4. **A daily snapshot** into `backups/YYYY-MM-DD`; the newest one is kept.
+5. **The files themselves** — a folder per note (`notes/<id>/<id>.json` with its
+   pictures and videos) in your profile, not beside the app. Uninstalling leaves them.
+
+A note deleted from the Trash leaves the backups too: what you delete stays deleted.
 
 Full detail, including how to restore from a backup:
 **[docs/UPDATING.md](docs/UPDATING.md)**.
@@ -233,7 +235,7 @@ happens between a keystroke and a file.
 npm install
 npm run preflight   # START HERE — version, phase, what changed, what is stale
 npm run dev         # dev app on its OWN profile
-npm test            # 640 unit tests
+npm test            # 1522 unit tests
 npm run build && npm run smoke   # checks against the real Electron app
 npm run rebuild                  # local only: rewrite a real article in the app, score it per feature
 npm run old-notes                # the long-note trials on COPIES of Nebula Test's notes

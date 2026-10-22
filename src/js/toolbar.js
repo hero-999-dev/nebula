@@ -167,10 +167,10 @@ export function fontRows(query, { custom = [], installed = [], pinned = [], limi
   return { own, installed: others.slice(0, limit), add: typed && !exact ? typed : '' };
 }
 
-/** The fonts the reader added to the menu, and the ones pinned to its top: names, kept on this computer. */
 /** Blocks that hold lines and are never indented themselves: a Tab is for the line. */
 const HOLDERS = '.blk-cols, .blk-col, hr.blk-vr, .blk-toggle, .toggle-body';
 
+/** The fonts the reader added to the menu, and the ones pinned to its top: names, kept on this computer. */
 const CUSTOM_FONTS_KEY = 'nebula:fonts';
 const PINNED_FONTS_KEY = 'nebula:fonts-pinned';
 const FONT_STACKS_KEY = 'nebula:font-stacks';

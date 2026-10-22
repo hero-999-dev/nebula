@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "1.0.0",
-  "lastUpdated": "2026-10-21",
-  "currentPhase": "v1.0.0: the Universe (galaxy map of notes, folders, projects, labels and black holes; minimap, full-pane map, Universe widget, label and mention search, rockets), projects, split view, block handles, the lock-screen sky, Electron 45.",
-  "next": "Owner tests v1.0.0 from the installed update. Later: move electron/main.js safeStorage sync calls to the async API before Electron 46; the ~250 ms GC frame in the big map (perf audit 39, findings 4-5).",
+  "version": "1.0.1",
+  "lastUpdated": "2026-10-22",
+  "currentPhase": "v1.0.1: dividers cut parts of columns and work in toggles, the minimap Fit button, twinkling Universe stars, a smooth lock-screen planet, the German dash; on top of 1.0.0 (the Universe, projects, split view, block handles, Electron 45).",
+  "next": "Owner tests 1.0.1. Next release only when the owner says push. Later: move electron/main.js safeStorage sync calls to the async API before Electron 46; the ~250 ms GC frame in the big map (perf audit 39, findings 4-5).",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",
@@ -15,7 +15,7 @@
     "repo": "<workspace>/Cursor X Antigravity/Nebula",
     "installedApp": "%LOCALAPPDATA%\\Programs\\Nebula",
     "installedProfile": "%APPDATA%\\nebula",
-    "notes": "%APPDATA%\\nebula\\storage\\notes\\<id>.json",
+    "notes": "%APPDATA%\\nebula\\storage\\notes\\<id>\\<id>.json",
     "backups": "%APPDATA%\\nebula\\backups",
     "devProfile": "<repo>/.dev-profile",
     "flashMirror": "<HeroAI64GB>:\\AcerSwift\\Cursor X Antigravity\\Nebula"
@@ -32,8 +32,8 @@
     "precheck": "npm run push builds the release commit on GitHub (precheck/vX.Y.Z, scripts/precheck-ci.js) before tagging; npm run precheck:ci does it for HEAD; --no-precheck skips"
   },
   "quality": {
-    "unitTests": 1280,
-    "smokeChecks": 1041,
+    "unitTests": 1522,
+    "smokeChecks": 1200,
     "unitCommand": "npm test",
     "smokeCommand": "npm run build && npm run smoke"
   },
@@ -89,6 +89,18 @@
     "Assert that a label renders at a real width, not merely that its text is in the markup."
   ],
   "history": [
+    {
+      "version": "1.0.1",
+      "date": "2026-10-21",
+      "by": "claude",
+      "what": "The owner's note: dividers in toggles and over parts of columns, minimap Fit, twinkling stars, smooth lock-screen planet, no Zoom in on right-click, label chips stay, label field follows the language, German dash."
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-10-21",
+      "by": "claude",
+      "what": "Fixes from three cloud reviews: locked holes ask PIN on the map, moons select notes, rocket stops, dive cancelled on close, hidden holes off the map, right-click in holes, re-imported widgets drawn once (+ old-notes repair), pasted-link dressing, guide 091, release tag on built SHA + Ctrl+C cleanup. Unit 1516/1516."
+    },
     {
       "date": "2026-10-21",
       "version": "1.0.0",

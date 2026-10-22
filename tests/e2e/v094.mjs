@@ -10,6 +10,7 @@
  * and the note menu on a right-click (the only way to it on the folded rail).
  */
 import { _electron as electron } from 'playwright-core';
+import { until } from './settle.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -228,19 +229,24 @@ export async function runV094Checks(check) {
       const b = r.getBoundingClientRect();
       return { x: b.left, y: b.top + b.height / 2, left: title.getBoundingClientRect().left };
     });
-    let first = await firstLetter();
-    for (let same = 0, tries = 0; same < 4 && tries < 40; tries++) {
-      await win.waitForTimeout(150);
-      const now = await firstLetter();
-      same = Math.abs(now.y - first.y) < 0.5 && Math.abs(now.x - first.x) < 0.5 ? same + 1 : 0;
-      first = now;
-    }
+    const stillLetter = async () => {
+      let at = await firstLetter();
+      for (let same = 0, tries = 0; same < 4 && tries < 40; tries++) {
+        await win.waitForTimeout(150);
+        const now = await firstLetter();
+        same = Math.abs(now.y - at.y) < 0.5 && Math.abs(now.x - at.x) < 0.5 ? same + 1 : 0;
+        at = now;
+      }
+      return at;
+    };
+    let first = await stillLetter();
     await win.mouse.click(first.x - 3, first.y);
     check('a click just before a toggle’s first letter puts the caret there, and does not fold it', await win.evaluate(() =>
       document.querySelector('.blk-toggle').dataset.open === 'true' && document.querySelector('#tt').contains(getSelection().anchorNode) && getSelection().anchorOffset === 0));
-    first = await firstLetter();
+    // Measured still again (the first click can move the page), and the fold waited for: two of five runs failed here.
+    first = await stillLetter();
     await win.mouse.click(first.left + 10, first.y);
-    check('a click on the arrow still folds it', await win.evaluate(() => !document.querySelector('.blk-toggle').dataset.open));
+    check('a click on the arrow still folds it', await until(win, () => !document.querySelector('.blk-toggle').dataset.open));
     await win.mouse.click(first.left + 10, first.y);
     await setCaret('#tt', 0);
     await win.keyboard.press('Enter');

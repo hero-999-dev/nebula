@@ -110,6 +110,17 @@ as well, so the test build refreshes without anyone closing a window.
 
 Details and platform limits: **[docs/RELEASE.md](docs/RELEASE.md)**.
 
+**To do after 1.0.1 (owner, 2026-10-22): make the old-notes trials lighter, never drop them.**
+They are the only trials on markup older versions wrote, and they found a real bug no
+other test did (a note opening on a divider already picked, so the first Backspace took
+it). But most of their failures were the test's own gaps (B9's on-screen controls, the
+`<br>` after a line, 1.0.1's Universe star layer), and they make the release long. So:
+1. group the vault's notes by structure (which blocks they hold) and try one note of each
+   group — in the 1.0.1 run 35 of 42 notes were only opened and saved;
+2. a trial that fails runs on that note alone once before the release stops, as smoke's
+   failed suite files do (`retryAlone` in scripts/release.js);
+3. it stays a release gate, out of the everyday tests.
+
 ---
 
 ## Things that will bite you

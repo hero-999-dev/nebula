@@ -579,6 +579,7 @@ export function initBlackHoles({ listEl, store, noteItem, onChanged, onLocked, o
     if (!note) return false;
     const originalContent = note.content;
     const originalFolder = note.folder;
+    const originalProject = note.project;     // setHole clears both
     let content = String(note.content ?? '');
     const videos = plainVideosOf(content);
     const videoReplacements = [];
@@ -617,6 +618,8 @@ export function initBlackHoles({ listEl, store, noteItem, onChanged, onLocked, o
       current.content = latest;
       if (originalFolder === undefined) delete current.folder;
       else if (!current.folder) current.folder = originalFolder;
+      if (originalProject === undefined) delete current.project;
+      else if (!current.project) current.project = originalProject;
       if (current.hole) store.setHole(noteId, null, { notify: false });
       else store.save([noteId]);
       await flushNote(noteId).catch(() => {});
@@ -893,5 +896,5 @@ export function initBlackHoles({ listEl, store, noteItem, onChanged, onLocked, o
   // Every black hole is locked when the app starts: a page loaded again holds no notes of one.
   void Promise.resolve(api.lockAll()).catch(() => {}).then(refresh);
 
-  return { render, refresh, lock, lockAll, holeMenu, setPinned, noteHoleMenu, noteMenuLabel, moveIn, moveOut, list: () => holes, create: createDialog, unlock: unlockDialog, toTrash, restore, destroy, trashed: () => (away ? [] : binned) };
+  return { render, refresh, lock, lockAll, holeMenu, setPinned, noteHoleMenu, noteMenuLabel, moveIn, moveOut, list: () => (away ? [] : holes), create: createDialog, unlock: unlockDialog, toTrash, restore, destroy, trashed: () => (away ? [] : binned) };
 }

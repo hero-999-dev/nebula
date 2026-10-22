@@ -37,8 +37,8 @@ function signatureSource() {
       // The painted layer of a code block is redrawn from its source; the source is compared.
       // What the app itself keeps out of a saved note (note-markup.js): the
       // angle readout, a video's bar, what is drawn round a table, an attached
-      // file's Open and Save buttons. Drawn whenever a note is shown.
-      if (n.matches('.code-paint, .katex, .shape-angle, .video-bar, .tbl-ui, .attach-bar')) return;
+      // file's Open and Save buttons, the Universe's live map layer. Drawn whenever a note is shown.
+      if (n.matches('.code-paint, .katex, .shape-angle, .video-bar, .tbl-ui, .attach-bar, .wg-live')) return;
       // Code is coloured by spans that are redrawn after every restore: its text is what counts.
       if (n.matches('.code-src')) { out.push(`<code.code-src>${JSON.stringify(n.textContent)}</>`); return; }
       // A link card's title is the page's, fetched when it answers — sometimes long after
@@ -464,9 +464,13 @@ export async function runDenseChecks(check, { docs = [] } = {}) {
       const same = await win.evaluate(({ saved, baseHtml }) => {
         const a = document.createElement('div'); a.innerHTML = saved;
         const b = document.createElement('div'); b.innerHTML = baseHtml;
-        return window.__denseSig(a) === window.__denseSig(b);
+        const x = window.__denseSig(a), y = window.__denseSig(b);
+        if (x === y) return '';
+        // Where the two first part, so a failure says what changed.
+        let i = 0; while (i < x.length && x[i] === y[i]) i += 1;
+        return `saved …${x.slice(Math.max(0, i - 80), i + 120)}… opened …${y.slice(Math.max(0, i - 80), i + 120)}…`;
       }, { saved, baseHtml });
-      check(`long note "${doc.name}": after every trial the saved note is the note that was opened`, same);
+      check(`long note "${doc.name}": after every trial the saved note is the note that was opened`, same === '', same);
     }
     check('the long-note trials ran without a page error', errors.length === 0, errors.slice(0, 3).join(' | '));
   } catch (err) {

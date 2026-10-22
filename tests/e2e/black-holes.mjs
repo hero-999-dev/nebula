@@ -110,12 +110,20 @@ export async function runBlackHoleChecks(check) {
     };
     /** A note's ⋯ → its black-hole item → the entry asked for. */
     const noteHole = async (title, entry) => {
-      await win.evaluate((t) => [...document.querySelectorAll('#note-list .note-item, #holes-scroll .note-item')].find((i) => i.querySelector('.note-row')?.title === t).querySelector('.nr-more').click(), title);
-      const label = await win.evaluate(() => { const b = document.querySelector('#note-menu [data-note-act="hole"]'); return b.hidden ? null : b.textContent; });
-      await win.evaluate(() => document.querySelector('#note-menu [data-note-act="hole"]').click());
-      // The menu is there when it is there: straight after a build the app is slower, and a press at a fixed 100 ms met no menu.
-      await win.waitForFunction((label) => [...document.querySelectorAll('#hole-menu button')].some((b) => b.textContent.trim() === label), entry, { polling: 50, timeout: 5000 }).catch(() => {});
-      await press(entry, '#hole-menu');
+      // The menu is there when it is there: straight after a build the app is slower, and a press at a fixed
+      // 100 ms met no menu. In a full smoke run (1.0.1) even five seconds sometimes passed with no black hole
+      // offered, the press went nowhere and every check after it failed: the menus are waited for longer, and
+      // opened again if the entry never came.
+      let label = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await win.keyboard.press('Escape');
+        await win.evaluate((t) => [...document.querySelectorAll('#note-list .note-item, #holes-scroll .note-item')].find((i) => i.querySelector('.note-row')?.title === t).querySelector('.nr-more').click(), title);
+        await win.waitForFunction(() => { const b = document.querySelector('#note-menu [data-note-act="hole"]'); return b && !b.hidden && b.offsetParent; }, null, { polling: 50, timeout: 5000 }).catch(() => {});
+        label ??= await win.evaluate(() => { const b = document.querySelector('#note-menu [data-note-act="hole"]'); return !b || b.hidden ? null : b.textContent; });
+        await win.evaluate(() => document.querySelector('#note-menu [data-note-act="hole"]')?.click());
+        const offered = await win.waitForFunction((l) => [...document.querySelectorAll('#hole-menu button')].some((x) => x.textContent.trim() === l && x.offsetParent), entry, { polling: 50, timeout: 10_000 }).then(() => true, () => false);
+        if (offered && await win.evaluate(({ l }) => { const x = [...document.querySelectorAll('#hole-menu button')].find((y) => y.textContent.trim() === l); x?.click(); return !!x; }, { l: entry })) break;
+      }
       await win.waitForTimeout(150);
       return label;
     };

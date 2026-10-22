@@ -339,6 +339,24 @@ export function fromNebulaNote(text) {
 }
 
 /**
+ * A table on paper narrower than the place it was made in (1.0.0; Log, 0.9.4:
+ * "a table printed or exported to PDF on a page narrower than the one it was
+ * made on is not fitted there"). The note keeps each column's own width, and
+ * the screen only draws a table narrower (table.js fitTable); the print window
+ * runs no script to do that. So each column becomes its share of the whole,
+ * and the table is as wide as its columns or as its place, whichever is less —
+ * the page, or the column of the page it stands in.
+ */
+function fitToPaper(table) {
+  const cols = colsOf(table);
+  const own = cols.map(widthOf);
+  const total = own.reduce((sum, w) => sum + w, 0);
+  if (!cols.length || !(total > 0)) return;
+  table.style.width = `min(${Math.round(total * 100) / 100}px, 100%)`;
+  cols.forEach((col, i) => { col.style.width = `${Math.round((own[i] / total) * 1e5) / 1e3}%`; });
+}
+
+/**
  * A standalone document for the PDF writer.
  *
  * Exporting used to print the LIVE window, which forced a choice nobody should
@@ -360,24 +378,6 @@ export function fromNebulaNote(text) {
  *
  * @param {{title?: string, body?: string, css?: string, margin?: string, size?: string}} opts
  */
-/**
- * A table on paper narrower than the place it was made in (1.0.0; Log, 0.9.4:
- * "a table printed or exported to PDF on a page narrower than the one it was
- * made on is not fitted there"). The note keeps each column's own width, and
- * the screen only draws a table narrower (table.js fitTable); the print window
- * runs no script to do that. So each column becomes its share of the whole,
- * and the table is as wide as its columns or as its place, whichever is less —
- * the page, or the column of the page it stands in.
- */
-function fitToPaper(table) {
-  const cols = colsOf(table);
-  const own = cols.map(widthOf);
-  const total = own.reduce((sum, w) => sum + w, 0);
-  if (!cols.length || !(total > 0)) return;
-  table.style.width = `min(${Math.round(total * 100) / 100}px, 100%)`;
-  cols.forEach((col, i) => { col.style.width = `${Math.round((own[i] / total) * 1e5) / 1e3}%`; });
-}
-
 export function toPrintDocument({ title = 'Untitled', body = '', css = '', margin = '12.7mm', size = 'A4' } = {}) {
   const doc = parse(body, DROP_PRINT);
   // Nothing executable travels into the print window. It has JavaScript turned

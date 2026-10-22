@@ -21,10 +21,16 @@ export const REPO = 'hero-999-dev/nebula';
 export const WORKFLOW = 'release.yml';
 
 /**
- * Credential helpers are additive; the empty value clears the machine's
- * `manager` so Git cannot open a window and wait on it (see release.js).
+ * Git's credential chain, reset to the gh session we are signed into.
+ *
+ * Credential helpers are ADDITIVE: naming one only appends it to a list that
+ * already holds the machine's global `manager`, and Git asks them in order — so
+ * Windows' credential manager opened an interactive window and the release sat
+ * on it forever. Three releases were lost that way before the empty value,
+ * which clears the list, went in. `publish-site.js` learned this first.
+ * release.js takes REPO and CREDS from here, so the two cannot drift apart.
  */
-const CREDS = [
+export const CREDS = [
   '-c', 'credential.helper=',
   '-c', 'credential.helper=!gh auth git-credential',
 ];
@@ -45,9 +51,22 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** The branch a version's precheck runs on. */
 export const precheckBranch = (label) => `precheck/${label}`;
 
-/** The run that built exactly this commit, newest first; null when none yet. */
-export function runForSha(runs, sha) {
-  return (runs || []).find((r) => r.headSha === sha) ?? null;
+/**
+ * The run that built exactly this commit for this push, newest first; null
+ * when none yet. A run of the same commit that was there before the push (an
+ * earlier precheck of it, a re-run) is not this one: it may be red, green or
+ * still going for reasons of its own.
+ * @param {Array<{databaseId: number, headSha: string}>|undefined} runs
+ * @param {string} sha
+ * @param {Set<number>} [before] ids of the runs that existed before the push
+ */
+export function runForSha(runs, sha, before = new Set()) {
+  return (runs || []).find((r) => r.headSha === sha && !before.has(r.databaseId)) ?? null;
+}
+
+function listRuns(branch) {
+  return JSON.parse(gh('run', 'list', '--repo', REPO, '--workflow', WORKFLOW,
+    '--branch', branch, '--limit', '20', '--json', 'databaseId,headSha,url'));
 }
 
 /**
@@ -60,8 +79,16 @@ export function runForSha(runs, sha) {
  */
 export async function precheckOnCi({ sha, label, findTimeoutMs = 180_000, log = console.log }) {
   const branch = precheckBranch(label);
+  // Ctrl+C would end the process at once and skip the `finally` below, leaving
+  // the precheck branch on GitHub (and, in release.js, an untagged release
+  // commit). With a listener the run is only marked, and the waiting stops.
+  let interrupted = false;
+  const onInterrupt = () => { interrupted = true; log('\n  interrupted: stopping the precheck and removing its branch…'); };
+  process.on('SIGINT', onInterrupt);
   try {
     log(`\n> precheck on GitHub: ${branch} (${sha.slice(0, 7)})`);
+    let before = new Set();
+    try { before = new Set(listRuns(branch).map((r) => r.databaseId)); } catch { /* none, or no answer: nothing to skip */ }
     // --force: a precheck branch left behind by an interrupted run is replaced.
     // A push that fails returns instead of throwing, so the caller still
     // undoes its release commit.
@@ -74,14 +101,13 @@ export async function precheckOnCi({ sha, label, findTimeoutMs = 180_000, log = 
 
     let run = null;
     const until = Date.now() + findTimeoutMs;
-    while (!run && Date.now() < until) {
+    while (!run && !interrupted && Date.now() < until) {
       await sleep(5000);
       try {
-        const runs = JSON.parse(gh('run', 'list', '--repo', REPO, '--workflow', WORKFLOW,
-          '--branch', branch, '--limit', '10', '--json', 'databaseId,headSha,url'));
-        run = runForSha(runs, sha);
+        run = runForSha(listRuns(branch), sha, before);
       } catch { /* the API can lag behind the push; ask again */ }
     }
+    if (interrupted) return { ok: false, url: run?.url ?? null, conclusion: 'interrupted' };
     if (!run) return { ok: false, url: null, conclusion: 'not-found' };
 
     log(`  run: ${run.url}`);
@@ -96,9 +122,12 @@ export async function precheckOnCi({ sha, label, findTimeoutMs = 180_000, log = 
       conclusion = JSON.parse(gh('run', 'view', String(run.databaseId), '--repo', REPO,
         '--json', 'conclusion')).conclusion || 'unknown';
     } catch { /* stays unknown, which is not a pass */ }
+    await sleep(0); // a Ctrl+C that stopped the watcher is heard here
+    if (interrupted) return { ok: false, url: run.url, conclusion: 'interrupted' };
     return { ok: conclusion === 'success', url: run.url, conclusion };
   } finally {
     try { git('push', 'origin', '--delete', branch); } catch { /* already gone */ }
+    process.off('SIGINT', onInterrupt);
   }
 }
 

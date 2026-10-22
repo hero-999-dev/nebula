@@ -24,7 +24,7 @@ import { dropFrozenInk } from './paste-clean.js';
 import { healColumns } from './columns.js';
 
 /** Bumped whenever a step is added, so the log line means something. */
-export const MARKUP_VERSION = '0.9.6';
+export const MARKUP_VERSION = '1.0.1';
 
 /**
  * @param {Element} root the editor
@@ -58,6 +58,8 @@ export function migrateNote(root, { fitShape } = {}) {
   healColumns(root);
   // 0.9.6 — half an emoji left at the end of a card's name (hunt B24).
   dropHalfCharacters(root);
+  // 1.0.1 — the stale copy of a widget's drawing an import left beside the one drawn again.
+  dropStaleWidgetDrawings(root);
   return {
     shapes: migrateShapes(root, fitShape),
     code: migrateCodeBlocks(root),
@@ -69,6 +71,24 @@ export function migrateNote(root, { fitShape } = {}) {
 }
 
 /** Half of a character: a surrogate with no partner, drawn as "\uFFFD". */
+/**
+ * A widget holds one drawing, its `.wg` (widgets.js). Up to 1.0.0 an imported
+ * widget kept the exported drawing with its class stripped, and the next open
+ * drew a second one in front of it. Everything else in the figure goes; the
+ * widget is drawn again from its data-wg-* state.
+ * @returns {number} the figures repaired
+ */
+export function dropStaleWidgetDrawings(root) {
+  let n = 0;
+  for (const fig of root.querySelectorAll('figure.note-widget')) {
+    const stale = [...fig.childNodes].filter((c) => !(c.nodeType === 1 && c.classList.contains('wg')));
+    if (!stale.length) continue;
+    stale.forEach((c) => c.remove());
+    n++;
+  }
+  return n;
+}
+
 export const LONE_HALF = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
 
 /**

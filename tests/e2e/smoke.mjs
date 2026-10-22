@@ -28,6 +28,7 @@ import { runAiSleepChecks } from './ai-sleep.mjs';
 import { runNoteFolderChecks } from './note-folders.mjs';
 import { runBlackHoleChecks } from './black-holes.mjs';
 import { runOpenWithChecks } from './open-with.mjs';
+import { runV101Checks } from './v101.mjs';
 import { _electron as electron } from 'playwright-core';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -71,8 +72,12 @@ if (!fs.existsSync(mainJs)) {
 const SEEDED = 1;
 
 const results = [];
+// The file a check is in: 'smoke' for this file's own checks, else the suite running.
+let suite = 'smoke';
+// Errors that say the run could not go on — the machine, not the app (exit 2, below).
+const ABORTS = /Timeout|Target closed|browser has been closed|ENOMEM|ERR_ABORTED|\(-3\) loading/i;
 const check = (name, ok, extra = '') => {
-  results.push({ name, ok });
+  results.push({ name, ok, suite });
   console.log(`${ok ? '+' : 'x'} ${name}${extra ? ` - ${extra}` : ''}`);
 };
 
@@ -2412,51 +2417,71 @@ try {
   check('unreadable vault is left exactly as it was',
     fs.readFileSync(path.join(broken, 'storage', 'notes'), 'utf8') === 'not a directory');
   await app.close();
-  await runRecoveryChecks(check);
-  await runReportedChecks(check);
-  await runEdgeChecks(check);
-  await runRichPasteChecks(check);
-  await runIdeasChecks(check);
-  await runRebuildFindingChecks(check);
-  await runCanvasChecks(check);
-  await runViewSnapChecks(check);
-  await runGuideChecks(check);
-  // The guide, and a note as older versions and pasting left them (0.9.1).
-  await runDenseChecks(check, { docs: [OLD_NOTE] });
-  await runV090Checks(check);
-  await runV093Checks(check);
-  await runV094Checks(check);
-  await runV095Checks(check);
-  await runLayoutChecks(check);
-  // 1.0.0: every block taken by the mouse, as in Notion.
-  await runBlockHandleChecks(check);
-  // 1.0.0: a table fitted to paper narrower than where it was made.
-  await runTablePaperChecks(check);
-  // 1.0.0: keys beside folded toggles, and Tab in columns.
-  await runToggleKeyChecks(check);
-  await runSpellingChecks(check);
-  await runTableKeyChecks(check);
-  await runLinkPasteChecks(check);
-  await runWidgetChecks(check);
-  await runSplitChecks(check);
-  await runGalaxyChecks(check);
-  await runUniverseWidgetChecks(check);
-  await runSideScrollChecks(check);
-  await runAiSleepChecks(check);
-  await runNoteFolderChecks(check);
-  await runBlackHoleChecks(check);
-  await runOpenWithChecks(check);
-  await runDeletedChecks(check);
-  await runIpcSurfaceChecks(check);
-  await runEmbedAskChecks(check);
-  await runAppLockOpenedChecks(check);
-  await runAttachAdoptChecks(check);
-  await runToggleBodyChecks(check);
-  await runCardKeysChecks(check);
-  await runFindFoldedChecks(check);
-  await runPdfScratchChecks(check);
-  await runOpenGuardChecks(check);
-  await runVaultDisconnectChecks(check);
+  // Each suite by its file name: a failed check is filed under the file that
+  // holds it, so the release can run that file alone (test-results/smoke-failed.json).
+  const SUITES = [
+    ['recovery', runRecoveryChecks],
+    ['reported', runReportedChecks],
+    ['editing-edges', runEdgeChecks],
+    ['rich-paste', runRichPasteChecks],
+    ['ideas-note', runIdeasChecks],
+    ['rebuild-findings', runRebuildFindingChecks],
+    ['canvas', runCanvasChecks],
+    ['view-snap', runViewSnapChecks],
+    ['guide', runGuideChecks],
+    // The guide, and a note as older versions and pasting left them (0.9.1).
+    ['dense', (c) => runDenseChecks(c, { docs: [OLD_NOTE] })],
+    ['v090', runV090Checks],
+    ['v093', runV093Checks],
+    ['v094', runV094Checks],
+    ['v095', runV095Checks],
+    ['layout', runLayoutChecks],
+    // 1.0.0: every block taken by the mouse, as in Notion.
+    ['block-handle', runBlockHandleChecks],
+    // 1.0.0: a table fitted to paper narrower than where it was made.
+    ['table-paper', runTablePaperChecks],
+    // 1.0.0: keys beside folded toggles, and Tab in columns.
+    ['toggle-keys', runToggleKeyChecks],
+    ['spelling', runSpellingChecks],
+    ['table-keys', runTableKeyChecks],
+    ['link-paste', runLinkPasteChecks],
+    ['widgets', runWidgetChecks],
+    ['split-view', runSplitChecks],
+    ['galaxy', runGalaxyChecks],
+    ['universe-widget', runUniverseWidgetChecks],
+    ['side-scroll', runSideScrollChecks],
+    ['ai-sleep', runAiSleepChecks],
+    ['note-folders', runNoteFolderChecks],
+    ['black-holes', runBlackHoleChecks],
+    ['open-with', runOpenWithChecks],
+    ['deleted', runDeletedChecks],
+    ['ipc-surface', runIpcSurfaceChecks],
+    ['embed-ask', runEmbedAskChecks],
+    ['app-lock-opened', runAppLockOpenedChecks],
+    ['attach-adopt', runAttachAdoptChecks],
+    ['toggle-body', runToggleBodyChecks],
+    ['card-keys', runCardKeysChecks],
+    ['find-folded', runFindFoldedChecks],
+    ['pdf-scratch', runPdfScratchChecks],
+    ['open-guard', runOpenGuardChecks],
+    ['vault-disconnect', runVaultDisconnectChecks],
+    // 1.0.1: dividers in toggles and over parts of columns, the minimap Fit, the German dash.
+    ['v101', runV101Checks],
+  ];
+  for (const [name, run] of SUITES) {
+    suite = name;
+    // A suite that throws is a failed check of its own, and the suites after it
+    // still run (each closes its app in a finally): one TypeError in black-holes
+    // used to leave twenty suites unrun and nothing the release could retry.
+    // A Playwright timeout still ends the run — exit 2, the machine, not the code.
+    try {
+      await run(check);
+    } catch (err) {
+      if (ABORTS.test(err?.message ?? '')) throw err;
+      check(`${name} ran to its end`, false, String(err?.message ?? err).split('\n')[0]);
+    }
+  }
+  suite = 'smoke';
 } catch (err) {
   failure = err;
   check('smoke run completed', false, err.message);
@@ -2480,8 +2505,19 @@ if (failure) console.error(failure);
  * code, so the release retries once on a 2 and stops on a 1, which is a check
  * that actually failed.
  */
-const aborted = failure && /Timeout|Target closed|browser has been closed|ENOMEM|ERR_ABORTED|\(-3\) loading/i.test(failure.message ?? '');
+const aborted = failure && ABORTS.test(failure.message ?? '');
 const realFailures = failed.filter((r) => r.name !== 'smoke run completed');
+// What failed, by file, for the release (scripts/release.js): a run that finished
+// with checks failing only in suite files can have those files run alone.
+try {
+  const out = path.join(root, 'test-results', 'smoke-failed.json');
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, JSON.stringify({
+    finished: !failure,
+    checks: results.length,
+    failed: realFailures.map((r) => ({ suite: r.suite, name: r.name })),
+  }, null, 2));
+} catch { /* the report is a help, never the result */ }
 // A run that threw for any other reason did not finish either, and is never a
 // pass: before 0.9.6 it exited 0 with the suites after the throw never run.
 if (realFailures.length || (failure && !aborted)) process.exit(1);

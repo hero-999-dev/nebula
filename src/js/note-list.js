@@ -539,7 +539,7 @@ export function initNoteList({ listEl, store, folders, projects = null, noteItem
   // A right-click on a row opens its ⋯ menu where the pointer is (0.9.4). On
   // the folded rail it is the only way to it: the ⋯ is hidden there, where it
   // sat on top of the note's initial.
-  listEl.addEventListener('contextmenu', (e) => {
+  const onContextMenu = (e) => {
     const projectRow = e.target.closest?.('.project-item');
     const folderRow = projectRow ? null : e.target.closest?.('.folder-item');
     const noteRow = projectRow || folderRow ? null : e.target.closest?.('.note-item[data-id]');
@@ -549,7 +549,10 @@ export function initNoteList({ listEl, store, folders, projects = null, noteItem
     if (projectRow) projectMenu(projectRow.dataset.project, at);
     else if (folderRow) folderMenu(folderRow.dataset.folder, at);
     else noteMenu?.(noteRow.dataset.id, e.clientX, e.clientY);
-  });
+  };
+  listEl.addEventListener('contextmenu', onContextMenu);
+  // The notes of an open black hole sit in their own scroll area (1.0.0): their rows open the same menu.
+  if (holesEl && holesEl !== listEl) holesEl.addEventListener('contextmenu', onContextMenu);
 
   function place(anchor) {
     menu.hidden = false;

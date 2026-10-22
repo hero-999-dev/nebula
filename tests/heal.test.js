@@ -25,6 +25,12 @@ const parse = (html) => {
 
 const MUSEUM = [
   {
+    when: 'up to 1.0.0: an imported widget kept the exported drawing, unclassed, beside the one drawn again',
+    html: '<p>sum</p><figure class="note-image note-image--inline note-widget" contenteditable="false" data-block-type="image" data-widget="calc" data-wg-expr="12×3" data-wg-out="36"><span class="wg wg--calc">12×3 36</span><span>12×3 36 C ± %</span></figure><p>after</p>',
+    gone: 'figure.note-widget > :not(.wg)',
+    present: 'figure.note-widget > .wg',
+  },
+  {
     when: 'up to 0.9.3: a paste froze the theme\'s ink into the words — pasted in Light, black for good, unreadable in Main and Dark (the owner\'s Ideas note)',
     html: '<p>here dressed <b style="color: rgb(17, 17, 17);">words</b> and <span style="color: rgb(237, 231, 247); scrollbar-color: auto;">more</span></p>',
     gone: '[style*="color"]',

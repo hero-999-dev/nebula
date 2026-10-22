@@ -23,6 +23,15 @@ describe('sanitize', () => {
     expect(out).toBe('<p>text</p>');
   });
 
+  it('drops a widget\'s exported drawing and keeps its state, so it is drawn once', () => {
+    const out = sanitize('<figure class="note-image note-image--inline note-widget" data-widget="calc" data-wg-expr="1+1" data-wg-out="2">'
+      + '<span class="wg wg--calc"><span>1+1</span><button>=</button></span></figure>');
+    const fig = new DOMParser().parseFromString(out, 'text/html').querySelector('figure.note-widget');
+    expect(fig.dataset.widget).toBe('calc');
+    expect(fig.dataset.wgExpr).toBe('1+1');
+    expect(fig.childNodes.length).toBe(0);
+  });
+
   it('refuses javascript: and data: URLs but keeps ordinary links', () => {
     expect(sanitize('<a href="javascript:alert(1)">x</a>')).toBe('<a>x</a>');
     expect(sanitize('<img src="data:text/html,<script>">')).toBe('<img>');

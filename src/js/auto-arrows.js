@@ -13,9 +13,14 @@
  * it a divider by itself" (the owner, on the first build) — read first as the
  * fifth, and then set right: "at the fourth dash". The fourth dash on a line
  * that holds nothing else does it; Ctrl+Z gives the dashes back.
+ *
+ * In German, two dashes between words are the Gedankenstrich, "–" (the owner,
+ * 1.0.1). They change when the space after them is typed, so `-->` and the
+ * four dashes of a divider are still reached through `--`.
  */
 
 import { blockFromNode, insertDivider } from './blocks.js';
+import { getLang } from './i18n.js';
 
 const ARROWS = [['-->', '→'], ['<--', '←']];
 
@@ -29,6 +34,18 @@ export function arrowFor(before) {
     if (text.endsWith(typed)) return { cut: typed.length, put: arrow };
   }
   return null;
+}
+
+/**
+ * The German dash: `--` standing alone before the space just typed.
+ * @param {string} before the text up to the caret, the space included
+ * @param {string} lang the app's language
+ * @returns {{cut: number, put: string, back: number} | null} the dashes to cut, `back` characters before the caret
+ */
+export function dashFor(before, lang) {
+  if (lang !== 'de') return null;
+  const text = String(before ?? '');
+  return /(^|[\s\u00a0])--[ \u00a0]$/.test(text) ? { cut: 2, put: '\u2013', back: 1 } : null;
 }
 
 const NO_ARROWS = '.code-src, .blk-code, .inline-code, pre, code, .inline-eq, .note-mention, .note-tag';
@@ -70,20 +87,22 @@ export function initAutoArrows(editorEl, { history, isLocked = () => false } = {
   }
   editorEl.addEventListener('input', (e) => {
     if (e.inputType !== 'insertText' || e.isComposing || isLocked()) return;
-    if (e.data !== '>' && e.data !== '-') return;
+    if (e.data !== '>' && e.data !== '-' && e.data !== ' ') return;
     const sel = window.getSelection();
     if (!sel?.isCollapsed) return;
     const node = sel.anchorNode;
     if (node?.nodeType !== Node.TEXT_NODE || !editorEl.contains(node)) return;
     if (node.parentElement?.closest(NO_ARROWS)) return;
     if (e.data === '-' && dashesToDivider(node)) return;
-    const found = arrowFor(node.nodeValue.slice(0, sel.anchorOffset));
+    const before = node.nodeValue.slice(0, sel.anchorOffset);
+    const found = e.data === ' ' ? dashFor(before, getLang()) : arrowFor(before);
     if (!found) return;
     history?.push();
-    const start = sel.anchorOffset - found.cut;
+    const back = found.back ?? 0;
+    const start = sel.anchorOffset - back - found.cut;
     node.replaceData(start, found.cut, found.put);
     const caret = document.createRange();
-    caret.setStart(node, start + found.put.length);
+    caret.setStart(node, start + found.put.length + back);
     caret.collapse(true);
     sel.removeAllRanges();
     sel.addRange(caret);

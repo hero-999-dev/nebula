@@ -27,10 +27,19 @@ const PICK_MAX = 6;                    // labels lit at once — the engine's ow
  * @param {{ notes: object[], folders: object[], projects: object[], holes: object[], holeId?: string|null, holeNotes?: object[], initials?: (name: string) => string, projectOf?: (folderId: string) => object|null }} from
  */
 export function galaxyInput({ notes = [], folders = [], projects = [], holes = [], holeId = null, holeNotes = [], initials = (n) => String(n || '?').slice(0, 2).toUpperCase(), projectOf = () => null }) {
+  // One label whatever its case: "Work" on one note and "#work" on another are
+  // one moon colour and one constellation, as they are one entry in the list's
+  // filter. The first spelling met names it.
+  const spelling = new Map();
+  const canon = (l) => {
+    const key = l.toLocaleLowerCase();
+    if (!spelling.has(key)) spelling.set(key, l);
+    return spelling.get(key);
+  };
   const note = (n) => {
     // A label is either set on the note or a #chip in its text — the list's
     // filter counts both, and so does the map (the owner: "labels are missing").
-    const labels = normalizeLabels([...(Array.isArray(n.labels) ? n.labels : []), ...contentTags(n.content)]);
+    const labels = normalizeLabels([...(Array.isArray(n.labels) ? n.labels : []), ...contentTags(n.content)]).map(canon);
     const out = { id: n.id, title: n.title || '', labels };
     // Its @mentions, so the search can show which note links to which.
     const mentions = contentMentions(n.content).filter((m) => m !== n.id);
@@ -171,7 +180,6 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
       item(t('Enter the black hole'), () => goIn(map, body));
       item(t('Lock'), () => { void blackHoles?.lock?.(body.ref); });
     }
-    if (body) item(t('Zoom in'), () => map.focus(body.id));
     item(t('Show all of Universe'), () => map.overview?.());
     // The way out of a hole on every map, the sidebar's too (Codex 25 #1).
     if (inside) item(t('Back to main space'), () => map.leaveHole?.());
@@ -227,7 +235,15 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
   full.title = t('Universe over the whole page');
   full.setAttribute('aria-label', t('Universe over the whole page'));
   full.addEventListener('click', () => { split?.mapFull?.(); paintFull(); });
-  head.append(grip, full);
+  // Beside it, Fit (owner, 1.0.1): the minimap rides the open note's planet
+  // by itself; after a zoom by hand this takes it back there.
+  const miniFit = el('button', 'galaxy-mini-fit');
+  miniFit.type = 'button';
+  miniFit.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 2v4H2M10 2v4h4M14 10h-4v4M2 10h4v4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  miniFit.title = t('Fit');
+  miniFit.setAttribute('aria-label', t('Fit'));
+  miniFit.addEventListener('click', () => miniMap?.fit?.({ glide: true }));
+  head.append(grip, miniFit, full);
   const miniCanvas = el('canvas', 'galaxy-canvas');
   miniCanvas.tabIndex = 0;
   miniCanvas.setAttribute('role', 'img');
@@ -252,7 +268,8 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
   // Top right (owner, 2026-10-21): the label search, then Fit and Full screen
   // as two icon buttons of one size.
   const tools = el('div', 'galaxy-tools');
-  const back = el('button', 'btn galaxy-back', `↩ ${t('Back to main space')}`);
+  const back = el('button', 'btn galaxy-back', '↩ ');
+  back.append(el('span', null, t('Back to main space')));
   back.type = 'button';
   back.hidden = true;
   const iconBtn = (cls, svg, label) => {
@@ -325,8 +342,12 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
     const apply = () => {
       big?.highlight?.(picked);
       chips.textContent = '';
+      box.classList.toggle('has-chips', picked.length > 0);
+      const have = new Set(known());
       for (const name of picked) {
-        const chip = el('span', 'galaxy-chip');
+        // A pick the map does not show now stays, faded, until it is taken
+        // off by hand (owner, 1.0.1: "they vanish when I click outside").
+        const chip = el('span', have.has(name) ? 'galaxy-chip' : 'galaxy-chip gone');
         chip.style.setProperty('--chip', colorOf(name));
         const dot = el('i', 'galaxy-chip-dot');
         const text = el('span', null, nameOf(name));
@@ -385,12 +406,9 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
     });
     return {
       el: box,
-      // Labels that left the map (renamed, removed, a hole entered) drop out.
-      sync() {
-        const have = new Set(known());
-        picked = picked.filter((l) => have.has(l));
-        apply();
-      },
+      // The map changed: the picks stay (a label gone for now is drawn faded
+      // and lights again when it is back); only a new space starts empty.
+      sync() { apply(); },
       // A constellation belongs to one space: going into a hole or back out
       // starts the search empty (Codex, map v2 ideas).
       clear() { picked = []; input.value = ''; close(); apply(); },

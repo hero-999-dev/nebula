@@ -9,7 +9,7 @@
  * app.css), is hidden from screen readers, and stops by itself the moment the
  * lock screen leaves the document.
  */
-import { sphere, stars, frameIndex, cacheKey } from './galaxy-ascii.js';
+import { sphere, stars, frameIndex, cacheKey, twinkle } from './galaxy-ascii.js';
 
 const TAU = Math.PI * 2;
 // One character cell of the 12px / 14px-line monospace face in app.css.
@@ -17,11 +17,13 @@ const CELL_W = 7.2;
 const CELL_H = 14;
 // What a container that has not been laid out yet (or jsdom) is drawn at.
 const FALLBACK = { cols: 120, rows: 40 };
-// ~14 fps, as Constellation's gate; reduced motion is gentler, not frozen.
-const TICK = 70;
+// ~25 fps; reduced motion is gentler, not frozen. At Constellation's 14 fps,
+// with the Universe's 48 frames a turn, the planet moved under twice a second
+// (owner, 1.0.1: "the lock screen turns at a low fps"): it has 360 now.
+const TICK = 40;
 const TICK_REDUCED = 250;
 const TURN_SECONDS = 28;
-const TWINKLE = ' .+*';
+const TURN_FRAMES = 360;
 
 function reducedMotion() {
   try { return !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
@@ -60,11 +62,11 @@ export function mount(container, { reduced = reducedMotion() } = {}) {
   const planet = (spin) => {
     const prow = Math.max(9, Math.min(26, Math.round(size.rows * 0.42)));
     const pcols = Math.round(prow * 2.6);
-    const idx = frameIndex(spin);
+    const idx = frameIndex(spin, TURN_FRAMES);
     const key = cacheKey(pcols, prow, idx);
     let art = frames.get(key);
     if (!art) {
-      art = sphere({ cols: pcols, rows: prow, spin: (idx / 48) * TAU, ring: true, seed: 'lock-space' });
+      art = sphere({ cols: pcols, rows: prow, spin: (idx / TURN_FRAMES) * TAU, ring: true, seed: 'lock-space' });
       frames.set(key, art);
     }
     return art;
@@ -75,8 +77,7 @@ export function mount(container, { reduced = reducedMotion() } = {}) {
     const { cols, rows } = size;
     const grid = Array.from({ length: rows }, () => new Array(cols).fill(' '));
     for (const s of sky) {
-      const glow = s.alpha * (0.55 + 0.45 * Math.sin(seconds * pace * (0.6 + s.depth * 1.4) + s.phase));
-      const ch = TWINKLE[Math.max(0, Math.min(3, Math.floor(glow * 7)))];
+      const { ch } = twinkle(s, seconds * pace);
       const x = Math.floor(s.x), y = Math.floor(s.y);
       if (ch !== ' ' && y < rows && x < cols) grid[y][x] = ch;
     }

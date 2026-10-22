@@ -15,7 +15,9 @@ for (const name of process.argv.slice(2)) {
   const run = Object.entries(mod).find(([key, fn]) => /^run\w*Checks$/.test(key) && typeof fn === 'function')?.[1];
   if (!run) throw new Error(`${name}.mjs exports no run…Checks`);
   console.log(`\n# ${name}`);
-  await run(check);
+  // dense runs in smoke on an old note too (smoke.mjs); alone, the same.
+  if (name === 'dense') await run(check, { docs: [(await import('./old-note.mjs')).OLD_NOTE] });
+  else await run(check);
 }
 console.log(`\n${passed}/${passed + failed} checks passed`);
 process.exit(failed ? 1 : 0);

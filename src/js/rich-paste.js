@@ -426,10 +426,15 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
    * Links pasted in come back as Nebula's links. Chromium's copy of a few lines
    * of links kept only their href — no class, no new window — and they showed
    * as plain words in the ink's colour (1.0.0: "five links copied inside
-   * Nebula, all in Nebula's format, came out not in it", the owner).
+   * Nebula, all in Nebula's format, came out not in it", the owner). Only the
+   * links the paste brought: a plain link already in the note stays as it is.
    */
+  let linksBeforePaste = null;
   function dressPastedLinks() {
+    const had = linksBeforePaste;
+    linksBeforePaste = null;
     for (const a of editor.querySelectorAll('a[href]:not([class])')) {
+      if (had?.has(a)) continue;
       if (!/^(https?:|mailto:)/i.test(a.getAttribute('href') || '')) continue;
       if (a.closest('.code-src, pre, .link-block, .note-mention')) continue;
       a.className = 'link-url';
@@ -1525,6 +1530,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
   let pasteModeTimer = 0;
 
   editor.addEventListener('paste', (event) => {
+    linksBeforePaste = new Set(editor.querySelectorAll('a[href]:not([class])'));
     const mode = pasteMode;
     pasteMode = 'nebula';
     // A caption is one line of words in the caption's own look (0.9.5). Left to

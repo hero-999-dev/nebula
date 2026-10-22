@@ -95,10 +95,18 @@ export async function runAiSleepChecks(check) {
     const written = (name) => app.evaluate(({ webContents }, n) => webContents.getAllWebContents()
       .find((c) => { try { return c.getType() === 'webview' && new URL(c.getURL()).pathname.startsWith(`/${n}`); } catch { return false; } })?.executeJavaScript('document.getElementById("t").value'), name);
 
+    // Each page is looked for as its tab opens: on a slow machine (the 1.0.1 release build) the time
+    // from "one" to "three" passed the 4 s sleep time and "one" was asleep, as it should be, at the check.
+    const seen = {};
+    const look = async (name) => {
+      for (let i = 0; i < 40 && !seen[name]; i += 1) { Object.assign(seen, await guests()); if (!seen[name]) await win.waitForTimeout(200); }
+    };
     await win.evaluate(() => document.querySelector('#pad [data-pad="ai"]').click());
     await win.waitForTimeout(700);
+    await look('one');
     await tab('two');
     await win.waitForTimeout(700);
+    await look('two');
     // Words typed in "two", and not sent.
     await typeIn('two', [...'draft']);
     let draft = await written('two');
@@ -106,16 +114,15 @@ export async function runAiSleepChecks(check) {
     await tab('three');
     await win.waitForTimeout(700);
     // A slow machine has not begun "three" in 700 ms (the 0.9.6 release build saw one,two): wait for it.
-    let first = await guests();
-    for (let i = 0; i < 40 && !first.three; i += 1) { await win.waitForTimeout(200); first = await guests(); }
-    check('three tabs opened are three pages loaded, and words typed in one are in its page', Object.keys(first).sort().join() === 'one,three,two' && draft === 'draft', `${JSON.stringify(first)} ${draft}`);
+    await look('three');
+    check('three tabs opened are three pages loaded, and words typed in one are in its page', Object.keys(seen).sort().join() === 'one,three,two' && draft === 'draft', `${JSON.stringify(seen)} ${draft}`);
 
     await nap();
     let g = await guests();
     let state = await tabs();
     check('a tab nobody looked at for the time goes to sleep: its page is gone, its tab stays, paler', !g.one && state.one === 'asleep', JSON.stringify({ g: Object.keys(g), state }));
     check('the tab on screen stays awake', !!g.three && state.three === 'active awake', JSON.stringify(state));
-    check('a tab that was typed in, on an address that names no saved chat, stays awake — its words still there', !!g.two && g.two.t0 === first.two.t0 && state.two === 'awake' && await written('two') === 'draft', JSON.stringify({ g, state }));
+    check('a tab that was typed in, on an address that names no saved chat, stays awake — its words still there', !!g.two && g.two.t0 === seen.two.t0 && state.two === 'awake' && await written('two') === 'draft', JSON.stringify({ g, state }));
 
     // A saved chat comes back from its address: sent with Enter, it may sleep.
     await go('two', `${base}/two/c/123e4567-e89b-12d3-a456-426614174000`);
@@ -128,7 +135,7 @@ export async function runAiSleepChecks(check) {
     await tab('two');
     await win.waitForTimeout(900);
     g = await guests();
-    check('opening a sleeping tab loads it again, where it was', g.two?.url === `${base}/two/c/123e4567-e89b-12d3-a456-426614174000` && g.two.t0 !== first.two.t0 && (await tabs()).two === 'active awake',
+    check('opening a sleeping tab loads it again, where it was', g.two?.url === `${base}/two/c/123e4567-e89b-12d3-a456-426614174000` && g.two.t0 !== seen.two.t0 && (await tabs()).two === 'active awake',
       JSON.stringify(g.two));
     // Typed there and not sent: Enter was not the last key.
     await typeIn('two', [...'sent', 'Enter', ...'more']);

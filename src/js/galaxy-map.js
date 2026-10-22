@@ -30,7 +30,7 @@
 
 import { buildScene, positionAt, boundsOf, focusFor, hueOf, labelsOf, mentionLinks } from './galaxy-model.js';
 import { RAMP, sphere, sun, vortex, core, stars, shot, cacheKey, frameIndex,
-  ROCKET_BODY, ROCKET_BURN } from './galaxy-ascii.js';
+  ROCKET_BODY, ROCKET_BURN, twinkle } from './galaxy-ascii.js';
 
 const TICK_MS = 70;          // ASCII frames at ~14 fps, like Constellation
 const FRAME_CACHE_MAX = 400; // LRU cap on ASCII frames (addendum #3)
@@ -223,6 +223,27 @@ export function createGalaxyMap(canvas, opts = {}) {
     return made;
   }
   const dropCaches = () => { frameCache.clear(); starCache = null; };
+  // Leaving a hole (locked, or simply left) forgets everything built from it:
+  // the scene key holds its notes' titles and labels as JSON, and the position
+  // map, culled list, constellation and selection hold its bodies.
+  const forgetHole = () => {
+    dropCaches();
+    sceneKey = null;
+    lit = null; system = null;
+    posMap = new Map(); posMapFor = null;
+    visItems.length = 0;
+    spinBoost.clear();
+    hoverId = null; selected = null;
+  };
+  // A dive still under way when the map is put away is called off: shown
+  // again, the map must not finish it and land inside the hole.
+  const cancelDive = () => {
+    if (!entering) return;
+    entering = null;
+    tween = null;
+    cam = savedMainCam || overviewCam();
+    auto = savedMainCam ? savedMainAuto : true;
+  };
 
   const ppw = () => cam.zoom * PX_PER_WORLD * Math.max(1, Math.min(W, H));
   const toScreen = (x, y) => {
@@ -265,10 +286,11 @@ export function createGalaxyMap(canvas, opts = {}) {
     }
     return overviewCam();
   };
-  const fit = () => {
+  // glide: the Fit button's way back, moved to rather than jumped to.
+  const fit = ({ glide = false } = {}) => {
     auto = true;
     tween = null;
-    if (!entering) cam = autoCam();
+    if (!entering) { if (glide && W && H) glideTo(autoCam(), reduced ? 300 : 600); else cam = autoCam(); }
     wake();
   };
   const handOver = () => { auto = false; };
@@ -384,11 +406,18 @@ export function createGalaxyMap(canvas, opts = {}) {
     for (const s of starCache.list) {
       const px = (((s.x - cam.x * ppw() * s.depth * 0.06) % W) + W) % W;
       const py = (((s.y - cam.y * ppw() * s.depth * 0.06) % H) + H) % H;
-      const tw = reduced ? 1 : 0.75 + 0.25 * Math.sin(animT * 1.6 + s.phase);
-      ctx.globalAlpha = s.alpha * tw;
-      const size = Math.round(s.size);
+      // The lock screen's twinkle (owner, 1.0.1): each star at its own pace
+      // fades out, comes back as a dot, grows to a + and a *. Reduced motion
+      // keeps every star still, as a *.
+      let ch = '*', glow = s.alpha;
+      if (!reduced) {
+        ({ ch, glow } = twinkle(s, animT));
+        if (ch === ' ') continue;
+      }
+      ctx.globalAlpha = Math.min(0.6, 0.1 + glow);
+      const size = Math.round(ch === '.' ? s.size * 1.4 : s.size);
       if (size !== lastSize) { ctx.font = size + 'px ' + face; lastSize = size; }
-      ctx.fillText('*', px, py);
+      ctx.fillText(ch, px, py);
     }
     ctx.globalAlpha = 1;
     ctx.font = baseFont;
@@ -473,7 +502,7 @@ export function createGalaxyMap(canvas, opts = {}) {
           cam.zoom = hop.from.zoom * Math.pow(hop.zoom / hop.from.zoom, e);
           if (k >= 1) hop = null;
         } else { cam.x = p.x; cam.y = p.y; }
-      }
+      } else hop = null;                 // its note left the map (moved into a hole, deleted)
     }
 
     ctx.fillStyle = c.paper;
@@ -971,7 +1000,7 @@ export function createGalaxyMap(canvas, opts = {}) {
     if (!p) return;
     const out = Math.atan2(p.y, p.x) + (Math.random() - 0.5) * 1.2;
     const ang = (p.x || p.y) ? out : Math.random() * Math.PI * 2;
-    const b = boundsOf(scene);
+    const b = boundsOf(scene, orbitT);   // without a time every position is NaN and the edge never comes
     const reach = Math.max(Math.abs(b.minX), Math.abs(b.maxX), Math.abs(b.minY), Math.abs(b.maxY)) + 12;
     rocket = { reach, start: now, x0: p.x + Math.cos(ang) * pad.size, y0: p.y + Math.sin(ang) * pad.size,
       ux: Math.cos(ang), uy: Math.sin(ang), burn: 0, lastBurn: 0, followed: false };
@@ -1067,8 +1096,9 @@ export function createGalaxyMap(canvas, opts = {}) {
       const r = b.size * k;
       const d = Math.hypot(mx - sx, my - sy);
       let target, body = b;
-      if (b.kind === 'moon' && r < MOON_CLICK_PX) {
-        // Too small to aim at: the click belongs to its planet.
+      if (isLabelMoon(b) && r < MOON_CLICK_PX) {
+        // Too small to aim at: the click belongs to its note. A folder's note
+        // moon is a body of its own and stays the target at any size.
         target = MIN_TARGET_PX;
         body = scene.byId.get(b.parent) || b;
         if (d > target) continue;
@@ -1270,7 +1300,7 @@ export function createGalaxyMap(canvas, opts = {}) {
       const still = (main.holes || []).some((h) => h.id === holeId && !h.locked);
       if (!still) {
         entering = null; tween = null;
-        dropCaches();
+        forgetHole();
         scene = buildScene(main);
         holeId = null;
         picked = [];
@@ -1336,7 +1366,7 @@ export function createGalaxyMap(canvas, opts = {}) {
     if (!holeId) return;
     entering = null;
     tween = null;
-    dropCaches();
+    forgetHole();
     const back = savedMainCam || null;
     auto = back ? savedMainAuto : true;
     scene = buildScene(getInput(null) || {});
@@ -1344,7 +1374,6 @@ export function createGalaxyMap(canvas, opts = {}) {
     picked = [];
     backdrop = null;
     onDimension(null);
-    selected = null;
     if (instant || !back) { cam = back || overviewCam(); wake(); return; }
     // The way out is the pull-in played backwards: glide from wherever the
     // hole left the camera back to where main space was.
@@ -1355,7 +1384,10 @@ export function createGalaxyMap(canvas, opts = {}) {
   function follow(noteId) {
     followId = noteId;
     const body = scene && scene.byId.get('note:' + noteId);
-    if (!body) { wake(); return; }
+    // A note the map does not show ends any glide still under way: draw()
+    // only finishes a hop on the note it follows, and an unfinished hop keeps
+    // the loop drawing every frame.
+    if (!body) { hop = null; wake(); return; }
     if (mini) {                           // in mini the camera is glued on — after a short glide over
       tween = null;
       const zoom = auto ? autoCam().zoom : cam.zoom;
@@ -1441,7 +1473,9 @@ export function createGalaxyMap(canvas, opts = {}) {
   return {
     refresh, follow, focus, enterHole, leaveHole, overview, select, restore, fit,
     dimension: () => holeId,
-    bodies: () => (scene ? scene.bodies.map((b) => ({ id: b.id, kind: b.kind, role: roleOf(b), ref: b.ref, name: b.name, parent: b.parent })) : []),
+    // A hole carries whether it is locked: the screen-reader list asks for the PIN on a locked one.
+    bodies: () => (scene ? scene.bodies.map((b) => ({ id: b.id, kind: b.kind, role: roleOf(b), ref: b.ref, name: b.name, parent: b.parent,
+      ...(b.kind === 'hole' ? { locked: !!b.locked, initials: b.initials } : {}) })) : []),
     // The label search: every label on this map, a label's colour on this
     // theme, and the labels whose constellations are drawn.
     labels: () => (scene ? labelsOf(scene) : []),
@@ -1475,12 +1509,12 @@ export function createGalaxyMap(canvas, opts = {}) {
     shooting: () => !!eventState,
     view: () => ({ x: cam.x, y: cam.y, zoom: cam.zoom, holeId, manual: !auto }),
     frames: () => [...frameCache.keys()],   // what the frame cache holds — for tests
-    resize, pause: () => { running = false; }, resume: () => { running = true; wake(); },
+    resize, pause: () => { running = false; cancelDive(); }, resume: () => { running = true; wake(); },
     // Lifecycle hooks for whoever owns the DOM around the canvas: shown
     // starts the loop again at the right size, hidden parks it, resized is
     // resize by the name a panel observer would call.
     shown: () => { running = true; resize(); wake(); },
-    hidden: () => { running = false; },
+    hidden: () => { running = false; cancelDive(); },
     resized: () => resize(),
     destroy: () => {
       destroyed = true;

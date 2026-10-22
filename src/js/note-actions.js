@@ -94,7 +94,8 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
 
   /** A right-click on a note's row (note-list.js). */
   function openAt(id, x, y) {
-    const button = [...document.querySelectorAll('#note-list .note-item')]
+    // A black hole's notes are drawn in #holes-scroll, not in #note-list.
+    const button = [...document.querySelectorAll('#note-list .note-item, #holes-scroll .note-item')]
       .find((el) => el.dataset.id === id)?.querySelector('.nr-more:not(.fr-more)');
     if (!button) return;
     close();

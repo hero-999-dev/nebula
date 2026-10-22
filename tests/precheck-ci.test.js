@@ -18,6 +18,18 @@ describe('precheck on GitHub before the tag', () => {
     expect(runForSha(undefined, 'aaa')).toBeNull();
   });
 
+  it('skips a run of the same commit that was there before this push', () => {
+    const runs = [{ databaseId: 5, headSha: 'aaa' }, { databaseId: 2, headSha: 'aaa' }];
+    expect(runForSha(runs, 'aaa', new Set([2])).databaseId).toBe(5);
+    expect(runForSha(runs, 'aaa', new Set([2, 5]))).toBeNull();
+  });
+
+  it('tags the commit GitHub built, refuses --no-smoke with --no-precheck, and keeps one REPO', () => {
+    expect(release).toContain("git('tag', '-a', tag, '-m', `Nebula ${tag}`, releaseSha)");
+    expect(release).toMatch(/--no-smoke'\) && skipPrecheck\)/);
+    expect(release).not.toMatch(/const REPO =/);
+  });
+
   it('runs the release workflow on precheck branches and publishes only from a tag', () => {
     expect(precheckBranch('v1.2.3')).toBe('precheck/v1.2.3');
     expect(workflow).toMatch(/branches:\s*\n\s*- 'precheck\/\*\*'/);

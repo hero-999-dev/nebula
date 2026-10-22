@@ -304,7 +304,7 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '1.0.0';
+export const GUIDE_VERSION = '1.0.1';
 
 /**
  * The guide's words, without its markup, shapes, code or equations — so a
@@ -535,10 +535,19 @@ export const GUIDE_SIGNATURES = {
   '1.0.0 pre-mentions de': '0a5d95f7',
   '1.0.0 pre-mentions pl': 'fa0a6781',
   '1.0.0 pre-mentions tr': '71371862',
-  '1.0.0': '8bb0a209',
-  '1.0.0 de': 'd22f8ceb',
-  '1.0.0 pl': '7132f5cd',
-  '1.0.0 tr': '102252ea',
+  '1.0.0 release': '8bb0a209',
+  '1.0.0 release de': 'd22f8ceb',
+  '1.0.0 release pl': '7132f5cd',
+  '1.0.0 release tr': '102252ea',
+  // The review-fix test build of 1.0.0 (paragraph 091), never released.
+  '1.0.0 review fixes': 'b7adb523',
+  '1.0.0 review fixes de': 'f4f9f64d',
+  '1.0.0 review fixes pl': '7bce5ef1',
+  '1.0.0 review fixes tr': '84978863',
+  '1.0.1': '722a5a15',
+  '1.0.1 de': '2c4b3bc8',
+  '1.0.1 pl': '6b2064d5',
+  '1.0.1 tr': 'a23fae10',
 };
 
 /** Whether a vault's guide is one we shipped and nobody has typed in. */
@@ -573,6 +582,11 @@ export const GUIDE_NOTE = {
     // Each release adds its features here (features, not fixes) and in the
     // section they belong to. See GUIDE_SIGNATURES before changing any text.
     // A divider closes each section before the next heading (owner, 0.8.9).
+    '<hr class="blk-hr">' +
+    '<h2>New in 1.0.1</h2>' +
+    '<p><strong>Dividers cut smaller parts.</strong> In an open toggle, a divider pulled sideways puts the toggle’s lines and pictures side by side. In a column, a divider pulled sideways and down or up over a part of the column cuts only that part.</p>' +
+    '<p><strong>A livelier Universe.</strong> The small Universe has a Fit button beside ⤢: after zooming in or out, it glides back to the view around the open note. Its stars twinkle the way the ones behind the lock screen do, and the lock screen’s planet turns smoothly.</p>' +
+    '<p><strong>The German dash.</strong> With the app in Deutsch, two hyphens typed between words become a dash (–) when you type the space after them.</p>' +
     '<hr class="blk-hr">' +
     '<h2>New in 1.0.0</h2>' +
     '<p><strong>Every block moves with the mouse.</strong> Point at a line, a heading, a list item, a toggle or a table and a grip of three dots appears at its left. Drag it and a mark shows where the block will land: between two lines, inside an open toggle or inside a column. Moving a block never adds a divider of its own: columns are made by pulling a divider sideways. A click on the grip picks the block, and Ctrl+C, Ctrl+X, Ctrl+D or Delete then work on all of it. A copied toggle pastes with everything inside it, and a file dragged over a note shows where it will land — section 4. A video or any other file copied in Explorer or Finder pastes into a note with Ctrl+V (section 7), and a table printed or exported to PDF on narrower paper is fitted to it (section 4).</p>' +
@@ -733,13 +747,13 @@ export const GUIDE_NOTE = {
     '<p><strong>Toggle headings.</strong> <span class="inline-code">/toggle-h1</span>, <span class="inline-code">/toggle-h2</span> and <span class="inline-code">/toggle-h3</span> make a heading that folds away what is under it; the ▸ button on a heading does the same. <strong>In a list</strong>, an item becomes a toggle where it stands — its bullet or number first, then the arrow — and a list under that item is what folds.</p>' +
     '<p><strong>Try it:</strong> put the caret in “second” above and press the ▸ button — the list stays one list.</p>' +
     '<h3>Moving blocks</h3>' +
-    '<p>Every block has a <strong>grip</strong> — three dots that show at its left while the mouse is over it. Drag the grip to move the block: a line shows where it goes — above or below another block, into an open toggle (let go over the lower half of its title), or, standing up, at the left or right edge of a line, where the line and the block become two columns. Hold Alt as you let go to leave the block where it was and drop a copy; Esc stops the drag. A list item dragged out of its list becomes a list of its own, and a column left empty goes away.</p>' +
+    '<p>Every block has a <strong>grip</strong> — three dots that show at its left while the mouse is over it. Drag the grip to move the block: a line shows where it goes — above or below another block, or into an open toggle (let go over the lower half of its title). Moving a block makes no columns; a block goes into a column, or out of one, the same way. Hold Alt as you let go to leave the block where it was and drop a copy; Esc stops the drag. A list item dragged out of its list becomes a list of its own, and a column left empty goes away.</p>' +
     '<p><strong>Picked blocks.</strong> A click on the grip picks the block. Ctrl+C copies it whole, Ctrl+X cuts it, Ctrl+D puts a copy under it, Delete removes it, ↑ and ↓ pick the block above or below, and Esc lets it go. Ctrl+Shift+↑ and Ctrl+Shift+↓ move the picked block — or the line the caret is in — one place up or down. Words selected from a toggle’s title into its body are copied with the toggle round them, so they paste as a toggle.</p>' +
     '<p><strong>Try it:</strong> click the grip of the toggle above, press Ctrl+D, then drag the copy under this line: it lands where the mark shows.</p>' +
 
     '<h3>Quotes and dividers</h3>' +
     '<blockquote>A quote stands apart from the text around it.</blockquote>' +
-    '<p>A quote comes from the outline dropdown or <span class="inline-code">/quote</span>. Enter on an empty line of a quote leaves it, the way a list does. A <strong>divider</strong> — the ― button, <span class="inline-code">/divider</span>, or four dashes typed on a line of their own — is a line of its own; Backspace next to it first marks it, and a second Backspace removes it, so one stray key cannot. A click on a divider picks it: Backspace or Delete then removes it, and any other key carries on in the line under it. A divider can be dragged too. Pulled up or down, a mark shows the place between two lines where it will lie. Pulled sideways it stands up: an upright mark and a tint show the part of the note it will split — everything up to the divider above, or from the line the pointer is over — and letting go makes that part two columns, what was there on the wider side and an empty line on the other; Esc gives the drag up. Drag the upright divider sideways to make one column wider; click it and press Backspace or Delete, and the two columns are one flow again. Another divider pulled sideways over a column cuts that column in two the same way — as many columns as the line has room for; each upright divider then moves by itself, and one taken away joins the two columns at its sides. A column always ends with a line to write on, under a picture too. <span class="inline-code">/paragraph</span> turns a heading or a quote back into a plain line.</p>' +
+    '<p>A quote comes from the outline dropdown or <span class="inline-code">/quote</span>. Enter on an empty line of a quote leaves it, the way a list does. A <strong>divider</strong> — the ― button, <span class="inline-code">/divider</span>, or four dashes typed on a line of their own — is a line of its own; Backspace next to it first marks it, and a second Backspace removes it, so one stray key cannot. A click on a divider picks it: Backspace or Delete then removes it, and any other key carries on in the line under it. A divider can be dragged too. Pulled up or down, a mark shows the place between two lines where it will lie. Pulled sideways it stands up: an upright mark and a tint show the part of the note it will split — everything up to the divider above, or from the line the pointer is over — and letting go makes that part two columns, what was there on the wider side and an empty line on the other; Esc gives the drag up. Drag the upright divider sideways to make one column wider; click it and press Backspace or Delete, and the two columns are one flow again. Another divider pulled sideways over a column cuts that column in two the same way — as many columns as the line has room for; each upright divider then moves by itself, and one taken away joins the two columns at its sides. A column always ends with a line to write on, under a picture too. A divider in a column pulled sideways and down or up over a part of it cuts only that part; in an open toggle, a divider pulled sideways puts the toggle’s lines — pictures too — side by side. <span class="inline-code">/paragraph</span> turns a heading or a quote back into a plain line.</p>' +
     // Tables (0.9.4, table.js).
     '<h3>Tables</h3>' +
     '<p><span class="inline-code">/table</span> or the table button on the bar asks how large the table is to be — point at a square, or type the two numbers; Enter alone makes five rows of five columns — and puts it on the line. Over its columns stand x1, x2, x3… and beside its rows y1, y2, y3…, as in a spreadsheet: a press on one selects that column or row, and the line at the right of an x is pulled to make its column wider or narrower, the line under a y to make its row higher or lower — the size shown in millimetres while you pull. Each cell is written in like a line of the note — <strong>Tab</strong> and <strong>Shift+Tab</strong> step from cell to cell (Tab in the last one makes a new row), the arrows cross from one cell into the next and out of the table, and Enter is a new line in the cell. <strong>Ctrl+A</strong> selects what the cell holds and, pressed again, every cell of the table; the bar’s left, centre and right buttons line up the words of the cell the caret is in, or of the selected cells. Pull the mouse from one cell to another — or hold Shift and click — to select cells: a background colour from the H button then colours their backs (with only the caret in a cell, that cell’s), Delete empties them, and Ctrl+C copies them as rows any spreadsheet reads; rows copied from one are pasted one cell each. At the selection’s lower right stands what can be done with it: <em>Merge</em> makes one cell of several and <em>Unmerge</em> takes it apart again; for whole rows, columns or the whole table, <em>Delete</em>. The small square at its lower left is pulled to carry the cells on over their neighbours: one cell is copied, 1, 2 goes on with 3, 4, and Day 1 with Day 2. The <strong>+</strong> along the bottom adds a row and the one at the right a column. A right-click in a cell puts a row in above or below it, or a column at its left or right, and deletes its row or its column. The corner where the numbers meet moves the table like a picture, and a right-click on it deletes the table. A table never reaches over the edge of its page or its column: where there is no room for its columns, they are drawn narrower. Printed or exported to PDF on paper narrower than the page it was made on, the table is fitted to the paper too, each column keeping its share of the width.</p>' +

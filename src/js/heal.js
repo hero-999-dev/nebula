@@ -26,6 +26,8 @@ import { getCode } from './codeblock.js';
 const CHROME = [
   '.blk-code', '.inline-eq', '.katex', '.shape-layer', '.image-layer',
   '.link-del', '.link-card__kind', '.image-h', '.shape-rot', '.shape-h', '.shape-angle',
+  // A widget's drawing is redrawn from its state on every open: not the note's words.
+  '.note-widget',
 ].join(', ');
 
 /** What a repair must not change: [what, selector]. */

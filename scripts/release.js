@@ -23,7 +23,7 @@
  *   npm run push -- --no-rebuild  skip the page rebuild (tests/e2e/rebuild-page.mjs)
  *   npm run push -- --no-old-notes skip the trials on Nebula Test's notes
  *   npm run push -- --no-browser-check  release although the browser the app tells Google it is has fallen behind
- *   npm run push -- --no-smoke    skip the local smoke run, once the suites that failed passed alone (node tests/e2e/only.mjs <suite>…)
+ *   npm run push -- --no-smoke    skip the local smoke run (GitHub still runs it before the tag)
  *   npm run push -- --no-precheck  tag without first building the commit on GitHub (scripts/precheck-ci.js)
  */
 import { execFileSync } from 'node:child_process';
@@ -32,7 +32,7 @@ import path from 'node:path';
 import { ROOT } from './paths.js';
 import { stampVersions, checkVersions } from './versions.js';
 import { checkBrowsers, printBrowsers } from './check-browsers.js';
-import { precheckOnCi } from './precheck-ci.js';
+import { precheckOnCi, REPO, CREDS } from './precheck-ci.js';
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
@@ -41,8 +41,8 @@ const skipPrecheck = args.includes('--no-precheck');
 const notesIdx = args.indexOf('--notes');
 const headline = notesIdx >= 0 ? args[notesIdx + 1] : null;
 const bumpArg = args.find((a) => !a.startsWith('--') && a !== headline) ?? 'patch';
-
-const REPO = 'hero-999-dev/nebula';
+/** Set when smoke checks passed only with their files run alone (retryAlone): said in Log.md. */
+let smokeRetried = null;
 
 function run(cmd, cmdArgs, opts = {}) {
   return execFileSync(cmd, cmdArgs, { cwd: ROOT, encoding: 'utf8', stdio: 'pipe', ...opts }).trim();
@@ -68,21 +68,7 @@ function runSoft(cmd, cmdArgs) {
   }
 }
 
-/**
- * Git, with the credential chain reset to the gh session we are signed into.
- *
- * Credential helpers are ADDITIVE: naming one only appends it to a list that
- * already holds the machine's global `manager`, and Git asks them in order — so
- * Windows' credential manager opened an interactive window and the release sat
- * on it forever. Three releases were lost that way before the empty value,
- * which clears the list, went in. `publish-site.js` learned this first; the
- * main repo's own push was still doing it.
- */
-const CREDS = [
-  '-c', 'credential.helper=',
-  '-c', 'credential.helper=!gh auth git-credential',
-];
-
+/** Git, with the credential chain reset to the gh session (CREDS, precheck-ci.js). */
 function git(...gitArgs) {
   const needsAuth = ['push', 'fetch', 'pull', 'ls-remote'].includes(gitArgs[0]);
   return run('git', needsAuth ? [...CREDS, ...gitArgs] : gitArgs,
@@ -121,6 +107,12 @@ if (!fs.existsSync(path.join(ROOT, '.git'))) {
 }
 if (!tryGit('remote', 'get-url', 'origin')) {
   fail(`No "origin" remote. Expected https://github.com/${REPO}.git — see docs/RELEASE.md.`);
+}
+
+// Skipping both leaves a commit no machine has run the smoke suite on, and it
+// would still be tagged and published.
+if (args.includes('--no-smoke') && skipPrecheck) {
+  fail('--no-smoke and --no-precheck together tag a commit nothing has smoke-tested. Drop one of them.');
 }
 
 const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
@@ -225,13 +217,34 @@ if (args.includes('--no-smoke')) {
   console.log('  skipped (--no-smoke): GitHub runs it on the commit before the tag.');
 } else {
   const first = runSoft('npm', ['run', 'smoke']);
-  if (first === 1) fail('Smoke checks failed. Nothing was committed.');
-  if (first !== 0) {
+  if (first === 1) retryAlone();
+  if (first !== 0 && first !== 1) {
     console.warn(`\n  ! the smoke run could not finish (exit ${first}) — retrying once.\n`);
     const second = runSoft('npm', ['run', 'smoke']);
-    if (second === 1) fail('Smoke checks failed. Nothing was committed.');
-    if (second !== 0) fail('Smoke could not complete twice. Nothing was committed.');
+    if (second === 1) retryAlone();
+    else if (second !== 0) fail('Smoke could not complete twice. Nothing was committed.');
   }
+}
+
+/**
+ * A full smoke run that finished with a few checks failing: the files that hold
+ * them, run alone once (tests/e2e/only.mjs). Most such failures were a fixed
+ * pause too short on a machine busy with the unit tests and the build; alone,
+ * the same checks pass. If they pass, the release goes on and Log.md says which
+ * files were retried. If they fail alone too, or the run did not finish, or a
+ * check of smoke.mjs itself failed, or more than three files failed, it stops.
+ */
+function retryAlone() {
+  const stop = (why) => fail(`Smoke checks failed${why ? ` (${why})` : ''}. Nothing was committed.`);
+  let report = null;
+  try { report = JSON.parse(fs.readFileSync(path.join(ROOT, 'test-results', 'smoke-failed.json'), 'utf8')); } catch { /* none */ }
+  if (!report?.finished || !report.failed?.length) stop('no report of a finished run');
+  const suites = [...new Set(report.failed.map((f) => f.suite))];
+  if (suites.includes('smoke')) stop('a check of smoke.mjs itself');
+  if (suites.length > 3) stop(`${suites.length} files`);
+  console.warn(`\n  ! ${report.failed.length} check(s) failed in ${suites.join(', ')} — running ${suites.length === 1 ? 'that file' : 'those files'} alone once.\n`);
+  if (runSoft('node', [path.join(ROOT, 'tests', 'e2e', 'only.mjs'), ...suites]) !== 0) stop(`${suites.join(', ')} failed alone too`);
+  smokeRetried = `Smoke: ${report.failed.length} of ${report.checks} checks failed in the full run (${suites.join(', ')}: ${report.failed.map((f) => f.name).join('; ')}) and passed with ${suites.length === 1 ? 'its file' : 'their files'} run alone.`;
 }
 
 // The page rebuild (tests/e2e/rebuild-page.mjs): real articles written again in
@@ -325,6 +338,7 @@ const entry = [
   `## [${timestamp()}] ${tag} - by ${process.env.NEBULA_RELEASE_AUTHOR || 'release-script'}`,
   '',
   headline ? `${headline}\n` : '',
+  smokeRetried ? `${smokeRetried}\n` : '',
   bullets.length ? bullets.join('\n') : '* (no commits since the last release)',
   '',
   '---',
@@ -354,6 +368,13 @@ if (dryRun) {
  * among them — so the commit is unwound with --mixed and the rest kept.
  */
 function undoReleaseCommit() {
+  // Only the release commit is taken back: if anything moved HEAD during the
+  // precheck, HEAD~1 would be some other commit.
+  if (git('rev-parse', 'HEAD') !== releaseSha) {
+    console.error(`\n  HEAD is no longer the release commit ${releaseSha.slice(0, 7)}; nothing was reset.`);
+    console.error(`  Undo it by hand: package.json, the stamped versions and Log.md hold ${version}.\n`);
+    return;
+  }
   git('reset', '--mixed', 'HEAD~1');
   const current = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   current.version = previousVersion;
@@ -366,12 +387,13 @@ function undoReleaseCommit() {
 
 git('add', '-A');
 git('commit', '-m', `Nebula ${tag}`);
+const releaseSha = git('rev-parse', 'HEAD');
 
 // GitHub builds the commit before it gets a tag (scripts/precheck-ci.js): the
 // gates above run on this machine, and five releases in a row failed only on
 // GitHub's slower Windows runner after their tag was already out.
 if (!skipPrecheck) {
-  const result = await precheckOnCi({ sha: git('rev-parse', 'HEAD'), label: tag });
+  const result = await precheckOnCi({ sha: releaseSha, label: tag });
   if (!result.ok) {
     undoReleaseCommit();
     fail([
@@ -384,7 +406,12 @@ if (!skipPrecheck) {
   console.log(`  precheck passed: ${result.url}`);
 }
 
-git('tag', '-a', tag, '-m', `Nebula ${tag}`);
+// The tag names the commit GitHub built, and only goes out on it: a HEAD that
+// moved while the precheck ran is pushed by nobody.
+if (git('rev-parse', 'HEAD') !== releaseSha) {
+  fail(`HEAD moved during the precheck (the release commit is ${releaseSha.slice(0, 7)}). Nothing was tagged or pushed.`);
+}
+git('tag', '-a', tag, '-m', `Nebula ${tag}`, releaseSha);
 git('push', 'origin', branch, '--follow-tags');
 
 console.log(`\n  pushed ${tag}`);

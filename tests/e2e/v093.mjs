@@ -14,6 +14,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
+import { until, steadyDrag } from './settle.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -871,15 +872,20 @@ export async function runV093Checks(check) {
     check('New folder makes a named folder, open and empty', (await listed()).includes('[Work]'));
     // Notes on screen: a drag that has to scroll the list on the way is cut
     // short by the test driver, not by the app.
-    await win.dragAndDrop(noteRow('picture'), '#note-list .folder-empty');
-    await win.waitForTimeout(200);
-    check('a note dragged onto a folder goes into it', await win.evaluate(() =>
-      !!document.querySelector('#note-list .folder-notes .note-row[title="picture"]')));
+    // Each drag waits for both rows to stand still, and each check for what it
+    // checks: fixed pauses failed releases on a loaded machine (1.0.1, the
+    // folder drag pressed on the row under a list still scrolling).
+    const inFolder = () => !!document.querySelector('#note-list .folder-notes .note-row[title="picture"]');
+    await steadyDrag(win, noteRow('picture'), '#note-list .folder-empty');
+    check('a note dragged onto a folder goes into it', await until(win, inFolder));
     const before = (await listed()).filter((x) => !x.startsWith('[') && x !== 'picture');
     // 1.0.0: the map below the list leaves it shorter — both rows brought into view first.
     await win.evaluate((t) => document.querySelector(`#note-list .note-row[title="${t}"]`).scrollIntoView({ block: 'start' }), before[0]);
-    await win.dragAndDrop(noteRow(before[3]), noteRow(before[0]), { targetPosition: { x: 20, y: 3 } });
-    await win.waitForTimeout(200);
+    await steadyDrag(win, noteRow(before[3]), noteRow(before[0]), { targetPosition: { x: 20, y: 3 } });
+    await until(win, ([a, b]) => {
+      const rows = [...document.querySelectorAll('#note-list .note-item:not(.folder-item) > .note-row')].map((r) => r.title);
+      return rows.indexOf(a) >= 0 && rows.indexOf(a) < rows.indexOf(b);
+    }, [before[3], before[0]]);
     const after = (await listed()).filter((x) => !x.startsWith('[') && x !== 'picture');
     check('a note dragged above another stands there', after[0] === before[3] && after[1] === before[0], after.join(', '));
     // Dragging never pins or unpins (the owner, 0.9.3: "a note moved above the folder was pinned").
@@ -887,30 +893,45 @@ export async function runV093Checks(check) {
     await win.hover(noteRow(after[2]));
     await win.click(`#note-list .note-item:has(> .note-row[title="${after[2]}"]) .nr-more`);
     await win.click('[data-note-act="pin"]');
-    await win.waitForTimeout(200);
     const pinnedName = after[2];
-    await win.dragAndDrop(noteRow(after[1]), noteRow(pinnedName), { targetPosition: { x: 20, y: 3 } });
-    await win.waitForTimeout(200);
+    await until(win, (t) => !!document.querySelector(`#note-list .note-row[title="${t}"] .nr-pin`), pinnedName);
+    await steadyDrag(win, noteRow(after[1]), noteRow(pinnedName), { targetPosition: { x: 20, y: 3 } });
+    await until(win, ([a, b]) => {
+      const rows = [...document.querySelectorAll('#note-list .note-row')].map((r) => r.title);
+      return rows.indexOf(b) === rows.indexOf(a) + 1 || rows.indexOf(a) === rows.indexOf(b) + 1;
+    }, [after[1], pinnedName]);
     check('a note dropped among the pinned ones is not pinned by it', !(await pinnedOf(after[1])) && (await pinnedOf(pinnedName)));
-    await win.dragAndDrop(noteRow(pinnedName), noteRow(after[4]), { targetPosition: { x: 20, y: 30 } });
-    await win.waitForTimeout(200);
-    check('a pinned note dropped among the others stays pinned', await pinnedOf(pinnedName));
+    await steadyDrag(win, noteRow(pinnedName), noteRow(after[4]), { targetPosition: { x: 20, y: 30 } });
+    check('a pinned note dropped among the others stays pinned', await until(win, (t) => !!document.querySelector(`#note-list .note-row[title="${t}"] .nr-pin`), pinnedName));
     // At the row's very foot: if the rows shift as the folder lifts off, the
     // pointer is then at the next row's head — the same place, under this note.
     // y: 30 sat near the middle and once landed a row low on a busy machine.
     const targetHeight = await win.evaluate((t) => document.querySelector(`#note-list .note-row[title="${t}"]`).getBoundingClientRect().height, after[1]);
-    await win.dragAndDrop('#note-list .folder-row', noteRow(after[1]), { targetPosition: { x: 20, y: Math.max(1, Math.round(targetHeight) - 3) } });
-    await win.waitForTimeout(200);
+    await win.evaluate(() => document.querySelector('#note-list .folder-row').scrollIntoView({ block: 'center' }));
+    await steadyDrag(win, '#note-list .folder-row', noteRow(after[1]), { targetPosition: { x: 20, y: Math.max(1, Math.round(targetHeight) - 3) } });
+    await until(win, (t) => {
+      const items = [...document.querySelectorAll('#note-list .note-item')];
+      const i = items.findIndex((el) => el.querySelector(':scope > .note-row')?.title === t);
+      return i >= 0 && items[i + 1]?.classList.contains('folder-item');
+    }, after[1]);
     const withFolder = await listed();
     check('a folder is dragged below a note like a note', withFolder.indexOf('[Work]') === withFolder.indexOf(after[1]) + 1, withFolder.join(', '));
+    // Where the note is before the folder is folded, so a failure below says which step lost it.
+    const held = await win.evaluate(inFolder);
     await win.click('#note-list .folder-row');
-    check('a click on a folder closes it, and shows its notes again', !(await listed()).includes('picture'));
+    check('a click on a folder closes it, and shows its notes again', await until(win, () => !document.querySelector('#note-list .note-row[title="picture"]')),
+      `${held ? 'in the folder' : 'NOT in the folder'} before the click: ${(await listed()).join(', ')}`);
     await win.click('#note-list .folder-row');
-    check('... and opens it', (await listed()).includes('picture'));
-    await win.waitForTimeout(600);
-    const vault = JSON.parse(fs.readFileSync(path.join(profile, 'storage', 'folders.json'), 'utf8'));
-    const shop = JSON.parse(fs.readFileSync(path.join(notes, 'picture', 'picture.json'), 'utf8'));
-    check('the folder is kept in the vault, and the note says it is in it', vault.folders?.[0]?.name === 'Work' && shop.folder === vault.folders[0].id);
+    check('... and opens it', await until(win, inFolder));
+    const readJson = (f) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return null; } };
+    const saved = () => {
+      const vault = readJson(path.join(profile, 'storage', 'folders.json'));
+      const shop = readJson(path.join(notes, 'picture', 'picture.json'));
+      return { vault, shop, ok: vault?.folders?.[0]?.name === 'Work' && !!shop && shop.folder === vault.folders[0].id };
+    };
+    for (let i = 0; i < 50 && !saved().ok; i += 1) await win.waitForTimeout(100);
+    const kept = saved();
+    check('the folder is kept in the vault, and the note says it is in it', kept.ok, JSON.stringify({ folders: kept.vault?.folders?.map((f) => f.name), folder: kept.shop?.folder ?? null }));
     await win.hover('#note-list .folder-item');
     await win.click('#note-list .fr-more');
     await win.click('#folder-menu .fm-delete');

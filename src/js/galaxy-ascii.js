@@ -340,6 +340,22 @@ export function core({ cols, rows, t }) {
  * phase — the same spread Constellation scattered as 160 asterisks, but from a
  * seed so the map redraws the identical sky every time.
  */
+/** The sky's alphabet, faintest first: a star fades out, comes back, grows a point. */
+export const TWINKLE = ' .+*';
+
+/**
+ * How a star of `stars()` shines at `seconds`: each at its own pace (the
+ * deeper, the quicker) and in its own phase, as the glyph it is drawn with
+ * (' ' when it has faded out) and how bright it is. The lock screen's sky,
+ * and since 1.0.1 the Universe's too (owner: "bring the lock screen's stars
+ * to Universe").
+ * @returns {{ch: string, glow: number}}
+ */
+export function twinkle(star, seconds) {
+  const glow = star.alpha * (0.55 + 0.45 * Math.sin(seconds * (0.6 + star.depth * 1.4) + star.phase));
+  return { ch: TWINKLE[Math.max(0, Math.min(3, Math.floor(glow * 7)))], glow };
+}
+
 export function stars(seed, count, width, height) {
   const r = mulberry(typeof seed === 'string' ? hash32(seed) : seed >>> 0);
   const w = Math.max(1, width), h = Math.max(1, height);
