@@ -119,9 +119,13 @@ function findSites() {
   return sites.filter(Boolean);
 }
 
-export async function runDenseChecks(check, { docs = [] } = {}) {
+/**
+ * `guide: false` leaves the guide out: the old-notes run does, as smoke and the
+ * page rebuild already try it.
+ */
+export async function runDenseChecks(check, { docs = [], guide = true } = {}) {
   const { GUIDE_NOTE } = await import(pathToFileURL(path.join(root, 'src/js/seed-notes.js')).href);
-  const all = [{ name: 'guide', title: GUIDE_NOTE.title, content: GUIDE_NOTE.content }, ...docs];
+  const all = [...(guide ? [{ name: 'guide', title: GUIDE_NOTE.title, content: GUIDE_NOTE.content }] : []), ...docs];
   sweepStaleProfiles();   // what killed runs left behind, which may hold copies of real notes
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'nebula-dense-'));
   const notesDir = path.join(profile, 'storage', 'notes');

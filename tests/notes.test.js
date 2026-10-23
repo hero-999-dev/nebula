@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NoteStore, plainSnippet, relativeTime, noteText } from '../src/js/notes.js';
+import { on } from '../src/js/bus.js';
 import { codeBlockHtml } from '../src/js/codeblock.js';
 import { makeAttachBlock } from '../src/js/file-attach.js';
 import { SEED_NOTES } from '../src/js/seed-notes.js';
@@ -60,6 +61,23 @@ describe('NoteStore', () => {
     store.createNote('Beta');
     expect(store.filter('zebra').some((n) => n.title === 'Alpha')).toBe(true);
     expect(store.filter('Beta').length).toBe(1);
+  });
+
+  it('a body save says contentOnly, so the list can wait for typing to settle', () => {
+    // The list redraw is the cost a large note pays on every autosave; the
+    // flag lets it debounce body saves only (perf, 2026-10-23).
+    const store = new NoteStore({ allowSeed: false });
+    store.createNote('A');
+    const id = store.activeId;
+    const seen = [];
+    const off = on('note-changed', (e) => seen.push(e));
+    try {
+      store.updateNote(id, { content: '<p>x</p>' });           // a body autosave
+      store.updateNote(id, { title: 'New' });                 // a rename
+      store.updateNote(id, { content: '<p>y</p>', labels: ['a'] }); // body and labels together
+    } finally { off(); }
+    expect(seen.map((e) => !!e.contentOnly)).toEqual([true, false, false]);
+    expect(seen.every((e) => typeof e.id === 'string')).toBe(true);
   });
 });
 

@@ -695,7 +695,11 @@ function watchUniverses(editor) {
   if (watched.has(editor)) return;
   watched.add(editor);
   let queued = 0;
-  const later = () => {
+  const later = (records) => {
+    // Typing moves text, never a Universe: only an element that came or went
+    // can change which figures are live, and the rescan is a query over the
+    // whole note — skipped while someone types in a large one (perf, 2026-10-23).
+    if (records && !records.some((r) => [...r.addedNodes, ...r.removedNodes].some((n) => n.nodeType === 1))) return;
     if (queued) return;
     queued = requestAnimationFrame(() => { queued = 0; syncUniverses(editor); });
   };

@@ -107,6 +107,36 @@ describe('disk mirror', () => {
     expect(vault.api.write.mock.calls.length).toBe(first);
   });
 
+  it('a save landing on a still-pending write takes its place — one write, the last state', async () => {
+    // A slow write of a large note used to pile one save per debounce up
+    // behind it; the states in between were written only to be replaced
+    // (perf, 2026-10-23).
+    const vault = fakeVault({ writeDelay: () => 30 });
+    window.nebula = { storage: vault.api };
+    await initDiskStorage();
+
+    saveJson('nebula:notes', [note('n1', 'first')]);
+    saveJson('nebula:notes', [note('n1', 'second')]); // the first has not started yet
+    await flushDisk();
+
+    expect(vault.api.write.mock.calls.length).toBe(1);
+    expect(JSON.parse(vault.files.get('n1.json')).content).toBe('second');
+  });
+
+  it('a save landing on a write already in flight still queues behind it', async () => {
+    const vault = fakeVault({ writeDelay: () => 30 });
+    window.nebula = { storage: vault.api };
+    await initDiskStorage();
+
+    saveJson('nebula:notes', [note('n1', 'first')]);
+    await new Promise((r) => setTimeout(r, 5));        // the first is in flight now
+    saveJson('nebula:notes', [note('n1', 'second')]);
+    await flushDisk();
+
+    expect(vault.api.write.mock.calls.length).toBe(2);
+    expect(JSON.parse(vault.files.get('n1.json')).content).toBe('second');
+  });
+
   it('protects a partially corrupt vault and preserves the previous cache', async () => {
     const vault = fakeVault();
     vault.files.set('good.json', JSON.stringify(note('good', 'ok')));
@@ -161,8 +191,9 @@ describe('disk mirror', () => {
 
     vault.api.write.mockRejectedValueOnce(new Error('transient'));
     saveJson('nebula:notes', [note('n1', 'second')]);
-    saveJson('nebula:notes', [note('n1', 'latest')]);
-    await flushDisk();
+    saveJson('nebula:notes', [note('n1', 'latest')]);   // takes the pending write's place: one write, the newest state
+    await expect(flushDisk()).rejects.toThrow('transient'); // that one write failed — the flush says so
+    await flushDisk();                                      // the retry keeps the latest state
     expect(JSON.parse(vault.files.get('n1.json')).content).toBe('latest');
   });
 

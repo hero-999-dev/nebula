@@ -1,5 +1,5 @@
 /** Simple contenteditable editor with debounced autosave. */
-import { serializeNote } from './note-markup.js';
+import { serializeNote, hasTransient } from './note-markup.js';
 
 const AUTOSAVE_MS = 400;
 
@@ -48,11 +48,19 @@ export function bindEditor(el, store, onSaveState) {
     // What the note is, not what is on screen: no selection, no shape being
     // typed in, no pending-format caret (note-markup.js).
     const html = serializeNote(el);
-    // Every picture and video the editor shows is in what is written.
-    const shown = el.innerHTML;
-    if (html !== shown) {
-      const lost = lostFrom(html, namedIn(shown));
-      if (lost.length) return refuse(`The note would have been saved without ${lost.length} of the pictures or videos it shows, so nothing was written. Open the note again.`);
+    // serializeNote clones only when something transient is on screen; when
+    // it did not, what it returned IS the editor's own markup — the second,
+    // whole-document read the lost-media check needs would be the same
+    // string over again, a whole extra serialization of a large note per
+    // save (perf, 2026-10-23). Only a clone can hold a picture that shows on
+    // screen and is missing from what is saved.
+    if (!!el.querySelector('[data-format-caret]') || hasTransient(el)) {
+      // Every picture and video the editor shows is in what is written.
+      const shown = el.innerHTML;
+      if (html !== shown) {
+        const lost = lostFrom(html, namedIn(shown));
+        if (lost.length) return refuse(`The note would have been saved without ${lost.length} of the pictures or videos it shows, so nothing was written. Open the note again.`);
+      }
     }
     // Nothing to write, but the indicator was told "saving" when the input came
     // in: say it is saved, or it stays on "Saving…" (0.8.7; an input event with
@@ -66,10 +74,16 @@ export function bindEditor(el, store, onSaveState) {
   function schedule() {
     onSaveState?.('saving');
     clearTimeout(timer);
+    // A large note's save is a whole-document pass — serialize, stringify,
+    // and inside a black hole a seal — so the pause before it grows with the
+    // note (by its last-saved size): typing stays first, and the queue still
+    // ends with the newest state (perf, 2026-10-23).
+    const size = store.get(noteId)?.content?.length ?? 0;
+    const wait = size > 200_000 ? 1500 : size > 50_000 ? 800 : AUTOSAVE_MS;
     timer = setTimeout(() => {
       try { flush(); }
       catch (err) { onSaveState?.('error', err); }
-    }, AUTOSAVE_MS);
+    }, wait);
   }
 
   el.addEventListener('input', schedule);

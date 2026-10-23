@@ -34,6 +34,17 @@ let readError = null;
 let generation = 0;
 
 /**
+ * One note as its file's text. A long note's pretty-printed file is twice
+ * the bytes through the bridge, the seal and the write (perf, 2026-10-23);
+ * the padding stays for the notes a person reads and leaves once a note is
+ * large. Every place the text is made or compared uses this, so a note never
+ * flips between the two shapes on its own.
+ */
+const PRETTY_CHARS = 100_000;
+export const noteJson = (note) =>
+  String(note?.content ?? '').length > PRETTY_CHARS ? JSON.stringify(note) : JSON.stringify(note, null, 2);
+
+/**
  * One promise chain per file. Rapid saves (seeding, fast typing) used to fire
  * overlapping writes at the same path and interleave into corrupt JSON —
  * queueing makes the last state win, in order.
@@ -54,25 +65,32 @@ function enqueue(id, json, where = VAULT) {
   if (prev?.json === json) return prev.promise;
   // Nothing to do — unless it is a deletion of a note that is on the disk somewhere.
   if (!prev && !failures.has(id) && (lastWritten.get(id) ?? null) === json && !(json === null && placed.has(id))) return Promise.resolve();
+  // The same note already waiting for the same place: the older state would
+  // reach the disk only to be overwritten at once by the newer one — a slow
+  // write of a large sealed note left a backlog of one save per debounce
+  // behind it (perf, 2026-10-23). The pending write takes the newer state;
+  // a move to another place still queues, written where it belongs first.
+  if (prev && !prev.started && prev.where === where) { prev.json = json; return prev.promise; }
 
   const targetApi = api;
   const currentGeneration = generation;
-  const entry = { json, promise: null };
+  const entry = { json, where, started: false, promise: null };
   entry.promise = (prev?.promise ?? Promise.resolve()).then(async () => {
+    entry.started = true;
     const rel = `notes/${id}.json`;
     const was = placed.get(id) ?? null;
-    const to = json === null ? null : where;
+    const to = entry.json === null ? null : entry.where;
     // Written where it belongs first; only then deleted from where it was.
-    let result = to ? await put(targetApi, id, json, to) : { ok: true };
+    let result = to ? await put(targetApi, id, entry.json, to) : { ok: true };
     if (result?.ok && was && was !== to) result = await take(targetApi, id, was);
-    if (!result?.ok) throw new Error(result?.error ?? `Could not ${json === null ? 'remove' : 'save'} ${rel}`);
+    if (!result?.ok) throw new Error(result?.error ?? `Could not ${entry.json === null ? 'remove' : 'save'} ${rel}`);
     if (generation !== currentGeneration) return;
     if (to) placed.set(id, to); else placed.delete(id);
     // Acknowledging before this result used to suppress every later retry.
-    if (json === null) lastWritten.delete(id);
-    else lastWritten.set(id, json);
+    if (entry.json === null) lastWritten.delete(id);
+    else lastWritten.set(id, entry.json);
     failures.delete(id);
-    if (json === null && desired.get(id) === null) desired.delete(id);
+    if (entry.json === null && desired.get(id) === null) desired.delete(id);
   }).catch((err) => {
     if (generation !== currentGeneration) return;
     failures.set(id, err?.message ?? String(err));
@@ -102,7 +120,7 @@ function mirrorNotes(notes, changed) {
     if (!note?.id) continue;
     ids.add(note.id);
     if (only && !only.has(note.id) && (desired.has(note.id) || lastWritten.has(note.id))) continue;
-    const json = JSON.stringify(note, null, 2);
+    const json = noteJson(note);
     desired.set(note.id, json);
     jobs.push(enqueue(note.id, json, placeOf(note)));
   }
@@ -223,7 +241,7 @@ export async function initDiskStorage() {
           delete note.hole;
           notes.push(note);
           placed.set(note.id, VAULT);
-          if (!marked) lastWritten.set(note.id, JSON.stringify(note, null, 2));
+          if (!marked) lastWritten.set(note.id, noteJson(note));
         } else readError = `Invalid note file: ${file}`;
       } catch {
         readError = `Unreadable note file: ${file}`;
@@ -300,7 +318,7 @@ export function adoptHoleNotes(holeId, jsons) {
     // A note that is also a plain file (a move that was cut short) keeps its
     // place on record, so the next save takes the plain file away.
     if (placed.get(note.id) === VAULT) continue;
-    const now = JSON.stringify(note, null, 2);
+    const now = noteJson(note);
     placed.set(note.id, `hole:${holeId}`);
     lastWritten.set(note.id, now);
     desired.set(note.id, now);
@@ -314,7 +332,7 @@ export function adoptHoleNotes(holeId, jsons) {
     if (index >= 0) notes[index] = recovered; else notes.push(recovered);
     placed.set(id, VAULT);
     lastWritten.delete(id);
-    const json = JSON.stringify(recovered, null, 2);
+    const json = noteJson(recovered);
     desired.set(id, json);
     void enqueue(id, json, `hole:${holeId}`);
     pendingSeals.delete(id);

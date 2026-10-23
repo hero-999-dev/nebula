@@ -285,6 +285,33 @@ export function inlinePictures(text, folders) {
   });
 }
 
+/**
+ * inlinePictures without the sync reads: a black hole's every save ran the
+ * sync one in the main process, and each picture it named was re-read from
+ * the disk with the event loop held (perf, 2026-10-23). Same result, the
+ * reads awaited; a reference whose file is not there is left as it is.
+ */
+export async function inlinePicturesAsync(text, folders) {
+  const source = String(text ?? '');
+  if (!source.includes(`${MEDIA_SCHEME}://${MEDIA_HOST}/`)) return source;
+  const roots = Array.isArray(folders) ? folders : [folders];
+  const parts = [];
+  let last = 0;
+  for (const m of source.matchAll(REFERENCE)) {
+    const [all, id, file] = m;
+    if (!isPicture(file)) continue;
+    let data = null;
+    for (const root of roots) {
+      try { data = await fs.promises.readFile(path.join(root, id, file)); break; }
+      catch { /* not in this one */ }
+    }
+    if (data === null) continue;
+    parts.push(source.slice(last, m.index), `data:${IMAGE_MIME[extOf(file)]};base64,${data.toString('base64')}`);
+    last = m.index + all.length;
+  }
+  return parts.length ? parts.join('') + source.slice(last) : source;
+}
+
 /** One picture a reference names, written out as text — for a copy, or a crop. Null when it is not a picture that is there. */
 export function pictureDataUrl(notesDir, url) {
   const named = parseMediaUrl(url);

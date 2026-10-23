@@ -58,6 +58,21 @@ describe('lock space', () => {
     expect(el.textContent).toBe(after);
   });
 
+  it('fills a screen laid out after mount, not the fallback corner (owner, 2026-10-22)', () => {
+    const { el, stop } = mount(box, { reduced: false });
+    expect(el.textContent.split('\n')).toHaveLength(40);   // not laid out yet: the fallback
+    Object.defineProperty(box, 'clientWidth', { configurable: true, value: 1800 });
+    Object.defineProperty(box, 'clientHeight', { configurable: true, value: 1000 });
+    vi.advanceTimersByTime(100);
+    const lines = el.textContent.split('\n');
+    expect(lines).toHaveLength(Math.floor(1000 / 14));
+    expect(lines[0]).toHaveLength(Math.floor(1800 / 7.2));
+    // Stars reach the far quarter the fallback's 120 x 40 never covered.
+    const far = lines.slice(50).map((l) => l.slice(150)).join('');
+    expect(far.trim().length).toBeGreaterThan(0);
+    stop();
+  });
+
   it('stop() ends the loop at once', () => {
     const { stop } = mount(box, { reduced: false });
     stop();

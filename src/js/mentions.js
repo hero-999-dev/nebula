@@ -21,6 +21,14 @@ import { fold } from './fold.js';
  * Read from the stored markup, so a note never opened has them too. Pure — tested.
  */
 const tagCache = new Map();
+let tagCacheChars = 0;
+/** The key is the note's whole markup, so a note being typed in is a new
+ * entry on every save. The entries keep a character budget and leave one at
+ * a time, oldest first: 200 stale versions of a long article used to stay in
+ * memory until the cache was emptied wholesale — the GC pressure behind the
+ * typing lag in large notes and low-memory machines (perf audit, 2026-10-23).
+ * A note too big for the budget is scanned again rather than kept. */
+const TAG_CACHE_CHARS = 250_000;
 export function contentTags(html) {
   const src = String(html ?? '');
   if (!src.includes('note-tag')) return [];
@@ -32,8 +40,12 @@ export function contentTags(html) {
     if (tag && !seen.has(tag.toLocaleLowerCase())) seen.set(tag.toLocaleLowerCase(), tag.replace(/&amp;/g, '&').replace(/&quot;/g, '"'));
   }
   const out = [...seen.values()];
-  if (tagCache.size > 200) tagCache.clear();
-  tagCache.set(src, out);
+  if (src.length > TAG_CACHE_CHARS) return out;
+  while (tagCache.size && tagCacheChars + src.length > TAG_CACHE_CHARS) {
+    const oldest = tagCache.keys().next().value;
+    tagCacheChars -= oldest.length; tagCache.delete(oldest);
+  }
+  tagCache.set(src, out); tagCacheChars += src.length;
   return out;
 }
 
@@ -42,6 +54,9 @@ export function contentTags(html) {
  * order. Read from the stored markup like contentTags. Pure — tested.
  */
 const mentionCache = new Map();
+let mentionCacheChars = 0;
+/** The same character budget as contentTags' — see there. */
+const MENTION_CACHE_CHARS = 250_000;
 export function contentMentions(html) {
   const src = String(html ?? '');
   if (!src.includes('note-mention')) return [];
@@ -53,8 +68,12 @@ export function contentMentions(html) {
     if (id) seen.add(id);
   }
   const out = [...seen];
-  if (mentionCache.size > 200) mentionCache.clear();
-  mentionCache.set(src, out);
+  if (src.length > MENTION_CACHE_CHARS) return out;
+  while (mentionCache.size && mentionCacheChars + src.length > MENTION_CACHE_CHARS) {
+    const oldest = mentionCache.keys().next().value;
+    mentionCacheChars -= oldest.length; mentionCache.delete(oldest);
+  }
+  mentionCache.set(src, out); mentionCacheChars += src.length;
   return out;
 }
 

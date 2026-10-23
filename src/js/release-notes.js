@@ -13,6 +13,17 @@
  * A version with no entry here simply shows nothing.
  */
 export const RELEASE_NOTES = {
+  '1.0.2': {
+    headline: 'The Universe names its bodies as you come closer, and long notes keep up with you.',
+    items: [
+      { title: 'Names layer by layer', text: 'On the whole-map view the Universe names only its projects; come closer and the folders and black holes are named, then the notes, then the labels. What you pick names everything that orbits it, at any zoom.' },
+      { title: 'Labels as planets', text: 'A label on the map is a small planet of its own, and a big one a turning globe — no longer a tilde.' },
+      { title: 'Stars everywhere', text: 'The map’s stars twinkle even with the computer’s animation effects off, and the lock screen’s stars cover the whole screen.' },
+      { title: 'Long notes keep up with you', text: 'Typing in a long note no longer pauses for the save: it waits until you stop, and the note list does not redraw behind your typing.' },
+      { title: 'Black holes while you type', text: 'A note inside a black hole saves without holding anything back — menus and windows answer while it is sealed.' },
+      { title: 'Search on a big vault', text: 'The first search over many notes no longer waits: the list’s reading is done in the background while the app is idle, and the filter shows its results when you pause, not after every letter.' },
+    ],
+  },
   '1.0.1': {
     headline: 'Dividers cut smaller parts, and the Universe twinkles.',
     items: [

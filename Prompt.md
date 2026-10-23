@@ -120,7 +120,7 @@ page on every release.
 
 ---
 
-## Current implementation state (v1.0.1)
+## Current implementation state (v1.0.2)
 
 **Security fixes released in v0.9.9; manual owner checks remain:** Black-hole save retries retain their encrypted destination. Ordinary storage and localStorage refuse hole-marked writes. Historical marked plaintext is withheld at boot, then re-sealed after authenticated unlock before its plain copy and backups are removed; an exact-ID markerless plain copy is reconciled with its sealed note by edit time on unlock. Media referenced by the recovered edit is preserved. New PIN wrappers require OS secure storage; old unprotected wrappers remain readable and are strengthened after a valid PIN unlock when OS protection returns. Accessible local backup wrappers are strengthened too and retried on later unlocks if necessary. Locking invalidates pending authentication and media work. Trashing a hole clears its opened copies; a retained plaintext copy cannot authorize reopening a locked hole, and a copy held open by another program is retried after the program releases it. Note/hole deletion refuses an active sealed media stream before shredding. Acceptance checklist: `docs/BLACKHOLE-TESTS.md`. Tests use synthetic profiles and mocked OS authentication; physical passkey and macOS testing remain separate. This does not promise protection against malware running as the signed-in OS user or erase previously copied plaintext.
 

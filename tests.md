@@ -1,3 +1,23 @@
+## 2026-10-23 — typing lag in large notes and black holes (Mistral Vibe)
+
+- `tests/mentions-budget.test.js` (new): a markup over the tag/mention cache budget is read right every time (with and without a cache hit); a small one still answers from the cache. What it proves: the bounded cache changes retention, never results.
+- `tests/notes.test.js`: a body save says `contentOnly`; a rename or a body+labels change does not — the flag the list redraw debounces on.
+- `tests/disk-store.test.js`: a save landing on a still-pending write takes its place (one write, the last state); a save landing on a write already in flight still queues behind it. "retries a rejected bridge call on flush" updated to the coalescing: the once-rejected mock now hits the newest state's one write, so the flush rejects and the retry keeps the latest state — the old intermediate write no longer exists to absorb the rejection.
+- Throwaway probes (test-results, not part of the suite): `perf-probe2.mjs` (before/after, `performance-2026-10-23.json`), `stress-test.mjs` (`stress-report.json`: 785 notes + a 1.7 MB note — boot, open, type, ops burst, 300 KB paste, 60 switches, filter, 15 rapid black-hole seals + round trip, leak check; the one "typed text on disk" FAIL was the probe's own off-by-one check string — the paste phase proves the save path), `close-hang-repro.mjs` (a close hang seen once in the stress run does not reproduce; both variants close in <300 ms), `bisect-keys.mjs` (per-key cost scales with DOM nodes: 26 ms at 4.6 k, 53 ms at 12.4 k; code blocks add nothing), `warm-verify.mjs` (filter 10.2 s → 1.2 s over 785 notes with the warm-up + debounce).
+- `src/js/main.js`: snippet cache warmed after boot in idle slices; the filter input debounced 150 ms (clearing is immediate). Covered by `only.mjs side-scroll` 7/7 (the filter suites); no new unit test — timing behaviour, measured by `warm-verify.mjs`.
+- Unit 1531/1531; smoke 1199/1200 (view-snap's F12 clipboard check alone: 22/22); old-notes "every trial passed on every note tried" (8 of 42 notes).
+
+## 2026-10-22 — after 1.0.1: Universe names by zoom, labels, stars (Claude)
+
+- `tests/galaxy.test.js`: at the whole-map view only project names are drawn; with a project selected, its folders, notes and labels are named at that same view and another project's folders are not. `nameShownAt`: projects, then folders and holes together, then notes, then labels, hidden backwards going out; without projects folders are named at the whole-map view.
+- `tests/lock-space.test.js`: a screen laid out after mount() gets a sky of its own size (rows and columns from 1800 x 1000), with stars in the part the fallback never covered.
+- Guide signatures 1.0.2 (four languages).
+
+## 2026-10-22 — after 1.0.1: old-notes made lighter (Claude)
+
+- `tests/e2e/old-notes.mjs`: notes grouped by structure (each element as parent > tag.classes, digits dropped), the fullest of each group tried; the guide left to smoke and the rebuild (`runDenseChecks(…, { guide: false })` in `dense.mjs`); a failed trial's note runs alone once, and a pass alone is written to `test-results/old-notes-retried.json`, which `release.js` puts in Log.md. Nebula Test's vault: 8 of 42 notes, 38/38 in 77 s; both notes with trial places among the 8. The retry path has not met a real failure yet.
+- Unrelated to the tests: `tests/v094.test.js` uses the word 'zorblat' where it had a local account name (history rewritten 2026-10-22).
+
 ## 2026-10-21 — 1.0.1: the owner's note (Claude)
 
 - `tests/v101.test.js` (new): `dashFor` only in German and only between words; `englishOf` brings the label field back to English; `twinkle` stays in its characters and under its alpha; `splitPart` gives three rows, the part in three columns, nothing to heal.

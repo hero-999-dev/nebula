@@ -14,7 +14,11 @@
  * read or copied by any agent or test (owner, 2026-09-28). 0.9.1 read them
  * here; that was removed.
  *
- *   node tests/e2e/old-notes.mjs            every note in Nebula Test's vault (npm run push runs it)
+ * Lighter since 1.0.1 (owner, 2026-10-22, never dropped): one note of each
+ * structure is tried, not the guide (smoke and the rebuild try it), and a
+ * failed trial runs once more on its note alone before the release stops.
+ *
+ *   node tests/e2e/old-notes.mjs            Nebula Test's vault, one note per structure (npm run push runs it)
  *   NEBULA_OLD_NOTES=dir1;dir2 node ...     other vaults' notes folders
  *
  * Exit: 0 all passed · 1 a trial failed · 2 the run could not finish · 3 no notes.
@@ -65,19 +69,69 @@ if (!docs.length) {
   process.exit(3);
 }
 
-console.log(`long-note trials on ${docs.length} notes from this machine's vaults (copies)`);
-let failed = 0;
-let aborted = false;
-await runDenseChecks((name, ok, detail = '') => {
-  console.log(`  ${ok ? '+' : 'x'} ${name}${ok ? '' : ` ${detail}`}`);
-  // A run that could not finish (a wait that timed out on a busy machine) says
-  // nothing about the notes; a trial that failed does.
-  if (!ok && name === 'long-note trials ran to the end') aborted = true;
-  else if (!ok) failed++;
-}, { docs });
+/**
+ * What a note is built of: every element as its parent > itself, with its
+ * classes (digits dropped: ids and sizes are not structure). Two notes with the
+ * same set hold the same blocks in the same nesting, and a trial that passes in
+ * one says what it would in the other (owner, 2026-10-22: in 1.0.1's run 35 of
+ * 42 notes were only opened and saved, many of them alike).
+ */
+const VOID = new Set(['br', 'hr', 'img', 'input', 'wbr', 'source', 'col', 'area', 'embed', 'track', 'meta', 'link']);
+function structure(html) {
+  const seen = new Set();
+  const stack = ['note'];
+  for (const [, close, tag, attrs] of html.matchAll(/<(\/?)([a-zA-Z][\w-]*)([^>]*)>/g)) {
+    const t = tag.toLowerCase();
+    if (close) { const at = stack.lastIndexOf(t); if (at > 0) stack.length = at; continue; }
+    const cls = (/\bclass\s*=\s*"([^"]*)"/.exec(attrs)?.[1] ?? '').split(/\s+/).filter(Boolean).map((c) => c.replace(/\d+/g, '#')).sort();
+    seen.add(`${stack.at(-1)}>${[t, ...cls].join('.')}`);
+    if (!VOID.has(t) && !attrs.trimEnd().endsWith('/')) stack.push(t);
+  }
+  return [...seen].sort().join(' ');
+}
+const groups = new Map();
+for (const d of docs) {
+  const key = structure(d.content);
+  if (!groups.has(key)) groups.set(key, []);
+  groups.get(key).push(d);
+}
+// Of each group, the note with the most in it: the likeliest to have places for the trials.
+const tried = [...groups.values()].map((g) => g.reduce((a, b) => (b.content.length > a.content.length ? b : a)));
+
+// The guide is tried by smoke and by the page rebuild already; here only the vault's notes.
+console.log(`long-note trials on ${tried.length} of ${docs.length} notes from this machine's vaults (copies): one of each structure`);
+const run = async (list) => {
+  const out = { failed: [], aborted: false };
+  await runDenseChecks((name, ok, detail = '') => {
+    console.log(`  ${ok ? '+' : 'x'} ${name}${ok ? '' : ` ${detail}`}`);
+    // A run that could not finish (a wait that timed out on a busy machine) says
+    // nothing about the notes; a trial that failed does.
+    if (!ok && name === 'long-note trials ran to the end') out.aborted = true;
+    else if (!ok) out.failed.push(name);
+  }, { docs: list, guide: false });
+  return out;
+};
+let { failed, aborted } = await run(tried);
+
+// A trial that failed is run once more on that note alone, as smoke's failed
+// files are (retryAlone in scripts/release.js): most such failures were a wait
+// on a busy machine. If it passes alone the release goes on and Log.md says so.
+const retriedFile = path.join(root, 'test-results', 'old-notes-retried.json');
+fs.rmSync(retriedFile, { force: true });
+const named = failed.map((n) => /^long note "([^"]+)"/.exec(n)?.[1]);
+const again = [...new Set(named)];
+if (failed.length && !aborted && !again.includes(undefined) && again.length <= 3) {
+  console.log(`\n  ! ${failed.length} trial(s) failed in ${again.length} note(s) — running ${again.length === 1 ? 'that note' : 'those notes'} alone once.\n`);
+  const second = await run(tried.filter((d) => again.includes(d.name)));
+  if (!second.failed.length && !second.aborted) {
+    fs.mkdirSync(path.dirname(retriedFile), { recursive: true });
+    fs.writeFileSync(retriedFile, JSON.stringify({ notes: again.length, failed }));
+  }
+  ({ failed, aborted } = second);
+}
 
 for (const { file, sha } of originals) {
-  if (hash(file) !== sha) { console.log(`  x a note file changed during the trials: ${path.basename(file)}`); failed++; }
+  if (hash(file) !== sha) { console.log(`  x a note file changed during the trials: ${path.basename(file)}`); failed.push(file); }
 }
-console.log(failed ? `\n${failed} failed` : aborted ? '\nthe run could not finish' : '\nevery trial passed on every note');
-process.exit(failed ? 1 : aborted ? 2 : 0);
+console.log(failed.length ? `\n${failed.length} failed` : aborted ? '\nthe run could not finish' : '\nevery trial passed on every note tried');
+process.exit(failed.length ? 1 : aborted ? 2 : 0);

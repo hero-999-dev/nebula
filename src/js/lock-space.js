@@ -57,6 +57,10 @@ export function mount(container, { reduced = reducedMotion() } = {}) {
     sky = stars('lock-space', Math.round((cols * rows) / 55), cols, rows);
     frames.clear();
   };
+  // Measured again on every draw, not only on a resize: mount() runs before the
+  // lock screen is laid out, and a sky sized then kept the fallback's 120 x 40
+  // corner of a bigger screen (owner, 2026-10-22: "the stars are only in one
+  // part of the lock screen"). measure() returns at once when nothing changed.
   const onResize = () => { size = null; };
 
   const planet = (spin) => {
@@ -73,7 +77,7 @@ export function mount(container, { reduced = reducedMotion() } = {}) {
   };
 
   const draw = (seconds) => {
-    if (!size) measure();
+    measure();
     const { cols, rows } = size;
     const grid = Array.from({ length: rows }, () => new Array(cols).fill(' '));
     for (const s of sky) {

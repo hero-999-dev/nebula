@@ -43,6 +43,8 @@ const headline = notesIdx >= 0 ? args[notesIdx + 1] : null;
 const bumpArg = args.find((a) => !a.startsWith('--') && a !== headline) ?? 'patch';
 /** Set when smoke checks passed only with their files run alone (retryAlone): said in Log.md. */
 let smokeRetried = null;
+/** The same for the old-notes trials (tests/e2e/old-notes.mjs). */
+let oldNotesRetried = null;
 
 function run(cmd, cmdArgs, opts = {}) {
   return execFileSync(cmd, cmdArgs, { cwd: ROOT, encoding: 'utf8', stdio: 'pipe', ...opts }).trim();
@@ -273,7 +275,12 @@ if (!fs.existsSync(rebuildScript)) {
 if (!args.includes('--no-old-notes')) {
   console.log('\n> npm run old-notes');
   const code = runSoft('node', [path.join(ROOT, 'tests', 'e2e', 'old-notes.mjs')]);
-  if (code === 1) fail('A long-note trial failed in one of this machine\'s own notes (copies). Nothing was committed.\n  See the output above: the old-notes check names the vault and the note file.');
+  if (code === 1) fail('A long-note trial failed in one of this machine\'s own notes (copies), alone too. Nothing was committed.\n  See the output above: the old-notes check names the vault and the note file.');
+  // Passed only on its note alone (old-notes.mjs runs a failed trial's note once more): said in Log.md.
+  try {
+    const r = JSON.parse(fs.readFileSync(path.join(ROOT, 'test-results', 'old-notes-retried.json'), 'utf8'));
+    if (code === 0) oldNotesRetried = `Old notes: ${r.failed.length} trial(s) failed in the full run (${r.failed.join('; ')}) and passed with ${r.notes === 1 ? 'its note' : 'their notes'} run alone.`;
+  } catch { /* none */ }
   if (code === 3) console.log('  (no notes in this machine\'s vaults: nothing to try)');
   else if (code !== 0) console.warn(`\n  ! the old-notes trials could not finish (exit ${code}); not blocking the release.\n`);
 }
@@ -339,6 +346,7 @@ const entry = [
   '',
   headline ? `${headline}\n` : '',
   smokeRetried ? `${smokeRetried}\n` : '',
+  oldNotesRetried ? `${oldNotesRetried}\n` : '',
   bullets.length ? bullets.join('\n') : '* (no commits since the last release)',
   '',
   '---',

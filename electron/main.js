@@ -23,7 +23,7 @@ import { staysOnPage, externalUrl, popupGate } from './navigation.js';
 import { allowed, isChatSession, isEmbedSession, ASK_EMBED, askKeys, checkKey, askWords, pageAnswers } from './permissions.js';
 import { words } from './dialog-words.js';
 import {
-  MEDIA_SCHEME, NOTE_ID, externalize, inlinePictures, rehome, removeNoteFolderAsync, tidyVault, addVideo, addAttachment, pictureDataUrl, travelWhole, travelFolder, noteFile, noteIds, snapshotVault, missingMedia, sweepNote, RELEASED_FILE, readReleased, writeReleased, noteReleases, releaseAdded,
+  MEDIA_SCHEME, NOTE_ID, externalize, inlinePictures, inlinePicturesAsync, rehome, removeNoteFolderAsync, tidyVault, addVideo, addAttachment, pictureDataUrl, travelWhole, travelFolder, noteFile, noteIds, snapshotVault, missingMedia, sweepNote, RELEASED_FILE, readReleased, writeReleased, noteReleases, releaseAdded,
   parseMediaUrl, mediaPath, mimeOf, byteRange, isVideoName, VIDEO_EXTENSIONS,
 } from './note-media.js';
 import { initUpdater } from './updater.js';
@@ -1660,7 +1660,7 @@ app.whenReady().then(async () => {
   hole('lock-all', async () => { blackHoles.lockAll(); await clearOpenedAsync({ holes: true }); dropAllPreviews(); return { ok: true }; });
   // Sealed whole: a note that still names pictures in the notes folder (it was
   // just moved in) has them written into it first — the folder goes with its plain file.
-  hole('write', (id, noteId, json) => blackHoles.writeAsync(String(id ?? ''), String(noteId ?? ''), inlinePictures(String(json ?? ''), notesRoot())));
+  hole('write', async (id, noteId, json) => blackHoles.writeAsync(String(id ?? ''), String(noteId ?? ''), await inlinePicturesAsync(String(json ?? ''), notesRoot())));
   hole('remove', async (id, noteId) => {
     const res = await blackHoles.remove(String(id ?? ''), String(noteId ?? ''));
     // Deleted is deleted: its sealed copies leave the backups too.
@@ -1993,7 +1993,11 @@ app.whenReady().then(async () => {
   ipcMain.handle('storage:write', async (_e, rel, content) => {
     if (shut()) throw new Error('Nebula is locked');
     const noteId = noteIdOf(rel);
-    if (noteId && JSON.parse(String(content))?.hole) return { ok: false, error: 'Encrypted notes require black-hole storage' };
+    // The hole mark without parsing the whole file: a large note's every save
+    // paid a full JSON.parse here (perf, 2026-10-23). Inside a note's own
+    // text a quote is escaped (\"), so a bare "hole" key after a brace or a
+    // comma is only the note's own mark.
+    if (noteId && /[{,]\s*"hole"\s*:/.test(String(content))) return { ok: false, error: 'Encrypted notes require black-hole storage' };
     vault.assert(noteId);
     const abs = inStorage(rel);
     await fs.mkdir(path.dirname(abs), { recursive: true });

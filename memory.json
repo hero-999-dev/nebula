@@ -1,9 +1,9 @@
 {
   "projectName": "Nebula",
-  "version": "1.0.1",
-  "lastUpdated": "2026-10-22",
-  "currentPhase": "v1.0.1: dividers cut parts of columns and work in toggles, the minimap Fit button, twinkling Universe stars, a smooth lock-screen planet, the German dash; on top of 1.0.0 (the Universe, projects, split view, block handles, Electron 45).",
-  "next": "Owner tests 1.0.1. Next release only when the owner says push. Later: move electron/main.js safeStorage sync calls to the async API before Electron 46; the ~250 ms GC frame in the big map (perf audit 39, findings 4-5).",
+  "version": "1.0.2",
+  "lastUpdated": "2026-10-23",
+  "currentPhase": "v1.0.2: the Universe names its bodies layer by layer as you come closer (projects, then folders and black holes, then notes, then labels; a picked body names its orbit), labels are small planets, the map's stars twinkle under reduced motion, the lock screen's stars cover the whole screen; typing in large notes and inside black holes no longer pauses to save — the list redraw waits for typing to settle, the label and mention caches keep a budget, autosave scales with the note's size, disk writes coalesce, sealed saves read their pictures without blocking, the map draws without per-frame churn; the first search over a big vault no longer waits (the snippet cache is warmed after boot, the filter debounced).",
+  "next": "Owner tests the 1.0.2 test build (Universe names by zoom layer, a selected body names its orbit, labels as small planets, map stars twinkle under reduced motion, lock-screen stars over the whole screen; old-notes trials lighter; typing-lag fixes: list redraw debounced on body saves, bounded tag/mention caches, size-scaled autosave, coalesced disk writes, async picture inlining for black-hole saves, map backdrop and draw allocations; snippet cache warmed after boot, filter input debounced — first filter over 785 notes 10.2 s → 1.2 s). Next release only when the owner says push. Later: move electron/main.js safeStorage sync calls to the async API before Electron 46 — the blocker is the sync #meta()/#name() core of electron/black-holes.js, so it is its own careful session; a paged/virtualized editor for notes past ~1 MB (per-key cost scales with DOM nodes: 26 ms at 4.6 k, 53 ms at 12.4 k); piecewise sealing for hole notes with pictures (nebula-media://hole/); re-run the perf probe (perf audit 39) with --trace-gc around the 60-120 s mark.",
   "repository": {
     "url": "https://github.com/hero-999-dev/nebula",
     "visibility": "public",

@@ -1,4 +1,53 @@
 
+## [2026-10-23 12:41] v1.0.2 - by release-script
+
+
+
+
+* (no commits since the last release)
+
+---
+
+## [2026-10-23 10:20] v1.0.1 - by Mistral Vibe (typing lag in large notes and black holes; not released)
+
+Asked (the owner, Turkish): the app answers late after the recent updates, especially while a note grows large and inside black holes, on a machine with about 1 GB of RAM free; find the source in the code first, then fix. A second CLI's plan was reviewed and merged, with two of its points corrected: serializeNote's transient strip is a safety property (only the *second* serialization is skipped when no clone happened), and the map's refresh signature stringifies the slim model, not note contents — the expensive part is the content scans, now bounded.
+
+The source: every body autosave (400 ms while typing) rebuilt the whole note list — every row, a `contentTags` scan over every note's markup, the black-hole sections — and refreshed the map (v1.0.0 wired the Universe to `note-changed`); the tag/mention caches were keyed by a note's whole markup and cleared wholesale at 200 entries, so a large note being typed in pinned every stale version in memory until then — the GC sawtooth behind the ~250 ms frame, worst at low RAM; a black hole's save re-read every referenced picture with `readFileSync` in the main process on every write; inside a hole the backdrop ran `positionAt` (a fresh chain and a fresh point) for every main-space body every frame; and `draw()` made a fresh colour object, loose shade, closures and art arrays every frame.
+
+- **List redraw** (`notes.js`, `main.js`): `updateNote` says `contentOnly` when only the body changed; `renderList` waits 250 ms for the typing to settle instead of redrawing per autosave. Every other change still draws at once.
+- **Caches** (`mentions.js`): `contentTags`/`contentMentions` keep a 250 000-char budget, evict one entry at a time oldest-first, and a markup too big for the budget is scanned again, never kept.
+- **Editor** (`editor.js`): the lost-media check's second whole-document serialization runs only when `serializeNote` had to clone (transient markup or a pending caret); the autosave pause grows with the last-saved note size (400 ms → 800 ms above 50 k chars → 1500 ms above 200 k), so typing stays first while the queue still ends with the newest state.
+- **Disk mirror** (`disk-store.js`): a save that lands on a still-pending write of the same note in the same place takes its place — one write, the last state (a slow sealed write no longer piles one save per debounce up behind it); a move still queues, written where it belongs first. `noteJson`: a note over 100 k chars of content is written compact, not pretty — the same shape everywhere the text is made or compared, so a note never flips between them on its own.
+- **Black hole save** (`note-media.js`, `electron/main.js`): `inlinePicturesAsync` — the seal path no longer re-reads every referenced picture with `fs.readFileSync` on the main process' event loop per save. `storage:write` reads the hole mark with a regex (`[{,]\s*"hole"\s*:` — inside a note's text a quote is escaped) instead of a full `JSON.parse` of a large note per save.
+- **Map** (`galaxy-map.js`): the backdrop inside a hole fills one persistent position map in place (perf audit 39, finding 5); `draw()` reuses one colour object, one loose shade (recomputed only when the theme moves), module-level `colorOf`/`dimmed`, and one `artOrder`/`artSet` (finding 4).
+- **Guards** (`columns.js`, `widgets.js`): the column heal trails typing by 150 ms instead of querying the whole note per keystroke; the Universe observer skips its whole-note rescan when no element came or went (typing alone cannot move a widget).
+
+Validation: unit 1531/1531; smoke 1199/1200 — the one failure was view-snap's F12 clipboard check, which passes alone (22/22, `only.mjs`); old-notes "every trial passed on every note tried". `npm run pack:test` refreshed root Nebula Test.exe (SHA-256 0C673768ACE4443289EE3CD6575D83689B8888164C81AF007F697D346186DBD6).
+
+Measured before/after (`test-results/perf-probe2.mjs`, a throwaway profile with a 312 KB note; before = the v1.0.1 release built in a worktree; results in `test-results/performance-2026-10-23.json`): typing in word-gap rhythm — before saved and redrew the whole list on every gap (6 autosaves, 6 full list redraws in ~11 s), after does neither mid-typing; the black-hole seal's sync picture reads blocked the main process (an unrelated IPC call waited 15.7 ms median, 24.3 ms max), after it answers in under 2 ms during the same seal, at ~10 ms more wall time per seal. Keystroke latency itself is unchanged — the fixes remove the hitches between keystrokes.
+
+Stress run (`test-results/stress-test.mjs`, `stress-report.json`; 785 synthetic notes + a 1.7 MB note, throwaway profile): boot 3.3 s; the 1.7 MB note opens in 4.1 s; a 300 KB paste and 60 rapid switches hold (heap after GC even falls); the filter answers over the whole vault; 15 rapid 1.7 MB seals into an open black hole all land, and a lock+unlock round trip brings the note back with the last write in it; zero renderer errors; undo/redo storm leaves the editor answering. The frontier found: typing in the 1.7 MB note costs ~125 ms a key (the live DOM itself — the save path stays out of the way; at 312 KB it is ~24 ms). The filter's first use on a big vault pays a one-time snippet pass over every note (~10 s over 785 notes; cached after). A close-hang seen once in the stress run did not reproduce (open-hole and locked-hole repro both close in <300 ms; the one-off was the test harness running the same command twice).
+
+Follow-ups from the stress findings (same day): the snippet pass behind the list and the search is warmed in the background after boot — idle `requestIdleCallback` slices, `timeRemaining`-budgeted (`main.js`) — and typing in the filter box redraws the list 150 ms after the last character instead of once per key, clearing at once; the first filter over 785 notes went from 10.2 s to 1.2 s (`test-results/warm-verify.mjs`). The per-key cost in a huge note is the live DOM, not the app: 26 ms a key at 4.6 k nodes, 53 ms at 12.4 k, code blocks adding nothing (`test-results/bisect-keys.mjs`) — a paged/virtualized editor is the real fix, left as planned work. The safeStorage sync → async move is deliberately not rushed: the calls sit in the sync `#meta()`/`#name()` core of `electron/black-holes.js`, and that is the planned "before Electron 46" refactor.
+
+Not done (deliberate): `desired`/`lastWritten` stay two records (the retry and the "nothing to do" check live on both); sealed media as `nebula-media://hole/` references with piecewise sealing is the deeper fix for hole notes with pictures, left for later.
+
+---
+
+
+## [2026-10-22 11:40] v1.0.1 - by Claude (Universe names by zoom, labels as planets, stars; not released)
+
+Asked (the owner, Turkish): the map's stars do not twinkle like the lock screen's; labels show as ~ instead of a planet; names should come in layer by layer as you zoom in (projects, then folders and black holes, then notes, then labels), a click should name everything in that body's orbit, and zooming out should hide them by the hierarchy; the lock screen's stars cover only one part of it.
+
+- **Stars** (`galaxy-map.js` `drawStars`): they twinkle under reduced motion too, on animT's slower clock. Windows with Animation effects off asks for reduced motion, which kept every map star still.
+- **Lock screen** (`lock-space.js`): the sky is measured on every draw, not only on a resize. mount() ran before the screen was laid out and kept the 120 x 40 fallback corner.
+- **Labels** (`galaxy-map.js` `tinyGlyph`, art pass): a label is an 'o', and a big one a turning globe like a planet, not '~'.
+- **Names by zoom** (`galaxy-map.js` `NAME_LAYERS`, `nameShownAt`, `wantsName`): each layer shows once the camera is both a set number of times closer than the whole-map view and a set px per world unit, so the whole map names its projects only; a scene without projects starts at its first layer with bodies. The selected body's whole system (`systemOf`) is named at any zoom.
+- Guide: "New in 1.0.2" and a sentence in the Universe section, four languages; GUIDE_VERSION 1.0.2 with its signatures.
+
+---
+
+
 ## [2026-10-22 06:33] v1.0.1 - by release-script
 
 

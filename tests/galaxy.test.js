@@ -23,7 +23,7 @@ import {
   core,
   stars,
 } from '../src/js/galaxy-ascii.js';
-import { createGalaxyMap, spanningTree, hueColor, mentionKey, mixColor } from '../src/js/galaxy-map.js';
+import { createGalaxyMap, spanningTree, hueColor, mentionKey, mixColor, nameShownAt } from '../src/js/galaxy-map.js';
 
 describe('galaxy-model', () => {
   describe('hashSeed', () => {
@@ -750,6 +750,58 @@ describe('galaxy-map (engine)', () => {
     for (let i = 0; i < 10; i++) step(70);
     expect(texts).toBeGreaterThan(0);
     map.destroy();
+  });
+
+  it('names come in a layer at a time; a selected body names its whole orbit (owner, 2026-10-22)', () => {
+    const seen = new Set();
+    const ctx = new Proxy({ measureText: () => ({ width: 8 }), fillText: (s) => seen.add(s) },
+      { get: (t, k) => (k in t ? t[k] : () => {}) });
+    const canvas = document.createElement('canvas');
+    Object.defineProperty(canvas, 'clientWidth', { get: () => 800 });
+    Object.defineProperty(canvas, 'clientHeight', { get: () => 600 });
+    canvas.getContext = () => ctx;
+    const notes = [{ id: 'n1', title: 'Alphanote', folder: 'f1', labels: ['Labelle'] }];
+    for (let i = 2; i < 30; i++) notes.push({ id: 'n' + i, title: 'Other' + i, folder: 'f' + (i % 4) });
+    const map = createGalaxyMap(canvas, {
+      getInput: () => ({
+        notes,
+        folders: [0, 1, 2, 3].map((i) => ({ id: 'f' + i, name: i === 1 ? 'Folderly' : 'Fold' + i, project: i < 2 ? 'j1' : 'j2' })),
+        projects: [{ id: 'j1', name: 'Projecta' }, { id: 'j2', name: 'Projectb' }], holes: [],
+      }),
+      colors: COLORS,
+    });
+    for (let i = 0; i < 30; i++) step(70);          // the whole map, fitted
+    const fitView = map.view();
+    seen.clear();
+    for (let i = 0; i < 5; i++) step(70);
+    expect(seen.has('Projecta')).toBe(true);
+    expect(seen.has('Folderly')).toBe(false);
+    expect(seen.has('Alphanote')).toBe(false);
+    expect(seen.has('Labelle')).toBe(false);
+    // Picked, at the same whole-map view: everything in Projecta's orbit is named.
+    const sun = map.bodies().find((b) => b.name === 'Projecta');
+    map.select(sun.id);
+    map.restore({ ...fitView, manual: true });
+    seen.clear();
+    for (let i = 0; i < 5; i++) step(70);
+    for (const n of ['Projecta', 'Folderly', 'Alphanote', 'Labelle']) expect(seen.has(n), n).toBe(true);
+    expect(seen.has('Fold2')).toBe(false);          // Projectb's own folders stay unnamed
+    map.destroy();
+  });
+
+  it('the name layers: projects, then folders and holes, then notes, then labels (owner, 2026-10-22)', () => {
+    const fitK = 1;
+    const order = ['project', 'folder', 'note', 'label'];
+    const firstAt = (role) => [0.5, 1, 2, 3, 5, 8, 13, 20].find((k) => nameShownAt(role, k, fitK));
+    for (let i = 1; i < order.length; i++) expect(firstAt(order[i])).toBeGreaterThan(firstAt(order[i - 1]));
+    expect(firstAt('hole')).toBe(firstAt('folder'));
+    expect(nameShownAt('core', 100, fitK)).toBe(false);
+    // Going out they hide in the same order backwards.
+    expect(nameShownAt('label', 10, fitK)).toBe(false);
+    expect(nameShownAt('note', 10, fitK)).toBe(true);
+    // Without projects, folders are the outermost layer and named at the whole-map view.
+    expect(nameShownAt('folder', fitK, fitK, 1)).toBe(true);
+    expect(nameShownAt('folder', fitK, fitK, 0)).toBe(false);
   });
 
   it('a turning sun keeps at most 48 frames, so it never churns the shared cache (Codex, 2026-10-20)', () => {

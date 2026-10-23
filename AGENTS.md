@@ -110,7 +110,11 @@ as well, so the test build refreshes without anyone closing a window.
 
 Details and platform limits: **[docs/RELEASE.md](docs/RELEASE.md)**.
 
-**To do after 1.0.1 (owner, 2026-10-22): make the old-notes trials lighter, never drop them.**
+**Done after 1.0.1 (owner, 2026-10-22): the old-notes trials are lighter, never dropped.**
+`tests/e2e/old-notes.mjs` now groups the notes by structure (every element as parent > tag.classes)
+and tries the fullest note of each group, leaves the guide to smoke and the rebuild, and runs a
+failed trial's note alone once; `release.js` writes into Log.md when that retry saved the release.
+On 2026-10-22: 8 of 42 notes, 77 s, both notes with trial places among them. Why it was asked:
 They are the only trials on markup older versions wrote, and they found a real bug no
 other test did (a note opening on a divider already picked, so the first Backspace took
 it). But most of their failures were the test's own gaps (B9's on-screen controls, the

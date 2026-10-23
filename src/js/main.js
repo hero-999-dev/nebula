@@ -593,9 +593,16 @@ async function boot() {
     }, AUTOSAVE_MS);
   });
 
+  // Typing in the filter redraws the whole list per character; on a large
+  // vault that is a full re-render a keypress. The redraw waits for the typing
+  // to settle instead; clearing the filter shows everything at once (perf, 2026-10-23).
+  let filterTimer = null;
   filterEl.addEventListener('input', () => {
-    listFilter = filterEl.value;
-    renderList();
+    const value = filterEl.value;
+    if (value === listFilter) return;
+    clearTimeout(filterTimer); filterTimer = null;
+    if (!value) { listFilter = value; renderList(); return; }
+    filterTimer = setTimeout(() => { filterTimer = null; listFilter = filterEl.value; renderList(); }, 150);
   });
 
   /** A new note, in a folder when one is named ("+ Add a note" in an empty folder, 0.9.4), in a project (1.0.0) — or in an open black hole. */
@@ -830,7 +837,20 @@ async function boot() {
     if (firstRun) whatsNew.acknowledge();
     else whatsNew.maybeOpen();
   }).catch(() => { /* a browser preview has no main process */ });
-  on('note-changed', () => renderList());
+  // A body autosave arrives in a stream while someone types; redrawing the
+  // whole list per save — every row, a label scan over every note's content,
+  // the black-hole sections and the map's refresh — is what made a large note
+  // answer late (perf audit, 2026-10-23). The redraw waits for the stream to
+  // settle; every other change draws at once.
+  let listDebounce = null;
+  const settleList = () => {
+    clearTimeout(listDebounce);
+    listDebounce = setTimeout(() => { listDebounce = null; renderList(); }, 250);
+  };
+  on('note-changed', ({ contentOnly } = {}) => {
+    if (!contentOnly) { clearTimeout(listDebounce); listDebounce = null; renderList(); return; }
+    settleList();
+  });
   on('lang-changed', () => {
     // The guide follows the language while nobody has written in it (0.9.4).
     if (disk.ok) {
@@ -881,6 +901,27 @@ async function boot() {
         if (result.healed) renderList();
       }).catch((err) => console.warn('[nebula] note repair stopped:', err?.message ?? err));
     }, 1500);
+  }
+
+  // The list's rows and the search read each note's first words from its
+  // markup (plainSnippet → noteText), parsed once and cached by content. On a
+  // big vault the first filter or list redraw paid that whole pass at once —
+  // ten seconds over 785 notes in the stress run (perf, 2026-10-23). Warmed
+  // here in the background while the app is idle, a few milliseconds a slice,
+  // so nobody waits for it. New notes are parsed by their first redraw anyway.
+  {
+    const idle = (fn) => (window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 2000 }) : setTimeout(() => fn(null), 0));
+    const notes = [...store.notes];
+    let i = 0;
+    const warm = (deadline) => {
+      const left = () => (deadline && typeof deadline.timeRemaining === 'function') ? deadline.timeRemaining() : 8;
+      while (i < notes.length && left() > 2) {
+        try { plainSnippet(notes[i].content, 48); } catch { /* a snippet is a convenience */ }
+        i += 1;
+      }
+      if (i < notes.length) idle(warm);
+    };
+    setTimeout(() => idle(warm), 1500);
   }
 
   // Notes that lost many pictures at once since the last start: asked about before anything is deleted (held-media.js).

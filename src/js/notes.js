@@ -255,7 +255,10 @@ export class NoteStore {
     if (!note) return;
     Object.assign(note, partial, { updatedAt: Date.now() });
     this.save([note.id]);
-    emit('note-changed', { id: note.id });
+    // contentOnly: a body autosave — the one change that arrives in a stream
+    // while someone types. The list can wait for the typing to settle instead
+    // of redrawing per save (main.js renderList, perf 2026-10-23).
+    emit('note-changed', { id: note.id, contentOnly: 'content' in partial && Object.keys(partial).length === 1 });
   }
 
   /** Notes on the main list: not archived, not in the trash, not in a black hole. */

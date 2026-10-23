@@ -71,6 +71,30 @@ const roleOf = (b) => b.role || (b.kind === 'sun' ? 'folder' : b.kind === 'plane
  * labels are the small satellites that hand their clicks to their note. */
 const isLabelMoon = (b) => b.kind === 'moon' && roleOf(b) === 'label';
 
+/* The colours the loop reads live in one reusable object, filled once per
+ * draw (perf audit finding 4, 2026-10-23): a fresh colour object, a fresh
+ * loose shade and fresh closures every frame are part of the churn that fed
+ * the GC sawtooth behind the occasional long frame. Both engines share them
+ * — one theme, and a draw never runs inside another draw. */
+const C = { ink: '#cfcfcf', faint: '#8a8a8a', accent: '#9ac2e8', fern: '#9ab97a', madder: '#c98a8a', paper: '#14161a' };
+let looseInk = '', loosePaper = '', loose = '';
+let glowNow = null;
+/** A body's own colour: its hue on this paper, or the ink for a null hue.
+ * Labels are one colour on every note, read from the label's name. The core
+ * stays the theme's ink; the loose notes round it a shade deeper, so the
+ * white middle stands out (owner, 2026-10-21). */
+const colorOf = (b) => {
+  if (b.hue === null || b.hue === undefined) {
+    const role = roleOf(b);
+    return role === 'label' ? C.faint : role === 'note' ? loose : C.ink;
+  }
+  return hueColor(b.hue, C.paper);
+};
+/** A body outside the lit constellation (set once per draw). */
+const dimmed = (b) => glowNow && !glowNow.ids.has(b.id);
+const artOrder = [];               // the bodies big enough for art, reused per draw
+const artSet = new Set();
+
 /** A hue (degrees) as a colour that sits on the theme's paper: light and soft
  * on a dark paper, deeper on a light one. Memoised: the draw asks every frame. */
 const hueCache = new Map();
@@ -137,10 +161,34 @@ export function spanningTree(points) {
   return links;
 }
 
+/** Names come in by the zoom, a layer at a time: projects first, then folders
+ * and black holes, then notes, then labels, and going out they hide in the
+ * same order backwards (owner, 2026-10-22: "layer by layer … step by step by
+ * the hierarchy"). A layer's names show once the camera is both
+ * `fit` times closer than the whole-map view and `px` px per world unit (a
+ * folder 7 px across, a label 5 px), so the whole map names its projects
+ * only, in a big vault and a small one alike. A scene without projects (a
+ * hole, a vault of folders) starts at its first layer that has bodies. */
+export const NAME_LAYERS = [
+  { roles: ['project'], fit: 0, px: 0 },
+  { roles: ['folder', 'hole'], fit: 1.6, px: 2 },
+  { roles: ['note'], fit: 3, px: 5 },
+  { roles: ['label'], fit: 6, px: 12 },
+];
+/** Whether role's names show at k px per world unit, the whole map being at
+ * fitK; `first` is the scene's outermost layer with bodies in it. */
+export function nameShownAt(role, k, fitK, first = 0) {
+  const i = NAME_LAYERS.findIndex((l) => l.roles.includes(role));
+  if (i < 0) return false;
+  const rung = NAME_LAYERS[Math.max(0, i - first)];
+  return k >= rung.px && k >= fitK * rung.fit;
+}
+
 /** Which glyph a body shrinks to when it is too small for art. */
 function tinyGlyph(b) {
   if (b.kind === 'planet') return b.size > 2.5 ? '@' : 'o';
-  if (b.kind === 'moon') return isLabelMoon(b) ? RAMP[3] : 'o';
+  // A label is a little planet too, not a '~' (owner, 2026-10-22).
+  if (b.kind === 'moon') return 'o';
   if (b.kind === 'sun' || b.kind === 'core' || b.kind === 'singularity') return '*';
   if (b.kind === 'hole') return '@';
   return RAMP[2];
@@ -407,13 +455,12 @@ export function createGalaxyMap(canvas, opts = {}) {
       const px = (((s.x - cam.x * ppw() * s.depth * 0.06) % W) + W) % W;
       const py = (((s.y - cam.y * ppw() * s.depth * 0.06) % H) + H) % H;
       // The lock screen's twinkle (owner, 1.0.1): each star at its own pace
-      // fades out, comes back as a dot, grows to a + and a *. Reduced motion
-      // keeps every star still, as a *.
-      let ch = '*', glow = s.alpha;
-      if (!reduced) {
-        ({ ch, glow } = twinkle(s, animT));
-        if (ch === ' ') continue;
-      }
+      // fades out, comes back as a dot, grows to a + and a *. Under reduced
+      // motion too, on animT's slower clock: Windows with "Animation effects"
+      // off asks for reduced motion, and the map's stars stood still while the
+      // lock screen's twinkled (owner, 2026-10-22).
+      const { ch, glow } = twinkle(s, animT);
+      if (ch === ' ') continue;
       ctx.globalAlpha = Math.min(0.6, 0.1 + glow);
       const size = Math.round(ch === '.' ? s.size * 1.4 : s.size);
       if (size !== lastSize) { ctx.font = size + 'px ' + face; lastSize = size; }
@@ -472,21 +519,11 @@ export function createGalaxyMap(canvas, opts = {}) {
   function draw(now, force) {
     if (!scene || !W || !H) return;
     const colors = getColors() || {};
-    const c = { ink: colors.ink || '#cfcfcf', faint: colors.faint || '#8a8a8a',
-      accent: colors.accent || '#9ac2e8', fern: colors.fern || '#9ab97a',
-      madder: colors.madder || '#c98a8a', paper: colors.paper || '#14161a' };
-    // A body's own colour: its hue on this paper, or the ink for a null hue.
-    // Labels are one colour on every note, read from the label's name.
-    // The core stays the theme's ink; the loose notes round it a shade deeper,
-    // so the white middle stands out (owner, 2026-10-21).
-    const loose = mixColor(c.ink, c.paper, LOOSE_SHADE);
-    const colorOf = (b) => {
-      if (b.hue === null || b.hue === undefined) {
-        const role = roleOf(b);
-        return role === 'label' ? c.faint : role === 'note' ? loose : c.ink;
-      }
-      return hueColor(b.hue, c.paper);
-    };
+    const c = C;
+    c.ink = colors.ink || '#cfcfcf'; c.faint = colors.faint || '#8a8a8a';
+    c.accent = colors.accent || '#9ac2e8'; c.fern = colors.fern || '#9ab97a';
+    c.madder = colors.madder || '#c98a8a'; c.paper = colors.paper || '#14161a';
+    if (looseInk !== c.ink || loosePaper !== c.paper) { looseInk = c.ink; loosePaper = c.paper; loose = mixColor(c.ink, c.paper, LOOSE_SHADE); }
 
     if (followId && mini) {
       const body = scene.byId.get('note:' + followId);
@@ -533,7 +570,7 @@ export function createGalaxyMap(canvas, opts = {}) {
     const vis = visibleBodies(pos);
     const k = ppw();
     const glow = litNow();
-    const dimmed = (b) => glow && !glow.ids.has(b.id);
+    glowNow = glow;
 
     // Cheap clock quantisation: flicker/pulse frames advance ~7 fps, sphere
     // turns are 48 steps — both memoised through the same key shape.
@@ -541,14 +578,14 @@ export function createGalaxyMap(canvas, opts = {}) {
     // Art budget: only the largest few visible bodies get full frames; the
     // rest are glyphs (addendum #3).
     const artCap = mini ? 10 : ART_BODIES_MAX;
-    const artOrder = [];
+    artOrder.length = 0;
     for (let i = 0; i < vis.length; i++) {
       const v = vis[i];
       if (v.r >= (isLabelMoon(v.b) ? 10 : ART_MIN_R)) artOrder.push(v);
     }
     artOrder.sort((a, b2) => b2.r - a.r);
     vis.sort((a, b2) => b2.r - a.r);
-    const artSet = new Set();
+    artSet.clear();
     for (let i = 0; i < artOrder.length && i < artCap; i++) artSet.add(artOrder[i].b.id);
 
     // Constellations go under everything: thin lines between the notes of
@@ -582,7 +619,8 @@ export function createGalaxyMap(canvas, opts = {}) {
       // asteroids round their notes and found none (1.0.0).
       if (v.r < (label ? 0.45 : 0.8)) continue;
       const parentFocused = label && focusedPlanet && b.parent === focusedPlanet.id;
-      if (artSet.has(b.id) && !(label && !parentFocused)) {
+      // A label big enough is a turning globe like any planet (owner, 2026-10-22).
+      if (artSet.has(b.id)) {
         arts.push(v);
         continue;
       }
@@ -593,6 +631,8 @@ export function createGalaxyMap(canvas, opts = {}) {
         let arr = bucket.get(col);
         if (!arr) { arr = []; bucket.set(col, arr); }
         arr.push(v.sx, v.sy, Math.max(1, v.r));
+        // Only the selected body's system is named this small.
+        if (!mini && selected && wantsName(v, role, parentFocused)) names.push(v);
         continue;
       }
       if (col !== fill) { ctx.fillStyle = col; fill = col; }
@@ -712,31 +752,54 @@ export function createGalaxyMap(canvas, opts = {}) {
     drawEvent(now, c);
   }
 
-  /** Whose name is written under it: projects, folders and holes (an open
-   * one — a locked hole is its initials only) once they are a few pixels
-   * across, notes when they are big enough to read as a body, a label only
-   * while its note is selected. */
+  /** Whose name is written under it. Names come in by the zoom, a layer at a
+   * time (nameShownAt), and the selected body's whole system — everything in
+   * its orbit, down to a note's labels — is named whatever the zoom (owner,
+   * 2026-10-22). A locked hole is its initials only. */
   function wantsName(v, role, parentFocused) {
     if (!namesShown) return false;
-    if (role === 'project' || role === 'folder') return v.r >= 3;
-    if (role === 'hole') return !v.b.locked && v.r >= 4;
-    if (role === 'label') return !!parentFocused;
-    if (v.b.kind === 'moon') return v.r * 2 >= cellH * 1.4;
-    return v.r * 2 >= cellH * 1.6;
+    if (role === 'hole' && v.b.locked) return false;
+    if (parentFocused || v.b.id === selected || inSystem(v.b)) return v.r >= 0.45;
+    const l = layersNow();
+    return nameShownAt(role, ppw(), l.fitK, l.first) && v.r >= 2;
   }
-
-  /** How far from the selected body its own system reaches, in world units:
-   * every body whose parent chain leads to it. Rebuilt when the selection or
-   * the scene changes, measured every frame (they orbit). */
-  function systemReach(b, p, pos) {
+  /** The whole-map view's px per world unit and the scene's outermost named
+   * layer, kept until the scene or the pane changes. */
+  let layers = null;
+  function layersNow() {
+    if (!layers || layers.scene !== scene || layers.W !== W || layers.H !== H) {
+      const has = new Set(scene.bodies.map(roleOf));
+      const first = Math.max(0, NAME_LAYERS.findIndex((l) => l.roles.some((r) => has.has(r))));
+      const fitK = overviewCam().zoom * PX_PER_WORLD * Math.max(1, Math.min(W, H));
+      layers = { scene, W, H, fitK, first };
+    }
+    return layers;
+  }
+  /** Whether b is bound to the selected body's orbit (its parent chain leads there). */
+  function inSystem(b) {
+    if (!selected || !b.parent) return false;
+    const sel = scene.byId.get(selected);
+    if (!sel) return false;
+    systemOf(sel);
+    return system.set.has(b.id);
+  }
+  function systemOf(b) {
     if (!system || system.scene !== scene || system.id !== b.id) {
       const ids = [];
       const under = new Set([b.id]);
       for (const x of scene.bodies) {
         if (x.parent && under.has(x.parent)) { under.add(x.id); ids.push(x); }
       }
-      system = { scene, id: b.id, ids };
+      system = { scene, id: b.id, ids, set: new Set(ids.map((x) => x.id)) };
     }
+    return system;
+  }
+
+  /** How far from the selected body its own system reaches, in world units:
+   * every body whose parent chain leads to it. Rebuilt when the selection or
+   * the scene changes, measured every frame (they orbit). */
+  function systemReach(b, p, pos) {
+    systemOf(b);
     let reach = 0;
     for (const x of system.ids) {
       const q = pos.get(x.id);
@@ -922,12 +985,29 @@ export function createGalaxyMap(canvas, opts = {}) {
   function drawBackdrop(c) {
     if (!backdrop || backdrop.for !== holeId) {
       const main = buildScene(getInput(null) || {});
-      backdrop = { for: holeId, scene: main, b: boundsOf(main, 0) };
+      backdrop = { for: holeId, scene: main, b: boundsOf(main, 0), pos: new Map() };
+      for (const b of main.bodies) backdrop.pos.set(b.id, { x: 0, y: 0 });
     }
     const main = backdrop.scene;
     const here = main.byId.get('hole:' + holeId);
     if (!here) return;
-    const hp = positionAt(main, here.id, orbitT);
+    // The backdrop's positions in place, like allPositions: positionAt per
+    // body per frame handed the collector a fresh chain and a fresh point for
+    // every main-space body, at frame rate, inside every hole (perf audit
+    // finding 5, 2026-10-23).
+    const pos = backdrop.pos;
+    for (const b of main.bodies) {
+      const p = pos.get(b.id);
+      if (!b.parent) { p.x = b.x; p.y = b.y; }
+      else {
+        const pp = pos.get(b.parent) || ORIGIN;
+        const a = b.orbit.phase + b.orbit.speed * orbitT;
+        p.x = pp.x + Math.cos(a) * b.orbit.r;
+        p.y = pp.y + Math.sin(a) * b.orbit.r;
+      }
+    }
+    const hp = pos.get(here.id);
+    if (!hp) return;
     const b = backdrop.b;
     const span = Math.max(b.maxX - b.minX, b.maxY - b.minY) || 1;
     const kb = (Math.min(W, H) * 1.4) / span;   // main space a little wider than the pane
@@ -936,7 +1016,7 @@ export function createGalaxyMap(canvas, opts = {}) {
     ctx.globalAlpha = 0.22;
     for (const x of main.bodies) {
       if (x.id === here.id || isLabelMoon(x)) continue;
-      const q = positionAt(main, x.id, orbitT);
+      const q = pos.get(x.id);
       const sx = ox + (q.x - hp.x) * kb, sy = oy + (q.y - hp.y) * kb;
       if (sx < -10 || sy < -10 || sx > W + 10 || sy > H + 10) continue;
       const r = clamp(x.size * kb * 0.5, 1, 4);

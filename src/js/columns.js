@@ -1002,15 +1002,24 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
     return touched;
   }
   // An edit across both columns can take one of them away; the rest is put right at once.
-  editorEl.addEventListener('input', () => {
-    if (!editorEl.querySelector(`.${COLS}, .${COL}, hr.${VR}`)) return;
-    const sel = window.getSelection();
-    const keep = sel?.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
-    if (healColumns(editorEl) && keep && editorEl.contains(keep.startContainer)) {
-      sel.removeAllRanges();
-      sel.addRange(keep);
-    }
-  });
+  // The whole-note query does not run on every keystroke of a large note
+  // (perf, 2026-10-23): it trails the typing by a moment, and heals with the
+  // selection as it stands then.
+  let healTimer = null;
+  const healColumnsLater = () => {
+    if (healTimer) return;
+    healTimer = setTimeout(() => {
+      healTimer = null;
+      if (!editorEl.querySelector(`.${COLS}, .${COL}, hr.${VR}`)) return;
+      const sel = window.getSelection();
+      const keep = sel?.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+      if (healColumns(editorEl) && keep && editorEl.contains(keep.startContainer)) {
+        sel.removeAllRanges();
+        sel.addRange(keep);
+      }
+    }, 150);
+  };
+  editorEl.addEventListener('input', healColumnsLater);
 
   return { refresh, release, dragging: () => !!drag?.moved };
 }

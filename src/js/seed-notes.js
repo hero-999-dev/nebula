@@ -304,7 +304,7 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '1.0.1';
+export const GUIDE_VERSION = '1.0.2';
 
 /**
  * The guide's words, without its markup, shapes, code or equations — so a
@@ -548,6 +548,10 @@ export const GUIDE_SIGNATURES = {
   '1.0.1 de': '2c4b3bc8',
   '1.0.1 pl': '6b2064d5',
   '1.0.1 tr': 'a23fae10',
+  '1.0.2': 'c0083b5b',
+  '1.0.2 de': '3cc83dfb',
+  '1.0.2 pl': '9f6e7b4b',
+  '1.0.2 tr': '6bacf9d5',
 };
 
 /** Whether a vault's guide is one we shipped and nobody has typed in. */
@@ -582,6 +586,9 @@ export const GUIDE_NOTE = {
     // Each release adds its features here (features, not fixes) and in the
     // section they belong to. See GUIDE_SIGNATURES before changing any text.
     // A divider closes each section before the next heading (owner, 0.8.9).
+    '<hr class="blk-hr">' +
+    '<h2>New in 1.0.2</h2>' +
+    '<p><strong>Names layer by layer.</strong> In the Universe, names come in as you zoom in: projects first, then folders and black holes, then notes, then labels, and zooming out hides them in the same order. A click on a body names everything in its orbit. Labels are small planets now, and the map’s stars twinkle like the lock screen’s, which now fill the whole lock screen — section 11.</p>' +
     '<hr class="blk-hr">' +
     '<h2>New in 1.0.1</h2>' +
     '<p><strong>Dividers cut smaller parts.</strong> In an open toggle, a divider pulled sideways puts the toggle’s lines and pictures side by side. In a column, a divider pulled sideways and down or up over a part of the column cuts only that part.</p>' +
@@ -827,7 +834,7 @@ export const GUIDE_NOTE = {
     '<h2>11 · Projects and the Universe</h2>' +
     '<p><strong>Projects.</strong> Drag a folder by its row and let go on the middle of another folder: the two go into a new project, a row like a folder’s one step up. A folder let go on a project joins it. An open project shows <em>+ Add a note</em> and <em>+ Add a folder</em>; a note made there, or dragged onto the project, sits in the project itself, beside its folders. Double-click a project to rename it; its ⋯ menu holds the rest. Projects are kept beside your folders, and there are none inside black holes.</p>' +
     '<p><strong>The Universe.</strong> The small window above Archive and Trash is your notes as a galaxy. Each project is a star, each folder a planet — round its project’s star, or on its own — and a folder’s notes are its moons. Notes in no folder are planets round the bright core in the middle, and once a ring is full the next ones go round farther out. Each of a note’s labels is a small moon of it. Every project and folder has a colour of its own, its notes wear it, and a label is the same colour on every note; notes in no folder stay in the theme’s own ink, a shade under the white core, and a project’s own loose notes wear its colour. Bodies sharing a ring are spread evenly round it. Everything turns slowly round the middle. The Universe follows the note you open. A shooting star crosses it about once a minute, and every five minutes a small rocket leaves a planet: click it and the camera rides along, and once it is gone the Universe fits itself again. Drag to look around; the wheel or the touchpad zooms. A click flies to a body and rings it, and a second, wider circle takes in everything that goes round it. Right-click → <em>Open</em> opens the note.</p>' +
-    '<p><strong>⤢</strong> at the top of the Universe puts it over the whole page; there, at the top right, are the search for labels and mentions, <em>Fit Universe</em>, <em>Hide names</em> — every name off the Universe until it is pressed again, then <em>Show names</em> — and the whole-screen button. The small Universe under the list only watches: it glides to the note you open and takes no clicks. Type a label and pick it: its notes are ringed in its colour and joined in thin lines, a constellation, while the rest fades; pick more and each is drawn in its own colour, × takes one away. Type @ or a note’s title to pick a mention: that note and every note it mentions or is mentioned by light up, joined by arrows from the note that mentions to the note mentioned. Open a note from the Universe and the note comes beside it; another one makes three. Drag the Universe by its name onto a note and the page is shared between them, as with notes side by side; its ✕ closes it. Right-click a black hole: a locked one offers <em>Open</em>, which asks for its PIN or passkey and then pulls you in — a double-click does the same; an open one offers <em>Enter the black hole</em> and <em>Lock</em>. Inside, a space of its own holds only its notes, with main space faint around it. A black hole shows its initials, open or locked, and a locked one nothing else. <em>Back to main space</em> brings you out. The Universe reads titles, folders, labels and @mentions — nothing else of what is written in a note.</p>' +
+    '<p><strong>⤢</strong> at the top of the Universe puts it over the whole page; there, at the top right, are the search for labels and mentions, <em>Fit Universe</em>, <em>Hide names</em> — every name off the Universe until it is pressed again, then <em>Show names</em> — and the whole-screen button. The small Universe under the list only watches: it glides to the note you open and takes no clicks. Type a label and pick it: its notes are ringed in its colour and joined in thin lines, a constellation, while the rest fades; pick more and each is drawn in its own colour, × takes one away. Type @ or a note’s title to pick a mention: that note and every note it mentions or is mentioned by light up, joined by arrows from the note that mentions to the note mentioned. Open a note from the Universe and the note comes beside it; another one makes three. Drag the Universe by its name onto a note and the page is shared between them, as with notes side by side; its ✕ closes it. Right-click a black hole: a locked one offers <em>Open</em>, which asks for its PIN or passkey and then pulls you in — a double-click does the same; an open one offers <em>Enter the black hole</em> and <em>Lock</em>. Inside, a space of its own holds only its notes, with main space faint around it. A black hole shows its initials, open or locked, and a locked one nothing else. <em>Back to main space</em> brings you out. Names come in as you zoom in, a layer at a time: projects first, then folders and black holes, then notes, then labels; zooming out hides them again in the same order. Click a body and everything in its orbit shows its name. The Universe reads titles, folders, labels and @mentions — nothing else of what is written in a note.</p>' +
     '<p><strong>Try it:</strong> drag one folder onto the middle of another to make a project. Then press ⤢ on the Universe, type a label into the search at the top right and pick it, then right-click a planet and choose <em>Open</em>.</p>' +
     '<hr class="blk-hr">' +
     '<h2>12 · A Universe of your own</h2>' +
