@@ -141,8 +141,8 @@ export async function runBlackHoleChecks(check) {
     };
 
     // ---- A new black hole -------------------------------------------------------
-    check('with no black hole there is no section for them, and the button stands beside New folder', (await list()).length === 0
-      && await win.evaluate(() => { const b = document.getElementById('btn-new-hole'); return !!b && b.previousElementSibling?.id === 'btn-new-folder' && b.offsetWidth > 0; })
+    check('with no black hole there is no section for them, and the button stands beside New folder and New project', (await list()).length === 0
+      && await win.evaluate(() => { const b = document.getElementById('btn-new-hole'); return !!b && b.previousElementSibling?.id === 'btn-new-project' && b.previousElementSibling.previousElementSibling?.id === 'btn-new-folder' && b.offsetWidth > 0; })
       && await win.evaluate(() => document.querySelector('#note-menu [data-note-act="hole"]').hidden));
     await win.evaluate(() => document.getElementById('btn-new-hole').click());
     check('“New black hole” asks for a name and a 6-digit PIN — always; a passkey is a box to tick beside it', (await dialog())?.title === 'New black hole'

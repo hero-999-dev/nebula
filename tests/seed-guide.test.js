@@ -42,8 +42,8 @@ describe('guide page', () => {
   it('tells what the current release added, and covers every feature since 0.6.0', () => {
     const text = doc.body.textContent;
     expect(text).toContain(`New in ${GUIDE_VERSION}`);
-    for (const feature of ['Four themes', 'Save this profile', 'Matcha', 'A divider that splits the page', 'two columns', 'beside the picture before it', 'AI tabs that sleep', 'Keep awake', 'A folder for each note', 'a folder of its own', 'A video file of your own', 'Black holes', 'AES-256', 'recovery key', 'Open with Nebula', 'violet document icon', 'Your privacy', 'Add a font', 'Arrows', 'angle shows', 'Link any words', 'Ctrl+click', 'Videos', 'caption', 'behind the text', 'one canvas', 'Rust', 'Nebula note (.json)', 'Bookmark',
-      'Embed', 'Mention', 'Only view', 'F12', 'snaps', 'Ctrl+F', 'Ctrl+K', 'Archive', 'Restore', 'Pin to top', 'The / menu', 'Quotes and dividers', 'Import', 'PDF', 'Labels', 'four corner handles', 'Google sign-in',
+    for (const feature of ['Five themes', 'Save this profile', 'Matcha', 'A divider that splits the page', 'two columns', 'beside the picture before it', 'AI tabs that sleep', 'Keep awake', 'A folder for each note', 'a folder of its own', 'A video file of your own', 'Black holes', 'AES-256', 'recovery key', 'Open with Nebula', 'violet document icon', 'Your privacy', 'Add a font', 'Arrows', 'angle shows', 'Link any words', 'Ctrl+click', 'Videos', 'caption', 'behind the text', 'one canvas', 'Rust', 'Nebula note (.json)', 'Bookmark',
+      'Embed', 'Ctrl+Shift+V', 'Only view', 'F12', 'snaps', 'Ctrl+F', 'Ctrl+K', 'Archive', 'Restore', 'Pin to top', 'The / menu', 'Quotes and dividers', 'Import', 'PDF', 'Labels', 'four corner handles', 'Google sign-in',
       'Older notes are brought up to date', 'pre-heal', 'Pictures\\Nebula', 'Deleted is deleted', 'A page in a note asks first']) {
       expect(text).toContain(feature);
     }
@@ -54,21 +54,24 @@ describe('guide order (owner, 0.8.9)', () => {
   const doc = new DOMParser().parseFromString(`<body>${GUIDE_NOTE.content}</body>`, 'text/html');
   const h2 = [...doc.querySelectorAll('h2')].map((h) => h.textContent);
 
-  it('ends with Where your notes live as 15 and Code blocks as 16, the last section', () => {
+  it('ends with Where your notes live as 17 and Code blocks as 18, the last section', () => {
     // Your privacy is 9 since 0.9.4, a page that asks 10 since 0.9.6, projects and the Universe 11 since 1.0.0;
-    // a Universe in a note, panes you can size and the black holes' own scroll are 12–14 since 1.0.0; the last two keep their places at the end.
-    expect(h2.at(-8)).toBe('9 · Your privacy');
-    expect(h2.at(-7)).toBe('10 · A page in a note that asks');
-    expect(h2.at(-6)).toBe('11 · Projects and the Universe');
-    expect(h2.at(-5)).toBe('12 · A Universe of your own');
-    expect(h2.at(-4)).toBe('13 · Panes you can size');
-    expect(h2.at(-3)).toBe('14 · Black holes scroll on their own');
-    expect(h2.at(-2)).toBe('15 · Where your notes live');
-    expect(h2.at(-1)).toBe('16 · Code blocks');
+    // a Universe in a note, panes you can size and the black holes' own scroll are 12–14 since 1.0.0;
+    // several blocks at once and a picture of your own are 15–16 since 1.0.3; the last two keep their places at the end.
+    expect(h2.at(-10)).toBe('9 · Your privacy');
+    expect(h2.at(-9)).toBe('10 · A page in a note that asks');
+    expect(h2.at(-8)).toBe('11 · Projects and the Universe');
+    expect(h2.at(-7)).toBe('12 · A Universe of your own');
+    expect(h2.at(-6)).toBe('13 · Panes you can size');
+    expect(h2.at(-5)).toBe('14 · Black holes scroll on their own');
+    expect(h2.at(-4)).toBe('15 · Several blocks at once');
+    expect(h2.at(-3)).toBe('16 · A picture of your own');
+    expect(h2.at(-2)).toBe('17 · Where your notes live');
+    expect(h2.at(-1)).toBe('18 · Code blocks');
   });
 
   it('opens the code samples with Markdown', () => {
-    const codeHeading = [...doc.querySelectorAll('h2')].find((h) => h.textContent === '16 · Code blocks');
+    const codeHeading = [...doc.querySelectorAll('h2')].find((h) => h.textContent === '18 · Code blocks');
     let el = codeHeading.nextElementSibling;
     while (el && el.tagName !== 'H3') el = el.nextElementSibling;
     expect(el.textContent).toBe('Markdown');

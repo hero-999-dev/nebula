@@ -28,6 +28,25 @@ export const WORDS = {
   ],
   'Keep editing': ['Weiter bearbeiten', 'Edytuj dalej', 'Düzenlemeyi sürdür'],
 
+  // The page in the window died, or never loaded
+  'Nebula\'s page stopped working.': [
+    'Die Seite von Nebula funktioniert nicht mehr.',
+    'Strona Nebula przestała działać.',
+    'Nebula sayfası çalışmayı durdurdu.',
+  ],
+  'Nebula could not load its page.': [
+    'Nebula konnte seine Seite nicht laden.',
+    'Nebula nie może wczytać swojej strony.',
+    'Nebula sayfasını yükleyemedi.',
+  ],
+  'Your notes on disk are safe; only what was typed in the last moments may be missing.': [
+    'Ihre gespeicherten Notizen sind sicher; nur das zuletzt Getippte kann fehlen.',
+    'Zapisane notatki są bezpieczne; brakować może tylko tego, co wpisano przed chwilą.',
+    'Diskteki notlarınız güvende; yalnızca son anda yazılanlar eksik olabilir.',
+  ],
+  'Try again': ['Erneut versuchen', 'Spróbuj ponownie', 'Yeniden dene'],
+  'Close Nebula': ['Nebula schließen', 'Zamknij Nebula', 'Nebula\'yı kapat'],
+
   // Titles of the save and open dialogs
   'Export note': ['Notiz exportieren', 'Eksportuj notatkę', 'Notu dışa aktar'],
   'Export as PDF': ['Als PDF exportieren', 'Eksportuj jako PDF', 'PDF olarak dışa aktar'],
@@ -41,6 +60,7 @@ export const WORDS = {
   'OpenDocument text': ['OpenDocument-Text', 'Tekst OpenDocument', 'OpenDocument metni'],
   'Word 97–2003 document': ['Word 97–2003-Dokument', 'Dokument Word 97–2003', 'Word 97–2003 belgesi'],
   'Evernote export': ['Evernote-Export', 'Eksport Evernote', 'Evernote dışa aktarımı'],
+  'Nebula note with its files': ['Nebula-Notiz mit ihren Dateien', 'Notatka Nebula z jej plikami', 'Dosyalarıyla birlikte Nebula notu'],
   'Notes': ['Notizen', 'Notatki', 'Notlar'],
   'All files': ['Alle Dateien', 'Wszystkie pliki', 'Tüm dosyalar'],
   'Video': ['Video', 'Wideo', 'Video'],

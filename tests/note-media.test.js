@@ -9,9 +9,10 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   externalize, inlinePictures, referencesOf, rehome, sweepNote, removeNoteFolder, removeNoteFolderAsync, shredAsync, tidyVault, addVideo, noteFile, noteIds, moveNotesIn, snapshotVault, missingMedia, shred, unnamedOf, readReleased, writeReleased, noteReleases, releaseAdded, RELEASED_FILE,
-  mediaUrl, mediaPath, parseMediaUrl, mimeOf, byteRange, isVideoName, pictureDataUrl, travelWhole, addAttachment, attachmentExt, isAttachmentName, isPicture, isKeptFile, travelFolder, stageTravelled, VIDEO_EXTENSIONS, stageVideos,
+  mediaUrl, mediaPath, parseMediaUrl, mimeOf, byteRange, isVideoName, pictureDataUrl, travelWhole, addAttachment, attachmentExt, isAttachmentName, isPicture, isKeptFile, travelFolder, zipFolder, stageTravelled, VIDEO_EXTENSIONS, stageVideos,
 } from '../electron/note-media.js';
 import { readNoteFile } from '../electron/open-file.js';
+import { writeZip } from '../electron/zip.js';
 import { purgeNoteFromBackups, purgeDeletedFromBackups, shredTree, staleLabelled, pruneLabelled, oldWayCopies, dropOldWayCopies, purgeUnnamedFromBackups } from '../electron/backup-purge.js';
 
 const b64 = (seed, bytes = 600) => Buffer.alloc(bytes, seed).toString('base64');
@@ -442,6 +443,25 @@ describe('a note that travels', () => {
     const ref = /nebula-media:\/\/note\/(incoming-[a-z0-9]+)\/(vid-[a-z0-9]+-[0-9a-f]{8}\.mp4)/.exec(res.text);
     expect(ref?.[2]).toBe(VIDEO);
     expect(fs.readFileSync(path.join(notes, ref[1], ref[2])).equals(film)).toBe(true);
+  });
+
+  it('exported as a zip with its files, it arrives whole on a computer that has nothing of it', async () => {
+    const out = await travelWhole(withVideo(), notes, { budget: 0 });
+    expect(out.beside.map((v) => v.name)).toEqual([VIDEO]);
+    const zip = path.join(root, 'Trip.zip');
+    await writeZip(zip, [{ name: 'Trip.json', data: out.text }, ...out.beside.map((v) => ({ name: `Trip files/${v.name}`, file: v.file }))]);
+    removeNoteFolder(notes, 'n1');                                       // another computer: nothing of n1 is here
+    const res = await readNoteFile(zip, notes);
+    expect(res.ok).toBe(true);
+    expect(res.text).toContain(PNG);
+    const ref = /nebula-media:\/\/note\/(incoming-[a-z0-9]+)\/(vid-[a-z0-9]+-[0-9a-f]{8}\.mp4)/.exec(res.text);
+    expect(ref?.[2]).toBe(VIDEO);
+    expect(fs.readFileSync(path.join(notes, ref[1], ref[2])).equals(film)).toBe(true);
+    expect(path.basename(zipFolder(path.join(root, 'Trip.json')))).toBe('Trip files');
+    // A zip with no note in it says so.
+    const empty = path.join(root, 'Empty.zip');
+    await writeZip(empty, [{ name: 'a.txt', data: 'x' }]);
+    expect(await readNoteFile(empty, notes)).toMatchObject({ ok: false, error: 'no Nebula note in this zip' });
   });
 });
 

@@ -957,6 +957,9 @@ export function initTables(editor, { history, isLocked = () => false, onGeometry
     return lines.sort((x, y) => x.top - y.top);
   }
 
+  /** Where the last arrow left the caret in a cell, and the place across it set out from. */
+  let goingAcross = null;
+
   /**
    * Into the cell over or under by an arrow, at the same place across as the
    * caret was — on its last line going up, its first going down — as a line of
@@ -1150,7 +1153,15 @@ export function initTables(editor, { history, isLocked = () => false, onGeometry
         if (dr) {
           const s = win.getSelection();
           const rect = s?.rangeCount ? caretRect(s.getRangeAt(0)) : null;
-          caretAcross(to, rect ? rect.left : null, dr < 0);
+          // An empty cell has no caret box: the caret lost its place across and
+          // came out at the far end of the next cell. The place it set out from
+          // is kept down a column, through empty and short cells alike ("the
+          // arrows go mad in a table", the owner's Ideas note).
+          const kept = goingAcross && goingAcross.node === s.anchorNode && goingAcross.at === s.anchorOffset;
+          const pad = Number.parseFloat(win.getComputedStyle(td).paddingLeft) || 0;
+          const x = kept ? goingAcross.x : rect ? rect.left : td.getBoundingClientRect().left + pad;
+          caretAcross(to, x, dr < 0);
+          goingAcross = { node: s.anchorNode, at: s.anchorOffset, x };
         } else caretIn(to, dc < 0);
       } else if (dr && leave(wrap, dr < 0)) e.preventDefault();
       else e.preventDefault();          // the first cell's start, the last cell's end: the caret stays

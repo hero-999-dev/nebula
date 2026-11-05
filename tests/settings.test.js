@@ -18,7 +18,7 @@ beforeEach(() => { localStorage.clear(); document.body.innerHTML = ''; });
 
 describe('the settings store', () => {
   it('is the app as it always was until something is chosen', () => {
-    expect(readSettings()).toEqual({ font: null, size: null, page: 'nw', hideAi: false, hideHoles: false, spell: ['en', 'de', 'pl', 'tr'] });
+    expect(readSettings()).toEqual({ font: null, size: null, page: 'nw', hideAi: false, hideHoles: false, spell: ['en', 'de', 'pl', 'tr'], backdrop: 0.3, smoothScreen: 'off', alarmSound: 'chime', focusSound: 'chime', breakSound: 'bell' });
     expect(readSettings()).toEqual({ ...DEFAULT_SETTINGS });
     expect(newNoteDefaults()).toEqual({ font: null, page: null });
   });
@@ -27,10 +27,10 @@ describe('the settings store', () => {
     expect(cleanSettings(null)).toEqual({ ...DEFAULT_SETTINGS });
     expect(cleanSettings('a string')).toEqual({ ...DEFAULT_SETTINGS });
     expect(cleanSettings({ font: 'Arial, Helvetica, sans-serif', size: '18', page: 'a4', hideAi: true, hideHoles: true }))
-      .toEqual({ font: 'Arial, Helvetica, sans-serif', size: 18, page: 'a4', hideAi: true, hideHoles: true, spell: ['en', 'de', 'pl', 'tr'] });
+      .toEqual({ font: 'Arial, Helvetica, sans-serif', size: 18, page: 'a4', hideAi: true, hideHoles: true, spell: ['en', 'de', 'pl', 'tr'], backdrop: 0.3, smoothScreen: 'off', alarmSound: 'chime', focusSound: 'chime', breakSound: 'bell' });
     // A font that could end a CSS value, a size no line is written in, a page there is none of, a yes that is not one.
     expect(cleanSettings({ font: 'Evil; } body { display: none', size: 2, page: 'a9', hideAi: 'yes', hideHoles: 1 }))
-      .toEqual({ font: 'Evil body display: none', size: null, page: 'nw', hideAi: false, hideHoles: false, spell: ['en', 'de', 'pl', 'tr'] });
+      .toEqual({ font: 'Evil body display: none', size: null, page: 'nw', hideAi: false, hideHoles: false, spell: ['en', 'de', 'pl', 'tr'], backdrop: 0.3, smoothScreen: 'off', alarmSound: 'chime', focusSound: 'chime', breakSound: 'bell' });
     expect(cleanSettings({ font: '   ', size: 'big' })).toMatchObject({ font: null, size: null });
     expect(cleanSettings({ size: 401 }).size).toBeNull();
     expect(cleanSettings({ size: 400 }).size).toBe(400);
@@ -46,13 +46,25 @@ describe('the settings store', () => {
     expect(readSettings().spell).toEqual(['pl']);
   });
 
+  it('keeps an alarm sound it knows, the wind chimes otherwise (1.0.3)', () => {
+    expect(cleanSettings({}).alarmSound).toBe('chime');
+    for (const id of ['off', 'chime', 'bell', 'own', 'own:k3j9x2a1', 'system:Alarm01.wav']) expect(cleanSettings({ alarmSound: id }).alarmSound).toBe(id);
+    for (const id of ['system:../x.wav', 'system:', 'loud', 3, 'own:', 'own:AB', 'own:../x', 'system:a\\b.wav']) expect(cleanSettings({ alarmSound: id }).alarmSound).toBe('chime');
+  });
+
+  it('does not soften the picture until asked (1.0.3: "never olsun doğal ayarı")', () => {
+    expect(cleanSettings({}).smoothScreen).toBe('off');
+    for (const v of ['auto', 'on', 'off']) expect(cleanSettings({ smoothScreen: v }).smoothScreen).toBe(v);
+    for (const v of ['yes', true, 1, 'ON', null]) expect(cleanSettings({ smoothScreen: v }).smoothScreen).toBe('off');
+  });
+
   it('writes a change, keeps the rest, and says so', () => {
     const heard = [];
     const off = on('settings-changed', ({ settings }) => heard.push(settings));
     writeSettings({ page: 'a5' });
     const now = writeSettings({ hideAi: true });
     off();
-    expect(now).toEqual({ font: null, size: null, page: 'a5', hideAi: true, hideHoles: false, spell: ['en', 'de', 'pl', 'tr'] });
+    expect(now).toEqual({ font: null, size: null, page: 'a5', hideAi: true, hideHoles: false, spell: ['en', 'de', 'pl', 'tr'], backdrop: 0.3, smoothScreen: 'off', alarmSound: 'chime', focusSound: 'chime', breakSound: 'bell' });
     expect(readSettings()).toEqual(now);
     expect(heard).toHaveLength(2);
     expect(heard[1]).toEqual(now);
@@ -176,8 +188,9 @@ describe('Settings in the menus', () => {
   it('stands after Help and opens the sheet at a press: no list under it', () => {
     const open = vi.fn();
     const menus = buildMenus(ctx({ settings: { open } }));
-    expect(menus.map((m) => m.title).slice(-2)).toEqual(['Help', 'Settings']);
-    const settings = menus.at(-1);
+    // Tools stands after it (1.0.3).
+    expect(menus.map((m) => m.title).slice(-3)).toEqual(['Help', 'Settings', 'Tools']);
+    const settings = menus.at(-2);
     expect(settings.direct).toBe(true);
     expect(settings.items).toHaveLength(1);
     settings.items[0].run();
@@ -190,10 +203,12 @@ describe('Settings in the menus', () => {
     const open = vi.fn();
     initAppMenu(ctx({ settings: { open } }));
     const titles = [...document.querySelectorAll('#app-menu .am-title')];
-    expect(titles.map((b) => b.textContent)).toEqual(['File', 'Edit', 'View', 'Window', 'Help', 'Settings']);
-    const last = titles.at(-1);
+    expect(titles.map((b) => b.textContent)).toEqual(['File', 'Edit', 'View', 'Window', 'Help', 'Settings', 'Tools']);
+    const last = titles.at(-2);
     expect(last.dataset.cmd).toBe('settings.open');
     expect(last.parentElement.querySelector('.am-menu')).toBeNull();
+    // Tools, beside it, has a list of its own.
+    expect(titles.at(-1).parentElement.querySelector('.am-menu')).not.toBeNull();
     // With another menu open, pressing it shuts that one and opens the sheet.
     titles[0].click();
     expect(document.querySelector('#app-menu .am-menu:not([hidden])')).not.toBeNull();

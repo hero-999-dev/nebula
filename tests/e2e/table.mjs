@@ -380,7 +380,7 @@ export async function runTableChecks(check) {
     };
     const pick = async (label) => { await win.evaluate((l) => [...document.querySelectorAll('#ctx-menu > button')].find((b) => b.textContent === l)?.click(), label); await win.waitForTimeout(150); };
     let offered = await rightClick(td(0, 1));
-    check('a right-click in a cell offers a row above or below, a column left or right, and deleting them — over the pastes', offered.join('|') === 'Insert row above|Insert row below|Insert column left|Insert column right|Delete row|Delete column|Delete table|Cut|Copy|Paste as Nebula format|Paste original format|Select all', offered.join('|'));
+    check('a right-click in a cell offers a row above or below, a column left or right, and deleting them — over the pastes', offered.join('|') === 'Insert row above|Insert row below|Insert column left|Insert column right|Delete row|Delete column|Delete table|Cut|Copy|Paste as Nebula format|Paste original format|Paste only text|Select all', offered.join('|'));
     await pick('Insert column left');
     await win.keyboard.type('new');
     s = await state();

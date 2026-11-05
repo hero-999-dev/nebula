@@ -34,10 +34,23 @@
  * taskbar and the shortcuts. Back at the logo the build came with nothing is
  * kept. The mark in the app's own title strip is not touched: it is drawn in
  * the theme's accent, as every icon of the app is.
+ *
+ * A picture of the user's own can stand in for the drawn logo (1.0.3,
+ * logo-crop.js): cut here, worn the same way. Picking a theme or a colour
+ * takes it off, but it is kept, first among the themes as "My picture", to be
+ * put on again ("use a picture of mine kaydedilmiyor"); Remove the picture
+ * removes it for good.
+ *
+ * In the test build Nebula's own is worn as any other theme is, drawn and
+ * kept (the owner: "teste özel Nebula's own … güncellemiyor, diğerleri
+ * güncelliyor"): taken back to the program's own icon, Windows kept drawing
+ * the last logo it had for the portable file's shortcuts and taskbar button.
  */
 
 import { t } from './i18n.js';
+import { cropLogoPicture } from './logo-crop.js';
 import { askText } from './dialog.js';
+import { icon } from './icons.js';
 import { SWATCHES, cleanHex, luminance } from './theme-custom.js';
 import { readReadyProfiles, readProfiles } from './theme-editor.js';
 import {
@@ -53,6 +66,13 @@ const FIXED_NAMES = { main: 'Main', dark: 'Dark', light: 'Light', white: 'White'
 const THEMES_KEY = 'nebula:logo-themes';
 /** Which of them the colours on the logo belong to, across a start of the app. */
 const EDITING_KEY = 'nebula:logo-theme';
+/** The name the user gave the kept picture ("my picture de double click to rename olsun"); none: My picture. */
+const PICTURE_NAME_KEY = 'nebula:logo-picture-name';
+const PICTURE_NAME_MAX = 40;
+const pictureName = () => { try { return localStorage.getItem(PICTURE_NAME_KEY) || null; } catch { return null; } };
+function setPictureName(name) {
+  try { if (name) localStorage.setItem(PICTURE_NAME_KEY, name); else localStorage.removeItem(PICTURE_NAME_KEY); } catch { /* not kept */ }
+}
 const WEAR_AFTER_MS = 350;
 
 const el = (tag, cls, text) => {
@@ -92,6 +112,10 @@ export function initLogoEditor({ host }) {
   let isTest = false;
   /** The colours on the logo now. */
   let draft = { ...own };
+  /** The user's own picture on the logo, as an address, or null when the colours are drawn. */
+  let picture = null;
+  /** The user's own picture kept for later, as an address (256 px), or null. */
+  let kept = null;
   let active = 0;
   /** The logo theme those colours belong to — a change is kept there — or null. */
   let editing = null;
@@ -157,7 +181,20 @@ export function initLogoEditor({ host }) {
   const barRow = el('div', 'te-bar-row');
   barRow.append(bar, hexInput);
   const grid = el('div', 'te-swatches');
-  tools.append(themesLabel, themesEl, slotsEl, barRow, grid);
+  const pictureRow = el('div', 'set-buttons');
+  const pictureFile = el('input');
+  pictureFile.type = 'file';
+  pictureFile.accept = 'image/*';
+  pictureFile.id = 'logo-picture-file';
+  pictureFile.hidden = true;
+  const pictureChoose = el('button', 'btn', 'Use a picture of mine');
+  pictureChoose.type = 'button';
+  pictureChoose.id = 'logo-picture-choose';
+  const pictureRemove = el('button', 'btn', 'Remove the picture');
+  pictureRemove.type = 'button';
+  pictureRemove.id = 'logo-picture-remove';
+  pictureRow.append(pictureChoose, pictureRemove, pictureFile);
+  tools.append(pictureRow, themesLabel, themesEl, slotsEl, barRow, grid);
 
   const editor = el('div', 'logo-editor');
   editor.id = 'logo-editor';
@@ -228,8 +265,24 @@ export function initLogoEditor({ host }) {
     }
     const mine = editing && themes.some((x) => x.name === editing) ? editing : null;
     let lit = false;
+    if (kept) {
+      const b = el('button', `te-chip logo-mine${picture ? ' on' : ''}`);
+      b.type = 'button';
+      b.dataset.logoTheme = 'picture';
+      const thumb = el('img', 'logo-mine__img');
+      thumb.alt = '';
+      thumb.src = kept;
+      const named = pictureName();
+      const label = el('span', '', named ?? 'My picture');
+      if (named) label.dataset.noI18n = '';       // the user's own word
+      b.title = t('Double-click to rename');
+      b.append(thumb, label);
+      b.addEventListener('click', () => { void wearKept(); });
+      b.addEventListener('dblclick', () => { void renamePicture(); });
+      themesEl.append(b);
+    }
     for (const [name, colors, ours] of offered()) {
-      const on = !mine && !lit && sameLogo(colors, draft);
+      const on = !picture && !mine && !lit && sameLogo(colors, draft);
       lit ||= on;
       const b = el('button', `te-chip${on ? ' on' : ''}`, name);
       b.type = 'button';
@@ -239,7 +292,7 @@ export function initLogoEditor({ host }) {
       themesEl.append(b);
     }
     for (const theme of themes) {
-      const on = mine ? mine === theme.name : (!lit && sameLogo(theme.colors, draft));
+      const on = !picture && (mine ? mine === theme.name : (!lit && sameLogo(theme.colors, draft)));
       lit ||= on;
       const wrap = el('span', `te-chip logo-theme${on ? ' on' : ''}`);
       wrap.dataset.logoTheme = theme.name;
@@ -283,6 +336,15 @@ export function initLogoEditor({ host }) {
     paint();
   }
 
+  /** The kept picture's name; left empty, it is My picture again. */
+  async function renamePicture() {
+    const to = await askText(t('Name of the picture:'), pictureName() ?? t('My picture'));
+    if (to === null) return;
+    const name = to.trim().slice(0, PICTURE_NAME_MAX);
+    setPictureName(name && name !== t('My picture') ? name : null);
+    paint();
+  }
+
   async function rename(from) {
     const to = await askText(t('Name of the logo theme:'), from);
     if (to === null) return;
@@ -295,9 +357,10 @@ export function initLogoEditor({ host }) {
 
   // ---- painting ----------------------------------------------------------------
   function paint() {
-    big.src = logoDataUrl(draft, 256);
-    mid.src = logoDataUrl(draft, 32);
-    tiny.src = logoDataUrl(draft, 16);
+    big.src = picture ?? logoDataUrl(draft, 256);
+    mid.src = picture ?? logoDataUrl(draft, 32);
+    tiny.src = picture ?? logoDataUrl(draft, 16);
+    pictureRemove.hidden = !picture && !kept;
     LOGO_SLOTS.forEach((slot, i) => {
       slotButtons[i].classList.toggle('on', i === active);
       slotButtons[i].setAttribute('aria-pressed', String(i === active));
@@ -311,27 +374,85 @@ export function initLogoEditor({ host }) {
     if (document.activeElement !== hexInput) hexInput.value = hex;
     for (const cell of swatchButtons) cell.classList.toggle('on', cell.dataset.hex === hex);
     paintThemes();
+    paintTitle();
+  }
+
+  /**
+   * The logo at the left of the title bar wears what the taskbar wears (the
+   * owner's Bug Find note: a theme or a picture put on the logo left it as it
+   * was). The logo the build came with stays the drawn one, in the theme's accent.
+   */
+  const titleLogo = document.getElementById('tb-logo');
+  function paintTitle() {
+    if (!titleLogo) return;
+    const worn = picture ?? (sameLogo(draft, own) ? null : logoDataUrl(draft, 64));
+    const img = titleLogo.querySelector('img.tb-logo__img');
+    if (!worn) {
+      if (img) titleLogo.innerHTML = icon('logo');
+      return;
+    }
+    if (img) { img.src = worn; return; }
+    const pic = el('img', 'tb-logo__img');
+    pic.alt = '';
+    pic.src = worn;
+    titleLogo.replaceChildren(pic);
   }
 
   /** Drawn now; worn a moment later, so a colour pulled across the wheel is not written at every step. */
   function wear() {
+    picture = null;
     paint();
     if (!api) return;
     clearTimeout(timer);
     timer = setTimeout(() => { void send(); }, WEAR_AFTER_MS);
   }
 
-  async function send() {
+  /** @param {Record<string, string>|null} [pictures] the user's own picture, cut; otherwise the colours are drawn */
+  async function send(pictures = null) {
     const mine = ++asked;
     const colors = { ...draft };
     try {
-      // The logo the build came with is the icon it has already: nothing of a logo is kept then.
-      const res = sameLogo(colors, own) ? await api.clear() : await api.set(colors, await logoPictures(colors));
+      // The logo the build came with is the icon it has already: nothing of a logo is kept then —
+      // but for the test build's, which is worn as the others are (see the head of this file).
+      const res = pictures ? await api.set(colors, pictures, true)
+        : sameLogo(colors, own) && !isTest ? await api.clear() : await api.set(colors, await logoPictures(colors));
       if (mine === asked && !res?.ok) toast('The logo could not be changed');
     } catch {
       if (mine === asked) toast('The logo could not be changed');
     }
   }
+
+  pictureChoose.addEventListener('click', () => pictureFile.click());
+  pictureFile.addEventListener('change', async () => {
+    const file = pictureFile.files?.[0];
+    pictureFile.value = '';
+    if (!file) return;
+    const pictures = await cropLogoPicture(file);
+    if (!pictures) return;
+    clearTimeout(timer);
+    picture = pictures[256];
+    kept = picture;
+    paint();
+    if (api) void send(pictures);
+  });
+  /** The kept picture put on again. */
+  async function wearKept() {
+    if (!kept || picture) return;
+    clearTimeout(timer);
+    const mine = ++asked;
+    picture = kept;
+    paint();
+    if (!api) return;
+    const res = await api.wearPicture({ ...draft }).catch(() => null);
+    if (mine === asked && !res?.ok) toast('The logo could not be changed');
+  }
+  // Removed for good: the kept picture goes, and the logo is drawn in its colours again.
+  pictureRemove.addEventListener('click', () => {
+    kept = null;
+    setPictureName(null);
+    if (api) void api.forgetPicture().catch(() => null);
+    wear();
+  });
 
   /**
    * A colour for the chosen slot. On a logo theme, that theme changes; on
@@ -364,6 +485,8 @@ export function initLogoEditor({ host }) {
           isTest = res.own === 'test';
           own = isTest ? OWN_LOGO.test : OWN_LOGO.main;
           draft = cleanLogo(res.colors ?? own, own);
+          picture = res.picture ?? null;
+          kept = res.kept ?? null;
           shortcut.hidden = !res.shortcuts;
         }
       } catch { /* as it was */ }
@@ -378,6 +501,7 @@ export function initLogoEditor({ host }) {
     paint();
   }
   paint();
+  if (api) void refresh();
 
   return { refresh, pending: () => asked };
 }

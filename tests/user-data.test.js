@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import path from 'node:path';
-import { resolveUserData, appChannel, canSelfUpdate, PORTABLE_DATA_DIR } from '../electron/user-data.js';
+import { resolveUserData, appChannel, canSelfUpdate, PORTABLE_DATA_DIR, syncVersion, testStamp } from '../electron/user-data.js';
 
 const APPDATA = path.join('C:', 'Users', 'someone', 'AppData', 'Roaming', 'nebula');
 const REPO = path.join('C:', 'work', 'Nebula');
@@ -66,5 +66,25 @@ describe('canSelfUpdate', () => {
     for (const channel of ['test', 'portable', 'dev']) {
       expect(canSelfUpdate(channel), channel).toBe(false);
     }
+  });
+});
+
+describe('syncVersion — a test build syncs only with the very same build (the owner, 2026-11-05)', () => {
+  it('leaves a released copy as its version', () => {
+    for (const channel of ['installed', 'portable', 'dev']) {
+      expect(syncVersion({ version: '1.0.2', channel, stamp: '20261105-0112' })).toBe('1.0.2');
+    }
+  });
+
+  it('adds the moment a test build was packed, so it never matches a release or an older test build', () => {
+    const now = syncVersion({ version: '1.0.2', channel: 'test', stamp: '20261105-0112' });
+    expect(now).toBe('1.0.2-test.20261105-0112');
+    expect(now).not.toBe(syncVersion({ version: '1.0.2', channel: 'installed' }));
+    expect(now).not.toBe(syncVersion({ version: '1.0.2', channel: 'test', stamp: '20261105-0003' }));
+    expect(syncVersion({ version: '1.0.2', channel: 'test', stamp: null })).toBe('1.0.2-test');
+  });
+
+  it('stamps local date and time', () => {
+    expect(testStamp(new Date(2026, 10, 5, 1, 2))).toBe('20261105-0102');
   });
 });

@@ -112,6 +112,10 @@ export const ICONS = {
   calendar: S('<rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M8 13h.01"/><path d="M12 13h.01"/><path d="M16 13h.01"/><path d="M8 16.5h.01"/><path d="M12 16.5h.01"/>'),
   // The Universe widget (1.0.0): the same Saturn as the minimap.
   universe: SATURN,
+  // The Pomodoro (1.0.3): a timer with its knob; the Clock: a face with an alarm's bells.
+  pomodoro: S('<circle cx="12" cy="13.5" r="7.5"/><path d="M10 2.5h4"/><path d="M12 2.5v3.5"/><path d="M12 13.5l3-3"/><path d="M18.5 6.5l1.5-1.5"/>'),
+  clock: S('<circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2"/><path d="M4.5 5.5l2.5-2"/><path d="M19.5 5.5l-2.5-2"/><path d="M7 19.5l-1.5 1.5"/><path d="M17 19.5l1.5 1.5"/>'),
+  bell: S('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>'),
   widget: S('<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><path d="M17 13.5v7"/><path d="M13.5 17h7"/>'),
   search: S('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>'),
   spell: S('<path d="M3 16 7 6l4 10"/><path d="M4.4 13h5.2"/><path d="m13.5 15 2.5 2.5 5-5.5"/>'),

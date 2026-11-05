@@ -115,6 +115,7 @@ body {
   border-right: 1px solid var(--rule);
   padding: 14px 12px;
   gap: 10px;
+  position: relative;
 }
 
 .brand {
@@ -127,6 +128,16 @@ body {
   padding: 2px 6px 8px;
   color: var(--ink);
 }
+/* Its line runs on from the title's (main.js measures --head-line): the list's
+   padding is reached across so the line meets the border at both ends. */
+#app[style*="--head-line"] .brand {
+  box-sizing: border-box;
+  min-height: calc(var(--head-line) - 14px);
+  margin: 0 -12px;
+  padding: 2px 18px 8px;
+  border-bottom: 1px solid var(--rule);
+}
+#app.side-collapsed[style*="--head-line"] .brand { margin: 0 -7px; padding: 2px 0 4px; }
 
 /* Collapse the note list. The button stays put — it is the one control that
    must still be reachable once the panel it hides is gone. */
@@ -200,8 +211,10 @@ body {
   font-size: 15px;
 }
 #app.side-collapsed .note-list-empty { display: none; }
-#app.side-collapsed .btn { padding: 8px 0; font-size: 0; }
-#app.side-collapsed .btn::before { content: "+"; font-size: 17px; line-height: 1; }
+/* Only the rail's own buttons (1.0.3): unscoped, every .btn in the app took the
+   "+", and the AI panel's reload and close turned into "+" over their icons. */
+#app.side-collapsed .side .btn { padding: 8px 0; font-size: 0; }
+#app.side-collapsed .side .btn::before { content: "+"; font-size: 17px; line-height: 1; }
 /* Stacked, the separator has to run ACROSS the buttons, not down their side.
    `.theme-pick button + button` draws a border-LEFT for the horizontal row, and
    in the rail those became two short vertical lines hanging beside the theme
@@ -402,7 +415,7 @@ body {
    is centred on its own. It was not: `gap: 6px` from the expanded rule still
    reserved room beside it for the count that is not drawn, pushing the word
    off to one side of a 64px rail. */
-#app.side-collapsed .drawer-tab {
+#app.side-collapsed .side .drawer-tab {
   font-size: 9px;
   line-height: 1.1;
   padding: 5px 0;
@@ -411,7 +424,7 @@ body {
   text-align: center;
   overflow: hidden;
 }
-#app.side-collapsed .drawer-tab::before { content: none; }   /* not the rail's "+" for .btn */
+#app.side-collapsed .side .drawer-tab::before { content: none; }   /* not the rail's "+" for .btn */
 #app.side-collapsed .drawer-count { display: none; }
 .note-row.active { background: var(--paper-raised); border-color: var(--rule); }
 .note-row .nr-title {
@@ -434,7 +447,7 @@ body {
 }
 .note-row .nr-title, .note-row .nr-meta { max-width: 100%; }
 
-.side-foot { display: flex; flex-direction: column; gap: 6px; }
+.side-foot { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
 
 /* Filter by label (0.9.3): a button under the filter box; its panel opens on
    a press and holds a search box and two groups of chips. */
@@ -635,6 +648,157 @@ body {
   min-width: 0;
   background: var(--paper);
 }
+/* The user's picture behind the note (1.0.3): under a veil of the theme's paper,
+   the thinner the veil the more of it shows. In the ground itself, so nothing
+   over it changes. Under the whole window, the note list too, each side under
+   a veil of its own colour (the owner's Bug Find note: left and right differed). */
+#app.has-backdrop {
+  --backdrop-veil: color-mix(in srgb, var(--paper) calc((1 - var(--backdrop, .3)) * 100%), transparent);
+  --backdrop-veil-side: color-mix(in srgb, var(--paper-sunken) calc((1 - var(--backdrop, .3)) * 100%), transparent);
+  background: var(--backdrop-image) center / cover no-repeat, var(--paper);
+}
+#app.has-backdrop .main { background: var(--backdrop-veil); }
+#app.has-backdrop .side { background: var(--backdrop-veil-side); }
+/* Settings is not dimmed over a picture (the owner, 2026-11-04: "ayarlar menüsünde
+   arka taraf inanılmaz pikselli"): the dim halved the picture's shades, and its
+   smooth colours fell into steps that were not there once Settings closed. */
+#app.has-backdrop ~ #ov-settings { background: transparent; }
+/* Appearance's preview (1.0.3): a Nebula in small — the title strip, the whole
+   note list with its foot, the page's head, the editing bar and a note — in
+   the app's own colours, the picture under the same veils as the window's.
+   It is laid out at a window's size (.lp-stage, 960 × 600) and brought down
+   to its column's width by settings-panel.js, so nothing in it is left out. */
+.look-preview {
+  --backdrop-veil: color-mix(in srgb, var(--paper) calc((1 - var(--backdrop, .3)) * 100%), transparent);
+  --backdrop-veil-side: color-mix(in srgb, var(--paper-sunken) calc((1 - var(--backdrop, .3)) * 100%), transparent);
+  position: relative; width: 100%; margin: 0 0 8px; overflow: hidden; aspect-ratio: 16 / 10;
+  border: 1px solid var(--rule); border-radius: 9px; color: var(--ink); background: var(--paper);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .12); user-select: none; pointer-events: none;
+}
+.look-preview.has-backdrop { background: var(--backdrop-image) center / cover no-repeat, var(--paper); }
+.lp-stage { position: absolute; top: 0; left: 0; width: 960px; height: 600px; display: flex; flex-direction: column; font-size: 13px; line-height: 1.35; }
+.lp-ic { display: inline-flex; flex: none; width: 16px; height: 16px; color: var(--ink-soft); }
+.lp-ic svg { width: 100%; height: 100%; }
+.lp-bar {
+  display: flex; align-items: center; gap: 14px; height: 34px; padding-left: 12px; flex: none;
+  background: var(--paper-sunken); border-bottom: 1px solid var(--rule); color: var(--ink-soft);
+}
+.lp-logo { display: inline-flex; width: 20px; height: 20px; }
+.lp-logo svg, .lp-logo img { width: 100%; height: 100%; }
+.lp-menus { display: flex; gap: 16px; white-space: nowrap; }
+.lp-wintitle { flex: 1; min-width: 0; text-align: center; font-size: 12.5px; color: var(--ink-faint); }
+.lp-win { display: flex; align-self: stretch; }
+.lp-win .lp-ic { width: 46px; height: 100%; padding: 0 15px; box-sizing: border-box; }
+.lp-body { flex: 1; display: flex; min-height: 0; }
+.lp-side {
+  flex: 0 0 260px; display: flex; flex-direction: column; gap: 8px; padding: 12px 12px 10px; min-width: 0;
+  background: var(--paper-sunken); border-right: 1px solid var(--rule);
+}
+.lp-brand { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; }
+.lp-search {
+  display: flex; align-items: center; gap: 7px; padding: 6px 9px; color: var(--ink-faint);
+  border: 1px solid var(--rule); border-radius: 8px; background: var(--paper-raised);
+}
+.lp-filters { display: flex; gap: 5px; }
+.lp-filter { padding: 2px 9px; border: 1px solid var(--rule); border-radius: 999px; font-size: 11.5px; color: var(--ink-soft); }
+.lp-filter.on { border-color: var(--clay); color: var(--clay); }
+.lp-list { flex: 1; display: flex; flex-direction: column; gap: 3px; min-height: 0; overflow: hidden; }
+.lp-sec { margin: 6px 0 2px 4px; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); }
+.lp-row { padding: 6px 9px; border-radius: 8px; }
+.lp-row.on { background: var(--paper-raised); box-shadow: inset 3px 0 0 var(--clay); }
+.lp-row__top { display: flex; align-items: center; gap: 5px; }
+.lp-row__top .lp-ic { width: 13px; height: 13px; color: var(--clay); }
+.lp-row__title { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-row__when { font-size: 11px; color: var(--ink-faint); }
+.lp-row__snip { display: block; margin-top: 1px; font-size: 11.5px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-folder { display: flex; align-items: center; gap: 7px; padding: 5px 9px; color: var(--ink-soft); }
+.lp-folder > .lp-ic:first-child { color: var(--clay); }
+.lp-folder__name { flex: 1; min-width: 0; }
+.lp-count { font-size: 11px; color: var(--ink-faint); }
+.lp-disc { flex: none; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle, #000 45%, var(--clay) 100%); box-shadow: 0 0 0 1px var(--rule); }
+.lp-hole .lp-ic { width: 13px; height: 13px; }
+.lp-galaxy { flex: none; overflow: hidden; border: 1.4px solid var(--rule); border-radius: 10px; background: color-mix(in srgb, var(--paper-sunken) 70%, #000 30%); }
+.lp-galaxy__head { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.lp-galaxy__head .lp-ic { width: 15px; height: 15px; color: var(--clay); }
+.lp-galaxy__sky { position: relative; height: 62px; }
+.lp-star { position: absolute; border-radius: 50%; background: var(--clay); box-shadow: 0 0 6px var(--clay); }
+.lp-drawers, .lp-newrow { display: flex; gap: 6px; flex: none; }
+.lp-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 6px 8px;
+  border: 1px solid var(--rule); border-radius: 8px; background: var(--paper-raised); font-size: 12.5px; color: var(--ink-soft);
+}
+.lp-btn--ic { flex: none; padding: 6px 7px; }
+.lp-plus { font-size: 11px; font-weight: 700; }
+.lp-new { background: var(--clay); border-color: var(--clay); color: var(--paper); font-weight: 600; }
+.lp-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex: none; font-size: 11px; color: var(--ink-faint); }
+.lp-langs { display: flex; gap: 6px; }
+.lp-langs .on { color: var(--clay); font-weight: 600; }
+.lp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lp-head { display: flex; align-items: center; gap: 10px; padding: 14px 22px 10px; flex: none; }
+.lp-title { flex: 1; min-width: 0; font-size: 24px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-label { padding: 2px 9px; border-radius: 999px; font-size: 11.5px; background: color-mix(in srgb, var(--clay) 18%, transparent); color: var(--clay); }
+.lp-saved { font-size: 11.5px; color: var(--ink-faint); }
+.lp-pad { display: flex; gap: 3px; padding: 3px 4px; border: 1px solid var(--rule); border-radius: 8px; }
+.lp-pad .lp-ic { width: 14px; height: 14px; }
+.lp-toolbar {
+  display: flex; flex-direction: column; gap: 5px; margin: 0 22px; padding: 6px 9px; flex: none;
+  border: 1px solid var(--rule); border-radius: 10px; background: var(--paper-raised);
+}
+.lp-tbrow { display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; }
+.lp-sep { flex: none; width: 1px; height: 16px; background: var(--rule); }
+.lp-select { flex: none; padding: 1px 8px; border: 1px solid var(--rule); border-radius: 6px; font-size: 11.5px; color: var(--ink-soft); }
+.lp-page {
+  flex: 1; min-height: 0; margin: 12px 22px 0; padding: 20px 28px; overflow: hidden;
+  border: 1px solid var(--rule); border-bottom: 0; border-radius: 10px 10px 0 0; background: var(--paper);
+}
+.lp-note { font-size: var(--lp-size, 16px); line-height: 1.55; }
+.lp-note p { margin: 0 0 10px; }
+.lp-h { margin: 4px 0 6px; font-size: 1.25em; font-weight: 700; }
+.lp-todo { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
+.lp-box { flex: none; width: .85em; height: .85em; border: 1.5px solid var(--ink-soft); border-radius: 3px; }
+.lp-todo.done .lp-box { background: var(--clay); border-color: var(--clay); }
+.lp-todo.done span:last-child { text-decoration: line-through; color: var(--ink-faint); }
+.lp-quote { margin: 12px 0 0; padding-left: 12px; border-left: 3px solid var(--clay); color: var(--ink-soft); }
+.look-preview.has-backdrop .lp-bar, .look-preview.has-backdrop .lp-side { background: var(--backdrop-veil-side); }
+.look-preview.has-backdrop .lp-main { background: var(--backdrop-veil); }
+.look-preview.has-backdrop .lp-page { background: transparent; }
+.lp-amount {
+  position: absolute; right: 8px; bottom: 8px; padding: 1px 6px; border-radius: 5px;
+  background: var(--paper-raised); color: var(--ink-soft); font-size: 11px; font-variant-numeric: tabular-nums;
+}
+.lp-amount[hidden] { display: none; }
+/* The theme organizer, laid out as the logo's editor is: the preview at the
+   left, staying in sight while the colours at its right are scrolled. */
+.modal.modal-wide.settings-modal.is-wide { width: min(1000px, 96vw); }
+.theme-studio { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+/* The side is as tall as the colours. Its preview scrolls with the rest, the picture's tools
+   under it (the owner: "picture kısmı önizlemenin altına düşüyor, hepsi sabit olsun aşağı doğru insin"). */
+.studio-side { align-self: stretch; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.studio-picture { display: flex; flex-direction: column; gap: 7px; margin-top: 6px; }
+.studio-picture .set-hint { margin: 0; }
+.studio-tools { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.studio-tools > .te-label:first-child { margin-top: 0; }
+.studio-tools > .te-label { margin-top: 6px; }
+.studio-tools .theme-editor { padding: 0; border: 0; background: transparent; }
+.studio-tools .set-hint { margin: 0; }
+@media (max-width: 760px) {
+  .theme-studio { grid-template-columns: minmax(0, 1fr); }
+  .studio-side > .look-preview { position: static; }
+}
+/* The note's own frame would stand over it: the words are what it is behind. */
+#app.has-backdrop .editor-frame { background: transparent; }
+@media print {
+  #app.has-backdrop, #app.has-backdrop .main { background: var(--paper); }
+}
+/* The styles, each button with its own little drawing of the colours. */
+.set-mix-styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; margin: 0 0 10px; }
+.set-mix-style {
+  display: grid; justify-items: center; gap: 4px; padding: 5px 4px 4px; border: 1px solid var(--rule); border-radius: 8px;
+  background: var(--paper-raised); color: var(--ink-soft); font-size: 11.5px; cursor: pointer;
+}
+.set-mix-style canvas { width: 64px; height: 36px; border-radius: 5px; display: block; }
+.set-mix-style:hover { color: var(--ink); border-color: var(--ink-faint); }
+.set-mix-style.on { border-color: var(--clay); box-shadow: 0 0 0 1px var(--clay); color: var(--ink); }
 
 .demo-banner {
   background: var(--clay-soft);
@@ -663,6 +827,9 @@ body {
   color: var(--ink);
   outline: none;
   min-width: 0;
+  /* A long title was cut off mid-letter ("Alphabe", the owner, 1.0.3): it
+     ends in an ellipsis until it is clicked, and its tooltip has all of it. */
+  text-overflow: ellipsis;
 }
 .title-input::placeholder { color: var(--ink-faint); }
 
@@ -745,6 +912,10 @@ body {
   gap: 6px;
 }
 .uc-actions .btn { font-size: 12px; padding: 6px 10px; }
+/* Onto another screen (screen-tip.js): three buttons, so a little wider, and they wrap rather than squeeze. */
+/* Over Settings too, for the window can be moved with it open; under a toast. */
+.screen-tip { width: min(380px, calc(100vw - 36px)); z-index: 110; }
+.screen-tip .uc-actions { flex-wrap: wrap; }
 
 /* About panel — paths are long, so the modal is wider and they wrap.
    `.modal.modal-wide`, not `.modal-wide`: editor.css sets .modal to 420px and
@@ -983,14 +1154,39 @@ body {
   box-shadow: 0 10px 26px var(--shadow);
   overflow-wrap: anywhere;
 }
+.toast--open { cursor: pointer; }   /* a saved snapshot: a press opens its folder (1.0.3) */
+
+/* No note open (1.0.3): no "Untitled", no page that takes no typing — a word in the middle. */
+.main.no-note-open .title-input { visibility: hidden; }
+.main.no-note-open #editor { display: none; }
+.no-note { display: grid; place-items: center; min-height: 240px; height: 100%; padding: 24px; color: var(--ink-soft); font-size: 15px; text-align: center; }
+.no-note[hidden] { display: none; }
+
+/* A file opened with Nebula (1.0.3): a card with a running bar while it becomes a note. */
+.opening { position: fixed; inset: 0; z-index: 130; display: grid; place-items: center; background: color-mix(in srgb, var(--paper) 55%, transparent); }
+.opening[hidden] { display: none; }
+.opening__card {
+  display: grid; gap: 8px; min-width: 260px; max-width: min(480px, 90vw); padding: 16px 20px;
+  border: 1px solid var(--rule); border-radius: 10px; background: var(--paper-raised); color: var(--ink);
+  font-size: 13px; box-shadow: 0 10px 26px var(--shadow);
+}
+.opening__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opening__name:empty { display: none; }
+.opening__bar { position: relative; height: 4px; overflow: hidden; border-radius: 2px; background: var(--rule); }
+.opening__bar i { position: absolute; inset: 0 auto 0 0; width: 35%; border-radius: 2px; background: var(--clay); animation: opening-run 1.1s ease-in-out infinite; }
+@keyframes opening-run { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
 
 /* ---- Folders and dragging in the note list (0.9.3) ----------------------
    A folder is a row like a note's, with a caret that turns when it is open;
    its notes hang under it on a thin rule. While a note is dragged, a line
    shows where it will land, and a folder it will go into is tinted. */
-.new-row { display: flex; gap: 6px; }
-.new-row #btn-new { flex: 1; min-width: 0; }
-.btn.new-folder { display: inline-flex; align-items: center; gap: 1px; padding: 6px 9px; color: var(--ink-soft); }
+.new-row { display: flex; flex-wrap: wrap; gap: 6px; }
+/* The words stay whole in every language at their one size: when the side is too
+   narrow for them the small buttons go under, and share that line (1.0.3). */
+.new-row #btn-new { flex: 999 1 auto; min-width: 0; padding-inline: 8px; white-space: nowrap; }
+.new-row .btn.new-folder { flex: 1 0 auto; justify-content: center; }
+#app.side-collapsed .new-row #btn-new { white-space: normal; }
+.btn.new-folder { display: inline-flex; align-items: center; gap: 1px; padding: 6px 7px; color: var(--ink-soft); }
 .btn.new-folder:hover { color: var(--ink); }
 .btn.new-folder svg { width: 16px; height: 16px; }
 .btn.new-folder .nf-plus { font-size: 13px; font-weight: 700; line-height: 1; margin-top: -6px; }
@@ -1159,23 +1355,15 @@ body {
    Trash, in the drawer's own place and dress. */
 .theme-row { display: flex; gap: 6px; }
 .theme-row .theme-pick { flex: 1; min-width: 0; }
-.btn.theme-custom { display: inline-flex; align-items: center; padding: 4px 9px; color: var(--ink-soft); }
-.btn.theme-custom:hover { color: var(--ink); }
-.btn.theme-custom svg { width: 16px; height: 16px; }
-.btn.theme-custom.on,
-.btn.theme-custom[aria-expanded="true"] { border-color: var(--clay); color: var(--clay); }
-.btn.theme-custom.on { background: var(--clay); color: var(--paper-sunken); }
-:root[data-theme="light"] .btn.theme-custom.on,
-:root[data-theme="white"] .btn.theme-custom.on { color: #fff; }
-#app.side-collapsed .theme-row { flex-direction: column; }
-#app.side-collapsed .btn.theme-custom { justify-content: center; padding: 6px 0; }
-#app.side-collapsed .btn.theme-custom::before { content: none; }
 #app.side-collapsed .theme-editor { display: none; }
 
 .theme-editor {
   /* What the window has left once the sidebar's fixed parts are counted: the
-     foot under it must stay on screen, so the panel scrolls inside itself. */
-  flex-shrink: 0;
+     foot under it must stay on screen, so the panel scrolls inside itself.
+     It also gives way when that is not enough (black holes over it, a short
+     window): the corner under it moved down by a few pixels (the owner, 1.0.3). */
+  flex-shrink: 1;
+  min-height: 120px;
   max-height: max(190px, calc(100vh - 400px));
   overflow-y: auto;
   overflow-x: hidden;
@@ -1402,6 +1590,57 @@ button.te-chip { padding: 3px 10px; cursor: pointer; }
 #ov-settings .modal { display: flex; flex-direction: column; max-height: 86vh; }
 #settings-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 4px; }
 .set-group + .set-group { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+/* The themes in Settings (1.0.3): the row as wide as the group, the editor opening under it. */
+.set-group .theme-pick button { font-size: 12px; padding: 6px 2px; }
+.set-group .theme-editor { margin-top: 8px; min-height: 0; max-height: none; overflow: visible; }
+/* At the organizer's foot, in the sheet's width: the slots two to a row, the colours fourteen. */
+.set-group .te-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.set-group .te-swatches { grid-template-columns: repeat(14, 1fr); }
+.set-group .te-save { flex-direction: row; }
+.set-group .te-save .te-name { flex: 1; }
+/* The style's colours and the photo's, chosen with the same bar. */
+.te-extra, .te-offers { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.te-extra[hidden], .te-offers[hidden], .te-label[hidden] { display: none; }
+.te-count { margin-left: 4px; font-family: var(--mono); font-weight: 400; color: var(--ink-faint); }
+/* What is chosen, and beside it what it is chosen from: side by side in the studio, one under the other elsewhere. */
+.te-pick, .te-pick__sets, .te-pick__colors, .te-pick__extra, .te-pick__offers { display: contents; }
+.studio-tools .te-pick { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 12px; align-items: start; }
+.studio-tools .te-pick__sets, .studio-tools .te-pick__colors,
+.studio-tools .te-pick__extra, .studio-tools .te-pick__offers { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.studio-tools .te-pick__extra[hidden], .studio-tools .te-pick__offers[hidden] { display: none; }
+/* The photo's colours stand under the picker, beside the style's, headed level with them. */
+.studio-tools .te-pick__extra { grid-column: 1; }
+.studio-tools .te-pick__offers { grid-column: 2; grid-row: 2; }
+.studio-tools .te-pick .te-slots { grid-template-columns: minmax(0, 1fr); }
+.studio-tools .te-pick .te-swatches { grid-template-columns: repeat(7, 1fr); }
+.studio-tools .te-pick > * > .te-label:first-child { margin-top: 0; }
+/* Its own head, level with Theme colours' (1.0.3), only where it stands beside them. */
+.te-pick-label { display: none; }
+.studio-tools .te-pick-label { display: block; }
+/* All five style colours and the + on one line ("yana doğru gitmek yerine bir tane alta gidiyor"): they narrow to fit. */
+.studio-tools .te-pick .te-extra { flex-wrap: nowrap; gap: 5px; }
+.studio-tools .te-pick .te-dot-wrap { flex: 0 1 34px; min-width: 0; }
+.studio-tools .te-pick .te-dot { width: 100%; }
+.studio-tools .te-pick .te-dot-add { flex: 0 0 26px; width: 26px; }
+@media (max-width: 560px) {
+  .studio-tools .te-pick { grid-template-columns: minmax(0, 1fr); }
+}
+.te-dot-wrap { position: relative; display: inline-flex; }
+.te-dot {
+  width: 34px; height: 26px; padding: 0; border: 1px solid var(--ink-faint); border-radius: 7px; cursor: pointer;
+}
+.te-dot.on { border: 2px solid var(--ink); box-shadow: 0 0 0 1px var(--paper-sunken) inset; }
+.te-dot__x {
+  position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; padding: 0; display: grid; place-items: center;
+  border: 1px solid var(--rule); border-radius: 50%; background: var(--paper-raised); color: var(--ink-soft);
+  font-size: 11px; line-height: 1; cursor: pointer;
+}
+.te-dot-add {
+  width: 30px; height: 26px; padding: 0; border: 1px dashed var(--rule); border-radius: 7px;
+  background: transparent; color: var(--ink-soft); font-size: 15px; cursor: pointer;
+}
+.te-offer { width: 26px; height: 26px; padding: 0; border: 1px solid var(--ink-faint); border-radius: 50%; cursor: pointer; }
+.te-offer:hover, .te-dot:hover { border-color: var(--ink); }
 .set-head { margin: 0 0 9px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); }
 .set-row { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; font-size: 13px; }
 .set-label { flex: 0 0 132px; color: var(--ink-soft); }
@@ -1438,6 +1677,88 @@ button.te-chip { padding: 3px 10px; cursor: pointer; }
 .set-buttons .btn:disabled { opacity: .45; cursor: default; }
 .set-status:empty { display: none; }
 .set-status.bad { color: var(--c-red, #c0392b); }
+/* The tabs (1.0.3): a quiet row over the sheet, wrapping when the window is narrow or the scale large. */
+.set-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--rule); }
+.set-tab { padding: 5px 11px; border: 1px solid transparent; border-radius: 999px; background: none; color: var(--ink-soft); font: inherit; font-size: 12.5px; cursor: pointer; }
+.set-tab:hover { background: var(--paper-sunken); color: var(--ink); }
+.set-tab.on { border-color: var(--rule); background: var(--paper-sunken); color: var(--ink); font-weight: 600; }
+.set-tab:focus-visible { outline: 2px solid var(--clay); outline-offset: 1px; }
+.set-panel[hidden] { display: none; }
+/* Storage: a size on every line, the biggest notes and the backups listed under theirs. */
+.set-store-total { margin: 0 0 12px; font-size: 15px; font-weight: 600; color: var(--ink); }
+.set-store-row { display: flex; align-items: baseline; gap: 12px; margin: 0 0 4px; font-size: 13px; }
+.set-store-row .set-label { flex: 1 1 auto; }
+.set-store-size { flex: 0 0 auto; font-variant-numeric: tabular-nums; color: var(--ink); }
+.set-store-row + .set-hint, .set-store-top + .set-hint { margin-bottom: 8px; }
+.set-store-top { margin: 0 0 10px; padding-left: 18px; font-size: 12px; color: var(--ink-soft); }
+.set-store-top li { display: flex; gap: 10px; }
+.set-store-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.set-store .btn.is-sure { border-color: var(--c-red, #c0392b); color: var(--c-red, #c0392b); }
+
+/* Tools (1.0.3, tools-panel.js): the Settings sheet's shape, for other apps. */
+#ov-tools { padding-top: 7vh; }
+#ov-tools .modal { display: flex; flex-direction: column; max-height: 86vh; }
+#tools-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 4px; }
+#tools-body .set-check { margin: 0 0 8px; }
+.set-input {
+  flex: 1; min-width: 0; height: 30px; padding: 0 9px;
+  border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; font-size: 13px;
+}
+.set-input:focus { outline: 2px solid var(--clay-soft); outline-offset: 0; border-color: var(--clay); }
+#tools-body .set-row .btn, .tool-row .btn, .tool-actions .btn { font-size: 12.5px; padding: 6px 11px; }
+.tool-status { margin: 0 0 10px; font-size: 12.5px; color: var(--ink-soft); }
+.tool-status::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--clay); vertical-align: 1px; }
+.tool-status--off::before { background: var(--ink-faint); }
+.tool-pair { margin: 4px 0 8px; }
+.tool-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0 0 8px; }
+.tool-row .set-hint { margin: 0; }
+.tool-paired { font-size: 13px; font-weight: 600; color: var(--clay); }
+.tool-status--linked { color: var(--ink); }
+.tool-status--linked::before { background: var(--c-green, #2e9d5b); }
+.tool-sub { margin: 10px 0 6px; font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.tool-devices { margin: 0 0 8px; padding: 0; list-style: none; }
+.tool-device { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 12.5px; border-bottom: 1px solid var(--rule); }
+.tool-device--none { color: var(--ink-faint); border-bottom: 0; }
+.tool-device__name { flex: 0 1 auto; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool-device__state { flex: 1 1 auto; min-width: 0; color: var(--ink-soft); }
+.tool-device__state::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--ink-faint); vertical-align: 1px; }
+.tool-device--ok .tool-device__state::before { background: var(--c-green, #2e9d5b); }
+.tool-device--bad .tool-device__state { color: var(--c-red, #c0392b); }
+.tool-device--bad .tool-device__state::before { background: var(--c-red, #c0392b); }
+.tool-device__remove { flex: none; padding: 1px 7px; font-size: 14px; line-height: 1; }
+.tool-code { padding: 5px 9px; border: 1px dashed var(--rule); border-radius: 6px; font-size: 14px; letter-spacing: .06em; user-select: all; }
+.tool-actions { display: flex; gap: 8px; margin: 6px 0 6px; }
+.tool-actions .btn:disabled { opacity: .45; cursor: default; }
+.tool-last { margin-bottom: 4px; }
+.tool-message { margin: 0 0 10px; font-size: 12px; color: var(--c-red, #c0392b); }
+.tool-message:empty { display: none; }
+/* How to set Tailscale up (1.0.3): numbered steps, folded away once paired. */
+.tool-guide { margin: 0 0 12px; padding: 8px 11px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper-sunken); }
+.tool-guide summary { font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer; }
+.tool-guide summary:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+.tool-steps { margin: 8px 0 8px; padding-left: 20px; font-size: 12.5px; line-height: 1.55; color: var(--ink-soft); }
+.tool-steps li + li { margin-top: 4px; }
+.tool-guide > .set-hint { margin-bottom: 2px; }
+
+/* A sync running (tailnet-sync.js): a thin line under the title bar, and on opening a card that can be skipped. */
+/* The sync card (tailnet-sync.js): bottom right like the update card, over Settings and Tools, under a toast. */
+.sync-card { z-index: 105; cursor: default; }
+.sync-card[hidden] { display: none; }
+.sync-card .uc-text { margin: 0 0 2px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-card__line { margin: 0 0 8px; font-size: 12px; line-height: 1.4; color: var(--ink-soft, var(--ink)); }
+.sync-card__line[hidden] { display: none; }
+.sync-card .uc-bar { position: relative; margin: 0; }
+.sync-card.sync-card--busy .uc-bar i { position: absolute; inset: 0 auto 0 0; width: 35%; transition: none; animation: opening-run 1.1s ease-in-out infinite; }
+.sync-card.sync-card--failed .uc-bar { display: none; }
+.sync-screen { position: fixed; inset: 0; z-index: 130; display: grid; place-items: center; background: color-mix(in srgb, var(--paper) 55%, transparent); }
+.sync-screen[hidden] { display: none; }
+.sync-screen__card {
+  display: grid; gap: 8px; min-width: 260px; max-width: min(480px, 90vw); padding: 16px 20px;
+  border: 1px solid var(--rule); border-radius: 10px; background: var(--paper-raised); color: var(--ink);
+  font-size: 13px; box-shadow: 0 10px 26px var(--shadow);
+}
+.sync-screen__peer { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sync-screen__skip { justify-self: end; font-size: 12px; padding: 4px 10px; }
 
 /* The lock on opening (app-lock.js): a screen over the whole window, under the
    title strip — which stays, so the window can still be moved and closed. */
@@ -1474,9 +1795,49 @@ button.te-chip { padding: 3px 10px; cursor: pointer; }
 .logo-tools .te-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
 .logo-tools .te-swatches { grid-template-columns: repeat(14, 1fr); }
 /* The logo's own themes: a + after the last of them, and under the editor a button for a shortcut. */
-.logo-themes .logo-add { min-width: 26px; padding: 3px 9px; font-weight: 600; color: var(--clay); }
+/* The user's own picture, kept among the themes (1.0.3). */
+.logo-themes .logo-mine { display: inline-flex; align-items: center; gap: 6px; }
+.logo-mine__img { width: 16px; height: 16px; border-radius: 4px; object-fit: cover; }
+.logo-themes .logo-add {min-width: 26px; padding: 3px 9px; font-weight: 600; color: var(--clay); }
 .logo-shortcut { font-size: 12.5px; padding: 6px 11px; margin-top: 2px; }
 .logo-shortcut:disabled { opacity: .5; cursor: default; }
+.set-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.set-buttons .btn { font-size: 12.5px; padding: 6px 11px; }
+.set-buttons .btn[hidden] { display: none; }
+/* The photos kept, beside Choose a picture (1.0.3): put on with a click, deleted with the ×. */
+.set-photos { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.set-photos[hidden] { display: none; }
+.set-photo { position: relative; display: inline-flex; }
+.set-photo__wear {
+  width: 44px; height: 28px; padding: 0; border: 1px solid var(--rule); border-radius: 6px;
+  background: var(--paper-sunken) center / cover no-repeat; cursor: pointer;
+}
+.set-photo.on .set-photo__wear { border-color: var(--clay); box-shadow: 0 0 0 1px var(--clay); }
+.set-photo__drop {
+  position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; padding: 0;
+  display: grid; place-items: center; border: 1px solid var(--rule); border-radius: 50%;
+  background: var(--paper-raised); color: var(--ink-soft); font-size: 11px; line-height: 1; cursor: pointer;
+  opacity: 0; transition: opacity .12s;
+}
+.set-photo:hover .set-photo__drop, .set-photo:focus-within .set-photo__drop { opacity: 1; }
+.set-photo__drop:hover { color: var(--madder); border-color: var(--madder); }
+.set-range { flex: 1; min-width: 120px; accent-color: var(--clay); }
+/* A sound and its play button, on one line (1.0.3). */
+.set-sound { flex: 1; min-width: 0; display: flex; gap: 6px; }
+.set-sound-play { flex: none; font-size: 11px; padding: 0 10px; }
+.set-sound-play:disabled { opacity: .45; cursor: default; }
+/* Cutting a picture to the logo's tile (1.0.3, logo-crop.js). */
+.logo-crop-ov { z-index: 130; }
+.logo-crop { display: flex; flex-direction: column; gap: 10px; width: min(360px, 92vw); padding: 16px; }
+.logo-crop__stage { display: block; width: 100%; aspect-ratio: 1; border-radius: 8px; background: #000; cursor: grab; touch-action: none; }
+/* The picture behind the note is cut in a frame of the window's shape (its aspect-ratio is set inline). */
+.logo-crop--window { width: min(560px, 92vw); }
+.logo-crop__note { margin: 0; color: var(--madder); }
+.logo-crop__note[hidden] { display: none; }
+.logo-crop__stage:active { cursor: grabbing; }
+.logo-crop__zoom { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-soft); }
+.logo-crop__zoom input { flex: 1; min-width: 0; accent-color: var(--clay); }
+.logo-crop__actions { display: flex; justify-content: flex-end; gap: 6px; }
 
 /* A black hole pinned to the top of its section (1.0.0) carries a pin, as a pinned note does. */
 .hole-row .nr-pin { flex: none; margin-right: 2px; }
@@ -1539,14 +1900,24 @@ button.te-chip { padding: 3px 10px; cursor: pointer; }
 .galaxy-back { border-color: var(--clay) !important; }
 .galaxy-back[hidden] { display: none; }
 
-/* The label search: chips of the picked labels and a field, one 28px pill. */
+/* The label search: chips of the picked labels and a field, one 28px pill.
+   Its words closer to its edge in 1.0.3 (8px until then): "a gap between the
+   | and Labels" (the owner). */
 .galaxy-search {
   position: relative; min-width: 0; max-width: min(420px, 100%); flex: 0 1 auto;
-  display: flex; align-items: center; gap: 4px; min-height: 28px; box-sizing: border-box; padding: 2px 4px 2px 8px;
+  display: flex; align-items: center; gap: 4px; min-height: 28px; box-sizing: border-box; padding: 2px 5px;
   border: 1.4px solid var(--rule); border-radius: 7px; background: var(--paper-raised); color: var(--ink);
 }
 .galaxy-search:focus-within { border-color: var(--clay); }
-.galaxy-chips { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.galaxy-chips { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; max-height: 96px; overflow-y: auto; }
+/* An empty row of chips would still take a gap: the words sat further in than they ended. */
+.galaxy-chips:empty { display: none; }
+.galaxy-search-clear {
+  flex-shrink: 0; height: 20px; padding: 0 6px; border: none; border-radius: 5px; background: transparent;
+  color: var(--ink-soft); font: inherit; font-size: 11.5px; cursor: pointer;
+}
+.galaxy-search-clear:hover, .galaxy-search-clear:focus-visible { color: var(--clay); background: var(--paper-sunken); outline: none; }
+.galaxy-search-clear[hidden] { display: none; }
 /* With chips the field takes a line of its own when the row is full, so its
    placeholder is never squeezed or cut (owner, 1.0.1). */
 .galaxy-search.has-chips { flex-wrap: wrap; padding-top: 3px; padding-bottom: 3px; }
@@ -1563,10 +1934,13 @@ button.te-chip { padding: 3px 10px; cursor: pointer; }
   color: var(--ink-soft); font: inherit; font-size: 12px; line-height: 1; cursor: pointer;
 }
 .galaxy-chip-x:hover { color: var(--ink); background: color-mix(in srgb, var(--chip) 30%, transparent); }
+/* As wide as its placeholder in the language it is in, or as what is typed. */
 .galaxy-search-input {
-  flex: 1 1 90px; min-width: 70px; width: 110px; height: 22px; padding: 0; border: none; outline: none;
+  flex: 0 1 auto; field-sizing: content; min-width: 70px; max-width: 100%; height: 22px; padding: 0; border: none; outline: none;
+  -webkit-appearance: none; appearance: none;
   background: transparent; color: var(--ink); font: inherit; font-size: 12px;
 }
+.galaxy-search-input::-webkit-search-decoration { display: none; }
 .galaxy-search-input::placeholder { color: var(--ink-faint); }
 .galaxy-search-input::-webkit-search-cancel-button { display: none; }
 .galaxy-suggest {
@@ -1599,3 +1973,29 @@ body.map-full .page-head, body.map-full #toolbar { display: none; }
   position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
+/* The logo the user put on it (1.0.3): a picture, the size of the drawn one. */
+.tb-logo__img { width: 22px; height: 22px; border-radius: 5px; display: block; }
+
+/* The corner's cards that follow from note to note (1.0.3, corner.js): a Pomodoro out of sight, a calendar's alarm. */
+.corner-stack { position: fixed; right: 18px; bottom: 18px; z-index: 104; display: flex; flex-direction: column; gap: 10px; width: min(300px, calc(100vw - 36px)); pointer-events: none; }
+.corner-stack:empty { display: none; }
+.corner-stack > .update-card { position: static; width: auto; pointer-events: auto; }
+.corner-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; font-family: var(--serif); cursor: pointer; }
+.corner-card button { font: inherit; }
+.corner-card[hidden] { display: none; }
+.corner-card:hover { border-color: var(--clay); }
+.corner-card:focus-visible { outline: 2px solid var(--clay); outline-offset: 2px; }
+.corner-card__ic { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--paper-sunken); color: var(--clay); }
+.corner-card__ic .ic { width: 20px; height: 20px; }
+.corner-card__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.corner-card__head { font-size: 12px; color: var(--ink-soft); }
+.corner-card__time { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+.corner-card--paused .corner-card__time { color: var(--ink-faint); }
+.pomo-card--break .corner-card__time { color: var(--clay); }
+.corner-card__text { font-size: 14px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.corner-card__note { font-size: 12px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.corner-card__key { flex: none; }
+.alarm-card { border-color: var(--clay); }
+.alarm-card .corner-card__ic { animation: corner-ring .5s ease-in-out 6; }
+@keyframes corner-ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-14deg); } 75% { transform: rotate(14deg); } }
+@media print { .corner-stack { display: none !important; } }

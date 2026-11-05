@@ -108,6 +108,18 @@ export async function runUniverseWidgetChecks(check) {
     });
     check('reopening the note brings the live map back', back.canvas && back.colours > 1 && back.count === 1, JSON.stringify(back));
 
+    // Hide names, as on the big map (1.0.3): kept with the widget, back again on a second press.
+    const names = await win.evaluate(() => {
+      const fig = document.querySelector('#editor .note-widget[data-widget="universe"]');
+      const b = fig.querySelector('.wg-live .wg-names');
+      if (!b) return { button: false };
+      b.click();
+      const off = { kept: fig.dataset.wgNames, pressed: b.getAttribute('aria-pressed') };
+      b.click();
+      return { button: true, off, on: fig.dataset.wgNames ?? null };
+    });
+    check('the Universe widget hides its names and shows them again', names.button && names.off?.kept === 'off' && names.off.pressed === 'true' && names.on === null, JSON.stringify(names));
+
     // Printed: the drawn face, never the live map, with widgets or without (Codex 34 #2).
     await win.emulateMedia({ media: 'print' });
     const printed = await win.evaluate(() => {

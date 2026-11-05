@@ -18,7 +18,8 @@ import { cleanPastedHtml, cleanNebulaHtml, fromNebula, undressInserted, dressInN
 import { dropTarget, insertBlocks, holdsStructure, caretAfter } from './block-handle.js';
 import { showDropMark, hideDropMark } from './drop-mark.js';
 
-const LINK_KINDS = ['embed', 'bookmark', 'url', 'mention'];
+// Mention left the menu (1.0.3, the owner); @site links already in notes still work.
+const LINK_KINDS = ['embed', 'bookmark', 'url'];
 
 export function normalizeUrl(raw) {
   const value = String(raw ?? '').trim();
@@ -356,15 +357,27 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
 
   function positionLinkMenu(range = pendingRange) {
     if (!range) return;
-    let rect = range.getBoundingClientRect();
+    // A collapsed caret often measures 0×0, and the menu fell back to the top of
+    // the note wherever the paste was (1.0.3, the owner). Its line rect, then its
+    // block's, come first; the note's top is only the last resort.
+    let rect = range.getClientRects?.()[0] || range.getBoundingClientRect?.() || { width: 0, height: 0 };
     if (!rect.width && !rect.height) {
-      const editorRect = editor.getBoundingClientRect();
-      rect = { left: editorRect.left + 20, bottom: editorRect.top + 36 };
+      const block = directBlock(editor, range.startContainer)
+        || (range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer.childNodes[range.startOffset] : null);
+      const blockRect = block?.getBoundingClientRect?.();
+      if (blockRect && (blockRect.width || blockRect.height)) rect = { left: blockRect.left, top: blockRect.top, bottom: blockRect.bottom };
+      else {
+        const editorRect = editor.getBoundingClientRect();
+        rect = { left: editorRect.left + 20, top: editorRect.top + 20, bottom: editorRect.top + 36 };
+      }
     }
     const width = linkMenu.offsetWidth || 320;
     const height = linkMenu.offsetHeight || 150;
     linkMenu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))}px`;
-    linkMenu.style.top = `${Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - height - 8))}px`;
+    // No room under the line: above it, not clamped down over the words pasted on.
+    const below = rect.bottom + 8;
+    const top = below + height + 8 > window.innerHeight && rect.top - height - 8 >= 8 ? rect.top - height - 8 : below;
+    linkMenu.style.top = `${Math.max(8, Math.min(top, window.innerHeight - height - 8))}px`;
   }
 
   function open(kind = '', url = '') {
@@ -786,7 +799,14 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     selectedImage?.classList.add('sel');
     imageBar.hidden = !selectedImage;
     if (selectedImage) {
-      editor.dispatchEvent(new CustomEvent('nebula-canvas-select', { detail: 'image' }));
+      // A press on a picture moves no focus (it is not editable): the caption
+      // or the title last typed in kept the keys, and Delete went there and
+      // the picture stayed (the owner's Bug Find note, 1.0.3: "bu resme
+      // tıklıyorum silmeye basıyorum silinmiyor"). Its own caption keeps them.
+      const typing = document.activeElement;
+      if (typing && typing !== editor && typing !== document.body && !selectedImage.contains(typing)
+        && typing.matches?.('input, textarea, .image-caption, .code-src, .shape-text, [contenteditable="true"]')
+        && !typing.closest?.('#image-bar')) typing.blur();
       const place = placementOf(selectedImage);
       for (const b of imageBar.querySelectorAll('[data-image="back"], [data-image="front"], [data-image="inline"]')) {
         b.classList.toggle('on', b.dataset.image === place);
@@ -795,6 +815,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
       // A widget is drawn, not a photo: there is nothing to crop.
       const cropButton = imageBar.querySelector('[data-image="crop"]');
       if (cropButton) cropButton.hidden = isWidget(selectedImage);
+      editor.dispatchEvent(new CustomEvent('nebula-canvas-select', { detail: 'image' }));
       // A picture just selected is one the owner wants to see — one pasted at
       // the end of a long note is still below the view — so it comes into view
       // with its bar. Only scrolling away from it afterwards hides the bar.
@@ -1058,7 +1079,10 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
         const drawn = parseFloat(getComputedStyle(drag.image).width);
         if (drawn && drawn < Math.round(box.width) - 0.5) drag.image.style.width = `${Math.floor(drawn)}px`;
         // The pictures beside it are told what it takes now: the room is theirs or its.
-        if (inRow(drag.image)) tidyRows(drag.image.parentElement);
+        if (inRow(drag.image)) {
+          tidyRows(drag.image.parentElement);
+          evenInRow(drag.image);
+        } else if (inWord(drag.image)) evenInRow(drag.image);
       }
       if (!inText) {
         drag.image.style.height = Math.round(box.height) + 'px';
@@ -1070,8 +1094,60 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     onGeometry?.();
   });
 
+  /**
+   * Pictures side by side, made as tall as each other (1.0.3). Pulled to within
+   * a few pixels of a picture beside it, the one resized takes its height, and
+   * a line along their foot shows they are even ("when they line up, show a
+   * line, to help", the owner's Bug Find note). Pictures set side by side in a
+   * line of words too: that is how the owner had put theirs.
+   */
+  const rowGuide = document.createElement('div');
+  rowGuide.className = 'image-row-guide';
+  rowGuide.hidden = true;
+  document.body.appendChild(rowGuide);
+  const SNAP = 6;
+  function evenInRow(image) {
+    rowGuide.hidden = true;
+    const own = image.querySelector(':scope > img');
+    if (!own) return;
+    const word = inWord(image);
+    const box = image.getBoundingClientRect();
+    // Beside it: a row's pictures start at one top; pictures in words stand
+    // on one line, so they share some of their height.
+    const beside = (el) => {
+      const r = el.getBoundingClientRect();
+      return word ? Math.min(r.bottom, box.bottom) - Math.max(r.top, box.top) > 4 : Math.abs(r.top - box.top) < 2;
+    };
+    const mates = [...image.parentElement.children].filter((el) => el !== image && el.matches('.note-image')
+      && (word ? inWord(el) : inRow(el)) && beside(el));
+    const h = own.getBoundingClientRect().height;
+    let best = null;
+    let bestImg = null;
+    for (const mate of mates) {
+      const img = mate.querySelector(':scope > img');
+      const m = img?.getBoundingClientRect();
+      if (m?.height && Math.abs(m.height - h) <= SNAP && (!best || Math.abs(m.height - h) < Math.abs(best.height - h))) { best = m; bestImg = img; }
+    }
+    if (!best || !h) return;
+    if (Math.abs(best.height - h) >= 0.5) {
+      image.style.width = `${Math.round(parseFloat(image.style.width) * best.height / h)}px`;
+      if (!word) tidyRows(image.parentElement);
+    }
+    // The resize may move the line, so the mate is measured again.
+    best = bestImg.getBoundingClientRect();
+    const now = own.getBoundingClientRect();
+    if (Math.abs(now.bottom - best.bottom) > 1) return;
+    const row = [image, ...mates].map((el) => el.getBoundingClientRect());
+    const left = Math.min(...row.map((r) => r.left));
+    rowGuide.style.left = `${left}px`;
+    rowGuide.style.top = `${Math.round(best.bottom)}px`;
+    rowGuide.style.width = `${Math.max(...row.map((r) => r.right)) - left}px`;
+    rowGuide.hidden = false;
+  }
+
   function finishDrag() {
     if (!drag) return;
+    rowGuide.hidden = true;
     if (drag.layer !== editor) {
       drag.layer.style.minHeight = '';
       if (!drag.layer.getAttribute('style')) drag.layer.removeAttribute('style');
@@ -1519,15 +1595,24 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
   });
 
   /**
-   * How the next paste is taken (0.9.4, the right-click menu's two ways — there
-   * were three; the owner: "take the option Paste only text away, for now"):
+   * How the next paste is taken (0.9.4, the right-click menu's ways; Paste only
+   * text was taken away "for now" and came back in 1.0.3):
    *   nebula    as Ctrl+V: the words and their structure in the note's own dress
    *   original  the same, and the SIZE the words were copied in (paste-clean.js);
    *             the font, the colour and the ground are the note's
+   *   text      the words alone, as Ctrl+Shift+V
    * Set by paste() just before the main process makes the paste, and used once.
    */
   let pasteMode = 'nebula';
   let pasteModeTimer = 0;
+
+  // Ctrl+Shift+V is Paste only text from the keyboard.
+  editor.addEventListener('keydown', (event) => {
+    if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.altKey || event.code !== 'KeyV') return;
+    pasteMode = 'text';
+    clearTimeout(pasteModeTimer);
+    pasteModeTimer = setTimeout(() => { pasteMode = 'nebula'; }, 1500);
+  });
 
   editor.addEventListener('paste', (event) => {
     linksBeforePaste = new Set(editor.querySelectorAll('a[href]:not([class])'));
@@ -1584,6 +1669,24 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     const text = event.clipboardData?.getData('text/plain') || '';
     // A URL pasted over selected words links them, as in any editor.
     const selected = currentRange(editor);
+    // "Paste only text" is back (1.0.3, the owner: "paste as text should come
+    // back"): the words alone, a web address too. And lines pasted into a quote
+    // run on as one quote: the browser made every line of the copy a quote of
+    // its own inside it, each as short as the line it was copied from ("the
+    // quote stays short, it does not stretch like other text", the owner).
+    const startEl = selected && (selected.startContainer.nodeType === Node.ELEMENT_NODE ? selected.startContainer : selected.startContainer.parentElement);
+    const quote = startEl?.closest?.('blockquote');
+    const intoQuote = !!quote && editor.contains(quote) && /[\r\n]/.test(text.trim());
+    if (text && (mode === 'text' || (intoQuote && !normalizeUrl(text)))) {
+      event.preventDefault();
+      if (editor.dataset.readonly === 'true') return;
+      history?.push();
+      const had = new Set(editor.querySelectorAll('[style*="color"]'));
+      insertPlain(text, !!quote);
+      undressInserted(editor, had);
+      dirty();
+      return;
+    }
     if (normalizeUrl(text) && wordsSelected(selected)) {
       event.preventDefault();
       linkWords(selected, normalizeUrl(text));
@@ -1643,6 +1746,17 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     // A pasted file card names another note's file: the file is copied in here at once.
     void adoptPastedCards();
   });
+
+  /** Words alone at the caret. In a quote the copy's line ends run on; an empty line still parts them. */
+  function insertPlain(text, runOn) {
+    const words = text.replace(/\r\n?/g, '\n');
+    if (!runOn) { document.execCommand('insertText', false, words); return; }
+    const parts = words.split(/\n\s*\n/).map((part) => part.replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean);
+    parts.forEach((part, i) => {
+      if (i) { document.execCommand('insertLineBreak'); document.execCommand('insertLineBreak'); }
+      document.execCommand('insertText', false, part);
+    });
+  }
 
   /**
    * Words copied with pictures among them (0.9.4): the note shows a picture
@@ -1928,7 +2042,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
       pasteMode = host?.matches?.('td') ? 'nebula' : mode;
       clearTimeout(pasteModeTimer);
       pasteModeTimer = setTimeout(() => { pasteMode = 'nebula'; }, 1500);
-      try { await window.nebula.edit.paste('rich'); } catch { pasteMode = 'nebula'; }
+      try { await window.nebula.edit.paste(pasteMode === 'text' ? 'plain' : 'rich'); } catch { pasteMode = 'nebula'; }
       return;
     }
     editor.focus();

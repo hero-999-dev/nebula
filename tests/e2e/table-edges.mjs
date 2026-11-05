@@ -964,13 +964,17 @@ export async function runTableEdgeChecks(check) {
     gone.back = await linesNow();
     check('a step back puts the last line back', gone.back.flat === 'hr,[table,g1b | video,g2b | g3,picture,g3b],g4', say(gone.back));
     await open('lone');
-    await onLine('o1');
-    await press('Backspace');
     await onLine('o2');
     await press('Home');
     await press('Backspace');
     gone.lone = await linesNow();
-    check('a column\'s only line, and a first line with words, stay where they are', gone.lone.flat === 'o0,[o1 | o2,o3]' && gone.lone.words === 'over word more', say(gone.lone));
+    check('a column\'s first line with words stays where it is', gone.lone.flat === 'o0,[o1 | o2,o3]' && gone.lone.words === 'over word more', say(gone.lone));
+    // The owner's Ideas note: Backspace in an empty column did nothing; it took the column away
+    // with its divider until 1.0.3, when the owner asked for the divider to be a wall: it goes up.
+    await onLine('o1');
+    await press('Backspace');
+    gone.empty = await linesNow();
+    check('Backspace in an empty column goes up out of the row; the column stays', gone.empty.flat === 'o0,[o1 | o2,o3]' && gone.empty.caret === 'o0' && gone.empty.words === 'over word more', say(gone.empty));
     for (const [note, want, caret] of [['toptable', 'table,t2', 'cell'], ['topvideo', 'video,t2', 't2'], ['toppicture', 'picture,t2', 't2']]) {
       await open(note);
       await onLine('t1');
@@ -1011,12 +1015,12 @@ export async function runTableEdgeChecks(check) {
       await rightClick('#p0');
       menu = await menuNow();
       await press('Escape');
-    }, () => menu.row > 5 && menu.items === 'Cut·|Copy·|Paste as Nebula format|Paste original format|Select all');
+    }, () => menu.row > 5 && menu.items === 'Cut·|Copy·|Paste as Nebula format|Paste original format|Paste only text|Select all');
     await scene('in a cell the table\'s choices stand in it, over cut and copy', async () => {
       await rightClick(cellAt(1, 1));
       menu = await menuNow();
       await press('Escape');
-    }, () => menu.row > 5 && menu.items === 'Insert row above|Insert row below|Insert column left|Insert column right|Delete row|Delete column|Delete table|Cut·|Copy·|Paste as Nebula format|Paste original format|Select all');
+    }, () => menu.row > 5 && menu.items === 'Insert row above|Insert row below|Insert column left|Insert column right|Delete row|Delete column|Delete table|Cut·|Copy·|Paste as Nebula format|Paste original format|Paste only text|Select all');
     await scene('with cells selected, Cut and Copy are for the cells', async () => {
       await drag(await centre(cellAt(0, 0)), await centre(cellAt(1, 1)));
       await rightClick(cellAt(0, 0));

@@ -799,6 +799,10 @@ describe('galaxy-map (engine)', () => {
     // Going out they hide in the same order backwards.
     expect(nameShownAt('label', 10, fitK)).toBe(false);
     expect(nameShownAt('note', 10, fitK)).toBe(true);
+    // Far past the whole-map view not even a project is named (1.0.3).
+    expect(nameShownAt('project', fitK, fitK)).toBe(true);
+    expect(nameShownAt('project', fitK * 0.3, fitK)).toBe(false);
+    expect(nameShownAt('project', fitK * 0.6, fitK)).toBe(false);
     // Without projects, folders are the outermost layer and named at the whole-map view.
     expect(nameShownAt('folder', fitK, fitK, 1)).toBe(true);
     expect(nameShownAt('folder', fitK, fitK, 0)).toBe(false);
@@ -1001,7 +1005,7 @@ describe('galaxy-map (engine)', () => {
       map.destroy();
     });
 
-    it('at most six labels are lit at once, so the lines stay cheap (Codex 25 #2)', () => {
+    it('as many labels as are picked are lit at once (the owner, 1.0.3: "daha fazla label secemiyorum")', () => {
       const many = () => ({
         notes: Array.from({ length: 10 }, (_, i) => ({ id: `n${i}`, title: `N${i}`, labels: [`l${i}`, 'all'] })),
         folders: [], projects: [], holes: [],
@@ -1009,7 +1013,7 @@ describe('galaxy-map (engine)', () => {
       const map = createGalaxyMap(stubCanvas(), { getInput: many, colors: COLORS });
       step(70);
       map.highlight(['all', 'l0', 'l1', 'l2', 'l3', 'l4', 'l5', 'l6']);
-      expect(map.highlighted()).toEqual(['all', 'l0', 'l1', 'l2', 'l3', 'l4']);
+      expect(map.highlighted()).toEqual(['all', 'l0', 'l1', 'l2', 'l3', 'l4', 'l5', 'l6']);
       for (let i = 0; i < 5; i++) step(70);       // draws with the lines and the cached trees
       map.destroy();
     });

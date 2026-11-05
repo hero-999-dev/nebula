@@ -283,13 +283,14 @@ export function contentBox(parent) {
   return { left, right: Math.max(left + 1, right), top: rect.top, bottom: rect.bottom };
 }
 
-/** The flow under a point: the column there, else the note itself. */
+/** The flow under a point: the column there (the inner one, where a column holds columns), else the note itself. */
 export function flowAt(editor, x, y) {
+  let at = editor;
   for (const col of editor.querySelectorAll('.blk-col')) {
     const r = col.getBoundingClientRect();
-    if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return col;
+    if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) at = col;
   }
-  return editor;
+  return at;
 }
 
 /**

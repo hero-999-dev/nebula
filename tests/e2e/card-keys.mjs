@@ -88,10 +88,14 @@ export async function runCardKeysChecks(check) {
     await until(() => fs.existsSync(path.join(profile, 'kb-copy.pdf')), 5000);
     check('Enter on the picked card saves a copy', fs.existsSync(path.join(profile, 'kb-copy.pdf')));
 
-    // The range-delete guard still refuses: a selection across the card leaves it.
+    // A selection that holds the card whole takes it with the rest, marked as it
+    // is selected (1.0.3: "I selected these together and Delete did not remove
+    // them", the owner); undo brings it back.
     await win.keyboard.press('Control+a');
     await win.keyboard.press('Backspace'); await win.waitForTimeout(350);
-    check('a range delete never takes a card silently', !!(await cardState()));
+    check('a selection holding a card takes it on Backspace', (await cardState()) === null);
+    await win.keyboard.press('Control+z'); await win.waitForTimeout(350);
+    check('and undo brings it back', !!(await cardState()));
 
 
     // A bookmark card from the other side: Delete on the empty line above picks it.

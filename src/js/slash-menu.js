@@ -40,7 +40,6 @@ export const SLASH_ITEMS = [
   { id: 'embed', ic: 'link', label: 'Embed' },
   { id: 'bookmark', ic: 'bookmark', label: 'Bookmark' },
   { id: 'url', ic: 'link', label: 'URL' },
-  { id: 'mention', ic: 'link', label: 'Mention' },
 ];
 
 /** Find a live "/query" immediately before the caret. Pure — tested. */
@@ -292,20 +291,24 @@ export function initSlashMenu(editorEl, { history, shapes, links } = {}) {
     menu.hidden = false;
   });
 
-  editorEl.addEventListener('keydown', (e) => {
-    if (menu.hidden) return;
+  // On the window, before the editor's own: ↓ at a column's (a table's, a
+  // divider's) edge moved the caret out under the open list (owner, 1.0.3).
+  window.addEventListener('keydown', (e) => {
+    if (menu.hidden || !editorEl.contains(e.target)) return;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
+      e.stopImmediatePropagation();
       sel = (sel + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length;
       render();
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopImmediatePropagation();
       apply(items[sel].id);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       hide();
     }
-  });
+  }, true);
 
   document.addEventListener('mousedown', (e) => {
     if (!e.target.closest('#slash-menu')) hide();

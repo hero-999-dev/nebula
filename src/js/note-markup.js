@@ -34,6 +34,8 @@ const CLASS_STATE = [
   // A block picked with its grip, or lifted while it is dragged (1.0.0, block-handle.js).
   ['.block-picked', 'block-picked'],
   ['.block-lifted', 'block-lifted'],
+  // A divider, picture or card the selection crosses (1.0.3, block-handle.js).
+  ['.in-sel', 'in-sel'],
 ];
 
 /**

@@ -93,6 +93,62 @@ export function initDividerSelect(editorEl, { history, isLocked = () => false } 
     pick(hr);
   }, true);
 
+  /** The nearest line over a divider, past what takes no caret. */
+  function upTo(hr) {
+    let el = hr.previousElementSibling;
+    while (el && el.matches(TEXTLESS)) el = el.previousElementSibling;
+    return el;
+  }
+
+  /**
+   * Whether the caret stands on the first (or last) row of a block's words.
+   * A caret at the very start of a text has no box, so the character beside it
+   * says which row it is on; a block with no words has one row.
+   */
+  function onEdgeRow(block, range, up) {
+    const all = document.createRange();
+    all.selectNodeContents(block);
+    const rows = [...all.getClientRects()].filter((b) => b.height);
+    if (!rows.length) return true;
+    const probe = range.cloneRange();
+    let box = probe.getClientRects()[0];
+    if (!box?.height && range.startContainer.nodeType === 3) {
+      const text = range.startContainer;
+      const at = range.startOffset;
+      if (at < text.length) probe.setEnd(text, at + 1); else if (at > 0) probe.setStart(text, at - 1);
+      box = probe.getClientRects()[0];
+    }
+    if (!box?.height) {
+      // Between elements: only the block's very edge counts.
+      const side = document.createRange();
+      side.selectNodeContents(block);
+      if (up) side.setEnd(range.startContainer, range.startOffset); else side.setStart(range.startContainer, range.startOffset);
+      return !side.toString().replace(/​/g, '').trim();
+    }
+    const mid = box.top + box.height / 2;
+    return up ? mid < rows[0].bottom : mid > rows.at(-1).top;
+  }
+
+  // Up from the row right under a divider, or Down from the row right over one,
+  // stops on the divider: the arrows pass it one step at a time, and the caret
+  // is not left on no line beside it to be pushed back (the owner's Ideas note).
+  const WHOLE = '.blk-table, .blk-code, .blk-toggle, .link-block, .note-image';
+  editorEl.addEventListener('keydown', (e) => {
+    if (picked || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+    const sel = window.getSelection();
+    if (!sel?.rangeCount || !sel.isCollapsed) return;
+    let block = sel.anchorNode?.nodeType === 1 ? sel.anchorNode : sel.anchorNode?.parentElement;
+    if (!block || !editorEl.contains(block) || block.closest(WHOLE)) return;
+    while (block && block !== editorEl && block.parentElement !== editorEl && !block.parentElement?.matches('.blk-col, .toggle-body')) block = block.parentElement;
+    if (!block || block === editorEl) return;
+    const up = e.key === 'ArrowUp';
+    const hr = up ? block.previousElementSibling : block.nextElementSibling;
+    if (!hr?.matches(HR) || !onEdgeRow(block, sel.getRangeAt(0), up)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    pick(hr);
+  }, true);
+
   editorEl.addEventListener('keydown', (e) => {
     if (!picked) return;
     if (!picked.isConnected || !picked.classList.contains('armed')) { picked = null; return; }
@@ -122,19 +178,44 @@ export function initDividerSelect(editorEl, { history, isLocked = () => false } 
     // stand on: that line was the "caret between the divider and the
     // picture" (the owner, 0.9.3).
     const pictureAt = (el) => (el?.matches('.note-image') && !el.closest('.shape-layer, .image-layer') ? el : null);
+    // The divider's selection goes first: left over it, Esc on the picture let
+    // go with no caret, and the next key typed would have replaced the divider.
+    const selectPicture = (picture) => {
+      const sel = window.getSelection();
+      const r = document.createRange();
+      r.setStartBefore(picture);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      editorEl.dispatchEvent(new CustomEvent('nebula-select-image', { detail: picture }));
+    };
     if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
       e.preventDefault();
       release();
       const above = hr.previousElementSibling;
       if (above && !above.matches(TEXTLESS)) caretIn(above, true);
-      else if (pictureAt(above)) editorEl.dispatchEvent(new CustomEvent('nebula-select-image', { detail: above }));
-      else caretIn(lineAfter(hr), false);
+      else if (above?.matches(HR)) pick(above);
+      else if (pictureAt(above)) selectPicture(above);
+      else {
+        // Nothing over it to stand on: it stays picked. Sending the caret back
+        // under it, the next Up picked it again, and the two pushed each other
+        // for ever (the owner's Ideas note).
+        const line = upTo(hr);
+        if (line) caretIn(line, true); else pick(hr);
+      }
+      return;
+    }
+    // The next divider of a pair is picked in its turn: no line is made between them.
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowRight') && hr.nextElementSibling?.matches(HR)) {
+      e.preventDefault();
+      release();
+      pick(hr.nextElementSibling);
       return;
     }
     if ((e.key === 'ArrowDown' || e.key === 'ArrowRight') && pictureAt(hr.nextElementSibling)) {
       e.preventDefault();
       release();
-      editorEl.dispatchEvent(new CustomEvent('nebula-select-image', { detail: hr.nextElementSibling }));
+      selectPicture(hr.nextElementSibling);
       return;
     }
     if (e.key === 'Enter') {

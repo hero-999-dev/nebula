@@ -21,6 +21,11 @@ if (!fs.existsSync(built)) {
   console.error(`Not built: ${built}\nRun: npm run pack:test`);
   process.exit(1);
 }
+// Packed by now: the stamp (scripts/test-stamp.js) belongs to this build only.
+// It moves beside the exe, where `npm run publish:test` uploads both: test
+// builds read it from GitHub to know a later one is out (electron/updater.js).
+const stampFile = path.join(ROOT, 'dist-electron', 'test-build.json');
+if (fs.existsSync(stampFile)) fs.renameSync(stampFile, path.join(ROOT, 'test-build', 'test-build.json'));
 
 // A running copy holds a lock. `npm run kill` already ran at the start of
 // pack:test, but packaging takes a couple of minutes and the app can easily be

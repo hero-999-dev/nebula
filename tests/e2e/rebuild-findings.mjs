@@ -212,13 +212,13 @@ export async function runRebuildFindingChecks(check) {
     await win.waitForFunction(() => document.activeElement?.id === 'link-url-input', null, { polling: 50 });
     await win.keyboard.press('ArrowDown');
     const first = await win.evaluate(() => document.activeElement?.dataset?.linkKind);
-    await win.keyboard.press('ArrowLeft');                 // wraps to the last: Mention
+    await win.keyboard.press('ArrowLeft');                 // wraps to the last: URL (Mention left the menu in 1.0.3)
     await win.keyboard.press('Enter');
     const byKeys = await win.evaluate(() => ({
       menuHidden: document.getElementById('link-menu').hidden,
-      mention: [...document.querySelectorAll('#editor a.link-mention')].some((a) => a.getAttribute('href') === 'https://example.org/keys'),
+      url: [...document.querySelectorAll('#editor a.link-url')].some((a) => a.getAttribute('href') === 'https://example.org/keys'),
     }));
-    check('in the link menu ↓ reaches the choices and ← → Enter picks one', first === 'embed' && byKeys.menuHidden && byKeys.mention, JSON.stringify({ first, ...byKeys }));
+    check('in the link menu ↓ reaches the choices and ← → Enter picks one', first === 'embed' && byKeys.menuHidden && byKeys.url, JSON.stringify({ first, ...byKeys }));
 
     /* Rust (0.8.7): the guide's Rust sample is coloured in the running app. */
     await win.evaluate(() => [...document.querySelectorAll('.note-row')].find((r) => r.textContent.includes('Welcome to Nebula Guide'))?.click());

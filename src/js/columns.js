@@ -51,15 +51,18 @@
  * A part of a column (1.0.1): a divider in a column, pulled sideways and up or
  * down over its own column, cuts only its part of it — what lies between it
  * and the next divider, or the part the pointer is over — the way it does on
- * the note; pulled level with itself, it still cuts the whole column
- * (the owner: "I want to split this part with the divider above, into small
- * pieces"). Columns do not nest, so the block is cut across into the rows
- * above that part, the part, and the rows under it; only the part's row gets
- * the new column.
+ * the note; pulled level with itself, the part under it (1.0.3), and the whole
+ * column only when the part is all of it (the owner: "I want to split this part
+ * with the divider above, into small pieces"). In a column of a block on the
+ * note, the part becomes two columns of its own inside that column, and the
+ * columns beside it stay as they are (1.0.3); a part of those columns is cut
+ * inside its column again. Columns nest that twice (MAX_NEST): in a column of
+ * the deepest, the inner block is cut across into the rows above that part,
+ * the part, and the rows under it; only the part's row gets the new column.
  */
 
 import { showDropMark, hideDropMark } from './drop-mark.js';
-import { gapAt, flowAt, contentBox } from './image-place.js';
+import { gapAwayFrom, flowAt, contentBox } from './image-place.js';
 
 export const COLS = 'blk-cols';
 export const COL = 'blk-col';
@@ -82,14 +85,24 @@ export const MIN_COL_PX = 48;
 /** What an upright divider takes of the line beside it (editor.css: 14px at each side, and the rule). */
 const RULE_PX = 29.4;
 
-/** The least share of a line that wide a column may have. */
-export function leastShare(linePx) {
+/**
+ * The words' room each half keeps when a part is cut inside a column: a short
+ * word. With MIN_COL_PX a column narrower than about 155px could not be cut at
+ * all (the owner's Ideas note, 1.0.3: "çok küçük ve bölmeli dividerler
+ * açamıyorum", "tam üstteki dividerla ikiye bölemiyorum halen").
+ */
+export const NEST_PX = 24;
+
+/** The least share of a line that wide a column may have, keeping `words` pixels of words. */
+export function leastShare(linePx, words = MIN_COL_PX) {
   const px = Number(linePx);
   if (!Number.isFinite(px) || px <= 0) return MIN_COL;
-  return Math.max(MIN_COL, Math.ceil(((MIN_COL_PX + RULE_PX) / px) * 100));
+  return Math.max(MIN_COL, Math.ceil(((words + RULE_PX) / px) * 100));
 }
 /** Sideways travel that stands a dragged divider up, in pixels. */
 const TURN = 40;
+/** The foot of an upright divider, in pixels: taken there, it pulls the columns down. */
+const FOOT_PX = 12;
 
 /** A share of the line a divider may stand at: whole percent, in range, the halves and thirds a little sticky. */
 export function cleanSplit(pct) {
@@ -213,9 +226,20 @@ export function splitAt(blocks, hr, pct, keep = null) {
   cols.append(left, rule, right);
   setSplit(cols, split);
 
-  // The empty lines at the end of what is split stay under the columns, as lines.
+  // The empty lines at the end of what is split stay under the columns, as
+  // lines. Empty lines alone were the part chosen: they all go, so the upright
+  // line is as tall as the mark showed. One was taken, the rest left under a
+  // stub of a line (the owner's Ideas note, 1.0.3). In a box closed under it —
+  // by a divider, columns, or a column's foot — the lines are the box's: the
+  // split is as tall as the box ("ortadan ikiye bölme tek satıra çıkıyor …
+  // aşağıya manuel uzatmak zorunda kalıyorum", 1.0.3). The divider pulled
+  // from under the box closes it too: the mark showed the whole box, and the
+  // cut was one line ("buradan ayırmaya çalıştım").
   const taken = [...blocks];
-  while (taken.length > 1 && isBlank(taken.at(-1))) taken.pop();
+  let after = taken.at(-1)?.nextElementSibling;
+  while (after?.matches(LAYER)) after = after.nextElementSibling;
+  const closed = after ? isBound(after) : !!taken.at(-1)?.parentElement?.classList.contains(COL);
+  if (!closed && !taken.every(isBlank)) while (taken.length > 1 && isBlank(taken.at(-1))) taken.pop();
   (taken[0] ?? hr).before(cols);
   // What was there stays on the side it stands on; when the divider cuts
   // through it, it keeps the wider side, and even, the left.
@@ -277,6 +301,29 @@ export function splitPoint(col, pct, least = MIN_COL) {
 }
 
 /**
+ * Where a divider pulled over a column cuts it: where the pointer is, but
+ * taken to a side of the column — its outer fifth — down the middle. Pulled to
+ * the edge it cut off a sliver as narrow as words allow (the owner's Ideas
+ * note, 1.0.3: "divideri yan kenara götürünce ortadan bölme divideri
+ * tetiklensin"). Null where the column cannot be cut.
+ */
+export function aimAt(col, pct, least = MIN_COL) {
+  const p = splitPoint(col, pct, least);
+  if (p === null) return null;
+  const columns = columnsOf(col.parentElement);
+  const k = columns.indexOf(col);
+  const at = [0, ...cleanSplits(splitsOf(col.parentElement), columns.length), 100];
+  const [from, to] = [at[k], at[k + 1]];
+  const edge = Math.max(MIN_COL, least, (to - from) / 5);
+  return pct < from + edge || pct > to - edge ? splitPoint(col, (from + to) / 2, least) : p;
+}
+
+/** The same for the note: pulled to a side, it splits down the middle. */
+export function aimOnNote(pct) {
+  return pct < MIN_SPLIT || pct > MAX_SPLIT ? 50 : cleanSplit(pct);
+}
+
+/**
  * One more column: the column is cut in two where the pointer is. What it
  * held keeps the wider part; the other is an empty line to write on.
  * @param {HTMLElement} col @param {number} pct the pointer, as a share of the line
@@ -329,6 +376,12 @@ export function splitPart(col, blocks, pct, hr = null, least = MIN_COL, keep = n
   const rects = blocks.map((el) => el.getBoundingClientRect());
   const top = Math.min(...rects.map((r) => r.top));
   const bottom = Math.max(...rects.map((r) => r.bottom));
+  // The side the pulled divider stood on is where the cut begins, as its mark
+  // showed (the owner's Ideas note, 1.0.3: "bu üstteki dividerın altına …
+  // ikiye bölmek istiyorum, olmuyor" — empty lines over it went with the part).
+  const before = [...col.children];
+  const edge = hr ? before.indexOf(hr) : -1;
+  const kept = [edge >= 0 && before[edge + 1] === blocks[0], edge >= 0 && before[edge - 1] === blocks.at(-1)];
   hr?.remove();
   const own = [...col.children];
   const a = own.indexOf(blocks[0]);
@@ -350,7 +403,7 @@ export function splitPart(col, blocks, pct, hr = null, least = MIN_COL, keep = n
   });
   // A row of nothing but empty lines is no row: its lines stay with the part.
   for (const k of [0, 2]) {
-    if (!rows[k].every((list) => list.every(isBlank))) continue;
+    if (kept[k / 2] || !rows[k].every((list) => list.every(isBlank))) continue;
     rows[k].forEach((list, i) => { if (k) rows[1][i].push(...list); else rows[1][i].unshift(...list); });
     rows[k] = columns.map(() => []);
   }
@@ -381,6 +434,58 @@ export function splitPart(col, blocks, pct, hr = null, least = MIN_COL, keep = n
   if (above) cols.before(above);
   if (under) cols.after(under);
   return splitColumn(columns[ci], pct, null, least, keep);
+}
+
+/**
+ * How many blocks of columns a block may stand in (1.0.3): a column's part cut
+ * inside it, and a part of that cut again (the owner's Ideas note: "tam üstteki
+ * dividerla ikiye bölemiyorum halen" — in a column of columns in a column,
+ * the lower divider pulled aside did nothing).
+ */
+export const MAX_NEST = 2;
+
+/** How many blocks of columns stand around an element. */
+const nestOf = (el) => {
+  let n = 0;
+  for (let p = el?.parentElement?.closest(`.${COLS}`); p; p = p.parentElement?.closest(`.${COLS}`)) n += 1;
+  return n;
+};
+
+/** Whether a block of columns stands in a column, no deeper than columns nest. */
+export function inside(cols) {
+  return !!cols?.parentElement?.classList.contains(COL) && nestOf(cols) <= MAX_NEST;
+}
+
+/** Whether a column's part may be split inside the column, as columns of its own: the block made would nest no deeper than MAX_NEST. */
+export const nestsIn = (col) => !!col?.parentElement?.classList.contains(COLS) && nestOf(col.parentElement) < MAX_NEST;
+
+/**
+ * Where a part of a column split inside it is cut, as a share of the column
+ * (two parts, each at least `least`): where the pointer is, or down the middle
+ * when it is pulled to a side, as aimAt does. Null where the column is too narrow.
+ */
+export function aimInside(pct, least = MIN_COL) {
+  const min = Math.max(MIN_SPLIT, least);
+  if (min > 50) return null;
+  const edge = Math.max(min, 20);
+  if (pct < edge || pct > 100 - edge) return 50;
+  return Math.min(100 - min, Math.max(min, sticky(pct)));
+}
+
+/**
+ * A part of a column split inside it (1.0.3): the part becomes two columns of
+ * its own in the column, and the other columns stay as they are. It was cut
+ * across the whole block (splitPart), so the columns beside it broke into rows
+ * and a picture beside it went down under the cut (the owner's Ideas note:
+ * "bu üstteki dividerın altına bir divider ekleyip burayı ikiye bölmek
+ * istiyorum", "çok küçük ve bölmeli dividerler açamıyorum").
+ * @param {Element[]} blocks the part: neighbours in the column, in order
+ * @param {HTMLElement} hr the divider that was dragged
+ * @param {number} pct where the cut stands, as a share of the column (aimInside)
+ * @param {'left'|'right'|null} [keep] the side the words already stand on
+ */
+export function splitInside(blocks, hr, pct, keep = null) {
+  return splitAt(blocks, hr, pct, keep ?? (pct >= 50 ? 'left' : 'right'));
 }
 
 /**
@@ -563,8 +668,8 @@ export function healColumns(root) {
   }
   for (const cols of [...root.querySelectorAll(`.${COLS}`)]) {
     const columns = columnsOf(cols);
-    // Columns do not nest, and one column is no columns.
-    if (columns.length < 2 || cols.parentElement?.closest(`.${COLS}`)) { unsplit(cols); touched += 1; continue; }
+    // Columns nest in a column, MAX_NEST deep (inside); one column is no columns.
+    if (columns.length < 2 || (cols.parentElement?.closest(`.${COLS}`) && !inside(cols))) { unsplit(cols); touched += 1; continue; }
     const before = cols.outerHTML;
     // More columns than a line holds: the last one takes what the others held.
     for (const extra of columns.splice(MAX_COLS)) { columns.at(-1).append(...extra.childNodes); extra.remove(); }
@@ -639,15 +744,37 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
     // carried a long way up or down drifts aside on the way, and turned into
     // a split instead of moving (1.0.0: "I cannot drag the lower of two
     // dividers to places I could", the owner).
-    const sideways = Math.abs(x - drag.x) >= TURN && Math.abs(x - drag.x) >= Math.abs(y - drag.y) * 0.75;
-    // Pulled sideways over its own column: only its part of it (1.0.1).
+    // A divider of the note pulled up and aside into a column's words is still
+    // a cut there (the Ideas-note check): only in a column, where the hand
+    // drifts the most, does the pull have to be well across.
     const home = hr.parentElement.classList.contains(COL) ? hr.parentElement : null;
-    if (sideways && home && flowAt(editorEl, x, y) === home) {
+    const sideways = Math.abs(x - drag.x) >= TURN && Math.abs(x - drag.x) >= Math.abs(y - drag.y) * (home ? 1.25 : 0.75);
+    // Pulled sideways over its own column: only its part of it (1.0.1).
+    if (sideways && home && besideHome(home, x, y)) {
       const blocks = partIn(hr, home, y, row);
       const cols = home.parentElement;
       const line = contentBox(cols);
-      const pct = ((x - line.left) / Math.max(1, line.right - line.left)) * 100;
-      const p = blocks ? splitPoint(home, pct, leastOf(cols)) : null;
+      // Past its column's side, in the gap or off the row, is that side: the part
+      // is cut in its middle. It turned into a move over the whole note (the
+      // owner's Ideas note, 1.0.3: "dikey bölmeyi tetiklesin, yatay değil").
+      const own = home.getBoundingClientRect();
+      // In a column of a block on the note, the part is split inside the
+      // column: the columns beside it stay whole (1.0.3).
+      if (blocks && nestsIn(home)) {
+        const inner = contentBox(home);
+        const local = ((Math.min(Math.max(x, inner.left), inner.right) - inner.left) / Math.max(1, inner.right - inner.left)) * 100;
+        const q = aimInside(local, leastOf(home, NEST_PX));
+        if (q !== null) {
+          const at = inner.left + ((inner.right - inner.left) * q) / 100;
+          const rects = blocks.map((el) => el.getBoundingClientRect());
+          const top = Math.min(...rects.map((r) => r.top));
+          const bottom = Math.max(...rects.map((r) => r.bottom));
+          showDropMark({ left: at - 1.5, top, width: 3, height: bottom - top }, { left: inner.left, top, width: inner.right - inner.left, height: bottom - top });
+          return { kind: 'inside', blocks, pct: q, x: at };
+        }
+      }
+      const pct = ((Math.min(Math.max(x, own.left), own.right) - line.left) / Math.max(1, line.right - line.left)) * 100;
+      const p = blocks ? aimAt(home, pct, leastOf(cols)) : null;
       if (p !== null) {
         const at = line.left + ((line.right - line.left) * p) / 100;
         const rects = blocks.map((el) => el.getBoundingClientRect());
@@ -655,7 +782,16 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
         const bottom = Math.max(...rects.map((r) => r.bottom));
         const part = home.getBoundingClientRect();
         showDropMark({ left: at - 1.5, top, width: 3, height: bottom - top }, { left: part.left, top, width: part.width, height: bottom - top });
-        return { kind: 'part', col: home, blocks, pct };
+        return { kind: 'part', col: home, blocks, pct: p };
+      }
+      // No part of its own (only empty lines, or the whole column): the column
+      // is cut from top to foot, at the same place.
+      const q = blocks ? null : aimAt(home, pct, leastOf(cols));
+      if (q !== null) {
+        const at = line.left + ((line.right - line.left) * q) / 100;
+        const whole = cols.getBoundingClientRect();
+        showDropMark({ left: at - 1.5, top: whole.top, width: 3, height: whole.height }, { left: own.left, top: whole.top, width: own.width, height: whole.height });
+        return { kind: 'column', col: home, pct: q };
       }
     }
     // Pulled sideways over a column: that column is cut in two where the pointer is.
@@ -663,16 +799,35 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
     if (col) {
       const cols = col.parentElement;
       const line = contentBox(cols);
-      const pct = ((x - line.left) / Math.max(1, line.right - line.left)) * 100;
-      const at = line.left + ((line.right - line.left) * splitPoint(col, pct, leastOf(cols))) / 100;
+      const p = aimAt(col, ((x - line.left) / Math.max(1, line.right - line.left)) * 100, leastOf(cols));
+      const at = line.left + ((line.right - line.left) * p) / 100;
       const whole = cols.getBoundingClientRect();
       const part = col.getBoundingClientRect();
       showDropMark({ left: at - 1.5, top: whole.top, width: 3, height: whole.height }, { left: part.left, top: whole.top, width: part.width, height: whole.height });
-      return { kind: 'column', col, pct };
+      return { kind: 'column', col, pct: p };
     }
     if (onNote && sideways) {
       // Pulled sideways: it stands up where the pointer is.
       const where = y < row.top - 8 ? 'above' : y > row.bottom + 8 ? 'below' : 'row';
+      // Beside columns, with only empty lines on its own side: it cuts those
+      // columns. It split the empty lines into a row of empty columns over the
+      // words instead (the owner's Ideas note, 1.0.3: "en üst hep boşa çıkıyor").
+      const beside = where === 'row' && sectionOf(hr, 'row').every(isBlank)
+        ? [hr.previousElementSibling, hr.nextElementSibling].filter((el) => el?.classList.contains(COLS))
+          .sort((a, b) => Math.abs(y - midY(a)) - Math.abs(y - midY(b)))[0]
+        : null;
+      if (beside) {
+        const line = contentBox(beside);
+        const pct = ((x - line.left) / Math.max(1, line.right - line.left)) * 100;
+        const near = columnsOf(beside).sort((a, b) => Math.abs(x - midX(a)) - Math.abs(x - midX(b)))[0];
+        const p = near ? aimAt(near, pct, leastOf(beside)) : null;
+        if (p === null) { hideDropMark(); return null; }
+        const at = line.left + ((line.right - line.left) * p) / 100;
+        const whole = beside.getBoundingClientRect();
+        const part = near.getBoundingClientRect();
+        showDropMark({ left: at - 1.5, top: whole.top, width: 3, height: whole.height }, { left: part.left, top: whole.top, width: part.width, height: whole.height });
+        return { kind: 'column', col: near, pct: p };
+      }
       // Over a part of the note away from the divider's own: that part (1.0.0).
       const under = where === 'row' ? null : partUnder(hr, y, hr.parentElement);
       let from = null;
@@ -684,7 +839,9 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
           : [...all].reverse().find((el) => el.getBoundingClientRect().top < y) ?? null;
       }
       const blocks = under ?? sectionOf(hr, where, from);
-      const pct = cleanSplit(((x - box.left) / Math.max(1, box.right - box.left)) * 100);
+      // Over columns too narrow to cut, the empty lines on the other side are not what was meant.
+      if (blocks.every(isBlank) && document.elementFromPoint(x, y)?.closest?.(`.${COLS}`)) { hideDropMark(); return null; }
+      const pct = aimOnNote(((x - box.left) / Math.max(1, box.right - box.left)) * 100);
       const rects = blocks.map((el) => el.getBoundingClientRect());
       const top = rects.length ? Math.min(row.top, ...rects.map((r) => r.top)) : row.top - 20;
       const bottom = rects.length ? Math.max(row.bottom, ...rects.map((r) => r.bottom)) : row.bottom + 20;
@@ -695,9 +852,21 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
     // Pulled up or down: to another place between two blocks.
     const body = hr.parentElement.classList.contains(BODY) ? hr.parentElement.getBoundingClientRect() : null;
     const inBody = body && x >= body.left && x <= body.right && y >= body.top - 8 && y <= body.bottom + 8;
-    const gap = gapAt(inBody ? hr.parentElement : flowAt(editorEl, x, y), y);
-    const mine = gap.units.findIndex((u) => u.els.includes(hr));
-    if (mine >= 0 && (gap.slot === mine || gap.slot === mine + 1)) { hideDropMark(); return null; }
+    // A divider is thin and so is its neighbour when that is a divider too: the
+    // nearest gap was its own, and the lower of two could not go above the upper
+    // (the owner's Ideas note). Pulled clear of itself it goes one place at least.
+    // A divider of the note stays on the note: over a row of columns it goes
+    // above or under the row. It fell into whichever column the pointer
+    // crossed, and could not be taken past the row (the owner's Ideas note,
+    // 1.0.3: "bu yatay divider taşınmıyor gene").
+    const flow = hr.parentElement === editorEl || inBody ? hr.parentElement : flowAt(editorEl, x, y);
+    // In the empty room at a column's foot, beside a taller one: there, with
+    // empty lines over it. It stopped at the column's last line (the owner's
+    // Ideas note, 1.0.3: "daha alta taşıyamıyorum divideri").
+    const room = roomUnder(flow, hr, y);
+    if (room) { showDropMark(room.line); return { kind: 'move', parent: flow, before: null, pad: room.pad }; }
+    const gap = gapAwayFrom(hr, flow, y);
+    if (!gap) { hideDropMark(); return null; }
     showDropMark(gap.line);
     return { kind: 'move', parent: gap.parent, before: gap.before };
   }
@@ -706,9 +875,33 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
    * The part of the note under the pointer, when it is not the divider's own
    * part (there the split starts at the block the pointer is over, as before).
    */
+  const midY = (el) => { const r = el.getBoundingClientRect(); return (r.top + r.bottom) / 2; };
+  const midX = (el) => { const r = el.getBoundingClientRect(); return (r.left + r.right) / 2; };
+
   /** A flow a divider stands up in: the note, or a toggle's body that is in no column. */
   function flat(parent) {
     return parent === editorEl || (!!parent?.classList.contains(BODY) && !parent.closest(`.${COL}`));
+  }
+
+  /**
+   * A column's empty room under its last line, when the pointer is a line or
+   * more down in it: how many empty lines go over the divider, and its mark.
+   */
+  function roomUnder(flow, hr, y) {
+    if (!flow?.classList.contains(COL)) return null;
+    const last = blocksOf(flow).filter((el) => el !== hr).at(-1);
+    if (!last) return null;
+    const bottom = last.getBoundingClientRect().bottom;
+    // An empty line takes its height and the gap between two lines.
+    const line = blocksOf(flow).find((el) => el !== hr && isBlank(el));
+    const css = line ? getComputedStyle(line) : null;
+    const lineH = line
+      ? line.getBoundingClientRect().height + Math.max(parseFloat(css.marginTop) || 0, parseFloat(css.marginBottom) || 0)
+      : parseFloat(getComputedStyle(flow).lineHeight) || 24;
+    const pad = Math.floor((y - bottom) / lineH);
+    if (pad < 1 || y > flow.getBoundingClientRect().bottom + 4) return null;
+    const box = contentBox(flow);
+    return { pad, line: { left: box.left, top: bottom + pad * lineH - 1.5, width: box.right - box.left, height: 3 } };
   }
 
   function partUnder(hr, y, flow = editorEl) {
@@ -728,23 +921,47 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
   /**
    * The part of its column a divider pulled sideways would cut, when the
    * pointer is above or under it: as on the note, its own part or the part
-   * the pointer is over. Null when it stays level with the divider, or the
-   * part is the whole column — then the column is cut, as before.
+   * the pointer is over. Level with the divider, the part under it, or above
+   * it when nothing stands under it (the owner, 1.0.3: "Bu hatti dividerden
+   * bölemiyorum" — a level pull cut the whole column, the line stayed where it
+   * was). Null when the part is the whole column — then the column is cut,
+   * as it is when nothing else is written or drawn in it ("tamamen bölmüyor").
+   * Empty lines between two dividers are a part like any other: pulled level,
+   * the upper divider cuts what is under it, empty or not ("bu üstteki
+   * dividerın altına … ikiye bölmek istiyorum").
    */
   function partIn(hr, col, y, row) {
     const where = y < row.top - 8 ? 'above' : y > row.bottom + 8 ? 'below' : 'row';
-    if (where === 'row') return null;
-    const under = partUnder(hr, y, col);
-    let from = null;
-    if (!under) {
-      const all = sectionOf(hr, where);
-      from = where === 'above'
-        ? all.find((el) => el.getBoundingClientRect().bottom > y) ?? null
-        : [...all].reverse().find((el) => el.getBoundingClientRect().top < y) ?? null;
+    if (where === 'row') {
+      const below = sectionOf(hr, 'below');
+      const above = sectionOf(hr, 'above');
+      const level = below.some((el) => !isBlank(el)) || !above.some((el) => !isBlank(el)) ? below : above;
+      const others = blocksOf(col).filter((el) => el !== hr && !level.includes(el) && !isBlank(el));
+      return others.length ? level : null;
     }
-    const blocks = under ?? sectionOf(hr, where, from);
+    // The whole box, not up to the line under the pointer: held a little under
+    // the divider, the split was one line tall (the owner's Ideas note, 1.0.3:
+    // "üstteki divider bu üst kutuyu ortadan bölmesi lazımdı ama tek satır çıktı").
+    const blocks = partUnder(hr, y, col) ?? sectionOf(hr, where);
     const rest = blocksOf(col).filter((el) => el !== hr && !blocks.includes(el) && !isBlank(el));
-    return blocks.length && rest.length ? blocks : null;
+    return rest.length ? blocks : null;
+  }
+
+  /** Over a divider's own column, or off it in the open with no other column nearer. */
+  function besideHome(home, x, y) {
+    const there = flowAt(editorEl, x, y);
+    if (there === home) return true;
+    if (there !== editorEl) return false;
+    const whole = home.parentElement.getBoundingClientRect();
+    if (y < whole.top - 8 || y > whole.bottom + 8) return false;
+    // The gaps at its sides are its own: past its edge, by the upright divider,
+    // a narrower column's middle was nearer, and the divider went out onto the
+    // note instead of cutting (the owner's Ideas note, 1.0.3).
+    const columns = columnsOf(home.parentElement);
+    const k = columns.indexOf(home);
+    const from = k > 0 ? columns[k - 1].getBoundingClientRect().right : -Infinity;
+    const to = k < columns.length - 1 ? columns[k + 1].getBoundingClientRect().left : Infinity;
+    return x >= from && x <= to;
   }
 
   /** The column under a point that can be cut in two, if there is one. */
@@ -755,10 +972,10 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
     return splitPoint(col, ((x - line.left) / Math.max(1, line.right - line.left)) * 100, leastOf(col.parentElement)) === null ? null : col;
   }
   /** The least share a column of this block may have, from the width its line is drawn at. */
-  function leastOf(cols) {
+  function leastOf(cols, words = MIN_COL_PX) {
     const line = contentBox(cols);
     const zoom = cols.getBoundingClientRect().width / Math.max(1, cols.offsetWidth) || 1;
-    return leastShare((line.right - line.left) / zoom);
+    return leastShare((line.right - line.left) / zoom, words);
   }
 
   /**
@@ -808,8 +1025,14 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
     d.hr.classList.remove('armed');
     if (d.target.kind === 'move') {
       if (d.target.before?.isConnected) d.target.before.before(d.hr); else d.target.parent.append(d.hr);
+      for (let i = 0; i < (d.target.pad ?? 0); i += 1) d.hr.before(blankLine(document));
       // A divider at the very end leaves no line to go on with.
       if (!d.hr.nextElementSibling) d.hr.after(blankLine(document));
+    } else if (d.target.kind === 'inside') {
+      const live = d.target.blocks.filter((el) => el.isConnected && el.parentElement === d.hr.parentElement);
+      if (!live.length) return;
+      const { empty } = splitInside(live, d.hr, d.target.pct, contentSide(live, d.target.x));
+      caretIn(empty.firstElementChild);
     } else if (d.target.kind === 'part') {
       const { col, blocks: part } = d.target;
       const cols = col.parentElement;
@@ -888,11 +1111,72 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
     e.stopPropagation();
     if (isLocked()) return;
     pick(vr);
-    rule = { vr, cols: vr.parentElement, x: e.clientX, moved: false };
+    // Taken by its foot, it is pulled down or up: the columns grow or shrink.
+    const foot = e.clientY >= vr.getBoundingClientRect().bottom - FOOT_PX;
+    rule = { vr, cols: vr.parentElement, x: e.clientX, y: e.clientY, foot, moved: false, to: null };
   }, true);
+
+  /**
+   * How far the columns may grow: down to the next divider or columns under
+   * them, or without end at the foot of their flow.
+   */
+  function stretchLimit(cols) {
+    let next = cols.nextElementSibling;
+    while (next && !isBound(next)) next = next.nextElementSibling;
+    return next ? next.getBoundingClientRect().top - 4 : Infinity;
+  }
+
+  function stretchOver(e) {
+    if (!rule.moved && Math.abs(e.clientY - rule.y) < 3) return;
+    if (!rule.moved) { rule.moved = true; document.body.classList.add('divider-dragging'); }
+    const whole = rule.cols.getBoundingClientRect();
+    const to = Math.max(whole.top + 20, Math.min(e.clientY, stretchLimit(rule.cols)));
+    rule.to = to;
+    const v = rule.vr.getBoundingClientRect();
+    showDropMark({ left: v.left - 1.5, top: whole.top, width: 3, height: to - whole.top }, { left: whole.left, top: whole.top, width: whole.width, height: to - whole.top });
+  }
+
+  /**
+   * The columns made as tall as `to`, a y on the screen (the owner's Ideas
+   * note, 1.0.3: "dividerlarda alta uzatma ayarı olsun, çekebileyim divideri
+   * aşağıya doğru"). Down, the lines under the block come in: empty ones are
+   * taken up, written ones go into the column left of the divider; then every
+   * column gets empty lines to that height. Up, empty lines at the columns'
+   * feet go back under the block.
+   */
+  function stretchTo(cols, vr, to) {
+    const whole = cols.getBoundingClientRect();
+    const line = cols.querySelector(':scope > .blk-col > p');
+    const lineH = line?.getBoundingClientRect().height || 24;
+    const columns = columnsOf(cols);
+    if (to > whole.bottom + lineH / 2) {
+      const into = vr.previousElementSibling?.classList.contains(COL) ? vr.previousElementSibling : columns[0];
+      const under = [];
+      for (let el = cols.nextElementSibling; el && !isBound(el); el = el.nextElementSibling) {
+        if (el.matches(LAYER)) continue;
+        if (midY(el) > to) break;
+        under.push(el);
+      }
+      for (const el of under) { if (isBlank(el)) el.remove(); else into.append(el); }
+      for (const c of columns) {
+        for (let i = 0; i < 400 && c.getBoundingClientRect().bottom < to - lineH / 2; i += 1) c.append(blankLine(document));
+      }
+    } else if (to < whole.bottom - lineH / 2) {
+      let most = 0;
+      for (const c of columns) {
+        let n = 0;
+        while (c.children.length > 1 && isBlank(c.lastElementChild) && c.lastElementChild.getBoundingClientRect().top >= to) { c.lastElementChild.remove(); n += 1; }
+        most = Math.max(most, n);
+      }
+      for (let i = 0; i < most; i += 1) cols.after(blankLine(document));
+    }
+    const next = cols.nextElementSibling;
+    if (!next || next.matches(LAYER)) cols.after(blankLine(document));
+  }
 
   function resize(e) {
     if (!rule.cols.isConnected) { rule = null; return; }
+    if (rule.foot) { stretchOver(e); return; }
     if (!rule.moved && Math.abs(e.clientX - rule.x) < 3) return;
     if (!rule.moved) { rule.moved = true; history?.push(); document.body.classList.add('divider-dragging'); }
     const box = contentBox(rule.cols);
@@ -900,10 +1184,17 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
     onGeometry?.();
   }
   function endResize() {
-    const moved = rule?.moved;
+    const r = rule;
     rule = null;
     document.body.classList.remove('divider-dragging');
-    if (moved) dirty();
+    if (r?.foot) {
+      hideDropMark();
+      if (!r.moved || r.to === null || !r.cols.isConnected) return;
+      history?.push();
+      stretchTo(r.cols, r.vr, r.to);
+      onGeometry?.();
+    }
+    if (r?.moved) dirty();
   }
 
   document.addEventListener('keydown', (e) => {
@@ -937,6 +1228,82 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
   }, true);
 
   const TEXT_LINE = 'p, div:not([class]), h1, h2, h3, h4, h5, h6, blockquote, ul, ol, .blk-todo, .blk-toggle';
+
+  /**
+   * Down from the last line of a column, or Up from the first: out of the row,
+   * to what stands under (over) it — a divider is picked, a row of columns is
+   * entered in the column under the caret. Chromium's own kept the caret where
+   * it was (the owner's Ideas note, 1.0.3: "alta inemiyorum alt oka basinca").
+   */
+  editorEl.addEventListener('keydown', (e) => {
+    if ((e.key !== 'ArrowUp' && e.key !== 'ArrowDown') || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || e.isComposing || picked || drag) return;
+    const sel = window.getSelection();
+    if (!sel?.rangeCount || !sel.isCollapsed) return;
+    const at = sel.anchorNode?.nodeType === 1 ? sel.anchorNode : sel.anchorNode?.parentElement;
+    const col = at?.closest?.(`.${COL}`);
+    if (!col || !editorEl.contains(col) || at.closest('.blk-table, .blk-code')) return;
+    let line = at;
+    while (line && line.parentElement !== col) line = line.parentElement;
+    if (!line?.matches('p, div:not([class]), h1, h2, h3, h4, h5, h6, blockquote')) return;
+    const up = e.key === 'ArrowUp';
+    const beyond = [];
+    for (let el = up ? line.previousElementSibling : line.nextElementSibling; el; el = up ? el.previousElementSibling : el.nextElementSibling) beyond.push(el);
+    if (beyond.some((el) => !el.matches(LAYER)) || !onEdgeRow(line, sel.getRangeAt(0), up)) return;
+    const box = sel.getRangeAt(0).getClientRects()[0] ?? line.getBoundingClientRect();
+    if (!outOfRow(col, up, box.left)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
+
+  /**
+   * The caret out of a column's row, up or down, near x: onto the divider over
+   * (under) it, or the line, or into the column at x of a row there. False when
+   * there is nowhere to go a caret can stand.
+   */
+  function outOfRow(col, up, x) {
+    const cols = col.parentElement;
+    let next = up ? cols.previousElementSibling : cols.nextElementSibling;
+    while (next?.matches(LAYER)) next = up ? next.previousElementSibling : next.nextElementSibling;
+    if (!next) return false;
+    let to = next;
+    if (next.classList.contains(COLS)) {
+      const into = columnsOf(next).sort((a, b) => Math.abs(x - midX(a)) - Math.abs(x - midX(b)))[0];
+      const lines = [...(into?.children ?? [])].filter((el) => !el.matches(LAYER));
+      to = up ? lines.at(-1) : lines[0];
+    }
+    if (to?.matches(HR)) {
+      editorEl.dispatchEvent(new CustomEvent('nebula-pick-divider', { detail: to }));
+      return true;
+    }
+    if (!to?.matches(TEXT_LINE)) return false;
+    caretIn(to, up);
+    return true;
+  }
+
+  /** Whether the caret stands on the first (or last) row of a line's words (as dividers.js). */
+  function onEdgeRow(block, range, up) {
+    const all = document.createRange();
+    all.selectNodeContents(block);
+    const rows = [...all.getClientRects()].filter((b) => b.height);
+    if (!rows.length) return true;
+    const probe = range.cloneRange();
+    let box = probe.getClientRects()[0];
+    if (!box?.height && range.startContainer.nodeType === 3) {
+      const text = range.startContainer;
+      const i = range.startOffset;
+      if (i < text.length) probe.setEnd(text, i + 1); else if (i > 0) probe.setStart(text, i - 1);
+      box = probe.getClientRects()[0];
+    }
+    if (!box?.height) {
+      const side = document.createRange();
+      side.selectNodeContents(block);
+      if (up) side.setEnd(range.startContainer, range.startOffset); else side.setStart(range.startContainer, range.startOffset);
+      return !side.toString().replace(/​/g, '').trim();
+    }
+    const mid = box.top + box.height / 2;
+    return up ? mid < rows[0].bottom : mid > rows.at(-1).top;
+  }
+
   document.addEventListener('selectionchange', () => {
     const sel = window.getSelection();
     const r = sel?.rangeCount ? sel.getRangeAt(0) : null;
@@ -964,7 +1331,11 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
   /**
    * The keys that would take a column apart. Backspace at the very start of a
    * column, or Delete at its very end, would join its first or last line to
-   * whatever stands outside it, and the column with it; there they do nothing.
+   * whatever stands outside it, and the column with it; Delete does nothing
+   * there. Backspace goes up out of the row, as ↑ does: the upright divider is
+   * a wall, it is neither crossed into the column before nor taken away with an
+   * empty column (the owner's Ideas note, 1.0.3: "geriye basınca ortadaki
+   * dividera değil yukarı çıkmalı"). A column goes by picking its divider.
    */
   editorEl.addEventListener('keydown', (e) => {
     if ((e.key !== 'Backspace' && e.key !== 'Delete') || e.ctrlKey || e.metaKey || e.altKey || isLocked()) return;
@@ -993,7 +1364,13 @@ export function initColumns(editorEl, { history, isLocked = () => false, onGeome
       && !line.querySelector('img, hr, .inline-eq, .note-image, .link-block, .blk-code, .note-mention, ul, ol, table')) return;
     e.preventDefault();
     e.stopPropagation();
+    if (e.key === 'Backspace') stepBack(col);
   }, true);
+
+  /** Backspace at the very start of a column. */
+  function stepBack(col) {
+    outOfRow(col, true, midX(col));
+  }
 
   /** After a load, an undo or a paste: columns as they should be. */
   function refresh() {

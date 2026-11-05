@@ -4,7 +4,7 @@
  * leaves behind. The dragging itself is in tests/e2e/layout.mjs.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { blocksOf, blockAt, dropTarget, moveBlock, tidyFrom, toggleCopyHtml, insertBlocks, holdsStructure, GUTTER } from '../src/js/block-handle.js';
+import { blocksOf, blockAt, dropTarget, moveBlock, tidyFrom, toggleCopyHtml, insertBlocks, holdsStructure, blocksBetween, blocksCopyHtml, GUTTER } from '../src/js/block-handle.js';
 import { sectionAround, columnsBeside, columnBeside, canShare, dropColumn, splitsOf } from '../src/js/columns.js';
 import { stripTransient } from '../src/js/note-markup.js';
 

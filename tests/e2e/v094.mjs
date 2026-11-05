@@ -190,7 +190,7 @@ export async function runV094Checks(check) {
     }));
     check('a right-click on selected words opens one menu: formatting, then cut, copy and the pastes',
       merged.row === 'bold,italic,underline,strike,color,hilite,code,link'
-      && merged.items === 'Cut|Copy|Paste as Nebula format|Paste original format|Select all' && !merged.barAlone, JSON.stringify(merged));
+      && merged.items === 'Cut|Copy|Paste as Nebula format|Paste original format|Paste only text|Select all' && !merged.barAlone, JSON.stringify(merged));
     check('and the words stay selected while it is open', merged.stillSelected === 'grow me', JSON.stringify(merged));
     await win.evaluate(() => document.querySelector('#ctx-menu .ctx-format [data-act="bold"]').click());
     check('its Bold makes the selected words bold and closes the menu', await win.evaluate(() =>
@@ -356,7 +356,7 @@ export async function runV094Checks(check) {
 
     await copy(DRESSED, 'dressed words');
     await rightClickAfter('#p');
-    check('a right-click in the note is the one menu: the formatting row, cut and copy (grey with nothing selected), the two ways to paste — "Paste only text" is not offered', await menuItems() === 'Cut·|Copy·|Paste as Nebula format|Paste original format|Select all'
+    check('a right-click in the note is the one menu: the formatting row, cut and copy (grey with nothing selected), the three ways to paste — "Paste only text" back in 1.0.3', await menuItems() === 'Cut·|Copy·|Paste as Nebula format|Paste original format|Paste only text|Select all'
       && await win.evaluate(() => document.querySelectorAll('#ctx-menu .ctx-format button').length > 0), await menuItems());
     await win.keyboard.press('Escape');
 
@@ -389,6 +389,28 @@ export async function runV094Checks(check) {
     check('Paste original format keeps the size the words were copied in, and bold', original.text.includes('dressed words') && original.size === '20px' && original.sized === '20px' && original.bold, JSON.stringify(original));
     check('and no more of the source: the font and the colour are the note’s, and its ground stays behind', !/color|font-family|Arial|background|animation/.test(original.dress)
       && original.shown === `${original.own} rgba(0, 0, 0, 0)`, JSON.stringify(original));
+
+    // Paste only text is back (1.0.3): the words, no bold, no size.
+    await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p id="p">here</p>'; });
+    await rightClickAfter('#p');
+    await choose('Paste only text');
+    const plain = await win.evaluate(() => ({ text: document.getElementById('editor').textContent, bold: !!document.querySelector('#editor b, #editor strong'), sized: !!document.querySelector('#editor [style*="font-size"]') }));
+    check('Paste only text puts the words in and nothing of their dress', plain.text.includes('dressed words') && !plain.bold && !plain.sized, JSON.stringify(plain));
+
+    // Lines pasted into a quote run on as one quote (1.0.3): each line was a short quote of its own.
+    await app.evaluate(({ clipboard }) => clipboard.writeText('first line of a copy that was\nwrapped short where it came from\n\nand a second part'));
+    await win.evaluate(() => {
+      const ed = document.getElementById('editor');
+      ed.innerHTML = '<p id="p">plain line</p><blockquote id="q">said: </blockquote>';
+      const r = document.createRange(); r.setStart(ed.querySelector('#q').firstChild, 6); r.collapse(true);
+      const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      ed.focus();
+    });
+    await win.keyboard.press('Control+v');
+    await win.waitForTimeout(300);
+    const quoted = await win.evaluate(() => ({ quotes: document.querySelectorAll('#editor blockquote').length, text: document.querySelector('#editor blockquote').innerText }));
+    check('lines pasted into a quote stay one quote, the copy’s short lines run on', quoted.quotes === 1
+      && quoted.text.includes('was wrapped short') && quoted.text.includes('and a second part'), JSON.stringify(quoted));
     // The caret is the theme's ink on every line, whatever the words under it wear.
     const carets = await win.evaluate(() => {
       const ed = document.getElementById('editor');
@@ -688,40 +710,37 @@ export async function runV094Checks(check) {
     check('taking the filter off takes the paint off', await win.evaluate(() =>
       !CSS.highlights.has('nebula-label-hit') && !document.querySelector('#note-labels .note-label.hit')));
 
-    // ---- A theme of one's own: the editor over Archive and Trash ------------------
+    // ---- A theme of one's own: the editor in Settings, open, no button (1.0.3; it stood over Archive and Trash) ---
     {
+    await win.evaluate(() => document.querySelector('#app-menu [data-cmd="settings.open"]').click());
+    await win.waitForFunction(() => !document.getElementById('ov-settings').hidden, null, { polling: 50 });
+    await win.evaluate(() => document.getElementById('set-tab-look').click());
     const themeRow = await win.evaluate(() => {
       const buttons = [...document.querySelectorAll('#theme-pick [data-theme]')];
-      const side = document.getElementById('side').getBoundingClientRect();
-      const palette = document.getElementById('btn-theme-custom').getBoundingClientRect();
-      const last = buttons.at(-1).getBoundingClientRect();
       return { names: buttons.map((b) => b.dataset.theme).join(','),
-        fits: buttons.every((b) => b.scrollWidth <= b.clientWidth + 1),
-        right: palette.width > 0 && palette.left >= last.right - 0.5 && palette.right <= side.right + 0.5
-          && Math.abs((palette.top + palette.bottom) - (last.top + last.bottom)) < 6 };
+        fits: buttons.every((b) => b.scrollWidth <= b.clientWidth + 1), palette: !!document.getElementById('btn-theme-custom') };
     });
-    check('four themes in the row, and the palette button at their right', themeRow.names === 'main,dark,light,white' && themeRow.fits && themeRow.right, JSON.stringify(themeRow));
-
-    await win.evaluate(() => document.getElementById('btn-theme-custom').click());
+    check('five themes in the row, Matcha in the middle, and no palette button', themeRow.names === 'main,dark,matcha,light,white' && themeRow.fits && !themeRow.palette, JSON.stringify(themeRow));
     await win.waitForTimeout(150);
     const opened = await win.evaluate(() => {
       const panel = document.getElementById('theme-editor');
       const box = panel.getBoundingClientRect();
-      const side = document.getElementById('side').getBoundingClientRect();
-      const tabs = document.querySelector('.drawer-tabs').getBoundingClientRect();
+      const side = panel.closest('.set-group').getBoundingClientRect();
       const row = document.querySelector('.theme-row').getBoundingClientRect();
-      const top = [...panel.children].filter((c) => !c.hidden).map((c) => c.className.split(' ')[0]);
-      return { shown: !panel.hidden, expanded: document.getElementById('btn-theme-custom').getAttribute('aria-expanded'),
-        above: box.bottom <= tabs.top + 0.5 && tabs.bottom <= row.top + 0.5, inside: box.top >= side.top - 0.5 && box.left >= side.left - 0.5 && box.right <= side.right + 0.5,
+      // The picker's two sides (1.0.3) only group what is chosen and what it is chosen from.
+      const flat = (box) => [...box.children].filter((c) => !c.hidden).flatMap((c) => (/^te-pick/.test(c.className) ? flat(c) : [c]));
+      const top = flat(panel).map((c) => c.className.split(' ')[0]);
+      return { shown: !panel.hidden,
+        below: box.top >= row.bottom - 0.5, inside: !!panel.closest('#ov-settings') && box.left >= side.left - 0.5 && box.right <= side.right + 0.5,
         order: top.join(','), slots: [...panel.querySelectorAll('.te-slot')].map((s) => s.dataset.slot).join(','),
         swatches: panel.querySelectorAll('.te-swatch').length, ready: panel.querySelector('.te-chip__name')?.textContent,
         theme: document.documentElement.dataset.theme, profile: document.documentElement.dataset.profile ?? null };
     });
-    check('it opens upward over Archive and Trash: name and Save on top, then profiles, five slots, the bar, the colours',
-      opened.shown && opened.expanded === 'true' && opened.above && opened.inside
-      && opened.order === 'te-head,te-save,te-label,te-profiles,te-slots,te-bar-row,te-hint,te-swatches'
+    check('it stands open in Settings under the themes: the profiles, name and Save, five slots, the bar, the colours, then the styles’ colours',
+      opened.shown && opened.below && opened.inside
+      && opened.order === 'te-label,te-profiles,te-save,te-label,te-slots,te-label,te-bar-row,te-hint,te-swatches,te-label,te-extra'
       && opened.slots === 'bg,dark,lines,accent,text' && opened.swatches === 28 && opened.ready === 'Matcha', JSON.stringify(opened));
-    check('opening it changes nothing yet', opened.theme === 'main' && opened.profile === null, JSON.stringify(opened));
+    check('Settings opened changes nothing yet', opened.theme === 'main' && opened.profile === null, JSON.stringify(opened));
 
     const look = () => win.evaluate(() => {
       const rgb = (c) => c.match(/\d+/g).slice(0, 3).map(Number);
@@ -731,15 +750,14 @@ export async function runV094Checks(check) {
       const root = document.documentElement;
       const ed = getComputedStyle(document.getElementById('editor'));
       const frame = getComputedStyle(document.getElementById('editor-frame'));
-      const on = getComputedStyle(document.getElementById('btn-theme-custom'));
       const btn = getComputedStyle(document.getElementById('btn-new'));
       const ground = frame.backgroundColor === 'rgba(0, 0, 0, 0)' ? getComputedStyle(document.body).backgroundColor : frame.backgroundColor;
       return { theme: root.dataset.theme, profile: root.dataset.profile ?? null, inline: root.style.getPropertyValue('--paper'),
         // The picked background is the app's ground; the note's sheet lies a tone above it.
         ink: hex(ed.color), paper: hex(getComputedStyle(document.body).backgroundColor), sheet: hex(ground), accent: hex(btn.backgroundColor), side: hex(getComputedStyle(document.getElementById('side')).backgroundColor),
-        scheme: getComputedStyle(root).colorScheme, lit: document.getElementById('btn-theme-custom').classList.contains('on'),
+        scheme: getComputedStyle(root).colorScheme, lit: !!document.querySelector('#theme-editor .te-chip.on'),
         fixedLit: !!document.querySelector('#theme-pick button.on'),
-        text: contrast(ed.color, ground), picked: contrast(on.color, on.backgroundColor), primary: contrast(btn.color, btn.backgroundColor),
+        text: contrast(ed.color, ground), primary: contrast(btn.color, btn.backgroundColor),
         chip: document.querySelector('#theme-editor .te-chip.on .te-chip__name')?.textContent ?? null,
         stored: localStorage.getItem('nebula:theme') };
     });
@@ -752,7 +770,7 @@ export async function runV094Checks(check) {
     check('pressing Matcha wears it at once: white words on dark green, readable — its buttons too',
       matcha.profile === 'custom' && matcha.theme === 'main' && matcha.paper === '#1A2420' && matcha.ink === '#F1F6EE' && matcha.accent === '#A6E3A1'
       && matcha.scheme === 'dark' && matcha.lit && !matcha.fixedLit && matcha.chip === 'Matcha' && matcha.stored === 'custom'
-      && matcha.text > 10 && matcha.picked > 4.5 && matcha.primary > 4.5, JSON.stringify(matcha));
+      && matcha.text > 10 && matcha.primary > 4.5, JSON.stringify(matcha));
 
     // A slot, then a colour: the app is the preview.
     await win.evaluate(() => document.querySelector('#theme-editor .te-slot[data-slot="accent"]').click());
@@ -842,17 +860,10 @@ export async function runV094Checks(check) {
     check('the unsaved colours wait under “Last edited”', again.profile === 'custom' && again.paper === '#F4F1EA' && again.ink === '#1B1B1B', JSON.stringify(again));
     await win.evaluate(() => document.querySelector('#theme-pick [data-theme="main"]').click());
 
-    // Archive and Trash need the room the editor stands in.
-    await win.evaluate(() => document.querySelector('.drawer-tab').click());
-    await win.waitForTimeout(150);
-    const drawer = await win.evaluate(() => ({ editor: document.getElementById('theme-editor').hidden, expanded: document.getElementById('btn-theme-custom').getAttribute('aria-expanded'),
-      open: document.querySelector('.drawer-tab').getAttribute('aria-expanded') }));
-    await win.evaluate(() => document.getElementById('btn-theme-custom').click());
-    await win.waitForTimeout(150);
-    const swapped = await win.evaluate(() => ({ editor: !document.getElementById('theme-editor').hidden, drawers: [...document.querySelectorAll('.drawer-tab')].map((t) => t.getAttribute('aria-expanded')).join(',') }));
-    await win.evaluate(() => document.querySelector('#theme-editor .te-close').click());
-    check('opening Archive puts the editor away, and the editor puts Archive away', drawer.editor && drawer.expanded === 'false' && drawer.open === 'true'
-      && swapped.editor && !/true/.test(swapped.drawers) && await win.evaluate(() => document.getElementById('theme-editor').hidden), JSON.stringify({ drawer, swapped }));
+    // The sidebar keeps no themes now, and the editor has nothing to shut it.
+    check('the themes live in Settings, not the sidebar, and the editor stays open', await win.evaluate(() =>
+      !document.querySelector('#side #theme-pick') && !document.getElementById('theme-editor').hidden && !document.querySelector('#theme-editor .te-close')));
+    await win.evaluate(() => document.getElementById('settings-close').click());
     }
 
     // ---- Fonts: a copy inside Nebula keeps its font; outside words take the note's ---

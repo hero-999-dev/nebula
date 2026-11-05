@@ -117,7 +117,7 @@ describe('rich paste editing regressions', () => {
       rich.open('', 'https://example.com/docs');
       const input = document.getElementById('link-url-input');
       const order = [...document.querySelectorAll('#link-menu [data-link-kind]')].map((b) => b.dataset.linkKind);
-      expect(order).toEqual(['embed', 'bookmark', 'url', 'mention']);   // left to right on screen
+      expect(order).toEqual(['embed', 'bookmark', 'url']);   // left to right on screen
       key(input, 'ArrowDown');
       expect(lit()).toBe('embed');
       expect(document.activeElement.dataset.linkKind).toBe('embed');
@@ -125,10 +125,9 @@ describe('rich paste editing regressions', () => {
       key(document.activeElement, 'ArrowRight');
       expect(lit()).toBe('url');
       key(document.activeElement, 'ArrowRight');
-      key(document.activeElement, 'ArrowRight');
       expect(lit()).toBe('embed');                     // wrapped round
       key(document.activeElement, 'ArrowLeft');
-      expect(lit()).toBe('mention');
+      expect(lit()).toBe('url');
       key(document.activeElement, 'ArrowUp');
       expect(document.activeElement).toBe(input);
     });
@@ -137,10 +136,10 @@ describe('rich paste editing regressions', () => {
       select(editor.querySelector('p').firstChild, 21, 21);
       rich.open('', 'https://example.com/docs');
       key(document.getElementById('link-url-input'), 'ArrowDown');
-      key(document.activeElement, 'ArrowLeft');          // wraps to mention, the last
+      key(document.activeElement, 'ArrowLeft');          // wraps to URL, the last
       key(document.activeElement, 'Enter');
       expect(document.getElementById('link-menu').hidden).toBe(true);
-      expect(editor.querySelector('a.link-mention').textContent).toBe('@example.com');
+      expect(editor.querySelector('a.link-url').textContent).toBe('https://example.com/docs');
     });
 
     it('Esc closes the menu and gives the caret back to the note', () => {
@@ -153,16 +152,10 @@ describe('rich paste editing regressions', () => {
     });
   });
 
-  it('mention replaces a selection inline without fetching', () => {
-    const kind = 'mention';
-    insert(kind);
-    const anchor = editor.querySelector('a');
-    expect(anchor.href).toBe('https://example.com/docs');
-    expect(anchor.textContent).toBe('@example.com');
-    expect(editor.querySelectorAll('p')).toHaveLength(1);
-    expect(editor.querySelector('webview, iframe')).toBeNull();
-    history.undo();
-    expect(editor.textContent).toBe('before selected after');
+  it('offers no Mention for a link (gone in 1.0.3, the owner)', () => {
+    rich.open('url', 'https://example.com/docs');
+    expect(document.querySelector('[data-link-kind="mention"]')).toBeNull();
+    expect(document.querySelector('[data-link-kind="url"]')).not.toBeNull();
   });
 
   it('embeds in a webview so sites that refuse frames can still load', () => {

@@ -26,6 +26,11 @@
  *                          line too, that line)
  *   Esc, a click, a key    lets it go
  *
+ * Several blocks are picked together with Shift+click on a second grip, with
+ * Shift+↑ / ↓, or with a box dragged from open ground on the page. All of the
+ * keys above then act on the whole pick, and a drag by the grip of any of them
+ * takes them all along.
+ *
  * A column whose last block is dragged away goes, as in Notion; a list whose
  * last item goes goes with it.
  */
@@ -227,13 +232,84 @@ export function dropTarget(editor, dragged, x, y, { sides = true } = {}) {
   };
 }
 
+/**
+ * Where neighbours pulled together would go: dropTarget() for the one of them
+ * that says the most (columns, if any holds some), and nowhere among themselves,
+ * inside one of them, or where they already stand.
+ * @param {HTMLElement[]} blocks neighbours in one place, in order
+ */
+export function dropTargetOfRun(editor, blocks, x, y) {
+  const target = dropTarget(editor, blocks.find((block) => block.classList.contains(COLS) || block.querySelector(`.${COLS}`)) ?? blocks[0], x, y, { sides: false });
+  if (blocks.length === 1 || target?.kind !== 'gap') return target;
+  if (blocks.some((block) => block.contains(target.parent))) return null;
+  if (target.parent !== blocks[0].parentElement) return target;
+  let ref = target.ref;
+  while (ref && (ref.nodeType !== 1 || ref.matches(NOT_BLOCK))) ref = ref.nextSibling;
+  return blocks.includes(ref) || ref === nextBlock(blocks.at(-1)) ? null : target;
+}
+
 /** A copy that is a new block: no ids, nothing that only means "on screen now". */
 function freshCopy(block) {
   const copy = block.cloneNode(true);
   for (const el of [copy, ...copy.querySelectorAll('[id]')]) el.removeAttribute?.('id');
-  copy.classList.remove('block-picked', 'block-lifted', 'sel');
-  copy.querySelectorAll('.block-picked, .block-lifted').forEach((el) => el.classList.remove('block-picked', 'block-lifted'));
+  copy.classList.remove('block-picked', 'block-lifted', 'sel', 'in-sel');
+  copy.querySelectorAll('.block-picked, .block-lifted, .in-sel').forEach((el) => el.classList.remove('block-picked', 'block-lifted', 'in-sel'));
   return copy;
+}
+
+/** The blocks from one to the other, in the note's order, when they are neighbours in one place; null otherwise. */
+export function blocksBetween(a, b) {
+  if (!a || !b || a.parentElement !== b.parentElement) return null;
+  for (const [from, to] of [[a, b], [b, a]]) {
+    const run = [];
+    for (let el = from; el; el = nextBlock(el)) {
+      run.push(el);
+      if (el === to) return run;
+    }
+  }
+  return null;
+}
+
+/** A line with nothing on it: no words, no picture, no widget. */
+export function isBlankLine(block) {
+  return block?.tagName === 'P' && !block.textContent.trim() && !block.querySelector('img, video, audio, iframe, webview, canvas, svg, hr, table, object, embed, [contenteditable="false"]');
+}
+
+/**
+ * What a pick of `run` holds: the empty lines at its ends are not picked, and
+ * the ones between its blocks go with them, unmarked (owner, 1.0.3: "seçerken
+ * boş alanlar da alınıyor"). A run of nothing but empty lines is only its first.
+ */
+export function pickOf(run) {
+  const first = run.findIndex((block) => !isBlankLine(block));
+  if (first < 0) return { blocks: run.slice(0, 1), marked: run.slice(0, 1) };
+  const blocks = run.slice(first, run.findLastIndex((block) => !isBlankLine(block)) + 1);
+  return { blocks, marked: blocks.filter((block) => !isBlankLine(block)) };
+}
+
+/** Fresh copies of blocks as one piece of HTML: list items stay in a list of their kind. */
+export function blocksCopyHtml(blocks) {
+  let html = '';
+  let list = null;
+  let items = '';
+  const flush = () => {
+    if (list) html += `<${list}>${items}</${list}>`;
+    list = null;
+    items = '';
+  };
+  for (const block of blocks) {
+    if (block.tagName !== 'LI') {
+      flush();
+      html += freshCopy(block).outerHTML;
+      continue;
+    }
+    const tag = block.parentElement?.tagName === 'OL' ? 'ol' : 'ul';
+    if (list !== tag) flush();
+    list = tag;
+    items += freshCopy(block).outerHTML;
+  }
+  flush();
+  return html;
 }
 
 const blankLine = (doc) => {
@@ -268,6 +344,16 @@ export function tidyFrom(editor, from) {
   if (from === editor && !blocksOf(editor).length) editor.append(blankLine(doc));
 }
 
+/** A playing video is moved, not taken out and put in again, where the browser can (block-drag.js). */
+function slip(parent, node, ref) {
+  try {
+    if (node.isConnected && typeof parent.moveBefore === 'function' && !node.querySelector('webview')) parent.moveBefore(node, ref);
+    else parent.insertBefore(node, ref);
+  } catch {
+    parent.insertBefore(node, ref);
+  }
+}
+
 /**
  * The block to where dropTarget() said. A list item put among other blocks
  * gets a list of its own kind.
@@ -294,13 +380,7 @@ export function placeAt(editor, block, target) {
     if (!parent?.isConnected) return null;
     const ref = target.ref && target.ref.parentNode === parent && target.ref !== block ? target.ref : (target.ref === block ? block.nextSibling : null);
     node = listed(parent);
-    // A playing video is moved, not taken out and put in again, where the browser can (block-drag.js).
-    try {
-      if (node === block && block.isConnected && typeof parent.moveBefore === 'function' && !block.querySelector('webview')) parent.moveBefore(node, ref);
-      else parent.insertBefore(node, ref);
-    } catch {
-      parent.insertBefore(node, ref);
-    }
+    slip(parent, node, ref);
   }
   // At the foot of a flow, a block that takes no caret leaves a line to go on with.
   if (node.matches(NO_CARET) && !nextBlock(node) && !node.parentElement.classList.contains(COL)) node.after(blankLine(doc));
@@ -312,10 +392,26 @@ export function placeAt(editor, block, target) {
  * Move or copy a block: placeAt, then what it left behind tidied.
  * @returns {HTMLElement|null} the block that moved (or the copy)
  */
-export function moveBlock(editor, block, target, { copy = false } = {}) {
-  const from = block.parentElement;
-  const moving = copy ? freshCopy(block) : block;
-  if (!placeAt(editor, moving, target)) return null;
+export function moveBlock(editor, block, target, opts) {
+  return moveBlocks(editor, [block], target, opts)?.[0] ?? null;
+}
+
+/**
+ * Neighbours moved or copied together, in their order: the last goes where the
+ * target says (so a line to go on with is left only if the last wants one, and
+ * list items get one list), the others in front of it.
+ * @param {HTMLElement[]} blocks neighbours in one place, in order
+ * @returns {HTMLElement[]|null} the blocks that moved (or the copies)
+ */
+export function moveBlocks(editor, blocks, target, { copy = false } = {}) {
+  const from = blocks[0].parentElement;
+  const moving = copy ? blocks.map(freshCopy) : blocks;
+  const last = moving.at(-1);
+  if (!placeAt(editor, last, target)) return null;
+  for (const block of moving.slice(0, -1)) {
+    slip(last.parentNode, block, last);
+    block.classList.remove(ROW);
+  }
   if (!copy) tidyFrom(editor, from);
   if (from?.isConnected) tidyRows(from);
   healColumns(editor);
@@ -343,7 +439,7 @@ export function toggleCopyHtml(range) {
 }
 
 /** Whether pasted markup holds blocks the browser's own paste takes apart. */
-export const holdsStructure = (html) => /class="[^"]*\b(?:blk-toggle|blk-cols)\b/.test(String(html ?? ''));
+export const holdsStructure = (html) => /class="[^"]*\b(?:blk-toggle|blk-cols|link-block)\b/.test(String(html ?? ''));
 
 /**
  * Blocks pasted at the caret, as blocks (1.0.0). The browser's paste merges
@@ -452,7 +548,7 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
   let hovered = null;
   /** The block picked with a click on the grip. */
   let picked = null;
-  /** @type {null | {block: HTMLElement, x: number, y: number, moved: boolean, target: object|null, ghost: HTMLElement|null, dx: number, dy: number}} */
+  /** @type {null | {block: HTMLElement, blocks: HTMLElement[], x: number, y: number, moved: boolean, target: object|null, ghost: HTMLElement|null, dx: number, dy: number}} */
   let drag = null;
   let lastX = 0;
   let lastY = 0;
@@ -480,6 +576,10 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
     if (drag || locked() || document.body.classList.contains('block-dragging') || document.body.classList.contains('divider-dragging')) return;
     const frame = boxOf(editor);
     if (x < frame.left || x > frame.right || y < frame.top || y > frame.bottom) { if (!grip.matches(':hover')) hideGrip(); return; }
+    // Something stands over the note here: a sheet's dots belong to no block
+    // (the owner, 1.0.3: "settings ekranina üc nokta cikiyor, arkadaki notu takip ediyor").
+    const top = document.elementFromPoint(x, y);
+    if (top && top !== grip && !grip.contains(top) && !editor.contains(top)) { hideGrip(); return; }
     const block = blockAt(editor, x, y);
     if (!block) { hideGrip(); return; }
     if (block !== hovered || grip.hidden) showGrip(block);
@@ -496,60 +596,80 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
     if (raf) return;
     raf = requestAnimationFrame(() => { raf = 0; track(lastX, lastY); });
   }, { passive: true });
+  // A sheet opened by a click or a key, the pointer not moving: it is looked at again.
+  const lookAgain = () => { if (!drag && !grip.hidden) requestAnimationFrame(() => track(lastX, lastY)); };
+  document.addEventListener('click', lookAgain);
+  document.addEventListener('keyup', lookAgain);
   // Typing hides it, as in Notion; the next move brings it back.
-  editor.addEventListener('keydown', () => { if (!drag) hideGrip(); });
+  // Not for Shift alone: it is held to click another grip.
+  editor.addEventListener('keydown', (e) => { if (!drag && !['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) hideGrip(); });
   editor.addEventListener('scroll', () => { if (!drag) hideGrip(); }, { passive: true });
   window.addEventListener('resize', () => { if (!drag) hideGrip(); });
 
   // ---- picked --------------------------------------------------------------
+  // Several blocks together, as in Notion (the owner, 1.0.3: "blok blok kopyalama"):
+  // `group` is everything picked, in the note's order; `picked` is where the pick
+  // began and `tip` the end Shift+↑/↓ moves.
+  let group = [];
+  let tip = null;
   function release() {
-    if (picked?.isConnected) picked.classList.remove('block-picked');
+    for (const block of group) block.classList.remove('block-picked');
+    group = [];
     picked = null;
+    tip = null;
   }
-  function pick(block) {
+  function pickRange(from, to) {
+    const run = blocksBetween(from, to);
+    if (!run) return false;
     release();
-    if (!block?.isConnected) return;
-    picked = block;
-    block.classList.add('block-picked');
+    picked = from;
+    tip = to;
+    const { blocks, marked } = pickOf(run);
+    group = blocks;
+    for (const block of marked) block.classList.add('block-picked');
     if (!editor.contains(document.activeElement)) editor.focus({ preventScroll: true });
     // No caret anywhere: a key goes to the picked block, not into some line.
     window.getSelection()?.removeAllRanges();
+    return true;
+  }
+  function pick(block) {
+    release();
+    if (block?.isConnected) pickRange(block, block);
   }
 
-  /** Copying the picked block: set while the copy event it starts goes by. */
+  /** Copying the picked blocks: set while the copy event it starts goes by. */
   let copying = null;
   document.addEventListener('copy', (e) => {
     if (!copying || !e.clipboardData) return;
-    const block = copying;
+    const blocks = copying;
     copying = null;
-    const copy = freshCopy(block);
-    let html = block.tagName === 'LI' ? `<${block.parentElement?.tagName === 'OL' ? 'ol' : 'ul'}>${copy.outerHTML}</${block.parentElement?.tagName === 'OL' ? 'ol' : 'ul'}>` : copy.outerHTML;
+    let html = blocksCopyHtml(blocks);
     if (window.nebula?.media?.inlineSync && /nebula-media:\/\/note\//.test(html)) {
       try { html = window.nebula.media.inlineSync(html); } catch { /* the note's own addresses */ }
     }
     e.clipboardData.setData('text/html', html);
-    e.clipboardData.setData('text/plain', block.innerText ?? block.textContent ?? '');
+    e.clipboardData.setData('text/plain', blocks.map((block) => block.innerText ?? block.textContent ?? '').join('\n'));
     e.preventDefault();
     e.stopImmediatePropagation();
   }, true);
   function copyPicked() {
     if (!picked?.isConnected) return false;
-    copying = picked;
+    copying = [...group];
     let ok = false;
     try { ok = document.execCommand('copy'); } catch { ok = false; }
     copying = null;
     return ok;
   }
 
-  /** The note changed around the picked block: its list, toggle or column is tidied. */
+  /** The note changed around the picked blocks: their list, toggle or column is tidied. */
   function removePicked() {
-    const block = picked;
-    if (!block?.isConnected || locked()) return;
+    const blocks = group.filter((block) => block.isConnected);
+    if (!blocks.length || locked()) return;
     history?.push();
-    const from = block.parentElement;
-    const after = nextBlock(block) ?? prevBlock(block);
+    const from = blocks[0].parentElement;
+    const after = nextBlock(blocks.at(-1)) ?? prevBlock(blocks[0]);
     release();
-    block.remove();
+    for (const block of blocks) block.remove();
     tidyFrom(editor, from);
     healColumns(editor);
     if (after?.isConnected) pick(after); else caretAfter(blocksOf(editor).at(-1));
@@ -558,23 +678,23 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
   }
 
   function duplicatePicked() {
-    const block = picked;
-    if (!block?.isConnected || locked()) return;
+    const blocks = group.filter((block) => block.isConnected);
+    if (!blocks.length || locked()) return;
     history?.push();
-    const copy = freshCopy(block);
-    block.after(copy);
-    pick(copy);
+    const copies = blocks.map(freshCopy);
+    blocks.at(-1).after(...copies);
+    pickRange(copies[0], copies.at(-1));
     onGeometry?.();
     dirty();
   }
 
-  /** One place up or down among its neighbours. */
-  function step(block, delta) {
-    if (!block?.isConnected || locked()) return false;
-    const other = delta < 0 ? prevBlock(block) : nextBlock(block);
+  /** One place up or down among its neighbours: a block, or the run from it to `last`. */
+  function step(block, delta, last = block) {
+    if (!block?.isConnected || !last?.isConnected || locked()) return false;
+    const other = delta < 0 ? prevBlock(block) : nextBlock(last);
     if (!other) return false;
     history?.push();
-    if (delta < 0) other.before(block); else other.after(block);
+    if (delta < 0) last.after(other); else block.before(other);
     block.scrollIntoView?.({ block: 'nearest' });
     onGeometry?.();
     dirty();
@@ -605,11 +725,13 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
       e.stopPropagation();
       const sel = window.getSelection();
       const keep = !picked && sel?.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
-      if (step(block, e.key === 'ArrowUp' ? -1 : 1) && keep) { sel.removeAllRanges(); sel.addRange(keep); }
+      const delta = e.key === 'ArrowUp' ? -1 : 1;
+      const moved = picked ? step(group[0], delta, group.at(-1)) : step(block, delta);
+      if (moved && keep) { sel.removeAllRanges(); sel.addRange(keep); }
       return;
     }
     if (!picked) return;
-    if (!picked.isConnected) { picked = null; return; }
+    if (!picked.isConnected) { release(); return; }
     if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
     const k = e.key.toLowerCase();
     if (mod && k === 'c') { e.preventDefault(); e.stopPropagation(); copyPicked(); return; }
@@ -620,13 +742,17 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
       e.stopPropagation();
-      const other = e.key === 'ArrowUp' ? prevBlock(picked) : nextBlock(picked);
-      if (other) { pick(other); other.scrollIntoView?.({ block: 'nearest' }); }
+      const other = e.key === 'ArrowUp' ? prevBlock(tip) : nextBlock(tip);
+      if (other) {
+        // Shift: the pick grows or shrinks; without it, one block again.
+        if (e.shiftKey) pickRange(picked, other); else pick(other);
+        other.scrollIntoView?.({ block: 'nearest' });
+      }
       return;
     }
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); release(); return; }
     // Enter or any other key: let go, the caret at the end of its words, and the key goes on there.
-    const block = picked;
+    const block = tip;
     release();
     caretAfter(block);
     if (e.key === 'Enter') e.preventDefault();
@@ -637,27 +763,195 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
     if (picked) release();
   }, true);
 
+  // ---- what a selection holds without words -------------------------------
+  // A divider, a picture, a video or a card in a selection gets no blue: it is
+  // marked `in-sel` while the selection crosses it (editor.css).
+  const NO_TINT = 'hr.blk-hr, .note-image, .link-block';
+  let tintRaf = 0;
+  function markSelection() {
+    tintRaf = 0;
+    const sel = window.getSelection();
+    const range = sel?.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0) : null;
+    const now = range && editor.contains(range.commonAncestorContainer)
+      ? [...editor.querySelectorAll(NO_TINT)].filter((el) => range.intersectsNode(el))
+      : [];
+    // One picture alone is the picture's own selection: it has its outline already.
+    if (now.length === 1 && now[0].classList.contains('sel')) now.length = 0;
+    // Every mark, not only ours: one copied along in a selection is pasted with it.
+    for (const el of editor.querySelectorAll('.in-sel')) if (!now.includes(el)) el.classList.remove('in-sel');
+    for (const el of now) el.classList.add('in-sel');
+  }
+  document.addEventListener('selectionchange', () => { if (!tintRaf) tintRaf = requestAnimationFrame(markSelection); });
+  editor.addEventListener('input', () => { if (!tintRaf) tintRaf = requestAnimationFrame(markSelection); });
+
+  // ---- the band ------------------------------------------------------------
+  // Pressed on the page where no block is — its sides, between blocks, under
+  // the last — and pulled: every block it crosses is picked. Only the sides
+  // started it, a strip the owner never hit, so they saw no box (1.0.3).
+  // Past the end of a line's words is open ground too: "every empty area
+  // should start the box" (the owner's Bug Find note).
+  const WORDY = 'p, h1, h2, h3, h4, h5, h6, li, blockquote';
+  const PAST = 16;
+  function pastWords(target, x, y) {
+    if (!(target instanceof Element) || !target.matches(WORDY) || !editor.contains(target)) return false;
+    const r = document.createRange();
+    r.selectNodeContents(target);
+    const lines = [...r.getClientRects()].filter((q) => q.width > 0);
+    if (!lines.length) return false;
+    // The line under the press, or the nearest one when it fell between lines.
+    const dist = (q) => (y < q.top ? q.top - y : y > q.bottom ? y - q.bottom : 0);
+    const near = Math.min(...lines.map(dist));
+    const line = lines.filter((q) => dist(q) - near < 1);
+    return x > Math.max(...line.map((q) => q.right)) + PAST;
+  }
+  let band = null;
+  editor.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || e.shiftKey || e.detail > 1 || locked()) return;
+    if (e.target !== editor && !pastWords(e.target, e.clientX, e.clientY)) return;
+    const r = boxOf(editor);
+    const scale = r.width / (editor.offsetWidth || 1);
+    if (e.clientX > r.left + editor.clientWidth * scale) return;    // the scrollbar
+    band = { x: e.clientX, y: e.clientY, scroll: editor.scrollTop, scale, el: null };
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!band) return;
+    if (!(e.buttons & 1)) { endBand(); return; }
+    if (!band.el) {
+      if (Math.abs(e.clientX - band.x) < TAKE && Math.abs(e.clientY - band.y) < TAKE) return;
+      band.el = document.createElement('div');
+      band.el.className = 'block-band';
+      document.body.append(band.el);
+      document.body.classList.add('block-banding');
+      hideGrip();
+    }
+    const frame = boxOf(editor);
+    if (e.clientY < frame.top + 24) editor.scrollTop -= 12;
+    else if (e.clientY > frame.bottom - 24) editor.scrollTop += 12;
+    // Where it began stays with the words under it when the page scrolls.
+    const fromY = band.y - (editor.scrollTop - band.scroll) * band.scale;
+    const top = Math.min(fromY, e.clientY);
+    const bottom = Math.max(fromY, e.clientY);
+    Object.assign(band.el.style, {
+      left: `${Math.min(band.x, e.clientX)}px`, width: `${Math.abs(e.clientX - band.x)}px`,
+      top: `${Math.max(frame.top, top)}px`, height: `${Math.max(0, Math.min(frame.bottom, bottom) - Math.max(frame.top, top))}px`,
+    });
+    const crossed = blocksOf(editor).filter((block) => { const b = boxOf(block); return !isBlankLine(block) && b.bottom > top && b.top < bottom; });
+    if (crossed.length) pickRange(crossed[0], crossed.at(-1)); else { release(); window.getSelection()?.removeAllRanges(); }
+  });
+  function endBand() {
+    band?.el?.remove();
+    if (band?.el) window.getSelection()?.removeAllRanges();
+    band = null;
+    document.body.classList.remove('block-banding');
+  }
+  window.addEventListener('mouseup', () => { if (band) endBand(); });
+  window.addEventListener('blur', () => { if (band) endBand(); });
+
+  // ---- words, then blocks --------------------------------------------------
+  // A drag begun in a line's words selects words while it stays in that block;
+  // once it reaches another block, whole blocks are picked, as in Notion, and
+  // back in its own block it is words again (the owner, 1.0.3: "it should know
+  // when to copy blocks and when a part of the words in a block").
+  const NO_SWEEP = '.code-src, .blk-table, .shape-layer, .image-layer, .note-image, .image-caption, .link-block, [contenteditable="false"]';
+  let sweep = null;
+  editor.addEventListener('mousedown', (e) => {
+    sweep = null;
+    if (e.button !== 0 || e.shiftKey || e.detail > 1 || e.target === editor || band || locked()) return;
+    if (!(e.target instanceof Element) || e.target.closest(NO_SWEEP)) return;
+    const block = blockAt(editor, e.clientX, e.clientY);
+    const at = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+    if (block && at) sweep = { block, at, blocks: false };
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!sweep) return;
+    if (!(e.buttons & 1)) { endSweep(); return; }
+    const over = blockAt(editor, e.clientX, e.clientY);
+    const pair = over && over !== sweep.block ? sharedFlow(sweep.block, over) : null;
+    if (pair && pair[0] !== pair[1]) {
+      if (!sweep.blocks) hideGrip();
+      sweep.blocks = true;
+      document.body.classList.add('block-sweeping');
+      if (tip !== pair[1] || picked !== pair[0]) pickRange(pair[0], pair[1]);
+      else window.getSelection()?.removeAllRanges();
+      return;
+    }
+    sweep.y = e.clientY;
+    sweep.over = over;
+    if (!sweep.blocks) { holdToBlock(); return; }   // still in its own block: the browser's own selection
+    // Back where it began: words again, from where the press was.
+    release();
+    document.body.classList.remove('block-sweeping');
+    const to = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+    if (to && editor.contains(to.startContainer)) {
+      window.getSelection()?.setBaseAndExtent(sweep.at.startContainer, sweep.at.startOffset, to.startContainer, to.startOffset);
+    }
+  });
+  // Pulled into the gap under (or over) its block, the browser's selection
+  // leapt the picture below and took it, unasked ("selecting words takes a
+  // picture I didn't choose", the owner's Bug Find note). Off the block's
+  // lines and over no other block, the words run to the block's end or start.
+  function holdToBlock() {
+    if (!sweep || sweep.blocks || (sweep.over && sweep.over !== sweep.block) || sweep.y == null) return;
+    const b = boxOf(sweep.block);
+    if (sweep.y >= b.top && sweep.y <= b.bottom) return;
+    const sel = window.getSelection();
+    // Only once the browser has begun a selection of its own: one set by us under
+    // a still press is taken by Chromium for words to drag away, and the sweep
+    // never sees another move (a pull from a line onto a divider and a card picked nothing).
+    if (!sel?.rangeCount || sel.isCollapsed) return;
+    const down = sweep.y > b.bottom;
+    const end = document.createRange();
+    end.selectNodeContents(sweep.block);
+    end.collapse(!down);
+    if (sel.focusNode === end.startContainer && sel.focusOffset === end.startOffset) return;
+    sel.setBaseAndExtent(sweep.at.startContainer, sweep.at.startOffset, end.startContainer, end.startOffset);
+  }
+  document.addEventListener('selectionchange', holdToBlock);
+  function endSweep() {
+    sweep = null;
+    document.body.classList.remove('block-sweeping');
+  }
+  window.addEventListener('mouseup', () => { if (sweep) endSweep(); });
+  window.addEventListener('blur', () => { if (sweep) endSweep(); });
+
+  /** The two blocks, or the blocks round them, that stand in one flow. */
+  function sharedFlow(a, b) {
+    const chain = (el) => {
+      const out = [];
+      for (; el && el !== editor; el = el.parentElement) if (isFlow(el.parentElement, editor)) out.push(el);
+      return out;
+    };
+    const left = chain(a);
+    const right = chain(b);
+    for (const x of left) {
+      const y = right.find((el) => el.parentElement === x.parentElement);
+      if (y) return [x, y];
+    }
+    return null;
+  }
+
   // ---- the drag ------------------------------------------------------------
-  function makeGhost(block) {
-    const r = boxOf(block);
+  function makeGhost(blocks) {
+    const r = boxOf(blocks[0]);
     const ghost = document.createElement('div');
     ghost.className = 'editor block-ghost';
     ghost.setAttribute('aria-hidden', 'true');
     const z = editorZoom(editor);
     ghost.style.zoom = String(z);
     ghost.style.width = `${Math.round(r.width / z)}px`;
-    const copy = freshCopy(block);
-    // A page, a player or a drawing in the copy would load or play again: a plain box stands in.
-    copy.querySelectorAll('webview, iframe, video, canvas, object, embed').forEach((el) => {
-      const box = document.createElement('div');
-      box.className = 'block-ghost-media';
-      el.replaceWith(box);
-    });
-    if (block.tagName === 'LI') {
-      const list = document.createElement(block.parentElement?.tagName === 'OL' ? 'ol' : 'ul');
-      list.append(copy);
-      ghost.append(list);
-    } else ghost.append(copy);
+    // List items are all of one list: they came from one place.
+    const holder = blocks[0].tagName === 'LI' ? document.createElement(blocks[0].parentElement?.tagName === 'OL' ? 'ol' : 'ul') : ghost;
+    if (holder !== ghost) ghost.append(holder);
+    for (const block of blocks) {
+      const copy = freshCopy(block);
+      // A page, a player or a drawing in the copy would load or play again: a plain box stands in.
+      copy.querySelectorAll('webview, iframe, video, canvas, object, embed').forEach((el) => {
+        const box = document.createElement('div');
+        box.className = 'block-ghost-media';
+        el.replaceWith(box);
+      });
+      holder.append(copy);
+    }
     document.body.appendChild(ghost);
     return ghost;
   }
@@ -670,7 +964,7 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
   }
 
   function over(x, y) {
-    const t = dropTarget(editor, drag.block, x, y, { sides: false });
+    const t = dropTargetOfRun(editor, drag.blocks, x, y);
     if (t) showDropMark(t.line); else hideDropMark();
     return t;
   }
@@ -699,18 +993,18 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
     scrollTimer = 0;
     document.body.classList.remove('block-dragging');
     d?.ghost?.remove();
-    d?.block.classList.remove('block-lifted');
+    d?.blocks.forEach((block) => block.classList.remove('block-lifted'));
     if (!d) return;
     if (!d.moved) {
-      // A click: the block is picked.
-      if (apply && d.block.isConnected) pick(d.block);
+      // A click: the block is picked. With Shift, every block from the one picked to this one.
+      if (apply && d.block.isConnected && !(d.shift && picked?.isConnected && pickRange(picked, d.block))) pick(d.block);
       return;
     }
-    if (!apply || !d.target || !d.block.isConnected || locked()) return;
+    if (!apply || !d.target || !d.blocks.every((block) => block.isConnected) || locked()) return;
     history?.push();
-    const moved = moveBlock(editor, d.block, d.target, { copy });
+    const moved = moveBlocks(editor, d.blocks, d.target, { copy });
     if (!moved) return;
-    pick(moved);
+    pickRange(moved[0], moved.at(-1));
     onGeometry?.();
     dirty();
   }
@@ -720,23 +1014,25 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
     e.preventDefault();
     e.stopPropagation();
     const r = boxOf(hovered);
-    drag = { block: hovered, x: e.clientX, y: e.clientY, moved: false, target: null, ghost: null, dx: Math.min(40, e.clientX - r.left + 24), dy: Math.min(16, Math.max(0, e.clientY - r.top)) };
+    // The grip of a block in a pick of several, or of a line inside one of them: the whole pick goes.
+    const run = group.length > 1 && group.some((block) => block.contains(hovered)) ? blocksBetween(group[0], group.at(-1)) : null;
+    drag = { block: hovered, blocks: run?.length === group.length ? run : [hovered], shift: e.shiftKey, x: e.clientX, y: e.clientY, moved: false, target: null, ghost: null, dx: Math.min(40, e.clientX - r.left + 24), dy: Math.min(16, Math.max(0, e.clientY - r.top)) };
   });
   // A right-click on the grip picks the block too, as Notion's menu would.
-  grip.addEventListener('contextmenu', (e) => { e.preventDefault(); if (hovered?.isConnected && !locked()) pick(hovered); });
+  grip.addEventListener('contextmenu', (e) => { e.preventDefault(); if (hovered?.isConnected && !locked() && !group.includes(hovered)) pick(hovered); });
 
   window.addEventListener('mousemove', (e) => {
     if (!drag) return;
     if (!drag.moved && Math.abs(e.clientX - drag.x) < TAKE && Math.abs(e.clientY - drag.y) < TAKE) return;
     // The button was let go where the window could not see it.
-    if (!drag.block.isConnected || !(e.buttons & 1)) { finish(false); return; }
+    if (!drag.blocks.every((block) => block.isConnected) || !(e.buttons & 1)) { finish(false); return; }
     if (!drag.moved) {
       drag.moved = true;
       release();
       grip.hidden = true;
       document.body.classList.add('block-dragging');
-      drag.block.classList.add('block-lifted');
-      drag.ghost = makeGhost(drag.block);
+      drag.blocks.forEach((block) => block.classList.add('block-lifted'));
+      drag.ghost = makeGhost(drag.blocks);
       scrollTimer = requestAnimationFrame(autoscroll);
     }
     moveGhost(e.clientX, e.clientY);
@@ -744,7 +1040,9 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
   });
   window.addEventListener('mouseup', (e) => { if (drag) finish(true, { copy: e.altKey }); });
   window.addEventListener('blur', () => { if (drag) finish(false); });
-  document.addEventListener('selectstart', (e) => { if (drag) e.preventDefault(); }, true);
+  // A band only once drawn: a press on open ground that is not pulled is a click,
+  // and the browser's caret must land (an empty note took no typing, 1.0.3).
+  document.addEventListener('selectstart', (e) => { if (drag || band?.el) e.preventDefault(); }, true);
 
   // A copy of words cut out of one toggle — title and body — is the toggle again.
   editor.addEventListener('copy', (e) => {

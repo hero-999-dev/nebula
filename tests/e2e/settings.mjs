@@ -68,9 +68,12 @@ export async function runSettingsChecks(check) {
     await win.waitForFunction((name) => document.getElementById('title').value === name, title, { polling: 50 });
     await win.waitForTimeout(150);
   };
-  const openSettings = async () => {
+  /** Settings opened on a tab of its own (null: on the one it remembers). */
+  const showTab = (tab) => win.click(`#set-tab-${tab}`);
+  const openSettings = async (tab = 'general') => {
     await win.click('#app-menu [data-cmd="settings.open"]');
     await win.waitForFunction(() => !document.getElementById('ov-settings').hidden, null, { polling: 50 });
+    if (tab) await showTab(tab);
   };
   const closeSettings = async () => {
     await win.click('#settings-close');
@@ -277,12 +280,14 @@ export async function runSettingsChecks(check) {
 
     // ---- Settings, beside Help -------------------------------------------------
     const titles = await win.evaluate(() => [...document.querySelectorAll('#app-menu .am-title')].map((b) => ({ text: b.textContent, left: b.getBoundingClientRect().left, top: b.getBoundingClientRect().top })));
-    check('Settings stands in the title strip, right after Help', titles.map((x) => x.text).join(',') === 'File,Edit,View,Window,Help,Settings' && titles[5].left > titles[4].left && Math.abs(titles[5].top - titles[4].top) < 1, JSON.stringify(titles.slice(-2)));
+    check('Settings stands in the title strip, right after Help, Tools after it', titles.map((x) => x.text).join(',') === 'File,Edit,View,Window,Help,Settings,Tools' && titles[5].left > titles[4].left && Math.abs(titles[5].top - titles[4].top) < 1, JSON.stringify(titles.slice(-2)));
     await openSettings();
     const sheet = await win.evaluate(() => {
       const modal = document.querySelector('#ov-settings .modal').getBoundingClientRect();
       return {
-        heads: [...document.querySelectorAll('#settings-body .set-head')].map((h) => h.textContent),
+        heads: [...document.querySelectorAll('#settings-body .set-panel')].map((p) => `${p.id.slice(10)}:${[...p.querySelectorAll('.set-head')].map((h) => h.textContent).join(',')}`),
+        tabs: [...document.querySelectorAll('#ov-settings .set-tab')].map((t) => t.textContent),
+        shown: [...document.querySelectorAll('#settings-body .set-panel')].filter((p) => !p.hidden).map((p) => p.id),
         font: document.getElementById('set-font').value, size: document.getElementById('set-size').value, page: document.getElementById('set-page').value,
         ownFont: document.getElementById('set-font').selectedOptions[0].textContent, ownSize: document.getElementById('set-size').selectedOptions[0].textContent,
         base: Math.round(parseFloat(getComputedStyle(document.getElementById('editor')).fontSize)),
@@ -292,7 +297,24 @@ export async function runSettingsChecks(check) {
         menus: document.querySelectorAll('#app-menu .am-menu:not([hidden])').length,
       };
     });
-    check('a press opens the sheet: new notes, show and hide, spelling, the lock on opening, the logo — nothing chosen yet', sheet.heads.join('|') === 'New notes|Show and hide|Spelling|Lock on opening|Logo' && sheet.font === '' && sheet.size === '14' && sheet.page === 'nw' && !sheet.ai && !sheet.holes && sheet.inside && sheet.menus === 0, JSON.stringify(sheet));
+    check('a press opens the sheet in tabs, on General — nothing chosen yet', sheet.tabs.join('|') === 'General|Appearance|Sounds|App lock|Storage' && sheet.shown.join('|') === 'set-panel-general' && sheet.font === '' && sheet.size === '14' && sheet.page === 'nw' && !sheet.ai && !sheet.holes && sheet.inside && sheet.menus === 0, JSON.stringify(sheet));
+    check('each tab holds its own: new notes, show and hide, spelling; the theme organizer with its preview, and the logo; the sounds; the lock; the room on this computer', sheet.heads.join('|') === 'general:New notes,Show and hide,Spelling|look:Theme organizer,Logo|sounds:Sounds|lock:Lock on opening|storage:On this computer', sheet.heads.join('|'));
+    await win.evaluate(() => document.getElementById('set-tab-general').focus());
+    await win.keyboard.press('ArrowRight');
+    const moved = await win.evaluate(() => ({ focus: document.activeElement?.id, shown: [...document.querySelectorAll('#settings-body .set-panel')].filter((p) => !p.hidden).map((p) => p.id).join(), sel: document.getElementById('set-tab-look').getAttribute('aria-selected') }));
+    check('the arrow keys go from tab to tab', moved.focus === 'set-tab-look' && moved.shown === 'set-panel-look' && moved.sel === 'true', JSON.stringify(moved));
+    await win.evaluate(() => document.getElementById('set-tab-storage').click());
+    await win.waitForFunction(() => /\d/.test(document.getElementById('set-store-total')?.textContent || ''), null, { polling: 100, timeout: 8000 }).catch(() => {});
+    const store = await win.evaluate(() => ({
+      total: document.getElementById('set-store-total').textContent,
+      rows: ['notes', 'holes', 'backups', 'trash'].map((k) => !!document.getElementById(`set-store-${k}`)),
+      empty: !!document.getElementById('set-store-empty'),
+    }));
+    check('Storage measures this computer: a total, the notes, black holes, backups and the Trash — nothing to empty while the Trash is', /\d/.test(store.total) && store.rows.every(Boolean) && !store.empty, JSON.stringify(store));
+    await closeSettings();
+    await openSettings(null);
+    check('the sheet opens again on the tab used last', await win.evaluate(() => !document.getElementById('set-panel-storage').hidden));
+    await win.evaluate(() => document.getElementById('set-tab-general').click());
     check('nothing chosen shows the font by its name and the size as a number (no "Nebula’s own", 1.0.0)', sheet.ownFont === 'Serif' && sheet.ownSize === `${sheet.base}` && sheet.base === 14, `${sheet.ownFont} | ${sheet.ownSize} | ${sheet.base}`);
     check('it offers the app’s fonts and every page', sheet.fonts === 15 && sheet.pages === 'nw,a3,a4,a5,nn,b3,b4,b5', `${sheet.fonts} ${sheet.pages}`);
     check('there is no lock, and one button to set one', (await lockState()) === 'Nebula opens without asking.' && (await lockButtons()) === 'set', `${await lockState()} | ${await lockButtons()}`);
@@ -383,8 +405,8 @@ export async function runSettingsChecks(check) {
     const aiBack = await win.evaluate(() => ({ button: getComputedStyle(document.querySelector('[data-pad="ai"]')).display !== 'none', panel: document.getElementById('ai-panel').hidden, six: [...document.querySelectorAll('#pad button')].filter((b) => b.getBoundingClientRect().width > 0).length }));
     check('turned off, the AI button is back — the panel still shut until it is pressed', aiBack.button && aiBack.panel && aiBack.six === 6, JSON.stringify(aiBack));
 
-    // ---- Your own theme: Matcha and Contrast, ready — and deletable ---------------
-    await win.click('#btn-theme-custom');
+    // ---- Your own theme: Matcha and Contrast, ready — and deletable (in Settings since 1.0.3) ---
+    await openSettings('look');
     await win.waitForFunction(() => !document.getElementById('theme-editor').hidden, null, { polling: 50 });
     const chips = () => win.evaluate(() => [...document.querySelectorAll('#theme-editor .te-profiles > *')].map((c) => `${c.querySelector('.te-chip__name')?.textContent ?? c.textContent}${c.querySelector('.te-chip__x') ? '×' : ''}${c.classList.contains('on') ? '*' : ''}`).join('|'));
     check('Your own theme comes with two ready profiles, Matcha and Contrast — each with a × like any other', (await chips()) === 'Matcha×|Contrast×', await chips());
@@ -398,14 +420,14 @@ export async function runSettingsChecks(check) {
     await win.click('#theme-editor .te-chip--back');
     check('brought back, Contrast is there again', (await chips()) === 'Matcha×|Contrast×*', await chips());
     await win.click('#theme-pick [data-theme="main"]');
-    await win.click('#theme-editor .te-close');
+    await closeSettings();
 
     {
     // ---- The logo, at the foot of Settings ---------------------------------------
     await app.evaluate(({ shell }, file) => shell.writeShortcutLink(file, 'create', { target: process.execPath }), shortcut);
     const linkOf = (file) => app.evaluate(({ shell }, f) => { const l = shell.readShortcutLink(f); return { icon: l.icon ?? '', target: l.target }; }, file);
     const linkIcon = () => linkOf(shortcut);
-    await openSettings();
+    await openSettings('look');
     await win.waitForTimeout(300);
     const logoNow = () => win.evaluate(() => {
       const ed = document.getElementById('logo-editor');
@@ -422,7 +444,7 @@ export async function runSettingsChecks(check) {
         drawn: [big, ed.querySelector('.logo-mid'), ed.querySelector('.logo-tiny')].every((i) => i.complete && i.naturalWidth > 0),
         left: side.right <= tools.left && side.left < tools.left,
         swatches: ed.querySelectorAll('.te-swatch').length,
-        below: ed.getBoundingClientRect().top > document.getElementById('set-lock').getBoundingClientRect().bottom,
+        below: ed.closest('.set-panel')?.id === 'set-panel-look' && ed.getBoundingClientRect().top > document.getElementById('set-panel-look').querySelector('.set-head').getBoundingClientRect().bottom,
         kept: JSON.parse(localStorage.getItem('nebula:logo-themes') || '[]').map((x) => `${x.name}:${x.colors.star}`).join('|'),
       };
     });
@@ -432,7 +454,7 @@ export async function runSettingsChecks(check) {
     const nameAsked = () => win.evaluate(() => (document.getElementById('ov-dialog').hidden ? null : { title: document.getElementById('dlg-title').textContent, value: document.getElementById('dlg-input').value }));
     const answerName = async (name) => { await win.fill('#dlg-input', name); await win.click('#dlg-ok'); await win.waitForTimeout(200); };
     const own = await logoNow();
-    check('at the foot of the sheet stands the logo — large, and as small as a taskbar and a title bar draw it — and at its right its colours, laid out as Your own theme is', own.left && own.below && own.sizes === '112,32,16' && own.drawn && own.swatches === 28 && own.slots.split('|').map((x) => x.split(':')[0]).join('|') === 'Background|Border|Moon|Moon’s shade|Star', JSON.stringify(own));
+    check('under Appearance stands the logo — large, and as small as a taskbar and a title bar draw it — and at its right its colours, laid out as Your own theme is', own.left && own.below && own.sizes === '112,32,16' && own.drawn && own.swatches === 28 && own.slots.split('|').map((x) => x.split(':')[0]).join('|') === 'Background|Border|Moon|Moon’s shade|Star', JSON.stringify(own));
     check('it starts as the logo Nebula comes with — the Main theme’s, lit — with no "Nebula’s own" in an app that is not the test build, and a + after the last theme', own.colors === '#17122A,#2A2145,#C9B6FF,#7C3AED,#996AF4' && own.chips === 'Main*|Dark|Light|White|Matcha|Contrast|+' && !fs.existsSync(logoDir) && own.kept === '', `${own.colors} ${own.chips}`);
     await win.click(chip('Contrast'));
     await until(() => logoKept()?.colors?.bg === '#F7F7F7');
@@ -451,7 +473,8 @@ export async function runSettingsChecks(check) {
     const firstId = await taskbarId();
     check('the window tells the taskbar of it under an app ID that is this logo’s own', firstId === `com.nebula.app.logo.${(firstIco ?? '').slice(5, 17)}`, `${firstId} ${firstIco}`);
     const stripMark = await win.evaluate(() => { const m = document.getElementById('tb-logo'); const probe = document.createElement('i'); probe.style.color = 'var(--clay)'; document.body.append(probe); const clay = getComputedStyle(probe).color; probe.remove(); return { color: getComputedStyle(m).color, clay, picture: !!m.querySelector('img'), svg: !!m.querySelector('svg') }; });
-    check('the mark at the top left of the app is not this logo: it stays in the app’s theme', stripMark.svg && !stripMark.picture && stripMark.color === stripMark.clay && stripMark.color !== 'rgb(43, 43, 43)', JSON.stringify(stripMark));
+    // 1.0.3: the title bar's mark follows the chosen logo ("Main, dark, light güncellenmiyor", read as that).
+    check('the mark at the top left of the app wears this logo too', stripMark.picture && !stripMark.svg, JSON.stringify(stripMark));
 
     // A change made to a ready theme is kept as a new theme, the logo's own.
     await win.click('#logo-editor .te-slot[data-slot="star"]');
@@ -506,7 +529,7 @@ export async function runSettingsChecks(check) {
     const madeLink = made ? await linkOf(path.join(shortcuts, made)) : null;
     check('“Put a shortcut on the desktop” makes one that starts this program and wears the logo', !!made && madeLink.target.toLowerCase() === (await linkIcon()).target.toLowerCase() && madeLink.icon.toLowerCase() === path.join(logoDir, icoFiles()[0]).toLowerCase(), `${made} ${JSON.stringify(madeLink)}`);
     await closeSettings();
-    await openSettings();
+    await openSettings('look');
     await win.waitForTimeout(300);
     check('the sheet opened again shows the logo as it is worn, its theme lit', (await logoNow()).colors === '#F7F7F7,#2B2B2B,#2B2B2B,#2B2B2B,#58A6FF' && (await logoNow()).chips === 'Main|Dark|Light|White|Matcha|Contrast|Contrast 2×*|+', (await logoNow()).chips);
     await closeSettings();
@@ -573,7 +596,7 @@ export async function runSettingsChecks(check) {
       return key;
     };
     await openNote('other');
-    await openSettings();
+    await openSettings('lock');
     await win.click('#set-lock [data-lock="set"]');
     await win.waitForSelector('#ov-app-lock:not([hidden]) [data-pin="new"]');
     const setting = await win.evaluate(() => ({ title: document.querySelector('#ov-app-lock .dlg-title').textContent, pins: document.querySelectorAll('#ov-app-lock .hole-pin').length, passkey: !!document.getElementById('app-lock-passkey'), off: document.getElementById('app-lock-passkey').disabled }));
@@ -632,7 +655,7 @@ export async function runSettingsChecks(check) {
     await win.keyboard.type(PIN, { delay: 15 });
     await ready();
     const opened = await win.evaluate(() => ({ gate: !!document.getElementById('app-lock'), inert: document.getElementById('app').inert, rows: document.querySelectorAll('.note-row').length, title: document.getElementById('title').value, menus: document.querySelectorAll('#app-menu .am-title').length }));
-    check('the right PIN opens the app as it was left, at its last digit', !opened.gate && !opened.inert && opened.rows >= 4 && opened.title === 'other' && opened.menus === 6, JSON.stringify(opened));
+    check('the right PIN opens the app as it was left, at its last digit', !opened.gate && !opened.inert && opened.rows >= 4 && opened.title === 'other' && opened.menus === 7, JSON.stringify(opened));
 
     // "Lock Nebula": shut at once, what was typed saved first.
     await win.click('#editor');
@@ -663,7 +686,7 @@ export async function runSettingsChecks(check) {
     await win.waitForFunction(() => !document.getElementById('toast').hidden, null, { polling: 50, timeout: 5000 }).catch(() => {});
     const recovered = await win.evaluate(() => ({ toast: document.getElementById('toast').textContent, words: document.getElementById('editor').textContent }));
     check('the recovery key opens the app, typed in any case, and says the lock was removed', recovered.toast === 'The lock was removed — set a new one in Settings' && /typed before the lock/.test(recovered.words) && !fs.existsSync(lockFile), JSON.stringify(recovered));
-    await openSettings();
+    await openSettings('lock');
     check('Settings shows no lock again', (await lockState()) === 'Nebula opens without asking.' && (await lockButtons()) === 'set', `${await lockState()} | ${await lockButtons()}`);
 
     // ---- "Turn the lock off" is not "Remove lock" -------------------------------
@@ -691,7 +714,7 @@ export async function runSettingsChecks(check) {
     await start({ NEBULA_LOGO_OWN: 'test' });
     await ready();
     check('opened again with the lock off, the app does not ask', await win.evaluate(() => !document.getElementById('app-lock') && document.querySelectorAll('.note-row').length >= 4));
-    await openSettings();
+    await openSettings('look');
     await win.waitForTimeout(400);
     const afterStart = await win.evaluate(() => { const big = document.querySelector('#logo-editor .logo-big'); return decodeURIComponent(big.src).includes('fill="#58A6FF"') && decodeURIComponent(big.src).includes('fill="#F7F7F7"'); });
     check('the logo is kept across a start of the app: its colours, its icon file, the shortcut still pointed at it', afterStart && logoKept()?.colors?.star === '#58A6FF' && icoFiles().length === 1
@@ -699,20 +722,23 @@ export async function runSettingsChecks(check) {
     const testChips = await win.evaluate(() => [...document.querySelectorAll('#logo-editor .logo-themes > .te-chip')].map((c) => `${c.querySelector('.te-chip__name')?.textContent ?? c.textContent}${c.classList.contains('on') ? '*' : ''}`).join('|'));
     check('the test build has a logo of its own, and offers it first — "Nebula’s own" — where no other build does', testChips === 'Nebula’s own|Main|Dark|Light|White|Matcha|Contrast|Contrast 2*|+', testChips);
     await win.click('#logo-editor .logo-themes > .te-chip:text-is("Nebula’s own")');
+    const TEST_OWN = { bg: '#14142E', edge: '#242551', moon: '#B3BEFF', shade: '#5B5BF0', star: '#7D81F6' };
     {
       const end = Date.now() + 6000;
-      while (Date.now() < end && fs.existsSync(logoDir)) await win.waitForTimeout(100);
+      while (Date.now() < end && JSON.stringify(logoKept()?.colors) !== JSON.stringify(TEST_OWN)) await win.waitForTimeout(100);
     }
     const backToOwn = await win.evaluate(() => decodeURIComponent(document.querySelector('#logo-editor .logo-big').src));
     // The shortcuts follow a moment after the window: they are not written on the spot.
     let linkBack = null;
     for (const end = Date.now() + 6000; Date.now() < end;) {
       linkBack = await app.evaluate(({ shell }, file) => { const l = shell.readShortcutLink(file); return { icon: l.icon ?? '', target: l.target }; }, shortcut);
-      if (linkBack.icon.toLowerCase() === linkBack.target.toLowerCase()) break;
+      if (icoFiles().length === 1 && linkBack.icon.toLowerCase() === path.join(logoDir, icoFiles()[0]).toLowerCase()) break;
       await win.waitForTimeout(150);
     }
-    check('it puts the build’s own logo back: nothing of a logo is kept, and the shortcut wears the program’s own icon again', !fs.existsSync(logoDir) && backToOwn.includes('fill="#14142E"') && backToOwn.includes('#B3BEFF')
-      && linkBack.icon.toLowerCase() === linkBack.target.toLowerCase(), JSON.stringify(linkBack));
+    // 1.0.3 (the owner: "teste özel Nebula's own … güncellemiyor"): worn as the others are, not handed back to the program's icon.
+    check('in the test build Nebula’s own is worn like any other: kept, and the shortcut points at its icon file', JSON.stringify(logoKept()?.colors) === JSON.stringify(TEST_OWN)
+      && backToOwn.includes('fill="#14142E"') && backToOwn.includes('#B3BEFF')
+      && icoFiles().length === 1 && linkBack.icon.toLowerCase() === path.join(logoDir, icoFiles()[0]).toLowerCase(), JSON.stringify({ linkBack, kept: logoKept() }));
     // In the test build the Main theme's logo is one to put on, like any other.
     await win.click('#logo-editor .logo-themes > .te-chip:text-is("Main")');
     {
@@ -723,8 +749,9 @@ export async function runSettingsChecks(check) {
     await win.click('#logo-editor .logo-themes > .te-chip:text-is("Nebula’s own")');
     {
       const end = Date.now() + 6000;
-      while (Date.now() < end && fs.existsSync(logoDir)) await win.waitForTimeout(100);
+      while (Date.now() < end && JSON.stringify(logoKept()?.colors) !== JSON.stringify(TEST_OWN)) await win.waitForTimeout(100);
     }
+    await showTab('lock');
     await win.click('#set-lock [data-lock="on"]');
     await lockSays('Nebula asks for its PIN when it opens.');
     check('turned on again at a press, with nothing to type: the same lock', kept()?.on === true && kept().pin.hash === whenOn.pin.hash && (await lockState()) === 'Nebula asks for its PIN when it opens.', await lockState());
@@ -745,7 +772,7 @@ export async function runSettingsChecks(check) {
     await ready();
     check('a font that is not on this computer, listed by one test build, is off the list at the next start', await win.evaluate(() => !(localStorage.getItem('nebula:fonts') || '').includes('Instrument Sans')
       && !(localStorage.getItem('nebula:fonts-pinned') || '').includes('Instrument Sans') && localStorage.getItem('nebula:font-stacks') === null));
-    await openSettings();
+    await openSettings('lock');
     await win.click('#set-lock [data-lock="remove"]');
     await win.waitForSelector('#ov-app-lock:not([hidden]) .hole-pin');
     check('Remove lock says what goes: the PIN, the passkey, the recovery key', await win.evaluate(() => document.querySelector('#ov-app-lock .dlg-title').textContent === 'Remove lock' && document.querySelector('#ov-app-lock .hole-note').textContent === 'The lock is deleted: its PIN, its passkey and its recovery key are forgotten.'));
@@ -760,10 +787,10 @@ export async function runSettingsChecks(check) {
 
     // ---- The words follow the language ------------------------------------------
     await win.click('#lang-row [data-lang="tr"]');
-    const turkish = await win.evaluate(() => [...document.querySelectorAll('#app-menu .am-title')].at(-1).textContent);
+    const turkish = await win.evaluate(() => [...document.querySelectorAll('#app-menu .am-title')].at(-2).textContent);
     await openSettings();
-    const sheetTr = await win.evaluate(() => ({ heads: [...document.querySelectorAll('#settings-body .set-head')].map((h) => h.textContent).join('|'), state: document.querySelector('#set-lock .set-state').textContent, own: document.getElementById('set-size').selectedOptions[0].textContent, font: document.getElementById('set-font').selectedOptions[0].textContent, page: document.getElementById('set-page').options[0].textContent, set: document.querySelector('#set-lock [data-lock="set"]').textContent }));
-    check('in Türkçe the title is Ayarlar and the sheet reads in Turkish, the pages keeping their names', turkish === 'Ayarlar' && sheetTr.heads === 'Yeni notlar|Göster ve gizle|Yazım denetimi|Açılışta kilit|Logo' && sheetTr.state === 'Nebula sormadan açılır.' && sheetTr.own === '14' && sheetTr.font === 'Serif' && sheetTr.page === 'Nebula Wide (NW)' && sheetTr.set === 'Kilit kur', JSON.stringify({ turkish, ...sheetTr }));
+    const sheetTr = await win.evaluate(() => ({ tabs: [...document.querySelectorAll('#ov-settings .set-tab')].map((t) => t.textContent).join('|'), heads: [...document.querySelectorAll('#settings-body .set-head')].map((h) => h.textContent).join('|'), state: document.querySelector('#set-lock .set-state').textContent, own: document.getElementById('set-size').selectedOptions[0].textContent, font: document.getElementById('set-font').selectedOptions[0].textContent, page: document.getElementById('set-page').options[0].textContent, set: document.querySelector('#set-lock [data-lock="set"]').textContent }));
+    check('in Türkçe the title is Ayarlar and the sheet reads in Turkish, the pages keeping their names', turkish === 'Ayarlar' && sheetTr.heads === 'Yeni notlar|Göster ve gizle|Yazım denetimi|Tema düzenleyici|Logo|Sesler|Açılışta kilit|Bu bilgisayarda' && sheetTr.tabs === 'Genel|Görünüm|Sesler|Uygulama kilidi|Depolama' && sheetTr.state === 'Nebula sormadan açılır.' && sheetTr.own === '14' && sheetTr.font === 'Serif' && sheetTr.page === 'Nebula Wide (NW)' && sheetTr.set === 'Kilit kur', JSON.stringify({ turkish, ...sheetTr }));
     await closeSettings();
     await win.click('#lang-row [data-lang="en"]');
     await stop();
@@ -771,7 +798,7 @@ export async function runSettingsChecks(check) {
     // ---- A passkey beside the PIN ------------------------------------------------
     await start({ NEBULA_HELLO: 'ok' });
     await ready();
-    await openSettings();
+    await openSettings('lock');
     const helloKey = await setLock({ passkey: true });
     await lockSays('Nebula asks for its PIN — or your passkey — when it opens.');
     await win.waitForTimeout(300);
@@ -793,7 +820,7 @@ export async function runSettingsChecks(check) {
     await win.keyboard.type(PIN, { delay: 15 });
     await ready();
     check('and the PIN opens it all the same: whichever the person likes', await win.evaluate(() => !document.getElementById('app-lock') && document.querySelectorAll('.note-row').length >= 4));
-    await openSettings();
+    await openSettings('lock');
     await win.waitForSelector('#set-lock [data-lock="passkey-off"]');
     await win.click('#set-lock [data-lock="passkey-off"]');
     await lockSays('Nebula asks for its PIN when it opens.');
@@ -815,7 +842,7 @@ export async function runSettingsChecks(check) {
     check('with the passkey taken away, the lock screen has the PIN alone', await win.evaluate(() => !document.querySelector('#app-lock [data-lock="passkey"]')));
     await win.keyboard.type(PIN, { delay: 15 });
     await ready();
-    await openSettings();
+    await openSettings('lock');
     await win.waitForSelector('#set-lock [data-lock="passkey-on"]:not([disabled])');
     await win.click('#set-lock [data-lock="passkey-on"]');
     await win.waitForSelector('#ov-app-lock:not([hidden]) .hole-pin');
@@ -843,7 +870,7 @@ export async function runSettingsChecks(check) {
     await win.click('#app-lock [data-lock="passkey"]');
     await ready();
     check('a press on Log in with passkey, and its yes, opens the app', await win.evaluate(() => !document.getElementById('app-lock') && document.querySelectorAll('.note-row').length >= 4));
-    await openSettings();
+    await openSettings('lock');
     await win.waitForSelector('#set-lock [data-lock="remove"]');
     await win.click('#set-lock [data-lock="remove"]');
     await win.waitForSelector('#ov-app-lock:not([hidden]) [data-lock="passkey"]');

@@ -2,7 +2,7 @@
 // 4 → 4, 5 → 5"; a project's loose notes in the project's colour; the core a
 // little bigger; and no two systems ever touch.
 import { describe, it, expect } from 'vitest';
-import { buildScene, positionAt } from '../src/js/galaxy-model.js';
+import { buildScene, positionAt, systemReach } from '../src/js/galaxy-model.js';
 
 const TAU = Math.PI * 2;
 
@@ -96,6 +96,30 @@ describe('even rings', () => {
     expect(core.size).toBeGreaterThan(3);
     for (const b of scene.bodies.filter((x) => x.parent === 'core')) {
       expect(b.orbit.r - b.size).toBeGreaterThan(core.size);
+    }
+  });
+
+  // Bug Find (1.0.3): "merkezin cemberi projectin cemberinin ic kisminda kaliyor, project cemberi tasiyor".
+  it("the centre's circle holds every circle drawn inside it, a project's and its folders'", () => {
+    const scene = projectScene(4, { notesPer: 6, extraProjects: 1, freeFolders: 2 });
+    const of = new Map();
+    // Listed children first, as a scene may be: the order must not leave any out.
+    for (const x of [...scene.bodies].reverse()) if (x.parent) { if (!of.has(x.parent)) of.set(x.parent, []); of.get(x.parent).push(x); }
+    const kidsOf = (id) => of.get(id) ?? [];
+    const gap = 2;
+    for (const t of [0, 300, 900]) {
+      const posOf = (id) => positionAt(scene, id, t);
+      const circle = (id) => systemReach(id, kidsOf, posOf, gap);
+      const c = posOf('core');
+      const outer = circle('core');
+      for (const b of scene.bodies) {
+        if (b.id === 'core' || !b.parent) continue;
+        const r = circle(b.id);
+        if (r === 0) continue;
+        const p = posOf(b.id);
+        expect(Math.hypot(p.x - c.x, p.y - c.y) + r + gap).toBeLessThanOrEqual(outer + 1e-9);
+      }
+      expect(outer).toBeGreaterThanOrEqual(reach(scene, 'core', t) - scene.byId.get('core').size);
     }
   });
 

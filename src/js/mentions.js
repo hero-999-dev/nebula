@@ -485,7 +485,14 @@ export function initMentions(editorEl, { store, history, openNote, showLabel, is
       }
       return;
     }
-    if (menu.hidden) return;
+  }, true);
+
+  // The open list's keys, on the window before the editor's own: at a
+  // column's last line ↓ took the caret out of the row while the list stepped,
+  // and Enter then went to the line under it (owner's Bug Find note, 1.0.3).
+  window.addEventListener('keydown', (e) => {
+    if (menu.hidden || !editorEl.contains(e.target)) return;
+    if (e.key === 'Enter' && mode === 'tag' && index < 0) return; // the editor's handler above makes the label
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       e.stopImmediatePropagation();

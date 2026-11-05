@@ -15,7 +15,7 @@ import { fromNebulaNote } from './export.js';
 const FORBIDDEN = 'script, style, link, meta, iframe, webview, object, embed, form, input, button, svg, math';
 
 /** Kept, per element. Anything else is dropped. */
-const ALLOWED_ATTRS = new Set(['href', 'src', 'alt', 'title', 'target', 'rel', 'class', 'data-lang', 'data-code', 'data-tex', 'data-ind', 'data-block-type', 'data-url', 'data-kind', 'data-ratio', 'data-open', 'data-note', 'data-tag', 'data-edge', 'data-widget', 'data-wg-expr', 'data-wg-out', 'data-wg-done', 'data-wg-angle', 'data-wg-month', 'data-wg-marks', 'colspan', 'rowspan']);
+const ALLOWED_ATTRS = new Set(['href', 'src', 'alt', 'title', 'target', 'rel', 'class', 'data-lang', 'data-code', 'data-tex', 'data-ind', 'data-block-type', 'data-url', 'data-kind', 'data-ratio', 'data-open', 'data-note', 'data-tag', 'data-edge', 'data-widget', 'data-wg-expr', 'data-wg-out', 'data-wg-done', 'data-wg-angle', 'data-wg-month', 'data-wg-marks', 'data-wg-events', 'data-wg-mode', 'data-wg-focus', 'data-wg-short', 'data-wg-long', 'data-wg-rounds', 'data-wg-alarm', 'data-wg-alarm-on', 'data-wg-auto', 'data-wg-pin', 'data-wg-follow', 'data-wg-names', 'data-wg-id', 'colspan', 'rowspan']);
 
 /** Classes the editor gives meaning to. An imported file may not invent others. */
 const ALLOWED_CLASSES = new Set([

@@ -23,7 +23,7 @@ export function buildMenus(ctx) {
   const {
     actions = {}, store, openNote, newNote, find, palette, shortcuts,
     about, checkUpdates, guide, toggleSide, toggleBar, toggleAi, history, blocks,
-    whatsNew, settings, aiShown, lockSet, lockNow,
+    whatsNew, settings, tools, aiShown, lockSet, lockNow,
   } = ctx;
   const shell = typeof window !== 'undefined' ? window.nebula : null;
 
@@ -119,6 +119,14 @@ export function buildMenus(ctx) {
       direct: true,
       items: [
         { id: 'settings.open', label: 'Settings', run: () => settings?.open() },
+      ],
+    },
+    // Tools, beside Settings (the owner, 1.0.3): what Nebula does with other apps — a list of its own.
+    {
+      title: 'Tools',
+      items: [
+        // One tool, Tailscale; Sync now is in its sheet only (the owner, 2026-11-05).
+        { id: 'tools.tailscale', label: 'Tailscale – for syncing devices', run: () => tools?.open() },
       ],
     },
   ];

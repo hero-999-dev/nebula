@@ -26,7 +26,7 @@ export async function runLayoutChecks(check) {
   seed('three', `<p id="t0">three pictures</p>${picture('ta', 200)}${picture('tb', 180)}${picture('tc', 160)}<p id="t1">and a line under them</p>`);
   seed('split','<p id="s0">above the divider</p><hr class="blk-hr" id="h1"><h2 id="s1">Pixel 2D Art Studies</h2><p id="s2">a line of notes</p>'
     + `${picture('spic', 260)}<p id="s3">under the picture</p><hr class="blk-hr" id="h2"><p id="s4">below the second divider</p>`);
-  seed('more', '<p id="m0">top</p><div class="blk-cols" data-block-type="columns" data-split="50" style="--split: 50%;"><div class="blk-col"><p id="ml">left words</p><hr class="blk-hr" id="mh"><p id="ml2">more left</p></div>'
+  seed('more', '<p id="m0">top</p><div class="blk-cols" data-block-type="columns" data-split="50" style="--split: 50%;"><div class="blk-col"><p id="ml">left words</p><p id="ml2">more left</p><hr class="blk-hr" id="mh"></div>'
     + '<hr class="blk-vr"><div class="blk-col"><p id="mr">right words</p></div></div><hr class="blk-hr" id="mh2"><p id="m1">under</p>');
   seed('word', `<p id="w0">The quick brown fox jumps over the lazy dog.</p>${picture('wp', 60)}<p id="w1">A second line of words to drag the picture into.</p>`);
   // What the owner's note held on the first build: a picture alone in the left column, a line and a picture in the right.
@@ -400,9 +400,11 @@ export async function runLayoutChecks(check) {
       getSelection().addRange(r);
     });
     await win.keyboard.press('Backspace');
-    await win.keyboard.press('Backspace');
     await win.waitForTimeout(120);
     check('Backspace at the start of a column leaves the columns as they are', /^s0,h1,\[s1,s2,spic,s3 \| p,ul\],s4$/.test(await struct()), await struct());
+    // The owner's Ideas note: it did nothing there. It goes up out of the row, as ↑ does — never past
+    // the upright divider into the column before (1.0.3): here onto the divider over the row.
+    check('and goes up out of the row, onto the divider over it', await win.evaluate(() => document.getElementById('h1').classList.contains('armed')));
     await win.evaluate(() => {
       const p = document.getElementById('s3');
       const r = document.createRange();
@@ -541,9 +543,10 @@ export async function runLayoutChecks(check) {
       const splits = () => win.evaluate(() => document.querySelector('#editor .blk-cols').dataset.split);
       const at = (list) => list.map((p) => pg.left + (W * p) / 100);
       const near = (got, want) => got.length === want.length && got.every((x, i) => Math.abs(x - want[i]) < 2.5);
-      check('the note begins with two columns and a divider lying in the left one', await struct() === 'm0,[ml,mh,ml2 | mr],mh2,m1', await struct());
+      check('the note begins with two columns and a divider lying in the left one', await struct() === 'm0,[ml,ml2,mh,p | mr],mh2,m1', await struct());
 
-      // A divider pulled sideways over a column cuts that column in two: shown first.
+      // A divider with words only on one side, pulled sideways over its column,
+      // cuts that column in two: shown first. (Words under it too: only those, ideas-103.)
       let mh = await box('#mh');
       const block = await box('#editor .blk-cols');
       const leftCol = await box('#editor .blk-col');
@@ -551,16 +554,16 @@ export async function runLayoutChecks(check) {
       const cut = { mark: await mark(), shade: await shade(), struct: await struct() };
       check('pulled sideways in a column, the mark stands upright in that column, as tall as the columns, the column tinted',
         !!cut.mark && cut.mark.upright && Math.abs(cut.mark.left + cut.mark.width / 2 - (pg.left + W * 0.25)) < 3 && Math.abs(cut.mark.top - block.top) < 2 && Math.abs(cut.mark.height - block.height) < 2
-        && !!cut.shade && Math.abs(cut.shade.left - leftCol.left) < 2 && Math.abs(cut.shade.right - leftCol.right) < 2 && cut.struct === 'm0,[ml,mh,ml2 | mr],mh2,m1',
+        && !!cut.shade && Math.abs(cut.shade.left - leftCol.left) < 2 && Math.abs(cut.shade.right - leftCol.right) < 2 && cut.struct === 'm0,[ml,ml2,mh,p | mr],mh2,m1',
         JSON.stringify({ cut, block, leftCol }));
       await win.keyboard.press('Escape');
       await win.mouse.up();
       await win.waitForTimeout(120);
-      check('Esc gives it up', !(await mark()) && await struct() === 'm0,[ml,mh,ml2 | mr],mh2,m1', await struct());
+      check('Esc gives it up', !(await mark()) && await struct() === 'm0,[ml,ml2,mh,p | mr],mh2,m1', await struct());
       mh = await box('#mh');
       await drag({ x: mh.left + 30, y: mh.cy }, { x: pg.left + W * 0.26, y: mh.cy + 3 });
       check('let go, there are three columns: what the column held at the left, an empty one beside it, the divider gone into the upright one',
-        await struct() === 'm0,[ml,ml2 | p | mr],mh2,m1' && await splits() === '25,50', `${await struct()} ${await splits()}`);
+        await struct() === 'm0,[ml,ml2,p | p | mr],mh2,m1' && await splits() === '25,50', `${await struct()} ${await splits()}`);
       check('each upright divider stands at its place on the line', near(await rules(), at([25, 50])), JSON.stringify({ rules: await rules(), want: at([25, 50]) }));
       await win.keyboard.type('middle words');
       await win.waitForTimeout(120);
@@ -570,7 +573,7 @@ export async function runLayoutChecks(check) {
       const mh2 = await box('#mh2');
       const right = await box('#editor .blk-col:last-child');
       await drag({ x: pg.left + 60, y: mh2.cy }, { x: pg.left + W * 0.8, y: right.cy });
-      check('a fourth column, from a divider under the columns pulled up into the right one', await struct() === 'm0,[ml,ml2 | p | mr | p],m1' && await splits() === '25,50,80', `${await struct()} ${await splits()}`);
+      check('a fourth column, from a divider under the columns pulled up into the right one', await struct() === 'm0,[ml,ml2,p | p | mr | p],m1' && await splits() === '25,50,80', `${await struct()} ${await splits()}`);
       check('all three dividers at their places, the columns inside the page', near(await rules(), at([25, 50, 80]))
         && await win.evaluate(() => { const c = [...document.querySelectorAll('#editor .blk-col')]; const b = document.querySelector('#editor .blk-cols').getBoundingClientRect(); return c.length === 4 && c.at(-1).getBoundingClientRect().right <= b.right + 1 && c.every((el) => el.getBoundingClientRect().width > 60); }),
         JSON.stringify({ rules: await rules(), want: at([25, 50, 80]) }));
@@ -597,11 +600,11 @@ export async function runLayoutChecks(check) {
       await win.waitForTimeout(120);
       await win.keyboard.press('Delete');
       await win.waitForTimeout(150);
-      check('Delete on the first upright divider joins the two columns at its sides, and the others stay', await struct() === 'm0,[ml,ml2,p | mr | p],m1' && await splits() === '60,80'
+      check('Delete on the first upright divider joins the two columns at its sides, and the others stay', await struct() === 'm0,[ml,ml2,p,p | mr | p],m1' && await splits() === '60,80'
         && await win.evaluate(() => document.querySelector('#editor .blk-col').textContent === 'left wordsmore leftmiddle words'), `${await struct()} ${await splits()}`);
       await win.keyboard.press('Control+z');
       await win.waitForTimeout(200);
-      check('Ctrl+Z brings the four back', await struct() === 'm0,[ml,ml2 | p | mr | p],m1' && await splits() === '25,60,80', `${await struct()} ${await splits()}`);
+      check('Ctrl+Z brings the four back', await struct() === 'm0,[ml,ml2,p | p | mr | p],m1' && await splits() === '25,60,80', `${await struct()} ${await splits()}`);
       await win.keyboard.press('Control+y');
       await win.waitForTimeout(200);
 
@@ -611,7 +614,7 @@ export async function runLayoutChecks(check) {
         kept.slice(0, 500));
       await open('other');
       await open('more');
-      check('opened again, three columns as they were left, each divider at its place', await struct() === 'm0,[ml,ml2,p | mr | p],m1' && await splits() === '60,80' && near(await rules(), at([60, 80])),
+      check('opened again, three columns as they were left, each divider at its place', await struct() === 'm0,[ml,ml2,p,p | mr | p],m1' && await splits() === '60,80' && near(await rules(), at([60, 80])),
         `${await struct()} ${await splits()} ${JSON.stringify(await rules())}`);
     }
 

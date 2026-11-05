@@ -480,6 +480,17 @@
    room, so every divider stands at its place on the line; the last column
    takes the rest. */
 .editor .blk-cols { display: flex; align-items: stretch; margin: 6px 0; }
+/* Rows cut from one block stand against each other, so an upright divider at the
+   same place runs on through them and a cut beside it does not break it. */
+.editor .blk-cols:has(+ .blk-cols) { margin-bottom: 0; }
+.editor .blk-cols + .blk-cols { margin-top: 0; }
+/* A flat divider at the top or bottom of a column in such a row keeps the small
+   room it had, so an upright one does not run into it (the owner's Ideas note,
+   1.0.3: "eskiden aralıklı olurdu"). */
+.editor .blk-cols + .blk-cols > .blk-col > hr.blk-hr:first-child { margin-top: 6px; }
+.editor .blk-cols:has(+ .blk-cols) > .blk-col > hr.blk-hr:last-child { margin-bottom: 6px; }
+/* A line with nothing in it, not even a break, still has a height to click on. */
+.editor p:empty { min-height: 1lh; }
 .editor .blk-col { flex: 1 1 0; min-width: 0; }
 .editor .blk-col:not(:first-child):not(:last-child) { flex: 0 0 calc(var(--w, 33%) - 29.4px); }
 .editor .blk-col:first-child { flex: 0 0 calc(var(--split, 50%) - 15px); }
@@ -500,6 +511,19 @@
 /* As thin as the flat one, so the band beside it takes the click too. */
 .editor hr.blk-vr::after { content: ""; position: absolute; top: 0; bottom: 0; left: -9px; width: 17px; }
 .editor hr.blk-vr.armed { border-color: var(--clay) !important; box-shadow: 0 0 0 2px var(--clay-soft); }
+/* Its foot: taken there, the divider is pulled down and the columns grow.
+   A small dot centred on the line: the line is the border, one pixel left of
+   the box, so an 11-pixel box from -6px has the line's pixel in its middle.
+   The box is wider than the dot, to be easy to take (the owner: "çok büyük
+   ve tam simetrik değil"). */
+.editor hr.blk-vr::before {
+  --dot: var(--rule);
+  content: ""; position: absolute; z-index: 1; bottom: -6px; left: -6px; width: 11px; height: 11px;
+  cursor: ns-resize; opacity: 0; transition: opacity .12s;
+  background: radial-gradient(circle at 50% 50%, var(--dot) 2.6px, transparent 3.2px);
+}
+.editor hr.blk-vr:hover::before, .editor hr.blk-vr.armed::before { opacity: 1; }
+.editor hr.blk-vr.armed::before { --dot: var(--clay); }
 /* A picture in a column, selected: the caret beside it is not drawn, as on the note itself. */
 #editor:has(.blk-col > .note-image.sel) { caret-color: transparent; }
 /* While a divider is dragged the page does not select words under the pointer. */
@@ -869,6 +893,12 @@ body.divider-dragging .link-frame { pointer-events: none; }
   max-width: max(calc((100% - 1px) / var(--row, 2) - 12px), calc(100% - 13px - var(--beside, 100%)));
   margin: 10px 12px 14px 0;
 }
+/* Pictures in a row pulled to the same height: a line along their foot (1.0.3, rich-paste.js). */
+.image-row-guide {
+  position: fixed; height: 0; border-top: 1.5px dashed var(--clay); pointer-events: none; z-index: 60;
+  margin-top: 3px;
+}
+.image-row-guide[hidden] { display: none; }
 /* A picture standing in a line of words (0.9.4): a character of the line,
    sitting on it like a tall letter. No shadow: in a line it reads as a smudge
    over the words under it. */
@@ -1081,6 +1111,11 @@ body.block-dragging .link-frame { pointer-events: none; }
 .block-grip svg { width: 4px; height: 16px; fill: currentColor; pointer-events: none; }
 .editor .block-picked { background: color-mix(in srgb, var(--clay-soft) 55%, transparent); border-radius: 4px; box-shadow: 0 0 0 2px color-mix(in srgb, var(--clay-soft) 55%, transparent); }
 .editor .block-lifted { opacity: .35; }
+/* The band pulled from the page's empty side across blocks (1.0.3). */
+.block-band { position: fixed; z-index: 91; pointer-events: none; border: 1px solid var(--clay); border-radius: 3px; background: color-mix(in srgb, var(--clay-soft) 30%, transparent); }
+body.block-banding, body.block-banding .editor { user-select: none; }
+/* A drag from the words into another block picks blocks (1.0.3): no words selected meanwhile. */
+body.block-sweeping .editor, body.block-sweeping .editor * { user-select: none; }
 /* The faint copy that follows the pointer. It is an .editor for the note's
    look, without the editor's frame. */
 .editor.block-ghost {
@@ -1287,6 +1322,8 @@ body.tbl-filling, body.tbl-filling * { cursor: crosshair !important; user-select
   gap: 2px;
   padding: 9px 12px;
   color: var(--ink);
+  /* The note's writing font (main.js paintTitleFont); the words have theirs on spans, a card has none. */
+  font-family: var(--note-font, inherit);
   text-decoration: none;
 }
 .link-card:hover { background: var(--paper-sunken); }
@@ -1362,7 +1399,7 @@ body.tbl-filling, body.tbl-filling * { cursor: crosshair !important; user-select
   font-size: 13px;
 }
 .link-menu input:focus { border-color: var(--clay); }
-.link-menu__options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 7px; }
+.link-menu__options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 7px; }
 .link-menu__options button { justify-content: center; padding: 7px 4px; font-size: 12px; }
 .link-menu__hint { padding: 7px 8px 3px; color: var(--ink-faint); font-size: 11px; }
 /* A shape's fill is always one of six light pastels, so its border and its text
@@ -1704,13 +1741,21 @@ body.resizing webview { pointer-events: none; }
   display: flex;
   gap: 4px;
   overflow-x: auto;
-  scrollbar-width: thin;
   flex: 1;
   min-width: 0;
-  padding-bottom: 2px;
+  scrollbar-width: none;
 }
-.ai-tabs::-webkit-scrollbar { height: 6px; }
-.ai-tabs::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 4px; }
+/* Chromium's bar took room under the tabs and pushed them about (the owner's
+   Bug Find note, twice): it is hidden, and .ai-tabs-bar (ai-panel.js) is a
+   2px line over the head's foot that takes none. */
+.ai-tabs::-webkit-scrollbar { display: none; }
+.ai-head { position: relative; }
+/* A 12px track straddling the head's foot takes the mouse; the line in it
+   thickens under the mouse and while dragged. */
+.ai-tabs-track { position: absolute; bottom: -5px; height: 12px; z-index: 3; cursor: default; touch-action: none; }
+.ai-tabs-track[hidden] { display: none; }
+.ai-tabs-bar { position: absolute; top: 5px; height: 2px; border-radius: 3px; background: var(--ink-faint); opacity: .55; transition: height .12s, top .12s, opacity .12s; }
+.ai-tabs-track:hover .ai-tabs-bar, .ai-tabs-track.drag .ai-tabs-bar { top: 3px; height: 6px; opacity: .9; }
 .ai-tab {
   display: inline-flex;
   align-items: center;
@@ -2002,22 +2047,24 @@ body.resizing webview { pointer-events: none; }
   border-radius: 3px;
   /* The 2px of breathing room is painted, not laid out: as plain padding it
      made every following word jump 4px sideways the moment a highlight was
-     applied, and jump back when it was removed. The negative margin gives the
-     width back. */
-  padding: 0 2px;
-  margin: 0 -2px;
+     applied. It was padding with a negative margin until 1.0.3, but that box
+     reached 2px over the letters either side, so a click or an ArrowDown at a
+     highlight's edge landed inside it ("I cannot select that part"). A shadow
+     is painted the same and never hit. */
+  background: var(--hl);
+  box-shadow: -2px 0 0 var(--hl), 2px 0 0 var(--hl);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
-.h-gray   { background: var(--h-gray); }
-.h-brown  { background: var(--h-brown); }
-.h-orange { background: var(--h-orange); }
-.h-yellow { background: var(--h-yellow); }
-.h-green  { background: var(--h-green); }
-.h-blue   { background: var(--h-blue); }
-.h-purple { background: var(--h-purple); }
-.h-pink   { background: var(--h-pink); }
-.h-red    { background: var(--h-red); }
+.h-gray   { --hl: var(--h-gray); }
+.h-brown  { --hl: var(--h-brown); }
+.h-orange { --hl: var(--h-orange); }
+.h-yellow { --hl: var(--h-yellow); }
+.h-green  { --hl: var(--h-green); }
+.h-blue   { --hl: var(--h-blue); }
+.h-purple { --hl: var(--h-purple); }
+.h-pink   { --hl: var(--h-pink); }
+.h-red    { --hl: var(--h-red); }
 
 /* Notes written before 0.4.3 carry an inline background-color chosen against
    the light paper. Nothing can retint those, but they can at least be made
@@ -2185,6 +2232,26 @@ body.resizing { cursor: col-resize; user-select: none; }
   border-color: var(--clay) !important;
   box-shadow: 0 0 0 2px var(--clay-soft);
 }
+
+/* What has no words to paint blue, inside a selection or a pick of blocks: a
+   divider, a picture, a video or a card. The selection's tint does not reach
+   them, and the owner could not tell whether a picture was taken along (1.0.3).
+   `in-sel` is put on by block-handle.js while the selection crosses them. */
+.editor hr.blk-hr:is(.in-sel, .block-picked),
+.editor .block-picked hr.blk-hr {
+  border-top-color: var(--clay) !important;
+  border-radius: 2px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--clay) 35%, transparent);
+  background: none;
+}
+.editor :is(.note-image, .link-block):is(.in-sel, .block-picked),
+.editor .block-picked :is(.note-image, .link-block) {
+  outline: 3px solid var(--clay);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 7px color-mix(in srgb, var(--clay) 30%, transparent);
+}
+.editor :is(.note-image, .link-block):is(.in-sel, .block-picked) :is(img, video),
+.editor .block-picked :is(.note-image, .link-block) :is(img, video) { filter: brightness(.82) saturate(.9); }
 
 /* The guide's shape stage: an empty band at the top of the guide where its demo
    shapes stand, so no line of text ever runs under them at any window width. */
@@ -2434,7 +2501,8 @@ body.resizing { cursor: col-resize; user-select: none; }
   padding: 4cqw;
   gap: 3cqw;
   color: var(--ink);
-  font-family: var(--sans, Inter, 'Segoe UI', sans-serif);
+  /* The note's own writing font, else the theme's (1.0.3: "herseyin fontu temaya ayarlara uygun olsun"). */
+  font-family: var(--note-font, var(--serif));
   line-height: 1.2;
   text-align: left;
   white-space: normal;
@@ -2442,7 +2510,7 @@ body.resizing { cursor: col-resize; user-select: none; }
 }
 .note-widget > .wg--calc { aspect-ratio: .72; }
 .note-widget > .wg--sci { aspect-ratio: .95; padding: 3cqw; gap: 2.2cqw; }
-.note-widget > .wg--calendar { aspect-ratio: .92; }
+.note-widget > .wg--calendar { aspect-ratio: .8; gap: 2.4cqw; }
 /* The Universe (1.0.0): a title bar and the sky; in the editor the live map
    (.wg-live, never saved) covers the drawn rings. */
 .note-widget > .wg--universe { aspect-ratio: 1.6; padding: 2.4cqw; gap: 1.8cqw; }
@@ -2455,6 +2523,22 @@ body.resizing { cursor: col-resize; user-select: none; }
 .wg-live-canvas { display: block; width: 100%; height: 100%; cursor: default; outline: none; }
 .wg-live-canvas.is-grabbing { cursor: grabbing; }
 .wg-live-canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--clay); }
+/* The pin of a live map: a corner button, bright when the map is held still. */
+.wg-pin {
+  position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 26px; height: 26px; margin: 0; padding: 0;
+  border: 1px solid var(--rule); border-radius: 50%; background: color-mix(in srgb, var(--paper) 80%, transparent);
+  color: var(--ink-faint); cursor: pointer; opacity: .55; transition: opacity .15s;
+}
+.wg-pin svg { width: 14px; height: 14px; }
+/* Lock at the corner, Follow beside it, Fit after (1.0.3: "kilitle fit arasina"). */
+.wg-follow { right: 38px; }
+.wg-follow svg { width: 14px; height: 14px; }
+.wg-fit { right: 70px; }
+.wg-fit svg { width: 13px; height: 13px; }
+.wg-names { right: 102px; }
+.wg-names:not(.on) .wg-names-off { display: none; }
+.wg-live:hover .wg-pin, .wg-pin:focus-visible { opacity: 1; }
+.wg-pin.on { opacity: 1; background: var(--clay); border-color: var(--clay); color: var(--paper); }
 .note-image.note-widget:not(.note-image--inline) > .wg { height: 100%; aspect-ratio: auto; }
 .wg-head { display: flex; align-items: center; gap: 2cqw; color: var(--ink-soft); font-size: 5cqw; line-height: 1; }
 .wg--sci .wg-head { font-size: 3.6cqw; }
@@ -2496,6 +2580,128 @@ body.resizing { cursor: col-resize; user-select: none; }
 .wg-day--today { border-color: var(--clay); color: var(--clay); font-weight: 600; }
 .wg-day--mark { background: var(--clay-soft); color: var(--ink); }
 .wg-day--today.wg-day--mark { background: var(--clay); color: var(--paper); }
+/* A chosen day, its events under the month (1.0.3): the month keeps its rows, the list scrolls. */
+.wg--calendar .wg-cal { flex: none; grid-auto-rows: 8cqw; gap: .8cqw 1.2cqw; }
+.wg-day { position: relative; }
+.wg--calendar .wg-day { border-radius: 2.4cqw; }
+.wg-day--sel { outline: .6cqw solid var(--ink-soft); outline-offset: -.6cqw; }
+.wg-day--event::after { content: ''; position: absolute; top: .8cqw; right: .9cqw; width: 1.3cqw; height: 1.3cqw; border-radius: 50%; background: var(--clay); }
+.wg-day--today.wg-day--mark.wg-day--event::after { background: var(--paper); }
+.wg-agenda { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 1.4cqw; border-top: 1px solid var(--rule); padding-top: 2cqw; }
+.wg-agenda-head { display: flex; align-items: center; justify-content: center; gap: 1.6cqw; }
+.wg-agenda-day { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 4cqw; font-weight: 600; text-transform: capitalize; }
+.wg-agenda-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; padding: .8cqw 2.4cqw; line-height: 1.2; white-space: nowrap; border: 1px solid var(--rule); border-radius: 999px; background: none; color: var(--ink-soft); font: inherit; font-size: 3.4cqw; cursor: pointer; }
+.wg-agenda-btn:hover { background: var(--paper-sunken); }
+.wg-agenda-btn.on { background: var(--clay-soft); border-color: var(--clay-soft); color: var(--ink); }
+.wg-agenda-add { border-color: var(--clay); color: var(--clay); }
+.wg-events { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 1cqw; }
+.wg-event { display: flex; align-items: center; gap: 2cqw; width: 100%; padding: 1.2cqw 2cqw; border: 0; border-radius: 2cqw; background: var(--paper-sunken); color: var(--ink); font: inherit; font-size: 3.6cqw; text-align: left; cursor: pointer; }
+.wg-event:hover { filter: brightness(.97); }
+.wg-ev-time { flex: none; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.wg-ev-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wg-ev-bell { flex: none; width: 3.6cqw; height: 3.6cqw; color: var(--clay); }
+.wg-ev-none { color: var(--ink-faint); font-size: 3.4cqw; }
+/* A widget found again from the corner: lit for a moment. */
+.note-widget.wg-flash { animation: wg-flash 1.5s ease-out; }
+@keyframes wg-flash { 0%, 40% { box-shadow: 0 0 0 3px var(--clay); } 100% { box-shadow: 0 0 0 3px transparent; } }
+/* An event written under its button. */
+/* Its time is set the way the Clock widget's alarm is: ▲/▼ round a typed hour and minute; the alarm is a switch. */
+.float-menu.event-menu { width: min(320px, calc(100vw - 16px)); overflow: visible; font-family: var(--serif); }
+.float-menu.event-menu button { width: auto; font: inherit; }
+.event-menu__when { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.event-menu__clock { display: flex; align-items: center; gap: 4px; flex: none; }
+.event-menu__spin { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.float-menu.event-menu .event-menu__step { width: 30px; height: 18px; display: grid; place-items: center; gap: 0; padding: 0; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); color: var(--ink-soft); font-size: 9px !important; line-height: 1; cursor: pointer; }
+.float-menu .event-menu__step:hover { background: var(--paper-sunken); color: var(--ink); }
+.link-menu input.event-menu__h, .link-menu input.event-menu__m { width: 42px; padding: 5px 0; text-align: center; font-size: 17px; font-variant-numeric: tabular-nums; }
+.event-menu__colon { font-size: 17px; color: var(--ink-soft); }
+.float-menu.event-menu .event-menu__clear { width: 22px; height: 22px; display: grid; place-items: center; gap: 0; padding: 0; margin-left: 2px; border: 0; border-radius: 6px; background: none; color: var(--ink-faint); font-size: 16px !important; line-height: 1; cursor: pointer; }
+.float-menu .event-menu__clear:hover { background: var(--paper-sunken); color: var(--ink); }
+.float-menu .event-menu__alarm { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 7px 9px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); color: var(--ink-soft); font-size: 13px; white-space: nowrap; text-align: left; cursor: pointer; }
+.event-menu__alarm > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.float-menu .event-menu__alarm:hover { background: var(--paper-sunken); }
+.float-menu .event-menu__alarm.on { border-color: var(--clay); color: var(--ink); }
+.float-menu .event-menu__alarm.off { color: var(--ink-faint); }
+.event-menu__switch { position: relative; flex: none; width: 30px; height: 17px; border-radius: 9px; background: var(--rule); transition: background .15s; }
+.event-menu__switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--paper); box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: transform .15s; }
+.event-menu__alarm.on .event-menu__switch { background: var(--clay); }
+.event-menu__alarm.on .event-menu__switch::after { transform: translateX(13px); }
+.event-menu__foot { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+.float-menu .event-menu__foot .btn { flex: none; width: auto; justify-content: center; }
+.event-menu__gap { flex: 1; }
+
+/* Pomodoro and Clock (1.0.3): a big time, the keys that run it, the settings under it. */
+.note-widget > .wg--pomodoro { aspect-ratio: .74; padding: 3.6cqw; gap: 2.4cqw; }
+.note-widget > .wg--clock { aspect-ratio: 1.02; }
+.wg-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4cqw; padding: 1cqw; border-radius: 3cqw; background: var(--paper-sunken); }
+.wg-tab { margin: 0; padding: 1.6cqw 0; border: 0; border-radius: 2.2cqw; background: none; color: var(--ink-soft); font: inherit; font-size: 4.2cqw; cursor: pointer; }
+.wg-tab.on { background: var(--paper); color: var(--ink); box-shadow: 0 0 0 1px var(--rule); }
+.wg-face { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1cqw; }
+.wg-phase { color: var(--clay); font-size: 4.4cqw; letter-spacing: .02em; }
+.wg-face--short .wg-phase, .wg-face--long .wg-phase { color: var(--ink-soft); }
+.wg-time { font-size: 17cqw; font-weight: 300; font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
+.wg--clock .wg-time { font-size: 18cqw; }
+.wg-date { color: var(--ink-soft); font-size: 5cqw; text-transform: capitalize; }
+.wg-row { display: flex; gap: 2cqw; }
+/* Every key of the row the same width, whatever its word (the stopwatch's Reset was narrower than Start). */
+.wg-row .wg-key { flex: 1 1 0; min-width: 0; margin: 0; padding: 2.6cqw 0; font-size: 4.6cqw; }
+/* The settings are one panel of rows: four steppers in one column, then
+   auto-continue as a switch and the two sounds, each a row of its own. */
+.wg-panel { display: flex; flex-direction: column; padding: 1.4cqw 3cqw; border-radius: 3cqw; background: var(--paper-sunken); }
+.wg-sets { display: flex; flex-direction: column; }
+.wg-set { display: grid; grid-template-columns: 1fr auto 2.4em auto 4.6em; align-items: center; gap: 1.2cqw; padding: 1cqw 0; font-size: 3.8cqw; }
+.wg-set-name { color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wg-set-v { text-align: center; font-variant-numeric: tabular-nums; }
+.wg-step {
+  width: 6.4cqw; height: 6.4cqw; margin: 0; padding: 0; border: 1px solid var(--rule); border-radius: 50%;
+  background: var(--paper); color: var(--ink-soft); font: inherit; font-size: 4cqw; line-height: 1; cursor: pointer;
+}
+.wg-step:hover, .wg-tab:hover:not(.on), .wg-bell:hover { background: var(--paper-sunken); }
+.wg-alarm { display: flex; align-items: center; justify-content: center; gap: 2cqw; font-size: 6cqw; font-variant-numeric: tabular-nums; }
+.wg-alarm:not(.on) .wg-spin, .wg-alarm:not(.on) .wg-colon { opacity: .45; }
+.wg-spin { display: flex; flex-direction: column; align-items: center; gap: .6cqw; }
+.wg-spin .wg-step { width: 7cqw; height: 5cqw; border-radius: 1.6cqw; font-size: 3cqw; }
+.wg-bell { display: flex; align-items: center; justify-content: center; width: 11cqw; height: 11cqw; margin: 0 2cqw 0 0; padding: 0; border: 1px solid var(--rule); border-radius: 50%; background: var(--paper); color: var(--ink-faint); cursor: pointer; }
+.wg-bell svg { width: 6cqw; height: 6cqw; }
+.wg-alarm.on .wg-bell { background: var(--clay); border-color: var(--clay); color: var(--paper); }
+.wg-stop { margin-left: 2cqw; padding: 2cqw 4cqw; font-size: 4.4cqw; }
+/* The long break's line, in words; under it, auto-continue and the two sounds. */
+.wg-set-unit { padding-left: .3em; color: var(--ink-faint); font-size: .9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wg-opts { display: flex; flex-direction: column; min-width: 0; margin-top: 1cqw; border-top: 1px solid var(--rule); padding-top: 1cqw; }
+.wg-panel .wg-opt { justify-content: flex-start; padding: 1.8cqw 0; border: 0; border-radius: 0; background: none; font-size: 3.8cqw; }
+.wg-panel .wg-opt + .wg-opt { border-top: 1px solid var(--rule); }
+.wg-panel .wg-opt:hover { background: none; color: var(--ink); }
+.wg-opt-name { flex: 1; text-align: left; }
+.wg-switch { position: relative; flex: none; width: 8.4cqw; height: 4.8cqw; border-radius: 3cqw; background: var(--rule); transition: background .15s; }
+.wg-switch::after { content: ''; position: absolute; top: .6cqw; left: .6cqw; width: 3.6cqw; height: 3.6cqw; border-radius: 50%; background: var(--paper); box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: transform .15s; }
+.wg-panel .wg-auto.on { background: none; color: var(--ink); }
+.wg-auto.on .wg-switch { background: var(--clay); }
+.wg-auto.on .wg-switch::after { transform: translateX(3.6cqw); }
+.wg-panel .wg-sound-for { flex: 1; text-align: left; color: var(--ink-soft); }
+.wg-panel .wg-sound-name { max-width: 60%; }
+.wg-opts--clock { display: flex; justify-content: center; }
+.wg-opt {
+  display: flex; align-items: center; justify-content: center; gap: 1cqw; flex: 1 1 0; min-width: 0; margin: 0;
+  padding: 1.6cqw 2cqw; border: 1px solid var(--rule); border-radius: 2.2cqw; background: var(--paper);
+  color: var(--ink-soft); font: inherit; font-size: 3.4cqw; white-space: nowrap; cursor: pointer;
+}
+.wg-opts--clock .wg-opt { flex: 0 1 auto; max-width: 70%; font-size: 3.8cqw; }
+.wg-opt:hover { background: var(--paper-sunken); }
+.wg-auto.on { background: var(--clay); border-color: var(--clay); color: var(--paper); }
+.wg-sound-ic { color: var(--clay); }
+.wg-sound-for { color: var(--ink-faint); }
+.wg-sound-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+
+/* A widget's sounds: the link menu's look, a list that scrolls, the user's own with a ×. */
+.float-menu.sound-menu { width: 280px; min-width: 0; max-width: calc(100vw - 16px); max-height: none; overflow: visible; }
+.sound-menu__list { max-height: 240px; overflow-y: auto; margin-top: 4px; }
+.sound-menu__row { display: flex; align-items: center; gap: 2px; }
+.float-menu .sound-menu__pick { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sound-menu__row.on .sound-menu__pick { color: var(--clay); font-weight: 600; }
+.sound-menu__row.on .sound-menu__pick::after { content: '✓'; margin-left: auto; padding-left: 8px; }
+.float-menu .sound-menu__remove { flex: 0 0 auto; width: 26px; justify-content: center; padding: 4px 0; color: var(--ink-faint); }
+.float-menu .sound-menu__remove:hover { color: var(--clay); }
+.float-menu .sound-menu__add { width: 100%; margin-top: 4px; border-top: 1px solid var(--rule); border-radius: 0; color: var(--clay); }
 
 /* The /widget chooser: the link menu's look, one row of three. */
 .widget-menu__options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; margin-top: 7px; }
@@ -2504,7 +2710,7 @@ body.resizing { cursor: col-resize; user-select: none; }
 .widget-menu__options button.sel { outline: 2px solid var(--clay); outline-offset: 1px; }
 
 @media print {
-  .note-widget .wg-key, .note-widget .wg-day, .note-widget .wg-nav { cursor: default; }
+  .note-widget .wg-key, .note-widget .wg-day, .note-widget .wg-nav, .note-widget .wg-step, .note-widget .wg-tab, .note-widget .wg-bell { cursor: default; }
   /* "Print without widgets" (Ctrl+P, toolbar.js). */
   body.print-no-widgets .note-widget { display: none !important; }
   /* A Universe prints its drawn face, never the live map (Codex 34 #2). */

@@ -359,19 +359,25 @@ export async function runNoteFolderChecks(check) {
       await win.waitForTimeout(1200);
       check('that it cannot be played is the screen’s to know, not the note’s', !/cannot-play|video-miss|video-bar/.test(stored('n-plain')) && stored('n-plain').includes(aviFile));
 
-      // Exported as a Nebula note: a kind of video that is not written into the file goes into a folder beside it.
+      // Exported as a Nebula note: a note with its videos goes out as one zip, the note and its files in it (1.0.3).
       const out = path.join(profile, 'out');
       fs.mkdirSync(out);
-      const target = path.join(out, 'Plain taken along.json');
+      const target = path.join(out, 'Plain taken along.zip');
       await app.evaluate(({ dialog }, file) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: file }); }, target);
       await win.evaluate(() => document.querySelector('[data-menu="menu-export"]').click());
       await win.waitForTimeout(150);
       await win.evaluate(() => [...document.querySelectorAll('#menu-export button')].find((b) => /Nebula note/.test(b.textContent)).click());
-      const beside = path.join(out, 'Plain taken along videos', mkv);
-      check('exported as a Nebula note, the video lies in a folder beside the file, named after it — the same bytes', await until(() => fs.existsSync(target) && fs.existsSync(beside))
-        && fs.readFileSync(beside).equals(fs.readFileSync(film)) && fs.readFileSync(target, 'utf8').includes(mkv) && fs.statSync(target).size < 4000, fs.existsSync(out) ? fs.readdirSync(out).join() : 'no folder');
+      await until(() => fs.existsSync(target));
+      const { unzipTo } = await import('../../electron/zip.js');
+      const opened = path.join(profile, 'opened');
+      const inZip = await unzipTo(target, opened).catch(() => []);
+      const zipped = path.join(opened, 'Plain taken along files', mkv);
+      const zippedNote = path.join(opened, 'Plain taken along.json');
+      check('exported as a Nebula note, it is one zip: the note, and its videos in a folder named after it — the same bytes', fs.existsSync(zipped) && fs.existsSync(zippedNote)
+        && fs.readFileSync(zipped).equals(fs.readFileSync(film)) && fs.readFileSync(zippedNote, 'utf8').includes(mkv) && fs.statSync(zippedNote).size < 4000
+        && !fs.existsSync(path.join(out, 'Plain taken along videos')), inZip.map((p) => path.relative(opened, p)).join());
       const said = await win.evaluate(() => document.getElementById('toast')?.textContent ?? '');
-      check('and the app says where they are, and that the two belong together', /Plain taken along videos/.test(said) && /Keep the folder with the file/.test(said), said);
+      check('and the app says it saved a zip with the note’s files in it', /Saved as a zip, with the note’s files in it: 2/.test(said), said);
 
       // Brought in again — as on another computer: nothing of the first note is asked for.
       await app.evaluate(({ dialog }, chosen) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [chosen] }); }, target);
@@ -383,7 +389,7 @@ export async function runNoteFolderChecks(check) {
       let fresh = '';
       await until(() => { fresh = noteNames().find((id) => !had.has(id)) ?? ''; return !!fresh && stored(fresh).includes(`nebula-media://note/${fresh}/${mkv}`); });
       const home = await win.evaluate(() => document.querySelector('#editor .link-file video')?.getAttribute('src') ?? '');
-      check('imported, the note is a new one with the video in a folder of its own — taken from the folder beside the file', !!fresh && fresh !== 'n-plain' && fs.existsSync(path.join(vault, fresh, mkv))
+      check('imported from the zip, the note is a new one with the video in a folder of its own — taken out of the zip',!!fresh && fresh !== 'n-plain' && fs.existsSync(path.join(vault, fresh, mkv))
         && fs.readFileSync(path.join(vault, fresh, mkv)).equals(fs.readFileSync(film)) && stored(fresh).includes(`nebula-media://note/${fresh}/${mkv}`) && !stored(fresh).includes('n-plain'),
         `${fresh} ${home} ${fresh ? folder(fresh) : ''}`);
       await win.keyboard.press('Escape');

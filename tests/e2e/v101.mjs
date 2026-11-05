@@ -149,15 +149,22 @@ export async function runV101Checks(check) {
     const tog = await win.evaluate(() => { const c = document.querySelector('#t > .toggle-body > .blk-cols'); return c ? c.querySelectorAll(':scope > .blk-col').length : 0; });
     check('a divider pulled sideways in a toggle makes two columns in it', tog === 2, String(tog));
 
-    // The lower of two dividers in a column cuts only the part under it.
+    // The lower of two dividers in a column cuts only the part under it: since 1.0.3 that part
+    // becomes two columns inside the column, and the column beside it stays as it was.
     await open('colpart');
     hr = await rect('#ch2');
     const words = await rect('#cw2');   // the part from the divider down to the line the pointer is on
     line = await rect('#cl');
     await drag({ x: hr.left + 20, y: hr.cy }, { x: line.left + (line.right - line.left) * 0.6, y: words.cy });
-    const part = await win.evaluate(() => [...document.querySelectorAll('#editor > .blk-cols')].map((c) => `${c.querySelectorAll(':scope > .blk-col').length}${c.querySelector('#cw') ? '*' : ''}`).join(','));
-    check('the lower of two dividers in a column cuts only the part under it', /^2,3\*$/.test(part)
-      && await win.evaluate(() => !!document.querySelector('#ct') && document.querySelector('#cw').parentElement === document.querySelector('#cw2').parentElement), `${part} ${await win.evaluate(() => document.getElementById('editor').innerHTML.replace(/ style="[^"]*"/g, ''))}`);
+    const part = await win.evaluate(() => {
+      const top = [...document.querySelectorAll('#editor > .blk-cols')];
+      const inner = document.querySelector('#cl > .blk-cols');
+      return `${top.map((c) => c.querySelectorAll(':scope > .blk-col').length).join(',')}/${inner ? inner.querySelectorAll(':scope > .blk-col').length : 0}`
+        + `/${document.querySelector('#ct')?.parentElement?.id}/${document.querySelector('#cr > p')?.textContent}`;
+    });
+    check('the lower of two dividers in a column cuts only the part under it', part === '2/2/cl/right'
+      && await win.evaluate(() => document.querySelector('#cw').parentElement === document.querySelector('#cw2').parentElement
+        && !!document.querySelector('#cw').closest('#cl > .blk-cols')), `${part} ${await win.evaluate(() => document.getElementById('editor').innerHTML.replace(/ style="[^"]*"/g, ''))}`);
 
     check('no page errors', errors.length === 0, errors.join(' | '));
   } finally {

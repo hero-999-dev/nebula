@@ -29,6 +29,8 @@ import { runNoteFolderChecks } from './note-folders.mjs';
 import { runBlackHoleChecks } from './black-holes.mjs';
 import { runOpenWithChecks } from './open-with.mjs';
 import { runV101Checks } from './v101.mjs';
+import { runIdeas103Checks } from './ideas-103.mjs';
+import { runIdeas103bChecks } from './ideas-103b.mjs';
 import { _electron as electron } from 'playwright-core';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -192,8 +194,8 @@ try {
     const btns = [...document.querySelectorAll('#theme-pick [data-theme]')];
     return { names: btns.map((b) => b.dataset.theme), on: btns.filter((b) => b.classList.contains('on')).map((b) => b.dataset.theme) };
   });
-  check('theme picker offers main, dark, light and white',
-    themes.names.join(',') === 'main,dark,light,white', themes.names.join(','));
+  check('theme picker offers main, dark, matcha, light and white',
+    themes.names.join(',') === 'main,dark,matcha,light,white', themes.names.join(','));
   check('main is the theme on a fresh profile',
     themes.on.length === 1 && themes.on[0] === 'main', themes.on.join(','));
 
@@ -238,8 +240,8 @@ try {
 
   await press(win, '#app-version');
   await win.waitForSelector('#ov-about:not([hidden])', { timeout: 5_000 });
-  const aboutRows = await win.evaluate(() => document.querySelectorAll('#about-body .about-table tr').length);
-  check('About opens and lists every folder', aboutRows === 6, `${aboutRows} rows`);
+  const aboutRows = await win.evaluate(() => document.querySelectorAll('#about-body > .about-table tr').length);
+  check('About opens and lists every folder', aboutRows === 7, `${aboutRows} rows`);
   await press(win, '#about-close');
 
   // Editor surfaces that only exist once the real page has booted.
@@ -376,11 +378,11 @@ try {
       return {
         notes: vis('.note-row'),
         newNote: vis('#btn-new'),
-        themes: [...document.querySelectorAll('#theme-pick button')].every((b) => b.getBoundingClientRect().width > 0),
+        themes: !document.querySelector('#side #theme-pick'),   // in Settings since 1.0.3
         initial: document.querySelector('.note-row .nr-title')?.dataset.initial,
       };
     });
-    check('and the notes, New note and the themes are all still on the rail',
+    check('and the notes and New note are still on the rail (the themes are in Settings)',
       rail.notes && rail.newNote && rail.themes && rail.initial === 'W',
       JSON.stringify(rail));
     await press(win, '#side-toggle');
@@ -404,8 +406,8 @@ try {
       // Only the menu buttons are text in the strip; no "Nebula Test" caption.
       caption: document.getElementById('titlebar').firstElementChild?.textContent.trim(),
     }));
-    check('the title strip carries the logo, the five menus and Settings',
-      strip.menus.join(',') === 'File,Edit,View,Window,Help,Settings' && strip.logo, strip.menus.join(','));
+    check('the title strip carries the logo, the five menus, Settings and Tools',
+      strip.menus.join(',') === 'File,Edit,View,Window,Help,Settings,Tools' && strip.logo, strip.menus.join(','));
     check('and no window title is written into it', strip.caption === '', JSON.stringify(strip.caption));
 
     const menuItem = (menu, starts) => win.evaluate(({ menu, starts }) => {
@@ -460,8 +462,8 @@ try {
         rows: document.querySelectorAll('#blocks-body .blocks-table tr').length,
         icons: document.querySelectorAll('#blocks-body .bl-ic svg').length,
       }));
-      // 16 since the toggle list (0.9.3), 19 with the three toggle headings, 21 with the table and the columns (0.9.4), 23 with the widget (1.0.0).
-      check('Help -> Blocks lists every block the / menu offers, from the same source', blocks.shown && blocks.rows === 23 && blocks.icons === 23, JSON.stringify(blocks));
+      // 16 since the toggle list (0.9.3), 19 with the three toggle headings, 21 with the table and the columns (0.9.4), 23 with the widget (1.0.0), 22 with Mention gone (1.0.3).
+      check('Help -> Blocks lists every block the / menu offers, from the same source', blocks.shown && blocks.rows === 22 && blocks.icons === 22, JSON.stringify(blocks));
     }
     await win.keyboard.press('Escape');
   }
@@ -2467,6 +2469,8 @@ try {
     ['vault-disconnect', runVaultDisconnectChecks],
     // 1.0.1: dividers in toggles and over parts of columns, the minimap Fit, the German dash.
     ['v101', runV101Checks],
+    ['ideas-103', runIdeas103Checks],
+    ['ideas-103b', runIdeas103bChecks],
   ];
   for (const [name, run] of SUITES) {
     suite = name;

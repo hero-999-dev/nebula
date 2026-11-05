@@ -50,5 +50,22 @@ export function appChannel({ packaged, metaChannel, portableDir }) {
   return 'installed';
 }
 
+/**
+ * The version a copy shows to the devices it syncs with. A test build carries
+ * the 1.0.2 of the last release while it holds the next one's work, so it adds
+ * the moment it was packed: it then syncs only with that very build — never
+ * with a released 1.0.2, nor with an older test build (the owner, 2026-11-05).
+ */
+export function syncVersion({ version, channel, stamp }) {
+  if (channel !== 'test') return version;
+  return stamp ? `${version}-test.${stamp}` : `${version}-test`;
+}
+
+/** The stamp `npm run pack:test` writes: local date and time, 20261105-0112. */
+export function testStamp(date = new Date()) {
+  const two = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}${two(date.getMonth() + 1)}${two(date.getDate())}-${two(date.getHours())}${two(date.getMinutes())}`;
+}
+
 /** Only an installed build may replace itself in place. */
 export const canSelfUpdate = (channel) => channel === 'installed';

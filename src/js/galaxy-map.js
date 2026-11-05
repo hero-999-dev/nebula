@@ -28,7 +28,7 @@
  * spanning tree in the label's colour, ringed, everything else dimmed.
  */
 
-import { buildScene, positionAt, boundsOf, focusFor, hueOf, labelsOf, mentionLinks } from './galaxy-model.js';
+import { buildScene, positionAt, systemReach, boundsOf, focusFor, hueOf, labelsOf, mentionLinks } from './galaxy-model.js';
 import { RAMP, sphere, sun, vortex, core, stars, shot, cacheKey, frameIndex,
   ROCKET_BODY, ROCKET_BURN, twinkle } from './galaxy-ascii.js';
 
@@ -36,7 +36,12 @@ const TICK_MS = 70;          // ASCII frames at ~14 fps, like Constellation
 const FRAME_CACHE_MAX = 400; // LRU cap on ASCII frames (addendum #3)
 const ART_BODIES_MAX = 28;   // how many visible bodies may draw full frames
 const ART_MIN_R = 5;         // a sun, planet or hole this big on screen is drawn as art, not a dot
-const HOVER_SPIN = 2.4;      // extra radians a second for the body under the pointer
+const ORBIT_PACE = 0.35;     // the orbits' clock against the wall clock: calm, and the same on every computer
+const TWINKLE_PACE = 0.7;    // the sky's clock against the wall clock: the stars shine slower than the lock screen's
+// Holes' and the core's swirl and every turn on its axis. Slowed to 0.6 for a
+// day in 1.0.3 with the stars and the rings, and given back: "Animasyonlar daha
+// yavaş demişsin, onu bir eski haline getirelim" (the owner's Bug Find note).
+const ART_PACE = 1;
 const MIN_TARGET_PX = 10;    // smallest thing a click can aim at (addendum #4)
 const MOON_CLICK_PX = 4;     // a moon must be this big on screen to be a target
 const NAME_MAX = 18;         // body names truncate to this on canvas (addendum #5)
@@ -47,10 +52,10 @@ const LINK_MAX = 400;        // a constellation joins at most this many notes
 const HOP_MS = 1200;          // the minimap's glide to the note just opened (650 read as a jerk)
 const LOOSE_SHADE = 0.3;     // loose notes: the ink this far towards the paper
 const NOTE_FRAME = 1.7;      // a selected note's system fills 1/1.7 of what a folder's would
+const TRACK_CLOSE = 1.6;     // a followed body: its own framing, this much nearer
 /** The search's key for a note's @mentions — never a label name (labels have no control characters). */
 export const MENTION_KEY = '\u0001@';
 export const mentionKey = (noteId) => MENTION_KEY + noteId;
-const PICK_MAX = 6;
 const SHOT_EVERY_MS = 60000;      // a shooting star about once a minute…
 const SHOT_MS = 900;              // …and fast
 const ROCKET_EVERY_MS = 300000;   // a rocket every five minutes
@@ -170,7 +175,12 @@ export function spanningTree(points) {
  * only, in a big vault and a small one alike. A scene without projects (a
  * hole, a vault of folders) starts at its first layer that has bodies. */
 export const NAME_LAYERS = [
-  { roles: ['project'], fit: 0, px: 0 },
+  // Projects are named at the whole-map view and a little past it, and hide
+  // going farther out like every other layer (1.0.3, the owner: "project ismi ne
+  // kadar uzaklassanda gözüküyor … mesafeye uygun degil"), and not long before
+  // the whole-map view ("project klasör ismi cok erken gözüküyor"): about half
+  // the next rung, the way each rung is about half the one after it.
+  { roles: ['project'], fit: 0.85, px: 0.8 },
   { roles: ['folder', 'hole'], fit: 1.6, px: 2 },
   { roles: ['note'], fit: 3, px: 5 },
   { roles: ['label'], fit: 6, px: 12 },
@@ -184,20 +194,24 @@ export function nameShownAt(role, k, fitK, first = 0) {
   return k >= rung.px && k >= fitK * rung.fit;
 }
 
-/** Which glyph a body shrinks to when it is too small for art. */
+/**
+ * Which glyph a body shrinks to when it is too small for art. Never an 'o':
+ * far away it read as a 0 (the owner's Ideas note, 1.0.3).
+ */
 function tinyGlyph(b) {
-  if (b.kind === 'planet') return b.size > 2.5 ? '@' : 'o';
   // A label is a little planet too, not a '~' (owner, 2026-10-22).
-  if (b.kind === 'moon') return 'o';
+  if (b.kind === 'planet' || b.kind === 'moon' || b.kind === 'hole') return '@';
   if (b.kind === 'sun' || b.kind === 'core' || b.kind === 'singularity') return '*';
-  if (b.kind === 'hole') return '@';
   return RAMP[2];
 }
 /** A body's ASCII art kind, and whether a planet shows rings (seeded). */
-/** How fast a body turns on its axis, radians a second: a planet in 10–20 s, a sun slower. */
+/**
+ * How fast a body turns on its axis, radians a second: a planet in 40–60 s, a
+ * sun slower (the owner, 1.0.3: "gezegenler cok hizli dönmesin").
+ */
 function spinRate(b) {
-  if (b.kind === 'sun') return 0.16 + (b.seed % 5) * 0.025;
-  return 0.3 + (b.seed % 8) * 0.035;
+  if (b.kind === 'sun') return (0.05 + (b.seed % 5) * 0.008) * ART_PACE;
+  return (0.125 + (b.seed % 8) * 0.01) * ART_PACE;
 }
 function artKind(b) {
   if (b.kind === 'sun') return 'sun';
@@ -229,6 +243,10 @@ export function createGalaxyMap(canvas, opts = {}) {
   let tween = null;                  // {from,to,start,dur} camera glide
   let followId = null;               // note id the camera tracks (mini mode)
   let hop = null;                    // the minimap's glide from one note to the next {from, zoom, start, dur}
+  // Any body the camera rides, in a big map or a widget's (1.0.3, the owner:
+  // "universe bir cismi takip etme özelligi"): {id, from, start, dur}, the
+  // glide over first; the zoom stays the reader's. A drag lets go of it.
+  let riding = null;
   let selected = null;               // body id with a selection ring (a11y)
   let namesShown = opts.names !== false; // "Hide names" beside Fit (owner, 2026-10-21)
   // The camera is the map's own until a hand moves it: then the big map fills
@@ -239,14 +257,11 @@ export function createGalaxyMap(canvas, opts = {}) {
   // whole map" or Escape gives it back.
   let auto = true;
   let savedMainAuto = true;
-  // Both clocks run under reduced motion too, only slower: a map that never
-  // moves reads as broken (Constellation's gate does the same), and Windows
-  // with "Animation effects" off asks every app for reduced motion.
+  // Both clocks run at one pace on every computer: Windows with "Animation
+  // effects" off asks every app for reduced motion, and the map ran 2.5 times
+  // slower there (the owner, 1.0.3: "iki bilgisayarda hizlari cok farkli").
   let orbitT = 0;                    // orbit clock
   let animT = 0;                     // flicker/pulse/turn clock
-  let hoverId = null;                // the body under the pointer turns faster
-  let hoverAt = -1e9;
-  const spinBoost = new Map();       // body id -> extra turn it has been given
   let start = 0;                     // performance.now at first frame
   let raf = 0, lastTick = 0, running = true, inView = true, destroyed = false;
   let entering = null;               // {holeId, from, to, start, dur} pull-in
@@ -270,7 +285,67 @@ export function createGalaxyMap(canvas, opts = {}) {
     if (frameCache.size > FRAME_CACHE_MAX) frameCache.delete(frameCache.keys().next().value);
     return made;
   }
-  const dropCaches = () => { frameCache.clear(); starCache = null; };
+  /* A small body's globe, drawn once in a big face on a canvas of its own and
+     shrunk to the body's size: far away a planet is a little planet that keeps
+     getting smaller, not an '@' beside a globe of the same size (the owner's
+     Ideas note, 1.0.3). It does not turn: at a few pixels a turn cannot be seen,
+     and one picture per body keeps the cache small. */
+  const SPRITE_FONT = 12;
+  const sprites = new Map();
+  function sprite(b, color) {
+    const kind = artKind(b);
+    const ring = kind === 'sphere' && b.kind === 'planet' && (b.ringed ?? b.seed % 4 === 0);
+    const rollStep = ring ? Math.round(((b.roll ?? 0.26) / (Math.PI / 4)) * 8) : 0;
+    const seed = b.seed % 8;
+    const key = kind + '|' + color + '|' + seed + '|' + (ring ? rollStep : '-');
+    const hit = sprites.get(key);
+    if (hit !== undefined) { sprites.delete(key); sprites.set(key, hit); return hit; }
+    const rows = kind === 'sphere' ? 4 : 5;
+    const cols = rows * 2;
+    const turn = ((b.seed % 48) / 48) * Math.PI * 2;
+    const args = { cols, rows, seed };
+    if (kind === 'sphere') Object.assign(args, { spin: turn, ring, roll: (rollStep / 8) * (Math.PI / 4) });
+    else if (kind === 'sun') Object.assign(args, { t: 0, spin: turn });
+    else Object.assign(args, { t: 0 });
+    const art = { sphere, sun, vortex, core }[kind](args);
+    const fsBase = parseFloat(baseFont) || 13;
+    const cw = cellW * (SPRITE_FONT / fsBase);
+    const ch = cellH * (SPRITE_FONT / fsBase);
+    let made = null;
+    const el = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    const g = el?.getContext?.('2d');
+    if (g) {
+      el.width = Math.ceil(cols * cw);
+      el.height = Math.ceil(rows * ch);
+      g.font = SPRITE_FONT + 'px ' + (baseFont.slice(baseFont.indexOf('px ') + 3) || 'monospace');
+      g.textBaseline = 'middle';
+      g.fillStyle = color;
+      art.forEach((row, i) => { if (row.trim()) g.fillText(row, 0, (i + 0.5) * ch); });
+      // Halved step by step down to a few pixels: shrunk in one step, the thin
+      // strokes fell between the pixels sampled, and a far body moving by part
+      // of a pixel went out and came back (the owner's Ideas note, 1.0.3:
+      // measured, a 4 px body's ink went from all to none).
+      const chain = [el];
+      while (chain.at(-1).height > 4) {
+        const p = chain.at(-1);
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(p.width / 2));
+        c.height = Math.max(1, Math.round(p.height / 2));
+        const cg = c.getContext('2d');
+        if (!cg) break;
+        cg.imageSmoothingQuality = 'high';
+        cg.drawImage(p, 0, 0, c.width, c.height);
+        chain.push(c);
+      }
+      // The smallest picture still at least as tall as it is drawn.
+      const at = (h) => { let s = el; for (const c of chain) if (c.height >= h) s = c; return s; };
+      made = { el, at, aspect: el.width / el.height };
+    }
+    sprites.set(key, made);
+    if (sprites.size > FRAME_CACHE_MAX) sprites.delete(sprites.keys().next().value);
+    return made;
+  }
+  const dropCaches = () => { frameCache.clear(); sprites.clear(); starCache = null; };
   // Leaving a hole (locked, or simply left) forgets everything built from it:
   // the scene key holds its notes' titles and labels as JSON, and the position
   // map, culled list, constellation and selection hold its bodies.
@@ -280,8 +355,7 @@ export function createGalaxyMap(canvas, opts = {}) {
     lit = null; system = null;
     posMap = new Map(); posMapFor = null;
     visItems.length = 0;
-    spinBoost.clear();
-    hoverId = null; selected = null;
+    selected = null;
   };
   // A dive still under way when the map is put away is called off: shown
   // again, the map must not finish it and land inside the hole.
@@ -336,6 +410,7 @@ export function createGalaxyMap(canvas, opts = {}) {
   };
   // glide: the Fit button's way back, moved to rather than jumped to.
   const fit = ({ glide = false } = {}) => {
+    riding = null;
     auto = true;
     tween = null;
     if (!entering) { if (glide && W && H) glideTo(autoCam(), reduced ? 300 : 600); else cam = autoCam(); }
@@ -343,6 +418,7 @@ export function createGalaxyMap(canvas, opts = {}) {
   };
   const handOver = () => { auto = false; };
   const setDimension = (id, keepCam) => {
+    riding = null;
     holeId = id;
     scene = buildScene(getInput(id) || {});
     picked = [];                                  // a constellation belongs to one space
@@ -459,7 +535,7 @@ export function createGalaxyMap(canvas, opts = {}) {
       // motion too, on animT's slower clock: Windows with "Animation effects"
       // off asks for reduced motion, and the map's stars stood still while the
       // lock screen's twinkled (owner, 2026-10-22).
-      const { ch, glow } = twinkle(s, animT);
+      const { ch, glow } = twinkle(s, animT * TWINKLE_PACE);
       if (ch === ' ') continue;
       ctx.globalAlpha = Math.min(0.6, 0.1 + glow);
       const size = Math.round(ch === '.' ? s.size * 1.4 : s.size);
@@ -541,6 +617,22 @@ export function createGalaxyMap(canvas, opts = {}) {
         } else { cam.x = p.x; cam.y = p.y; }
       } else hop = null;                 // its note left the map (moved into a hole, deleted)
     }
+    if (riding && !mini && !entering) {
+      const body = scene.byId.get(riding.id);
+      if (body) {
+        tween = null;
+        const p = positionAt(scene, body.id, orbitT);
+        const k = riding.dur ? clamp((now - riding.start) / riding.dur, 0, 1) : 1;
+        const e = easeOut(k);
+        cam.x = riding.from.x + (p.x - riding.from.x) * e;
+        cam.y = riding.from.y + (p.y - riding.from.y) * e;
+        // Closing in on the body as the glide goes; after it the zoom is the reader's again.
+        if (!riding.landed) {
+          cam.zoom = riding.from.zoom * Math.pow(riding.zoom / riding.from.zoom, e);
+          if (k >= 1) riding.landed = true;
+        }
+      }
+    }
 
     ctx.fillStyle = c.paper;
     ctx.fillRect(0, 0, W, H);
@@ -604,6 +696,8 @@ export function createGalaxyMap(canvas, opts = {}) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     let fill = null;
+    let glyphPx = 0;
+    const glyphFace = baseFont.slice(baseFont.indexOf('px ') + 3) || 'monospace';
     const focusedPlanet = selected && scene.byId.get(selected);
     const names = [];
     const arts = [];
@@ -639,7 +733,18 @@ export function createGalaxyMap(canvas, opts = {}) {
       if (dim) ctx.globalAlpha = DIM_ALPHA;
       const glowBody = b.kind === 'sun' || b.kind === 'hole';
       if (glowBody) { ctx.shadowColor = col; ctx.shadowBlur = 6; }
-      ctx.fillText(tinyGlyph(b), v.sx, v.sy);
+      // A little globe at the body's own size, like the art bodies beside it
+      // (the owner, 1.0.3: an '@' next to a planet of the same size, and a far
+      // 'o' that read as a 0). A glyph only where no canvas can be made.
+      const spr = sprite(b, col);
+      if (spr) {
+        const h = v.r * 2.6;
+        ctx.drawImage(spr.at(h), v.sx - (h * spr.aspect) / 2, v.sy - h / 2, h * spr.aspect, h);
+      } else {
+        const px = Math.round(clamp(v.r * 2.6, 7, cellH));
+        if (px !== glyphPx) { ctx.font = px + 'px ' + glyphFace; glyphPx = px; }
+        ctx.fillText(tinyGlyph(b), v.sx, v.sy);
+      }
       if (glowBody) ctx.shadowBlur = 0;
       if (dim) ctx.globalAlpha = 1;
       if (!mini && wantsName(v, role, parentFocused)) names.push(v);
@@ -655,6 +760,7 @@ export function createGalaxyMap(canvas, opts = {}) {
       }
     }
     ctx.globalAlpha = 1;
+    ctx.font = baseFont;
     for (const v of names) drawName(v, c);
 
     // The art pass: full ASCII frames for the largest bodies. A small one keeps
@@ -670,6 +776,22 @@ export function createGalaxyMap(canvas, opts = {}) {
       const minRows = kind === 'sphere' ? 4 : 5;
       let rows2 = Math.round((v.r * 2) / cellH);
       let scale = 1;
+      // Smaller than the smallest face can draw: the same little globe as the
+      // bodies beyond the budget, at its true size, so that two bodies alike
+      // in size look alike (the owner's Ideas note, 1.0.3).
+      const spr = rows2 < minRows && (v.r * 2.6) / (minRows * cellH) < 6 / fsBase ? sprite(b, colorOf(b)) : null;
+      if (spr) {
+        const h = v.r * 2.6;
+        const dimS = dimmed(b);
+        if (dimS) ctx.globalAlpha = DIM_ALPHA;
+        if (kind === 'sun') { ctx.shadowColor = colorOf(b); ctx.shadowBlur = 8; }
+        ctx.drawImage(spr.at(h), v.sx - (h * spr.aspect) / 2, v.sy - h / 2, h * spr.aspect, h);
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+        const pf = isLabelMoon(b) && focusedPlanet && b.parent === focusedPlanet.id;
+        if (!mini && wantsName(v, roleOf(b), pf)) drawName(v, c);
+        continue;
+      }
       if (rows2 < minRows) {
         scale = clamp((v.r * 2.6) / (minRows * cellH), 6 / fsBase, 1);
         rows2 = minRows;
@@ -682,7 +804,7 @@ export function createGalaxyMap(canvas, opts = {}) {
       const ring = kind === 'sphere' && b.kind === 'planet' && (b.ringed ?? b.seed % 4 === 0);
       const rollStep = ring ? Math.round(((b.roll ?? 0.26) / (Math.PI / 4)) * 8) : 0;
       const roll = (rollStep / 8) * (Math.PI / 4);
-      const spin = animT * spinRate(b) + (b.seed % 628) / 100 + (spinBoost.get(b.id) || 0);
+      const spin = animT * spinRate(b) + (b.seed % 628) / 100;
       const fi = kind === 'sphere' || kind === 'sun' ? frameIndex(spin, 48) : 0;
       const turn = (fi / 48) * Math.PI * 2;
       // A sun's corona flickers in step with its turn, so a sun has 48 frames
@@ -692,7 +814,7 @@ export function createGalaxyMap(canvas, opts = {}) {
         const args = { cols: cols2, rows: rows2, seed: b.seed % 8 };
         if (kind === 'sphere') Object.assign(args, { spin: turn, ring, roll });
         else if (kind === 'sun') Object.assign(args, { t: fi * 0.42, spin: turn });
-        else Object.assign(args, { t: tFrame * 0.14 });
+        else Object.assign(args, { t: tFrame * 0.14 * ART_PACE });
         return { rows: { sphere, sun, vortex, core }[kind](args) };
       });
       const color = colorOf(b);
@@ -701,10 +823,9 @@ export function createGalaxyMap(canvas, opts = {}) {
       const dim = dimmed(b);
       if (dim) ctx.globalAlpha = DIM_ALPHA;
       drawFrame(art, c, v.sx, v.sy, { color, glow: glowPx, ...small });
-      if (b.kind === 'hole' && b.initials && v.r >= 8) {
-        // A hole shows its initials in its dark middle, open or locked — a
-        // locked one shows nothing else. In the hole's own colour: in the
-        // paper's they could not be seen.
+      if (b.kind === 'hole' && b.locked && b.initials && v.r >= 8) {
+        // A locked hole shows its initials in its dark middle and nothing else.
+        // In the hole's own colour: in the paper's they could not be seen.
         ctx.font = 'bold ' + Math.round(clamp(v.r * 0.5, 7, cellH * 0.9)) + 'px ' + face;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -735,7 +856,8 @@ export function createGalaxyMap(canvas, opts = {}) {
         ctx.arc(s.x, s.y, inner, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
-        const reach = systemReach(b, p, pos) * k;
+        // Measured every frame (they orbit); round each sub-system its own circle (systemReach).
+        const reach = systemReach(b.id, kidsOf, (id) => pos.get(id), 6 / k) * k;
         if (reach > inner + 6) {
           ctx.globalAlpha = 0.45;
           ctx.lineWidth = 1;
@@ -755,11 +877,15 @@ export function createGalaxyMap(canvas, opts = {}) {
   /** Whose name is written under it. Names come in by the zoom, a layer at a
    * time (nameShownAt), and the selected body's whole system — everything in
    * its orbit, down to a note's labels — is named whatever the zoom (owner,
-   * 2026-10-22). A locked hole is its initials only. */
+   * 2026-10-22). An open hole is written with its whole name; a locked one
+   * has only its initials, inside it (the owner, 1.0.3). With the names hidden
+   * the selected body's system is still named: "we hide the names, yes, but a
+   * click on a planet should show its own" (the owner, 1.0.3). */
   function wantsName(v, role, parentFocused) {
-    if (!namesShown) return false;
     if (role === 'hole' && v.b.locked) return false;
-    if (parentFocused || v.b.id === selected || inSystem(v.b)) return v.r >= 0.45;
+    const own = v.b.id === selected || inSystem(v.b);
+    if (!namesShown) return own && v.r >= 0.45;
+    if (parentFocused || own) return v.r >= 0.45;
     const l = layersNow();
     return nameShownAt(role, ppw(), l.fitK, l.first) && v.r >= 2;
   }
@@ -783,30 +909,30 @@ export function createGalaxyMap(canvas, opts = {}) {
     systemOf(sel);
     return system.set.has(b.id);
   }
+  // Each body's children, by parent id: a child listed before its parent is
+  // still found (1.0.3; the order of the list had left some out).
+  let kids = null;                   // {scene, of: Map<parent id, body[]>}
+  function kidsOf(id) {
+    if (!kids || kids.scene !== scene) {
+      const of = new Map();
+      for (const x of scene.bodies) if (x.parent) { if (!of.has(x.parent)) of.set(x.parent, []); of.get(x.parent).push(x); }
+      kids = { scene, of };
+    }
+    return kids.of.get(id) ?? [];
+  }
+
   function systemOf(b) {
     if (!system || system.scene !== scene || system.id !== b.id) {
       const ids = [];
-      const under = new Set([b.id]);
-      for (const x of scene.bodies) {
-        if (x.parent && under.has(x.parent)) { under.add(x.id); ids.push(x); }
+      const seen = new Set([b.id]);
+      for (const stack = [b.id]; stack.length;) {
+        for (const x of kidsOf(stack.pop())) if (!seen.has(x.id)) { seen.add(x.id); ids.push(x); stack.push(x.id); }
       }
       system = { scene, id: b.id, ids, set: new Set(ids.map((x) => x.id)) };
     }
     return system;
   }
 
-  /** How far from the selected body its own system reaches, in world units:
-   * every body whose parent chain leads to it. Rebuilt when the selection or
-   * the scene changes, measured every frame (they orbit). */
-  function systemReach(b, p, pos) {
-    systemOf(b);
-    let reach = 0;
-    for (const x of system.ids) {
-      const q = pos.get(x.id);
-      if (q) reach = Math.max(reach, Math.hypot(q.x - p.x, q.y - p.y) + x.size);
-    }
-    return reach;
-  }
 
   /* ---------- constellations (owner, 2026-10-21: "Obsidian's grouping, in
      this space theme") ---------- */
@@ -1033,7 +1159,7 @@ export function createGalaxyMap(canvas, opts = {}) {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     ctx.fillStyle = c.faint;
-    ctx.fillText(name.length > NAME_MAX ? name.slice(0, NAME_MAX - 1) + '…' : name,
+    ctx.fillText(name.length > NAME_MAX && v.b.kind !== 'hole' ? name.slice(0, NAME_MAX - 1) + '…' : name,
       v.sx, v.sy + Math.max(v.r, cellH) + 3);
     ctx.font = baseFont;
     ctx.textBaseline = 'middle';
@@ -1205,18 +1331,12 @@ export function createGalaxyMap(canvas, opts = {}) {
     canvas.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e) => {
-    if (!down) {
-      // What is under the pointer turns faster — looked at at most every 60 ms.
-      if (e.timeStamp - hoverAt < 60) return;
-      hoverAt = e.timeStamp;
-      const body = hitAt(e.offsetX, e.offsetY);
-      hoverId = body && !isLabelMoon(body) ? body.id : null;
-      return;
-    }
+    if (!down) return;
     const dx = e.offsetX - down.x, dy = e.offsetY - down.y;
     if (!dragging && Math.hypot(dx, dy) > 4) dragging = true;   // >4 px = drag, not click
     if (dragging) {
       handOver();
+      riding = null;
       const k = ppw();
       cam.x = down.camX - dx / k;
       cam.y = down.camY - dy / k;
@@ -1306,7 +1426,6 @@ export function createGalaxyMap(canvas, opts = {}) {
   canvas.addEventListener('pointermove', onPointerMove);
   canvas.addEventListener('pointerup', onPointerUp);
   canvas.addEventListener('pointercancel', () => { down = null; dragging = false; canvas.classList.remove('is-grabbing'); });
-  canvas.addEventListener('pointerleave', () => { hoverId = null; });
   canvas.addEventListener('contextmenu', onContextEvent);
   canvas.addEventListener('dblclick', onDblClick);
   canvas.addEventListener('wheel', onWheel, { passive: false });
@@ -1336,16 +1455,16 @@ export function createGalaxyMap(canvas, opts = {}) {
     // dt capped so a tab that was away does not fast-forward the orbits.
     const dt = lastFrame ? Math.min(0.25, (now - lastFrame) / 1000) : 0;
     lastFrame = now;
-    const pace = reduced ? 0.4 : 1;
-    orbitT += dt * pace; animT += dt * pace;
-    if (hoverId) spinBoost.set(hoverId, ((spinBoost.get(hoverId) || 0) + dt * pace * HOVER_SPIN) % (Math.PI * 2));
+    orbitT += dt * ORBIT_PACE; animT += dt;
     stepTween(now);
-    const riding = followRocket(now);
+    const onRocket = followRocket(now);
     // ASCII frames tick at ~14 fps; while the camera is moving it redraws at
     // RAF rate so the glide is smooth (the frames themselves stay memoised).
     // A minimap glued to its note is not moving: the orbit is slow, the tick
-    // keeps up, and an idle sidebar must not draw 60 times a second.
-    const moving = !!(tween || entering || hop || riding);
+    // keeps up, and an idle sidebar must not draw 60 times a second. A body
+    // followed is glided to smoothly, then ridden at the tick like the orbit.
+    const gliding = riding && now - riding.start < riding.dur;
+    const moving = !!(tween || entering || hop || onRocket || gliding);
     if (moving || now - lastTick >= TICK_MS) {
       lastTick = now;
       tryEvent(now);
@@ -1401,7 +1520,6 @@ export function createGalaxyMap(canvas, opts = {}) {
     sceneKey = key;
     scene = buildScene(input);
     backdrop = null;
-    for (const id of spinBoost.keys()) if (!scene.byId.has(id)) spinBoost.delete(id);
     dropCaches();
     if (!keepZoom) cam = overviewCam();
     else if (auto && !entering && !parked && W && H) glideTo(autoCam(), 600);   // a new note or folder: still all in view
@@ -1464,6 +1582,9 @@ export function createGalaxyMap(canvas, opts = {}) {
   function follow(noteId) {
     followId = noteId;
     const body = scene && scene.byId.get('note:' + noteId);
+    // The selection goes along with the note opened beside the map; it stayed
+    // round the old one while the camera flew off (the owner, 1.0.3).
+    if (selected && selected !== body?.id) selected = body ? body.id : null;
     // A note the map does not show ends any glide still under way: draw()
     // only finishes a hop on the note it follows, and an unfinished hop keeps
     // the loop drawing every frame.
@@ -1500,6 +1621,7 @@ export function createGalaxyMap(canvas, opts = {}) {
   }
 
   function focus(bodyId) {
+    riding = null;
     if (rocket) rocket.followed = false;
     let to = (bodyId === 'core' && scene.kind === 'main' && coreFocus()) || focusFor(scene, bodyId, orbitT);
     // A note is framed with room round it: its label moons read as small
@@ -1517,7 +1639,21 @@ export function createGalaxyMap(canvas, opts = {}) {
     wake();
   }
 
+  /** The camera rides this body (null lets go); `instant` puts it there at once. */
+  function track(bodyId, { instant = false } = {}) {
+    // Followed from close by (the owner, 2026-11-04: "it stays very far — it
+    // should come closer to the planet"): the body's own framing, nearer still;
+    // never further out than the reader already was.
+    const own = bodyId && scene?.byId.has(bodyId) ? focusFor(scene, bodyId, orbitT) : null;
+    const zoom = clamp(Math.max(cam.zoom, own ? own.zoom * TRACK_CLOSE : cam.zoom), 0.01, 10);
+    riding = bodyId && scene?.byId.has(bodyId) ? { id: bodyId, from: { ...cam }, zoom, start: performance.now(), dur: instant || reduced ? 0 : 900 } : null;
+    if (riding) handOver();
+    wake();
+    return !!riding;
+  }
+
   function overview() {
+    riding = null;
     if (rocket) rocket.followed = false;
     auto = true;
     glideTo(overviewCam(), 900);
@@ -1551,7 +1687,8 @@ export function createGalaxyMap(canvas, opts = {}) {
   wake();
 
   return {
-    refresh, follow, focus, enterHole, leaveHole, overview, select, restore, fit,
+    refresh, follow, focus, enterHole, leaveHole, overview, select, restore, fit, track,
+    tracked: () => riding?.id ?? null,
     dimension: () => holeId,
     // A hole carries whether it is locked: the screen-reader list asks for the PIN on a locked one.
     bodies: () => (scene ? scene.bodies.map((b) => ({ id: b.id, kind: b.kind, role: roleOf(b), ref: b.ref, name: b.name, parent: b.parent,
@@ -1575,7 +1712,7 @@ export function createGalaxyMap(canvas, opts = {}) {
     highlight: (labels) => {
       const have = new Set(scene ? labelsOf(scene) : []);
       if (scene) for (const [a, z] of mentionLinks(scene)) { have.add(mentionKey(a)); have.add(mentionKey(z)); }
-      picked = [...new Set((labels || []).filter((l) => have.has(l)))].slice(0, PICK_MAX);
+      picked = [...new Set((labels || []).filter((l) => have.has(l)))];
       lit = null;
       draw(performance.now(), true);
       wake();

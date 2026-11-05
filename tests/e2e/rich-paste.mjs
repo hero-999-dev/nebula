@@ -48,8 +48,40 @@ export async function runRichPasteChecks(check) {
       editor.dispatchEvent(event);
       return { prevented: event.defaultPrevented, buttons: [...document.querySelectorAll('#link-menu [data-link-kind]')].map((b) => b.textContent) };
     });
-    check('pasting a URL opens the four Paste as choices', pasteUrl.prevented
-      && pasteUrl.buttons.join(',') === 'Embed,Bookmark,URL,Mention', pasteUrl.buttons.join(','));
+    check('pasting a URL opens the three Paste as choices (no Mention, 1.0.3)', pasteUrl.prevented
+      && pasteUrl.buttons.join(',') === 'Embed,Bookmark,URL', pasteUrl.buttons.join(','));
+    await win.keyboard.press('Escape');
+
+    // The menu opens where the paste was, not at the top of the note (1.0.3, the owner).
+    await prepareBlank();
+    const placed = await win.evaluate(() => {
+      const editor = document.getElementById('editor');
+      const p = editor.querySelector('p');
+      for (let i = 0; i < 14; i += 1) p.after(document.createElement('p'));
+      const last = editor.querySelector('p:last-of-type');
+      last.textContent = 'here';
+      last.scrollIntoView({ block: 'center' });
+      const range = document.createRange();
+      range.setStart(last.firstChild, 4); range.collapse(true);
+      const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+      const transfer = new DataTransfer(); transfer.setData('text/plain', 'https://example.com/docs');
+      editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true, cancelable: true }));
+      const menu = document.getElementById('link-menu').getBoundingClientRect();
+      const line = last.getBoundingClientRect();
+      return { top: Math.round(menu.top), bottom: Math.round(menu.bottom), lineTop: Math.round(line.top), lineBottom: Math.round(line.bottom) };
+    });
+    check('the Paste as menu opens by the line pasted on, not over it',
+      (placed.top >= placed.lineBottom && placed.top - placed.lineBottom < 40) || (placed.bottom <= placed.lineTop && placed.lineTop - placed.bottom < 40), JSON.stringify(placed));
+    await win.keyboard.press('Escape');
+    await win.evaluate(() => {
+      const editor = document.getElementById('editor');
+      const last = editor.querySelector('p:last-of-type');
+      const range = document.createRange();
+      range.setStart(last.firstChild, 4); range.collapse(true);
+      const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+      const transfer = new DataTransfer(); transfer.setData('text/plain', 'https://example.com/docs');
+      editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true, cancelable: true }));
+    });
 
     await win.evaluate(() => document.querySelector('#link-menu [data-link-kind="bookmark"]').click());
     await win.waitForSelector('.link-bookmark');
@@ -67,7 +99,7 @@ export async function runRichPasteChecks(check) {
     await win.keyboard.press('Control+Shift+z');
     check('redo removes that bookmark again', await win.locator('.link-bookmark').count() === 0);
 
-    for (const kind of ['url', 'mention', 'embed']) {
+    for (const kind of ['url', 'embed']) {
       await prepareBlank();
       await win.route('https://example.com/**', (route) => route.fulfill({
         contentType: 'text/html', body: '<html><body><h1>Embedded test content</h1></body></html>',
@@ -92,7 +124,7 @@ export async function runRichPasteChecks(check) {
           && info.prefs.includes('nodeIntegration=no'));
       } else {
         const text = await win.locator(`#editor .link-${kind}`).textContent();
-        check(`${kind} inserts the expected inline label`, text === (kind === 'url' ? 'https://example.com/preview' : '@example.com'));
+        check(`${kind} inserts the expected inline label`, text === 'https://example.com/preview');
       }
     }
 
@@ -107,7 +139,7 @@ export async function runRichPasteChecks(check) {
     });
     await win.waitForSelector('#slash-menu:not([hidden])');
     const slashLinks = await win.evaluate(() => [...document.querySelectorAll('#slash-menu button')].map((b) => b.textContent.trim()));
-    check('the slash menu offers Embed, Bookmark, URL and Mention', ['Embed', 'Bookmark', 'URL', 'Mention'].every((label) => slashLinks.includes(label)), slashLinks.slice(-4).join(','));
+    check('the slash menu offers Embed, Bookmark and URL, not Mention', ['Embed', 'Bookmark', 'URL'].every((label) => slashLinks.includes(label)) && !slashLinks.includes('Mention'), slashLinks.slice(-4).join(','));
     await win.keyboard.press('Escape');
 
     await prepareBlank();

@@ -137,8 +137,8 @@ describe('wearing a theme', () => {
     return { group, custom };
   };
 
-  it('has four fixed themes, Matcha no longer among them', () => {
-    expect(THEMES).toEqual(['main', 'dark', 'light', 'white']);
+  it('has five fixed themes, Matcha in the middle', () => {
+    expect(THEMES).toEqual(['main', 'dark', 'matcha', 'light', 'white']);
   });
 
   it('wears the picks as inline tokens over the fixed theme of the same tone, and takes them off again', () => {
@@ -168,11 +168,13 @@ describe('wearing a theme', () => {
     expect(localStorage.getItem('nebula:theme')).toBe('dark');
   });
 
-  it('comes back as it was left, and a test build’s "matcha" is the custom theme', () => {
+  it('comes back as it was left: "matcha" is the fixed theme, the custom one untouched', () => {
     localStorage.setItem('nebula:theme', 'matcha');
     const { group, custom } = picker();
     const theme = initTheme(group, { customButton: custom });
-    expect(theme.current()).toBe(CUSTOM);
+    expect(theme.current()).toBe('matcha');
     expect(document.documentElement.style.getPropertyValue('--clay')).toBe('#A6E3A1');
+    expect(group.querySelector('[data-theme="matcha"]').classList.contains('on')).toBe(true);
+    expect(custom.classList.contains('on')).toBe(false);
   });
 });

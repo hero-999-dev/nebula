@@ -115,7 +115,7 @@ export async function runGalaxyChecks(check) {
     check('and down to one, the page is whole again', s.panes.length === 0 && frame === 'edit-shell', JSON.stringify({ s, frame }));
 
     // Unstyled controls on a dark theme.
-    await win.click('#theme-pick [data-theme="dark"]');
+    await win.evaluate(() => document.querySelector('#theme-pick [data-theme="dark"]').click());   // in Settings since 1.0.3
     await win.waitForTimeout(300);
     const grey = await win.evaluate(() => [...document.querySelectorAll('.galaxy-mini button, .galaxy-pane button, .galaxy-menu button')]
       .filter((b) => { const c = getComputedStyle(b); return c.color === 'rgb(0, 0, 0)' || c.backgroundColor === 'rgb(240, 240, 240)'; })

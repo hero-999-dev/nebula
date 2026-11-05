@@ -166,6 +166,13 @@ describe('right-click suggestions', () => {
       .toEqual({ x: 1, y: 2, misspelledWord: 'teh', suggestions: ['the', 'ten'], isEditable: true, mediaType: 'none', selectionText: 'teh' });
   });
 
+  it('puts the nearest suggestion first when every language is checked (1.0.3)', () => {
+    // What Chromium gave for "kitaplarr" with English, German, Polish and Turkish on.
+    const facts = menuFacts({ misspelledWord: 'kitaplarr', dictionarySuggestions: ['Kita plärr', 'titular', 'kapilar', 'kitaplar', 'Kitaplatz'] });
+    expect(facts.suggestions[0]).toBe('kitaplar');
+    expect(menuFacts({ misspelledWord: 'bilgisayr', dictionarySuggestions: ['biliär', 'biliary', 'biliśmy', 'bilgisayar'] }).suggestions[0]).toBe('bilgisayar');
+  });
+
   it('checks spelling in the chosen language only, English when it has no dictionary', () => {
     const available = ['en-US', 'en-GB', 'de-DE', 'pl', 'tr'];
     expect(spellLanguages('tr', available)).toEqual(['tr']);

@@ -336,6 +336,8 @@ const SEALED = /nebula-media:\/\/hole\/([\w-]{1,120})\/([\w-]{1,120})\/((?:vid|a
 
 /** Where the videos too large for an exported note's own file are put: a folder beside it, named after it. */
 export const travelFolder = (filePath) => `${String(filePath).replace(/\.json$/i, '')} videos`;
+/** The same folder inside a note's zip (main.js note:export): its videos and its attached files. */
+export const zipFolder = (filePath) => `${String(filePath).replace(/\.json$/i, '')} files`;
 
 /**
  * A note leaving the vault as a Nebula note, with every video it has. Those
@@ -371,7 +373,7 @@ export async function travelWhole(text, notesDir, { budget = TRAVEL_VIDEO_BYTES,
       room -= size;
       swaps.push([address, `data:video/${VIDEO_KIND[extOf(file)]};base64,${fs.readFileSync(full).toString('base64')}`]);
     } else if (!beside.has(file)) {
-      beside.set(file, { name: file, put: async (dest) => { try { await fs.promises.copyFile(full, dest); return true; } catch { return false; } } });
+      beside.set(file, { name: file, file: full, put: async (dest) => { try { await fs.promises.copyFile(full, dest); return true; } catch { return false; } } });
     }
   }
   for (const [address, hole, id, file] of new Map([...out.matchAll(SEALED)].map((m) => [m[0], m])).values()) {
@@ -418,7 +420,8 @@ export function stageVideos(text, notesDir) {
 /**
  * A note file brought in from elsewhere, with all of its videos: those written
  * into it (stageVideos), and those lying beside it — in the folder an export
- * made for the large ones (travelFolder), or in the note's own folder when the
+ * made for the large ones (travelFolder), in the one a zip of the note
+ * unpacked (zipFolder), or in the note's own folder when the
  * file was copied out of a vault with it. Each is copied to where the others
  * wait, and the text names it there.
  * @param {string} text @param {string} notesDir @param {string} filePath the note file that is read
@@ -432,7 +435,7 @@ export async function stageTravelled(text, notesDir, filePath) {
   let incoming = null;
   for (const [address, id, file] of named) {
     // …or beside the note's file itself, when that is read out of its own folder.
-    const from = [path.join(travelFolder(filePath), file), path.join(here, id, file), ...(path.basename(here) === id ? [path.join(here, file)] : [])].find((p) => { try { return fs.statSync(p).isFile(); } catch { return false; } });
+    const from = [path.join(travelFolder(filePath), file), path.join(zipFolder(filePath), file), path.join(here, id, file), ...(path.basename(here) === id ? [path.join(here, file)] : [])].find((p) => { try { return fs.statSync(p).isFile(); } catch { return false; } });
     if (!from) continue;
     try {
       incoming ??= `incoming-${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`;

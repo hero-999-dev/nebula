@@ -18,7 +18,6 @@ import { MAP, DRAG_TYPE } from './split-view.js';
 const VIEW_KEY = 'nebula:map-view';
 const MINI_VIEW_KEY = 'nebula:map-mini-view';
 const NAMES_KEY = 'nebula:map-names';
-const PICK_MAX = 6;                    // labels lit at once — the engine's own cap too
 
 /**
  * What the map is built from: notes, folders (each with its project), projects
@@ -325,7 +324,11 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
     list.setAttribute('role', 'listbox');
     list.hidden = true;
     input.setAttribute('aria-controls', list.id);
-    box.append(chips, input, list);
+    // One press takes everything out of the search (the owner, 1.0.3).
+    const wipe = el('button', 'galaxy-search-clear', t('Clear'));
+    wipe.type = 'button';
+    wipe.hidden = true;
+    box.append(chips, input, wipe, list);
     let picked = [];
     let matches = [];
     let at = 0;
@@ -339,10 +342,12 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
     };
     const nameOf = (key) => titles.get(key) ?? key;
     const colorOf = (name) => big?.labelColor?.(name) || 'currentColor';
+    const paintWipe = () => { wipe.hidden = !picked.length && !input.value; };
     const apply = () => {
       big?.highlight?.(picked);
       chips.textContent = '';
       box.classList.toggle('has-chips', picked.length > 0);
+      paintWipe();
       const have = new Set(known());
       for (const name of picked) {
         // A pick the map does not show now stays, faded, until it is taken
@@ -366,7 +371,7 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
       const low = (k) => nameOf(k).replace(/^@/, '').toLowerCase();
       matches = (q ? all.filter((l) => nameOf(l).toLowerCase().includes(q))
         .sort((a, b) => (low(b).startsWith(q.replace(/^@/, '')) - low(a).startsWith(q.replace(/^@/, ''))) || nameOf(a).localeCompare(nameOf(b)))
-        : all).slice(0, 8);
+        : all);
       at = Math.min(at, Math.max(0, matches.length - 1));
       list.textContent = '';
       if (!matches.length) {
@@ -384,16 +389,19 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
       });
       list.hidden = false;
       input.setAttribute('aria-expanded', 'true');
+      list.querySelector('li.on')?.scrollIntoView?.({ block: 'nearest' });
     };
     const pick = (name) => {
-      if (!name || picked.includes(name) || picked.length >= PICK_MAX) return;
+      if (!name || picked.includes(name)) return;
       picked = [...picked, name];
       input.value = '';
       at = 0;
       apply();
       paint();
     };
-    input.addEventListener('input', () => { at = 0; paint(); });
+    const clear = () => { picked = []; input.value = ''; close(); apply(); };
+    wipe.addEventListener('click', clear);
+    input.addEventListener('input', () => { at = 0; paintWipe(); paint(); });
     input.addEventListener('focus', paint);
     input.addEventListener('blur', () => setTimeout(close, 120));
     input.addEventListener('keydown', (e) => {
@@ -411,7 +419,7 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
       sync() { apply(); },
       // A constellation belongs to one space: going into a hole or back out
       // starts the search empty (Codex, map v2 ideas).
-      clear() { picked = []; input.value = ''; close(); apply(); },
+      clear,
       picked: () => picked.slice(),
     };
   }

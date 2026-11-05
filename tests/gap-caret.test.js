@@ -4,7 +4,7 @@
  * tests/e2e/layout.mjs.
  */
 import { describe, it, expect } from 'vitest';
-import { placeForClick, NO_CARET } from '../src/js/gap-caret.js';
+import { placeForClick, initGapCaret, NO_CARET } from '../src/js/gap-caret.js';
 
 const KINDS = {
   p: (id) => `<p id="${id}">words</p>`,
@@ -65,7 +65,10 @@ describe('a click in the gap between two blocks', () => {
     expect(placeForClick(flow('pic pic'), 145)).toBeNull();
     expect(placeForClick(flow('hr pic'), 145)).toBeNull();
     expect(placeForClick(flow('p p'), 500)).toBeNull();
-    expect(placeForClick(flow('p pic'), 500)).toBeNull();
+  });
+
+  it('on the open ground under a picture that ends the flow, a line is made (the owner’s Ideas note)', () => {
+    expect(say(placeForClick(flow('p pic'), 500))).toBe('a line before the end');
   });
 });
 
@@ -131,11 +134,44 @@ describe('a click on the empty ground at the foot of a column', () => {
     expect(placeForClick(flow('p p'), 400)).toBeNull();
   });
 
-  it('under a picture that ends the column nothing of ours is done', () => {
-    expect(placeForClick(column('p pic'), 400)).toBeNull();
+  it('under a picture that ends the column, a line is made there', () => {
+    expect(say(placeForClick(column('p pic'), 400))).toBe('a line before the end');
   });
 
   it('between two lines of a column, too, the browser answers', () => {
     expect(placeForClick(column('p p'), 145)).toBeNull();
+  });
+});
+
+describe('a bare line break straight on the note (the owner’s Bug Find note, 1.0.3)', () => {
+  it('becomes an empty line at the first press, and a press at its height puts the caret in it', () => {
+    const editor = document.createElement('div');
+    editor.contentEditable = 'true';
+    editor.innerHTML = '<br><hr class="blk-hr"><ul><li>words</li></ul>';
+    document.body.replaceChildren(editor);
+    initGapCaret(editor);
+    const was = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function () { return this.tagName === 'P' ? { top: 0, bottom: 24, left: 0, right: 600 } : { top: 30, bottom: 40, left: 0, right: 600 }; };
+    try {
+      let inputs = 0;
+      editor.addEventListener('input', () => inputs++);
+      editor.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, clientX: 20, clientY: 10 }));
+      expect(editor.firstElementChild.outerHTML).toBe('<p><br></p>');
+      expect([...editor.children].some((c) => c.tagName === 'BR')).toBe(false);
+      expect(inputs).toBe(1);
+      expect(editor.firstElementChild.contains(window.getSelection().anchorNode)).toBe(true);
+    } finally {
+      Element.prototype.getBoundingClientRect = was;
+    }
+  });
+
+  it('between a divider and a picture it is a gap, not a line: it goes and no line is made', () => {
+    const editor = document.createElement('div');
+    editor.contentEditable = 'true';
+    editor.innerHTML = '<p>words</p><hr class="blk-hr"><br><figure class="note-image" contenteditable="false"></figure>';
+    document.body.replaceChildren(editor);
+    initGapCaret(editor);
+    editor.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, clientX: 20, clientY: 500 }));
+    expect([...editor.children].map((c) => c.tagName).join(' ')).toBe('P HR FIGURE');
   });
 });

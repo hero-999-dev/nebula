@@ -94,7 +94,17 @@ export function readLogo(dir) {
     const ico = /^icon-[0-9a-f]{12}\.ico$/.test(String(meta?.ico)) ? path.join(dir, meta.ico) : null;
     const png = path.join(dir, 'icon.png');
     if (!colors || !ico || !fs.existsSync(ico) || !fs.existsSync(png)) return null;
-    return { colors, ico, png };
+    return { colors, ico, png, picture: meta?.picture === true };
+  } catch {
+    return null;
+  }
+}
+
+/** A logo cut from the user's own picture, as an address the editor can show; null for one drawn from colours. */
+export function logoPictureUrl(logo) {
+  if (!logo?.picture) return null;
+  try {
+    return `data:image/png;base64,${fs.readFileSync(logo.png).toString('base64')}`;
   } catch {
     return null;
   }
@@ -105,9 +115,10 @@ export function readLogo(dir) {
  * @param {string} dir <profile>/logo
  * @param {object} colors the five picks
  * @param {Record<string, string>} images size → PNG data address, every size of ICON_SIZES
+ * @param {boolean} [picture] the images are the user's own picture (1.0.3), not the colours drawn
  * @returns {{ok: true, colors: object, ico: string, png: string} | {ok: false, error: string}}
  */
-export function writeLogo(dir, colors, images) {
+export function writeLogo(dir, colors, images, picture = false) {
   const clean = cleanLogoColors(colors);
   if (!clean) return { ok: false, error: 'colors' };
   const pictures = [];
@@ -116,16 +127,56 @@ export function writeLogo(dir, colors, images) {
     if (!png) return { ok: false, error: 'picture' };
     pictures.push([size, png]);
   }
-  const name = `icon-${crypto.createHash('sha256').update(LOGO_SLOTS.map((s) => clean[s]).join('')).digest('hex').slice(0, 12)}.ico`;
+  // Named after what it shows: a shortcut pointed at a new name draws the new icon.
+  const shows = picture ? pictures[0][1] : LOGO_SLOTS.map((s) => clean[s]).join('');
+  const name = `icon-${crypto.createHash('sha256').update(shows).digest('hex').slice(0, 12)}.ico`;
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, name), icoOf(pictures));
   fs.writeFileSync(path.join(dir, 'icon.png'), pictures[0][1]);
-  fs.writeFileSync(path.join(dir, 'logo.json'), JSON.stringify({ colors: clean, ico: name }, null, 2));
+  fs.writeFileSync(path.join(dir, 'logo.json'), JSON.stringify({ colors: clean, ico: name, ...(picture ? { picture: true } : {}) }, null, 2));
   // The icon files of the logos before this one.
   for (const file of fs.readdirSync(dir)) {
     if (/^icon-[0-9a-f]{12}\.ico$/.test(file) && file !== name) fs.rmSync(path.join(dir, file), { force: true });
   }
   return { ok: true, colors: clean, ico: path.join(dir, name), png: path.join(dir, 'icon.png') };
+}
+
+/**
+ * The user's own picture, cut, kept apart from the logo worn (1.0.3, the
+ * owner: "use a picture of mine kaydedilmiyor, hemen temaya bastım, kayboldu"):
+ * a theme put on the logo leaves it here, to be worn again, until it is removed.
+ *   <profile>/logo-picture/picture-<size>.png   every size of ICON_SIZES
+ */
+export function keepLogoPicture(dir, images) {
+  const pictures = [];
+  for (const size of ICON_SIZES) {
+    const png = pngOfSize(images?.[size], size);
+    if (!png) return { ok: false, error: 'picture' };
+    pictures.push([size, png]);
+  }
+  fs.mkdirSync(dir, { recursive: true });
+  for (const [size, png] of pictures) fs.writeFileSync(path.join(dir, `picture-${size}.png`), png);
+  return { ok: true };
+}
+
+/** The kept picture as size → PNG data address, or null where there is none (or it is not whole). */
+export function readLogoPicture(dir) {
+  const out = {};
+  for (const size of ICON_SIZES) {
+    try {
+      const url = `data:image/png;base64,${fs.readFileSync(path.join(dir, `picture-${size}.png`)).toString('base64')}`;
+      if (!pngOfSize(url, size)) return null;
+      out[size] = url;
+    } catch {
+      return null;
+    }
+  }
+  return out;
+}
+
+/** The kept picture, removed. */
+export function forgetLogoPicture(dir) {
+  fs.rmSync(dir, { recursive: true, force: true });
 }
 
 /** Nebula's own logo again: nothing of a custom one is kept. */

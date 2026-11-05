@@ -387,7 +387,7 @@ export async function runDenseChecks(check, { docs = [], guide = true } = {}) {
           expect: async () => (await win.evaluate(() => document.getElementById('slash-menu').hidden)) || 'Escape left the menu open',
           del: bs(1),
         });
-        for (const kind of ['url', 'mention']) {
+        for (const kind of ['url']) { // Mention left the link menu in 1.0.3 (owner's Bug Find note)
           await trial(`pasted link as ${kind === 'url' ? 'URL' : 'Mention'}`, site, where, {
             act: async () => {
               await app.evaluate(({ clipboard }) => clipboard.writeText('https://example.com/dense'));

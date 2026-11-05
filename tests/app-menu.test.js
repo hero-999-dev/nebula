@@ -11,8 +11,12 @@ import { buildMenus, commandsOf, filterCommands } from '../src/js/app-menu.js';
 const menus = () => buildMenus({ actions: {}, history: {}, find: {}, palette: {}, shortcuts: {} });
 
 describe('the five menus', () => {
-  it('are File, Edit, View, Window and Help, in that order — and Settings beside Help (0.9.4)', () => {
-    expect(menus().map((m) => m.title)).toEqual(['File', 'Edit', 'View', 'Window', 'Help', 'Settings']);
+  it('are File, Edit, View, Window and Help, in that order — Settings beside Help (0.9.4), Tools beside Settings (1.0.3)', () => {
+    expect(menus().map((m) => m.title)).toEqual(['File', 'Edit', 'View', 'Window', 'Help', 'Settings', 'Tools']);
+    const tools = menus().at(-1);
+    expect(tools.direct).toBeFalsy();
+    // One tool, Tailscale; Sync now is in its sheet only (the owner, 2026-11-05).
+    expect(tools.items.map((i) => [i.id, i.label])).toEqual([['tools.tailscale', 'Tailscale – for syncing devices']]);
   });
 
   it('gives every item a label and something to run', () => {

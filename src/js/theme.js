@@ -15,16 +15,16 @@ import { MATCHA, cleanColors, cleanProfileName, deriveTokens, toneOf } from './t
 
 const KEY = 'nebula:theme';
 const CUSTOM_KEY = 'nebula:theme-custom';
-export const THEMES = ['main', 'dark', 'light', 'white'];
+// Matcha (1.0.3, the owner: "matcha temasini oraya ekle, ortada olsun") is a
+// fixed theme again, in the middle of the row; it wears its colours the way the
+// custom theme does, without touching the reader's own.
+export const THEMES = ['main', 'dark', 'matcha', 'light', 'white'];
 export const CUSTOM = 'custom';
 const DEFAULT = 'main';
 
 function read() {
   try {
     const saved = localStorage.getItem(KEY);
-    // Matcha was a fixed theme in the 0.9.4 test builds; it is the ready
-    // profile of the custom theme now.
-    if (saved === 'matcha') return CUSTOM;
     return THEMES.includes(saved) || saved === CUSTOM ? saved : DEFAULT;
   } catch {
     return DEFAULT;
@@ -68,6 +68,7 @@ function unwear() {
 export function wearStoredTheme() {
   const theme = read();
   if (theme === CUSTOM) wear(readCustom().colors);
+  else if (theme === 'matcha') wear(MATCHA.colors);
   else { unwear(); root().dataset.theme = theme; }
 }
 
@@ -95,6 +96,8 @@ export function initTheme(group, { customButton = null } = {}) {
     current = theme;
     if (theme === CUSTOM) {
       wear(readCustom().colors);
+    } else if (theme === 'matcha') {
+      wear(MATCHA.colors);
     } else {
       unwear();
       root().dataset.theme = theme;

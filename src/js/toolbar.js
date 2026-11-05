@@ -1214,9 +1214,8 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
               : format === 'nebula' ? toNebulaNote({ title, content: html, labels: noteLabels?.() })
                 : toMarkdown(html, title);
     const res = await api.export({ suggested: safeFileName(title, fmt?.ext || format), content, format });
-    // A Nebula note carries its videos inside it, up to a size; the rest stay behind.
-    // The videos too large for the note's own file lie in a folder beside it: the two belong together.
-    if (res?.videosBeside) window.dispatchEvent(new CustomEvent('nebula-toast', { detail: `Videos in the folder “${res.folder}” beside the note: ${res.videosBeside}. Keep the folder with the file.` }));
+    // A Nebula note with videos or attached files goes out as one zip, with them in it.
+    if (res?.zipped) window.dispatchEvent(new CustomEvent('nebula-toast', { detail: `Saved as a zip, with the note’s files in it: ${res.zipped}${res.videosLeft ? `. Files that could not be taken along: ${res.videosLeft}` : ''}` }));
     else if (res?.videosLeft) window.dispatchEvent(new CustomEvent('nebula-toast', { detail: `Videos that could not be taken along: ${res.videosLeft}` }));
     return res;
   }
@@ -1296,7 +1295,8 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     const api = window.nebula?.note;
     if (!api) return;
     const res = await api.import();
-    if (!res?.ok) return;
+    // Chosen but not read (a zip with no note in it, a file too large): it says so.
+    if (!res || res.canceled) return;
     await takeFile(res);
   }
 
@@ -2331,6 +2331,21 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     const touching = (selector) => [...editorEl.querySelectorAll(selector)]
       .filter((el) => live.some((r) => r.intersectsNode(el)));
 
+    // Cards held whole by a selection go with it, as the pictures and lines in
+    // it do. Refused, nothing went: "I selected these together and Delete did
+    // not remove them" (the owner's Ideas note, 1.0.3).
+    const held = window.getSelection();
+    const cards = touching('.link-block').filter((c) => !c.closest('.shape-layer, .image-layer'));
+    if (cards.length && held?.rangeCount && !held.isCollapsed
+      && !touching('.shape-layer, .image-layer, .blk-table').length
+      && cards.every((c) => held.containsNode(c, false))) {
+      e.preventDefault();
+      history?.push();
+      cards.forEach((c) => c.remove());
+      if (!held.isCollapsed) document.execCommand('delete');
+      dirty();
+      return;
+    }
     // A shape layer is not text. Nothing typed, and no delete, removes one —
     // the shape bar's own ✕ is the way, and it is undoable.
     if (touching('.shape-layer, .image-layer, .link-block, .blk-table').length) {
@@ -2474,6 +2489,10 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
         // divider itself alone, so the second press appeared to do nothing.
         history?.push();
         const above = hr.previousElementSibling;
+        // The empty last line the caret stood on was kept only as its one place
+        // under the divider; with the caret going up it goes too, as Enter and
+        // /divider had made it (a note's last line, the long-note trials, 1.0.3).
+        const stayed = lastLine ? block : null;
         hr.remove();
         // Backspace goes backwards: with the divider gone the caret joins the
         // end of the line above, where it was before Enter and /divider. It
@@ -2490,6 +2509,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
           r.collapse(true);
           caret.removeAllRanges();
           caret.addRange(r);
+          stayed?.remove();
         }
         dirty();
       } else {

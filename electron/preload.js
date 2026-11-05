@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('nebula', {
   display: { realScale: () => ipcRenderer.invoke('display:real-scale'), windowZoom: () => webFrame.getZoomFactor() },
   version: () => ipcRenderer.invoke('app:version'),
   paths: () => ipcRenderer.invoke('app:paths'),
-  // Reveal takes a key ('exeDir' | 'userData' | 'storage' | 'backups'), not a
+  // Reveal takes a key ('exeDir' | 'userData' | 'storage' | 'backups' | 'snapshots'), not a
   // path — the renderer cannot ask the main process to open anything else.
   reveal: (key) => ipcRenderer.invoke('app:reveal', key),
   storage: {
@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('nebula', {
     root: () => ipcRenderer.invoke('storage:root'),
     // A labelled copy of the vault, taken before every note is repaired (heal.js).
     backup: (label) => ipcRenderer.invoke('storage:backup', label),
+    usage: (opts) => ipcRenderer.invoke('storage:usage', opts),
+    tidyBackups: () => ipcRenderer.invoke('storage:tidy-backups'),
   },
   lifecycle: {
     onSave: (fn) => {
@@ -78,6 +80,8 @@ contextBridge.exposeInMainWorld('nebula', {
   // over once, read the way File → Import reads one.
   files: {
     take: () => ipcRenderer.invoke('files:take'),
+    // The taken files are notes now: the taskbar's progress stops.
+    done: () => ipcRenderer.send('files:done'),
     onOpen: (fn) => {
       const handler = () => fn();
       ipcRenderer.on('files:open', handler);
@@ -111,10 +115,38 @@ contextBridge.exposeInMainWorld('nebula', {
   },
   // The logo in colours of one's own (0.9.4, app-logo.js): the five colours, and
   // the logo drawn in each size an icon holds, as PNG data addresses.
+  // The pictures behind the note (1.0.3, backdrop.js): kept in the profile, not in any note.
+  backdrop: {
+    get: () => ipcRenderer.invoke('backdrop:get'),
+    list: () => ipcRenderer.invoke('backdrop:list'),
+    add: (dataUrl) => ipcRenderer.invoke('backdrop:add', dataUrl),
+    wear: (id) => ipcRenderer.invoke('backdrop:wear', id),
+    remove: (id) => ipcRenderer.invoke('backdrop:remove', id),
+  },
+  // The screen the window stands on (1.0.3): the laptop's own, or one outside it.
+  screen: {
+    get: () => ipcRenderer.invoke('screen:get'),
+    onChanged: (fn) => {
+      const handler = (_e, info) => fn(info);
+      ipcRenderer.on('screen:changed', handler);
+      return () => ipcRenderer.off('screen:changed', handler);
+    },
+  },
+  // The widgets' sounds (1.0.3, alarm-sound.js): a system sound by name, or one of the user's by id.
+  sound: {
+    list: () => ipcRenderer.invoke('sound:list'),
+    get: (id) => ipcRenderer.invoke('sound:get', id),
+    setOwn: (dataUrl, name) => ipcRenderer.invoke('sound:setOwn', dataUrl, name),
+    clearOwn: (id) => ipcRenderer.invoke('sound:clearOwn', id),
+  },
   logo: {
     get: () => ipcRenderer.invoke('logo:get'),
-    set: (colors, images) => ipcRenderer.invoke('logo:set', colors, images),
+    // `picture`: the images are the user's own picture, not the colours drawn (1.0.3).
+    set: (colors, images, picture = false) => ipcRenderer.invoke('logo:set', colors, images, picture === true),
     clear: () => ipcRenderer.invoke('logo:clear'),
+    // The user's own picture, kept apart (1.0.3): worn again, or removed for good.
+    wearPicture: (colors) => ipcRenderer.invoke('logo:wear-picture', colors),
+    forgetPicture: () => ipcRenderer.invoke('logo:forget-picture'),
     // A shortcut to this copy on the desktop, wearing the logo.
     shortcut: () => ipcRenderer.invoke('logo:shortcut'),
   },
@@ -206,6 +238,37 @@ contextBridge.exposeInMainWorld('nebula', {
       const handler = (_e, status) => fn(status);
       ipcRenderer.on('update:status', handler);
       return () => ipcRenderer.off('update:status', handler);
+    },
+  },
+  // Tailscale sync (1.0.3): the pairing key never crosses; the code only to the Tools sheet, on asking.
+  sync: {
+    state: () => ipcRenderer.invoke('sync:state'),
+    configure: (patch) => ipcRenderer.invoke('sync:configure', patch),
+    makeCode: () => ipcRenderer.invoke('sync:make-code'),
+    setCode: (code) => ipcRenderer.invoke('sync:set-code', code),
+    unpair: () => ipcRenderer.invoke('sync:unpair'),
+    // The group's code again, for one more device; and whether each device answers.
+    showCode: () => ipcRenderer.invoke('sync:show-code'),
+    check: () => ipcRenderer.invoke('sync:check'),
+    now: () => ipcRenderer.invoke('sync:now'),
+    keepOut: (ids) => ipcRenderer.invoke('sync:keep-out', ids),
+    // The main process asks the window to write what it holds, or to take what came.
+    onAsk: (fn) => {
+      const handler = async (_e, { requestId, kind, payload }) => {
+        try {
+          ipcRenderer.send('sync:answer', { requestId, result: await fn(kind, payload) });
+        } catch (error) {
+          ipcRenderer.send('sync:answer', { requestId, error: error?.message ?? String(error) });
+        }
+      };
+      ipcRenderer.on('sync:ask', handler);
+      return () => ipcRenderer.off('sync:ask', handler);
+    },
+    on: (name, fn) => {
+      if (!['progress', 'media-ready', 'state'].includes(name)) return () => {};
+      const handler = (_e, payload) => fn(payload);
+      ipcRenderer.on(`sync:${name}`, handler);
+      return () => ipcRenderer.off(`sync:${name}`, handler);
     },
   },
 });

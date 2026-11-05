@@ -63,10 +63,6 @@
              does not move out from under the pointer, and two buttons side by
              side under it — Archive left, Trash right. -->
         <div class="drawer-body" id="drawer-body" hidden></div>
-        <!-- A theme of one's own (0.9.4): opens upward here, over Archive and
-             Trash, from the palette button at the right of the themes below.
-             Filled by theme-editor.js. -->
-        <div class="theme-editor" id="theme-editor" role="group" aria-label="Your own theme" hidden></div>
         <!-- The map of your notes (1.0.0): folders as suns, notes as planets,
              labels as moons. Filled by galaxy-ui.js; ⤢ puts it over the page,
              and its name dragged onto the page puts it beside the notes. -->
@@ -83,19 +79,10 @@
         <div class="new-row">
           <button class="btn primary" id="btn-new" type="button">New note</button>
           <button class="btn new-folder" id="btn-new-folder" type="button" title="New folder" aria-label="New folder"><span data-icon="folder"></span><span class="nf-plus" aria-hidden="true">+</span></button>
+          <!-- New project (1.0.3), folders in a folder, beside New folder. -->
+          <button class="btn new-folder" id="btn-new-project" type="button" title="New project" aria-label="New project"><span data-icon="project"></span><span class="nf-plus" aria-hidden="true">+</span></button>
           <!-- New black hole (0.9.4), beside New folder: notes kept encrypted. -->
           <button class="btn new-folder new-hole" id="btn-new-hole" type="button" title="New black hole" aria-label="New black hole"><span class="hole-disc" aria-hidden="true"></span><span class="nf-plus" aria-hidden="true">+</span></button>
-        </div>
-        <!-- The four themes, and at their right — like New folder beside New
-             note — the reader's own (0.9.4): the palette opens its editor. -->
-        <div class="theme-row">
-          <div class="theme-pick" id="theme-pick" role="group" aria-label="Theme">
-            <button type="button" data-theme="main" title="Main — violet">Main</button>
-            <button type="button" data-theme="dark" title="Dark">Dark</button>
-            <button type="button" data-theme="light" title="Light">Light</button>
-            <button type="button" data-theme="white" title="White — how the note looks on A4">White</button>
-          </div>
-          <button class="btn theme-custom" id="btn-theme-custom" type="button" title="Your own theme" aria-label="Your own theme" aria-expanded="false" aria-controls="theme-editor"><span data-icon="palette"></span></button>
         </div>
         <div class="side-meta">
           <span class="app-version" id="app-version" title="About Nebula"></span>
@@ -278,6 +265,8 @@
             <button type="button" class="find-btn" data-find="close" title="Close (Esc)">✕</button>
           </div>
           <div id="editor" class="editor" contenteditable="true" spellcheck="true" data-placeholder="Start writing…  ( / for blocks )"></div>
+          <!-- No note open (1.0.3): this, not an "Untitled" page that takes no typing. -->
+          <div class="no-note" id="no-note" hidden></div>
         </div>
       </div>
     </main>
@@ -381,8 +370,32 @@
     <div class="modal modal-wide settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <p class="dlg-title" id="settings-title">Settings</p>
       <div id="settings-body"></div>
+      <!-- The themes (1.0.3: moved here from the foot of the sidebar, the owner's
+           ask), Matcha in the middle, and the editor of the reader's own, which
+           stands open. settings-panel.js puts both in the Theme organizer. -->
+      <div class="theme-row" id="theme-row">
+        <div class="theme-pick" id="theme-pick" role="group" aria-label="Theme">
+          <button type="button" data-theme="main" title="Main — violet">Main</button>
+          <button type="button" data-theme="dark" title="Dark">Dark</button>
+          <button type="button" data-theme="matcha" title="Matcha — green tea">Matcha</button>
+          <button type="button" data-theme="light" title="Light">Light</button>
+          <button type="button" data-theme="white" title="White — how the note looks on A4">White</button>
+        </div>
+      </div>
+      <div class="theme-editor" id="theme-editor" role="group" aria-label="Your own theme"></div>
       <div class="dlg-actions">
         <button class="btn ghost" id="settings-close" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tools, beside Settings (1.0.3): Nebula with other apps. tools-panel.js fills it. -->
+  <div class="overlay" id="ov-tools" hidden>
+    <div class="modal modal-wide settings-modal" role="dialog" aria-modal="true" aria-labelledby="tools-title">
+      <p class="dlg-title" id="tools-title">Tools</p>
+      <div id="tools-body"></div>
+      <div class="dlg-actions">
+        <button class="btn ghost" id="tools-close" type="button">Close</button>
       </div>
     </div>
   </div>

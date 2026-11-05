@@ -10,24 +10,31 @@ import { AI_SERVICES, isGoogleService } from '../src/js/ai-services.js';
 import { realScaleFor } from '../src/js/page-zoom.js';
 import { fetchPageTitle, fetchVideoPoster } from './link-metadata.js';
 import { installContextMenu, registerEditingHandlers, writeImageToClipboard, forgetIgnoredWords } from './context-menu.js';
-import { purgeNoteFromBackupsAsync, purgeDeletedFromBackups, purgeHoleNoteFromBackupsAsync, purgeHoleFromBackupsAsync, purgeHoleFilesFromBackupsAsync, protectLegacyHoleBackups, purgeUnnamedFromBackups, shredTree, pruneLabelled, oldWayCopies, dropOldWayCopies } from './backup-purge.js';
+import { purgeNoteFromBackupsAsync, purgeDeletedFromBackups, purgeHoleNoteFromBackupsAsync, purgeHoleFromBackupsAsync, purgeHoleFilesFromBackupsAsync, protectLegacyHoleBackups, purgeUnnamedFromBackups, shredTree, pruneLabelled, staleLabelled, oldWayCopies, dropOldWayCopies } from './backup-purge.js';
+import { measureStorage } from './storage-usage.js';
 import { BlackHoles, WINDOWS_HELLO_SCRIPT, readHelloAnswer } from './black-holes.js';
 import { AppLock } from './app-lock.js';
-import { readLogo, writeLogo, clearLogo, pointShortcuts, makeShortcut, pinnedAppId, taskbarDetails } from './app-logo.js';
+import { readLogo, writeLogo, clearLogo, logoPictureUrl, keepLogoPicture, readLogoPicture, forgetLogoPicture, pointShortcuts, makeShortcut, pinnedAppId, taskbarDetails } from './app-logo.js';
+import { readBackdrop, listPhotos, wornPhoto, addPhoto, wearPhoto, removePhoto } from './backdrop.js';
+import { systemSoundDir, soundNames, readSystemSound, readOwnSound, listOwnSounds, writeOwnSound, clearOwnSound } from './alarm-sound.js';
 import { filesFromArgv, readNoteFile } from './open-file.js';
+import { writeZip } from './zip.js';
 import { offerOpenWith } from './open-with.js';
 import { attachedOf, attachedName, openedPath, runsCode, clearOpened as clearOpenedIn, clearOpenedAsync as clearOpenedAsyncIn } from './opened-files.js';
 import { markOfTheWeb } from './mark-of-the-web.js';
 import { vaultPresence } from './vault-presence.js';
+import { createSync } from './sync.js';
 import { staysOnPage, externalUrl, popupGate } from './navigation.js';
 import { allowed, isChatSession, isEmbedSession, ASK_EMBED, askKeys, checkKey, askWords, pageAnswers } from './permissions.js';
 import { words } from './dialog-words.js';
+import { persistName } from './session-name.js';
 import {
-  MEDIA_SCHEME, NOTE_ID, externalize, inlinePictures, inlinePicturesAsync, rehome, removeNoteFolderAsync, tidyVault, addVideo, addAttachment, pictureDataUrl, travelWhole, travelFolder, noteFile, noteIds, snapshotVault, missingMedia, sweepNote, RELEASED_FILE, readReleased, writeReleased, noteReleases, releaseAdded,
+  MEDIA_SCHEME, NOTE_ID, externalize, inlinePictures, inlinePicturesAsync, rehome, removeNoteFolderAsync, tidyVault, addVideo, addAttachment, pictureDataUrl, travelWhole, zipFolder, noteFile, noteIds, snapshotVault, missingMedia, sweepNote, RELEASED_FILE, readReleased, writeReleased, noteReleases, releaseAdded,
   parseMediaUrl, mediaPath, mimeOf, byteRange, isVideoName, VIDEO_EXTENSIONS,
 } from './note-media.js';
 import { initUpdater } from './updater.js';
-import { resolveUserData, appChannel, canSelfUpdate } from './user-data.js';
+import { onScreenBounds } from './window-bounds.js';
+import { resolveUserData, appChannel, canSelfUpdate, syncVersion } from './user-data.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -90,6 +97,12 @@ const CHANNEL = appChannel({
   metaChannel: META.nebulaChannel,
   portableDir: process.env.PORTABLE_EXECUTABLE_DIR,
 });
+/** When a test build was packed (scripts/test-stamp.js); null in every other build. */
+const TEST_STAMP = CHANNEL === 'test' ? (() => {
+  try { return JSON.parse(fsSync.readFileSync(path.join(__dirname, 'test-build.json'), 'utf8')).stamp ?? null; } catch { return null; }
+})() : null;
+/** What sync compares: a test build adds that stamp. */
+const SYNC_VERSION = syncVersion({ version: APP_VERSION, channel: CHANNEL, stamp: TEST_STAMP });
 /** The Blink feature behind passkeys; switched off in every page the app shows (see below). */
 export const NO_WEBAUTH = 'WebAuth';
 
@@ -353,7 +366,7 @@ function askWindowsHello(ask, reason = '') {
         const handle = ask && mainWindow && !mainWindow.isDestroyed() ? mainWindow.getNativeWindowHandle() : null;
         if (handle) owner = String(handle.length >= 8 ? handle.readBigUInt64LE(0) : handle.readUInt32LE(0));
       } catch { owner = ''; }
-      execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', WINDOWS_HELLO_SCRIPT], {
+      execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', WINDOWS_HELLO_SCRIPT], {
         env: { ...process.env, NEBULA_HELLO_ASK: ask ? '1' : '', NEBULA_HELLO_REASON: reason, NEBULA_HELLO_WINDOW: owner },
         timeout: ask ? 130_000 : 20_000,
         windowsHide: true,
@@ -539,16 +552,28 @@ function writePrefs(patch) {
 
 const saveZoom = (level) => writePrefs({ zoom: level });
 
-/** Only a plausible rectangle: a saved size from another monitor must not win. */
+const workAreas = () => screen.getAllDisplays().map((display) => display.workArea);
+
+/** Only a plausible rectangle: a saved size from another monitor must not win, nor a place on a monitor that is gone. */
 function savedBounds() {
   const { bounds } = readPrefs();
   if (!bounds) return null;
   const ok = ['x', 'y', 'width', 'height'].every((k) => Number.isFinite(bounds[k]));
   if (!ok || bounds.width < 720 || bounds.height < 480) return null;
-  return bounds;
+  return onScreenBounds(bounds, workAreas());
+}
+
+/** A running window that a screen has gone from under is brought back (window-bounds.js). */
+function keepOnScreen(win) {
+  if (!win || win.isDestroyed() || win.isMinimized() || win.isMaximized() || win.isFullScreen()) return;
+  const now = win.getNormalBounds();
+  const there = onScreenBounds(now, workAreas());
+  if (there !== now) win.setBounds(there);
 }
 
 let mainWindow = null;
+/** Tailscale sync, made once the app is ready (sync.js). */
+let sync = null;
 let quitRequested = false;
 
 /**
@@ -566,9 +591,21 @@ function handOver(files) {
   const win = mainWindow;
   if (!win || win.isDestroyed()) return;
   if (win.isMinimized()) win.restore();
+  keepOnScreen(win);
   win.show();
+  // "Open with → Nebula" on a running copy only stirred it in the background
+  // (the owner, 1.0.3): Windows keeps the focus where it was and flashes the
+  // taskbar. On top for a moment, the window comes to the front.
+  if (process.platform === 'win32') { win.setAlwaysOnTop(true); win.setAlwaysOnTop(false); }
   win.focus();
-  if (handedFiles.length) win.webContents.send('files:open');
+  if (handedFiles.length) {
+    showOpening(win);
+    win.webContents.send('files:open');
+  }
+}
+/** The taskbar button runs a progress bar while a handed file becomes a note. */
+function showOpening(win) {
+  try { win.setProgressBar(2, { mode: 'indeterminate' }); } catch { /* no taskbar */ }
 }
 app.on('second-instance', (_event, argv, cwd) => handOver(filesFromArgv(argv, cwd)));
 // A Mac hands a file over with an event, before the app is ready or after.
@@ -617,6 +654,8 @@ function windowIconPath() {
  * start this copy of the app.
  */
 const logoDir = () => path.join(app.getPath('userData'), 'logo');
+/** The user's own picture for the logo, kept while a theme is worn instead (1.0.3). */
+const logoPictureDir = () => path.join(app.getPath('userData'), 'logo-picture');
 /** The icon file the window wears: the user's logo where there is one, the app's own otherwise. */
 function windowIcon() {
   const logo = readLogo(logoDir());
@@ -667,6 +706,14 @@ function pointLogoShortcuts(ico, { after = 600 } = {}) {
   const mine = ++shortcutsFor;
   clearTimeout(shortcutsTimer);
   shortcutsTimer = setTimeout(() => {
+    // A portable copy has no Start-menu shortcut, so Windows search found the
+    // file itself and showed its own icon under a logo of the user's ("try it
+    // in search, in the test too" — the owner's Bug Find note). One of this
+    // user's, wearing the logo, is made for it; pointShortcuts below keeps it.
+    if (ico && process.env.PORTABLE_EXECUTABLE_FILE && !process.env.NEBULA_SHORTCUT_DIRS) {
+      const res = makeShortcut({ dir: path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs'), name: APP_TITLE, target: logoTarget(), icon: ico, shell });
+      if (!res.ok && res.error !== 'exists') console.warn('[nebula] no Start-menu shortcut for the logo:', res.error);
+    }
     pointShortcuts({ dirs: logoShortcutDirs(), target: logoTarget(), icon: ico ?? logoTarget(), shell, stale: () => mine !== shortcutsFor })
       .catch((err) => console.warn('[nebula] the shortcuts could not be given the logo:', err.message));
   }, after);
@@ -772,13 +819,44 @@ function createWindow() {
   // to tell: asked now, so it is ready by the time a note opens.
   void realScale(win);
 
+  let painted = false;
   win.once('ready-to-show', () => {
+    painted = true;
     if (startMaximized) {
       win.maximize();
       if (restored) win.once('unmaximize', () => { if (!win.isDestroyed()) win.setBounds(restored); });
     }
     win.show();
   });
+  // A start slowed by a virus scan, or a page that never paints: a running app
+  // with no window cannot be told from a dead one (2026-11-02). Nothing was
+  // typed into a page that never painted, so it can go: once without the
+  // graphics card (gpuOff), and a page that still does not paint says so.
+  // "Very often" (the owner, 2026-11-02): the GPU process hung from its first
+  // second and the page waited on it. Its death before the first paint is the
+  // same start, and does not wait for the clock.
+  let gaveUp = false;
+  const notPainted = (why) => {
+    if (win.isDestroyed() || painted || gaveUp) return;
+    if (why === 'gpu-gone' && gpuOff) return; // drawing without the card: the clock decides
+    gaveUp = true;
+    pageLog('page-not-painted', { why, gpuOff });
+    if (!gpuOff) {
+      // The portable copy runs from a folder its launcher deletes as this one exits.
+      const exe = process.env.PORTABLE_EXECUTABLE_FILE;
+      const args = [...process.argv.slice(1), GPU_OFF_ARG];
+      app.relaunch(exe ? { execPath: exe, args } : { args });
+      app.exit(0);
+      return;
+    }
+    void pageLost('Nebula could not load its page.');
+  };
+  setTimeout(() => notPainted('slow'), 15_000);
+  const gpuGone = (_event, details) => {
+    if (details.type === 'GPU' && details.reason !== 'clean-exit') notPainted('gpu-gone');
+  };
+  app.on('child-process-gone', gpuGone);
+  win.once('closed', () => app.off('child-process-gone', gpuGone));
 
   // Zoom is restored once the page exists, or it is applied to nothing.
   win.webContents.on('did-finish-load', () => {
@@ -794,6 +872,7 @@ function createWindow() {
   win.on('move', remember);
   win.on('maximize', remember);
   win.on('unmaximize', remember);
+  win.on('restore', () => keepOnScreen(win));
   let allowClose = false;
   let closing = false;
   win.on('close', (event) => {
@@ -802,7 +881,9 @@ function createWindow() {
     event.preventDefault();
     if (closing) return;
     closing = true;
-    void requestRendererSave(win).then(() => {
+    void requestRendererSave(win).then(async () => {
+      // Tailscale sync: the peer is asked to pull now, while this copy still answers (a few seconds at most).
+      await sync?.nudgePeer();
       if (win.isDestroyed()) return;
       allowClose = true;
       if (quitRequested) app.quit();
@@ -855,6 +936,7 @@ function createWindow() {
   });
 
   mainWindow = win;
+  if (handedFiles.length) showOpening(win);
   installContextMenu(win);
   const contentsId = win.webContents.id;
   win.webContents.on('did-start-loading', () => {
@@ -868,6 +950,48 @@ function createWindow() {
       pending.finish('The window closed before saving finished.');
     }
     rendererSavers.delete(contentsId);
+  });
+  // The page died, or never came: it was a blank window that nothing answered,
+  // and closing it waited on a save no page was left to do. Back once by itself;
+  // a page that dies again says so instead of going round (2026-11-02). Again
+  // means within two minutes: a page that died once an hour ago was back and
+  // working, and the next death is brought back by itself too.
+  let pageRevived = 0;
+  const pageLost = async (message) => {
+    if (win.isDestroyed()) return;
+    win.show();
+    const lang = await appLanguage();
+    const { response } = await dialog.showMessageBox(win, {
+      type: 'error',
+      buttons: [words('Try again', lang), words('Close Nebula', lang)],
+      defaultId: 0,
+      cancelId: 1,
+      message: words(message, lang),
+      detail: words('Your notes on disk are safe; only what was typed in the last moments may be missing.', lang),
+    });
+    if (win.isDestroyed()) return;
+    if (response === 0) win.webContents.reload();
+    else { allowClose = true; win.close(); }
+  };
+  win.webContents.on('render-process-gone', (_event, details) => {
+    if (win.isDestroyed() || details.reason === 'clean-exit') return;
+    pageLog('page-gone', { reason: details.reason, exitCode: details.exitCode });
+    const pending = rendererSavers.get(contentsId)?.pending;
+    if (pending) {
+      clearTimeout(pending.timeout);
+      pending.finish('The page stopped before saving finished.');
+    }
+    rendererSavers.delete(contentsId);
+    const now = Date.now();
+    const again = now - pageRevived < 120_000;
+    pageRevived = now;
+    if (!again) win.webContents.reload();
+    else void pageLost('Nebula\'s page stopped working.');
+  });
+  win.on('unresponsive', () => pageLog('page-unresponsive'));
+  win.webContents.on('did-fail-load', (_event, code, _text, _url, isMainFrame) => {
+    if (isMainFrame && code !== -3) pageLog('page-fail-load', { code });
+    if (isMainFrame && code !== -3) void pageLost('Nebula could not load its page.');
   });
   win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
   return win;
@@ -983,44 +1107,66 @@ function registerShellHandlers() {
       rtf: [{ name: 'Rich Text', extensions: ['rtf'] }],
       enex: [{ name: 'Evernote export', extensions: ['enex'] }],
     };
-    const filters = await appLanguage().then((lang) => (FILTERS[format] ?? [{ name: 'Markdown', extensions: ['md'] }]).map((f) => ({ ...f, name: words(f.name, lang) })));
+    // A Nebula note travels whole (note-media.js): its pictures are written
+    // into it, and a note with videos or attached files goes out as one zip —
+    // the note and those files, whatever their size, out of a black hole too
+    // while it is open. A note file copied to another computer without the
+    // folder beside it came there without them (the owner, 2026-11-02).
+    const nebula = !binary && format === 'nebula';
+    const whole = nebula ? await travelWhole(content, notesRoot(), {
+      budget: 0,
+      sealed: {
+        size: (holeId, noteId, name) => blackHoles.videoSize(holeId, noteId, name),
+        read: async (holeId, noteId, name) => {
+          const parts = [];
+          const size = blackHoles.videoSize(holeId, noteId, name) ?? 0;
+          if (size) for await (const part of blackHoles.videoPart(holeId, noteId, name, 0, size - 1)) parts.push(part);
+          return Buffer.concat(parts);
+        },
+        write: async (holeId, noteId, name, dest) => (await blackHoles.exportVideo(holeId, noteId, name, dest)).ok,
+      },
+    }) : null;
+    const zipped = !!whole?.beside.length;
+    const lang = await appLanguage();
+    const filters = (zipped ? [{ name: 'Nebula note with its files', extensions: ['zip'] }] : FILTERS[format] ?? [{ name: 'Markdown', extensions: ['md'] }]).map((f) => ({ ...f, name: words(f.name, lang) }));
+    const named = String(suggested ?? 'Untitled');
     const { canceled, filePath } = await dialog.showSaveDialog(win, {
-      title: words('Export note', await appLanguage()),
-      defaultPath: inLastFolder(String(suggested ?? 'Untitled')),
+      title: words('Export note', lang),
+      defaultPath: inLastFolder(zipped ? named.replace(/\.json$/i, '') + '.zip' : named),
       filters,
     });
     if (canceled || !filePath) return { ok: false, canceled: true };
     lastFolder = path.dirname(filePath);
     try {
-      if (binary || format !== 'nebula') {
+      if (!nebula) {
         await fs.writeFile(filePath, binary ? Buffer.from(content) : content, binary ? undefined : 'utf8');
         return { ok: true, path: filePath };
       }
-      // A Nebula note travels whole (note-media.js): its pictures and its
-      // smaller videos are written into it, and the videos too large for a
-      // file of text go into a folder beside it — whatever their size, and
-      // out of a black hole too, while it is open.
-      const whole = await travelWhole(content, notesRoot(), {
-        sealed: {
-          size: (holeId, noteId, name) => blackHoles.videoSize(holeId, noteId, name),
-          read: async (holeId, noteId, name) => {
-            const parts = [];
-            const size = blackHoles.videoSize(holeId, noteId, name) ?? 0;
-            if (size) for await (const part of blackHoles.videoPart(holeId, noteId, name, 0, size - 1)) parts.push(part);
-            return Buffer.concat(parts);
-          },
-          write: async (holeId, noteId, name, dest) => (await blackHoles.exportVideo(holeId, noteId, name, dest)).ok,
-        },
-      });
-      await fs.writeFile(filePath, whole.text, 'utf8');
-      let beside = 0;
-      let failed = whole.left;
-      const folder = travelFolder(filePath);
-      if (whole.beside.length) {
-        await fs.mkdir(folder, { recursive: true });
-        for (const video of whole.beside) { if (await video.put(path.join(folder, video.name))) beside += 1; else failed += 1; }
+      if (!zipped) {
+        await fs.writeFile(filePath, whole.text, 'utf8');
+        return { ok: true, path: filePath, ...(whole.left ? { videosLeft: whole.left } : {}) };
       }
-      return { ok: true, path: filePath, ...(beside ? { videosBeside: beside, folder: path.basename(folder) } : {}), ...(failed ? { videosLeft: failed } : {}) };
+      // In the zip: "<name>.json" and "<name> files/", as import unpacks it (open-file.js).
+      const base = path.basename(filePath).replace(/\.zip$/i, '');
+      const entries = [{ name: `${base}.json`, data: whole.text }];
+      let failed = whole.left;
+      // A sealed file is opened into a folder beside the zip for as long as it is written, then goes.
+      const parts = `${filePath}.parts`;
+      try {
+        for (const file of whole.beside) {
+          let from = file.file;
+          if (!from) {
+            await fs.mkdir(parts, { recursive: true });
+            from = path.join(parts, file.name);
+            if (!(await file.put(from))) { failed += 1; continue; }
+          }
+          entries.push({ name: `${path.basename(zipFolder(`${base}.json`))}/${file.name}`, file: from });
+        }
+        await writeZip(filePath, entries);
+      } finally {
+        await fs.rm(parts, { recursive: true, force: true }).catch(() => {});
+      }
+      return { ok: true, path: filePath, zipped: entries.length - 1, ...(failed ? { videosLeft: failed } : {}) };
     } catch (err) {
       return { ok: false, error: err.message };
     }
@@ -1197,7 +1343,7 @@ function registerShellHandlers() {
       title: words('Import a note', await appLanguage()),
       properties: ['openFile'],
       filters: [
-        { name: words('Notes', await appLanguage()), extensions: ['md', 'markdown', 'html', 'htm', 'txt', 'json', 'docx', 'odt', 'doc', 'rtf', 'enex'] },
+        { name: words('Notes', await appLanguage()), extensions: ['md', 'markdown', 'html', 'htm', 'txt', 'json', 'zip', 'docx', 'odt', 'doc', 'rtf', 'enex'] },
         { name: words('All files', await appLanguage()), extensions: ['*'] },
       ],
     });
@@ -1219,13 +1365,15 @@ export function snapshotName(date = new Date()) {
   return `Nebula ${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}.${p(date.getMinutes())}.${p(date.getSeconds())}.png`;
 }
 
+/** Where snapshots are kept. NEBULA_SNAPSHOT_DIR lets the tests keep their pictures out of the user's folder. */
+const snapshotDir = () => process.env.NEBULA_SNAPSHOT_DIR || path.join(app.getPath('pictures'), 'Nebula');
+
 async function takeSnapshot(win) {
   if (!win || win.isDestroyed()) return { ok: false };
   try {
     const image = await win.webContents.capturePage();
     await writeImageToClipboard(image);
-    // NEBULA_SNAPSHOT_DIR lets the tests keep their pictures out of the user's folder.
-    const dir = process.env.NEBULA_SNAPSHOT_DIR || path.join(app.getPath('pictures'), 'Nebula');
+    const dir = snapshotDir();
     await fs.mkdir(dir, { recursive: true });
     let file = path.join(dir, snapshotName());
     for (let n = 2; fsSync.existsSync(file); n += 1) file = file.replace(/( \(\d+\))?\.png$/, ` (${n}).png`);
@@ -1249,6 +1397,28 @@ async function takeSnapshot(win) {
  * machine waits for a connection from outside and Windows has nothing to ask.
  * A site's voice or video still works where the site offers a relay.
  */
+/**
+ * A window that never painted (2026-11-02): it stayed its bare colour, could
+ * not be dragged — the title bar is the page's — and the GPU process was killed
+ * two minutes on. Such a start opens again without the graphics card, for that
+ * run only: the switch rides on the relaunch and is kept nowhere, so the next
+ * start tries the card again. It was kept per version, and one bad start of
+ * 2026-11-03 left every test build of 1.0.2 without the card (the owner,
+ * 2026-11-04: "her tekrar açılışta tekrar gpu yolunu denemesi lazım").
+ */
+const GPU_OFF_ARG = '--nebula-gpu-off';
+const gpuOff = process.argv.includes(GPU_OFF_ARG);
+if (gpuOff) app.disableHardwareAcceleration();
+
+/**
+ * Colours are drawn as sRGB on every screen, card or no card. Left alone,
+ * Chromium bends them through the screen's colour profile, and the one Windows
+ * holds for an outside screen can be another model's (here an Acer S271HL
+ * profile on a VG240Y): a gradient then steps and turns green on that screen
+ * only (the owner, 2026-11-04: "harici ekranda yeşillenme oluyor").
+ */
+app.commandLine.appendSwitch('force-color-profile', 'srgb');
+
 app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
 app.commandLine.appendSwitch('force-webrtc-ip-handling-policy', 'disable_non_proxied_udp');
 
@@ -1306,6 +1476,24 @@ function signInLog(event, data = {}) {
     if (all.length > 480) fsSync.writeFileSync(signInLogFile(), all.slice(-400).join('\n'));
   } catch { /* the log is a help, never a reason to fail */ }
 }
+
+/**
+ * Why the page or a helper process went (2026-11-02: "Nebula's page stopped
+ * working" came and nothing said why): page-log.txt in this copy's folder, the
+ * last 200 lines. The reason and exit code only — never a note's words.
+ */
+const pageLogFile = () => path.join(app.getPath('userData'), 'page-log.txt');
+function pageLog(event, data = {}) {
+  const line = `${new Date().toISOString()} ${app.getVersion()} ${event} ${JSON.stringify(data)}\n`;
+  try {
+    fsSync.appendFileSync(pageLogFile(), line);
+    const all = fsSync.readFileSync(pageLogFile(), 'utf8').split('\n');
+    if (all.length > 240) fsSync.writeFileSync(pageLogFile(), all.slice(-200).join('\n'));
+  } catch { /* the log is a help, never a reason to fail */ }
+}
+app.on('child-process-gone', (_event, details) => {
+  if (details.reason !== 'clean-exit') pageLog('process-gone', { type: details.type, reason: details.reason, exitCode: details.exitCode, name: details.name });
+});
 
 /**
  * Actual size (0.9.3): how much a CSS millimetre must be zoomed to be a real
@@ -1397,13 +1585,15 @@ async function askEmbed(wc, permission, details) {
 
 app.on('web-contents-created', (_event, contents) => {
   try { contents.setWebRTCIPHandlingPolicy('disable_non_proxied_udp'); } catch { /* a contents that cannot take it */ }
-  if (contents.getType() === 'webview' && contents.session === session.fromPartition(PDF_PREVIEW_PARTITION)) {
+  // Read off the session's folder: asking for each partition by name opens it (session-name.js).
+  const onDisk = contents.getType() === 'webview' ? persistName(contents.session.storagePath) : null;
+  if (contents.getType() === 'webview' && !onDisk && contents.session === session.fromPartition(PDF_PREVIEW_PARTITION)) {
     // The export preview shows its PDF and nothing else: a link in the note is
     // not followed inside the preview, and nothing opens a window from it.
     contents.on('will-navigate', (ev) => ev.preventDefault());
     contents.setWindowOpenHandler(() => ({ action: 'deny' }));
   }
-  if (contents.getType() === 'webview' && contents.session === session.fromPartition(EMBED_PARTITION)) {
+  if (onDisk === EMBED_PARTITION.replace('persist:', '')) {
     // A page embedded in a note opened windows of the app's own, unasked (hunt
     // B23, navigation.js): a link the user just pressed goes to the browser.
     const gate = popupGate();
@@ -1419,7 +1609,7 @@ app.on('web-contents-created', (_event, contents) => {
     });
   }
   if (contents.getType() === 'webview') {
-    const id =Object.keys(AI_SERVICES).find(id => contents.session === session.fromPartition('persist:ai-' + id));
+    const id = onDisk?.startsWith('ai-') && AI_SERVICES[onDisk.slice(3)] ? onDisk.slice(3) : null;
     // Google sign-in stays in the app, in this service's own session (0.9.2).
     if (id) {
       const popupOptions = { parent: mainWindow ?? undefined };
@@ -1460,14 +1650,19 @@ app.on('web-contents-created', (_event, contents) => {
 
 app.whenReady().then(async () => {
   if (!onlyCopy) return;       // the running copy has the file; this one is on its way out
+  screen.on('display-removed', () => keepOnScreen(mainWindow));
   app.userAgentFallback = app.userAgentFallback
     .replace(/ Electron\/[\d.]+/gi, '')
     .replace(/ Nebula(?: Test)?\/[\d.]+/gi, '');
   // The app draws its own menus beside the logo, so the native bar goes.
   Menu.setApplicationMenu(null);
   // A portable copy tells Windows itself that it opens documents: no installer did (open-with.js).
-  if (process.platform === 'win32' && app.isPackaged && process.env.PORTABLE_EXECUTABLE_FILE) {
-    void offerOpenWith({ exe: process.env.PORTABLE_EXECUTABLE_FILE, name: APP_TITLE });
+  // Once for this path: writing to the registry on every start is one more thing a guard counts against it.
+  const portableExe = process.platform === 'win32' && app.isPackaged ? process.env.PORTABLE_EXECUTABLE_FILE : '';
+  if (portableExe && readPrefs().openWithSaid !== portableExe) {
+    void offerOpenWith({ exe: portableExe, name: APP_TITLE }).then((answer) => {
+      if (answer !== 'failed') writePrefs({ openWithSaid: portableExe });
+    });
   }
   registerShellHandlers();
   // "Ignore" on a misspelt word lasts until the app closes: what the last run
@@ -1552,6 +1747,8 @@ app.whenReady().then(async () => {
   logoCall('get', () => ({
     ok: true,
     colors: readLogo(logoDir())?.colors ?? null,
+    picture: logoPictureUrl(readLogo(logoDir())),
+    kept: readLogoPicture(logoPictureDir())?.[256] ?? null,
     taskbar: taskbarSays?.appId ?? null,
     own: CHANNEL === 'test' || process.env.NEBULA_LOGO_OWN === 'test' ? 'test' : 'main',
     shortcuts: logoShortcutsHere(),
@@ -1562,12 +1759,27 @@ app.whenReady().then(async () => {
     const res = makeShortcut({ dir: logoShortcutDirs()[0], name: APP_TITLE, target: logoTarget(), icon: readLogo(logoDir())?.ico ?? logoTarget(), shell });
     return { ok: res.ok, made: !!res.made, error: res.error };
   });
-  logoCall('set', (colors, images) => {
-    const res = writeLogo(logoDir(), colors, images);
+  logoCall('set', (colors, images, picture) => {
+    const res = writeLogo(logoDir(), colors, images, picture === true);
     if (!res.ok) return res;
+    // A picture of the user's own is kept as well, to be put on again after a theme.
+    if (picture === true) keepLogoPicture(logoPictureDir(), images);
     // The window wears it now; the shortcuts follow a moment later, without holding this up.
     wearLogo(res);
     return { ok: true, colors: res.colors };
+  });
+  // The kept picture worn again, or removed for good.
+  logoCall('wear-picture', (colors) => {
+    const images = readLogoPicture(logoPictureDir());
+    if (!images) return { ok: false, error: 'none' };
+    const res = writeLogo(logoDir(), colors, images, true);
+    if (!res.ok) return res;
+    wearLogo(res);
+    return { ok: true, colors: res.colors };
+  });
+  logoCall('forget-picture', () => {
+    forgetLogoPicture(logoPictureDir());
+    return { ok: true };
   });
   logoCall('clear', () => {
     clearLogo(logoDir());
@@ -1577,6 +1789,67 @@ app.whenReady().then(async () => {
   // A shortcut made since the logo was set wears the program's own icon: it is given the logo at the next start —
   // once the app is up, not while it starts.
   { const logo = readLogo(logoDir()); if (logo) pointLogoShortcuts(logo.ico, { after: 5000 }); }
+
+  // The picture behind the note (backdrop.js). Only the app's own window may ask.
+  const backdropDir = () => path.join(app.getPath('userData'), 'backdrop');
+  const backdropCall = (name, run) => ipcMain.handle(`backdrop:${name}`, (e, ...args) => {
+    if (e.sender !== mainWindow?.webContents) return { ok: false, error: 'not allowed' };
+    try { return run(...args); } catch (err) { console.warn(`[nebula] backdrop ${name} failed:`, err.message); return { ok: false, error: 'failed' }; }
+  });
+  backdropCall('get', () => ({ ok: true, picture: readBackdrop(backdropDir()), id: wornPhoto(backdropDir()) }));
+  backdropCall('list', () => ({ ok: true, photos: listPhotos(backdropDir()), worn: wornPhoto(backdropDir()) }));
+  backdropCall('add', (dataUrl) => addPhoto(backdropDir(), dataUrl));
+  backdropCall('wear', (id) => wearPhoto(backdropDir(), id ?? null));
+  backdropCall('remove', (id) => removePhoto(backdropDir(), id));
+
+  // The screen the window stands on (1.0.3): an outside one showed the picture's
+  // smooth colours in steps and green specks where the laptop's own did not, so
+  // the page softens the picture there (backdrop.js). NEBULA_SCREEN lets a test be either.
+  const screenOf = () => {
+    try {
+      const display = screen.getDisplayMatching(mainWindow?.getBounds?.() ?? screen.getPrimaryDisplay().bounds);
+      const forced = process.env.NEBULA_SCREEN;
+      const internal = forced === 'internal' ? true : forced === 'external' ? false : display.internal === true;
+      return { ok: true, id: display.id, internal, label: forced ? '' : String(display.label || ''), hz: display.displayFrequency || 0 };
+    } catch { return { ok: false }; }
+  };
+  ipcMain.handle('screen:get', (e) => (e.sender === mainWindow?.webContents ? screenOf() : { ok: false, error: 'not allowed' }));
+  let screenSent = null;
+  let screenTimer = null;
+  const sendScreen = () => {
+    clearTimeout(screenTimer);
+    screenTimer = setTimeout(() => {
+      const now = screenOf();
+      const key = `${now.id}:${now.internal}`;
+      if (!now.ok || key === screenSent || !mainWindow || mainWindow.isDestroyed()) return;
+      screenSent = key;
+      mainWindow.webContents.send('screen:changed', now);
+    }, 400);
+  };
+  for (const name of ['display-added', 'display-removed', 'display-metrics-changed']) screen.on(name, sendScreen);
+  app.on('browser-window-created', (_e, win) => { win.on('move', sendScreen); win.on('maximize', sendScreen); });
+  if (mainWindow) { mainWindow.on('move', sendScreen); mainWindow.on('maximize', sendScreen); }
+
+  // The widgets' alarm sound (alarm-sound.js): the system's own, or one of the user's kept in the profile.
+  const soundDir = () => path.join(app.getPath('userData'), 'alarm-sound');
+  const soundCall = (name, run) => ipcMain.handle(`sound:${name}`, (e, ...args) => {
+    if (e.sender !== mainWindow?.webContents) return { ok: false, error: 'not allowed' };
+    try { return run(...args); } catch (err) { console.warn(`[nebula] sound ${name} failed:`, err.message); return { ok: false, error: 'failed' }; }
+  });
+  soundCall('list', () => ({ ok: true, system: soundNames(systemSoundDir()), own: listOwnSounds(soundDir()) }));
+  soundCall('get', (id) => {
+    const at = String(id ?? '');
+    const own = /^own(?::(.+))?$/.exec(at);
+    const sound = own ? readOwnSound(soundDir(), own[1] ?? 'own')?.address : at.startsWith('system:') ? readSystemSound(systemSoundDir(), at.slice(7)) : null;
+    return sound ? { ok: true, sound } : { ok: false, error: 'none' };
+  });
+  soundCall('setOwn', (dataUrl, name) => writeOwnSound(soundDir(), dataUrl, name));
+  // One sound at a time, by its id: never the whole shelf from the window.
+  soundCall('clearOwn', (id) => {
+    if (typeof id !== 'string' || !id) return { ok: false, error: 'id' };
+    clearOwnSound(soundDir(), id);
+    return { ok: true };
+  });
 
   // The lock on opening the app (app-lock.js): the window asks, this process
   // decides. Only the app's own window may ask.
@@ -1718,6 +1991,10 @@ app.whenReady().then(async () => {
     if (e.sender !== mainWindow?.webContents || shut()) return [];
     const files = handedFiles.splice(0);
     return Promise.all(files.map((file) => readNoteFile(file, notesRoot())));
+  });
+  ipcMain.on('files:done', (e) => {
+    if (e.sender !== mainWindow?.webContents || mainWindow.isDestroyed()) return;
+    try { mainWindow.setProgressBar(-1); } catch { /* no taskbar */ }
   });
 
   // A video file dropped into a note: copied into that note's folder (0.9.4).
@@ -1965,6 +2242,38 @@ app.whenReady().then(async () => {
     return dest ? { ok: true, path: dest } : { ok: false };
   });
 
+  // How much room Nebula takes (Settings → Storage, storage-usage.js): sizes
+  // and the biggest notes' titles, measured off the window's thread, kept for
+  // half a minute. Shut, nothing is said — titles are the notes' own.
+  let usage = null;
+  ipcMain.handle('storage:usage', async (_e, { fresh = false, skip = [] } = {}) => {
+    if (shut()) return { ok: false, error: 'locked' };
+    if (!fresh && usage && Date.now() - usage.at < 30_000) return usage;
+    const portable = process.env.PORTABLE_EXECUTABLE_FILE;
+    usage = await measureStorage({
+      notesDir: notesRoot(),
+      holesDir: holesRoot(),
+      backupsDir: backupsRoot(),
+      openedDir: openedDir(),
+      appPath: !app.isPackaged ? null : portable || path.dirname(app.getPath('exe')),
+      skip: (Array.isArray(skip) ? skip : []).filter((id) => typeof id === 'string' && /^[\w-]{1,120}$/.test(id)),
+    }).catch(() => ({ ok: false, error: 'failed' }));
+    if (usage.ok) {
+      let names = [];
+      try { names = fsSync.readdirSync(backupsRoot(), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch { /* none */ }
+      usage.backups.stale = staleLabelled(names).length;
+    }
+    return usage;
+  });
+  // The backups' own tidying (backup-purge.js pruneLabelled), when it is asked
+  // for instead of waiting for the next copy: no other way to delete is added.
+  ipcMain.handle('storage:tidy-backups', () => {
+    if (shut()) return { ok: false, error: 'locked' };
+    const gone = pruneLabelled(backupsRoot());
+    usage = null;
+    return { ok: true, gone: gone.length };
+  });
+
   ipcMain.handle('storage:read', async (_e, rel) => {
     // Shut (app-lock.js): "could not be read", never "not there" — the window must not take it for an empty vault.
     if (shut()) return { ok: false, missing: false, error: 'locked' };
@@ -2064,6 +2373,8 @@ app.whenReady().then(async () => {
       const note = /^notes[\\/]([\w-]+)\.json$/.exec(String(rel));
       if (note && NOTE_ID.test(note[1])) { await removeNoteFolderAsync(notesRoot(), note[1]); vault.forget(note[1]); await clearOpenedAsync({ noteId: note[1] }); }   // its pictures, videos and files with it
       if (note) await purgeNoteFromBackupsAsync(backupsRoot(), note[1]);
+      // Tailscale sync: the peer lets it go too, and nothing half-downloaded for it is left.
+      if (note) await sync?.forgetNote(note[1]);
       return { ok: true };
     } catch {
       return { ok: false };
@@ -2093,8 +2404,23 @@ app.whenReady().then(async () => {
   });
   ipcMain.handle('app:version', () => APP_VERSION);
 
-  // The four places a user ever needs to find: the program, their notes, the
-  // backups, and the profile that holds both. About renders them and can open
+  // Tailscale sync (1.0.3): Tools → Tailscale sync. Served on the tailnet only, signed, read only.
+  sync = createSync({
+    userData: () => app.getPath('userData'),
+    notesRoot, storageRoot,
+    version: SYNC_VERSION,
+    shut,
+    getWindow: () => mainWindow,
+    canProtect: () => { try { return safeStorage.isEncryptionAvailable(); } catch { return false; } },
+    protect: (text) => safeStorage.encryptString(text),
+    unprotect: (box) => safeStorage.decryptString(box),
+  });
+  sync.register(ipcMain, (e) => e.sender === mainWindow?.webContents);
+  sync.start();
+  app.on('will-quit', () => sync?.shutdown());
+
+  // The places a user ever needs to find: the program, their notes, the backups,
+  // their snapshots, and the profile. About renders them and can open
   // each one — which is the whole answer to "where is this thing installed".
   const appPaths = () => ({
     version: APP_VERSION,
@@ -2104,6 +2430,7 @@ app.whenReady().then(async () => {
     userData: app.getPath('userData'),
     storage: storageRoot(),
     backups: path.join(app.getPath('userData'), 'backups'),
+    snapshots: snapshotDir(),
   });
   ipcMain.handle('app:paths', () => appPaths());
 
@@ -2111,7 +2438,7 @@ app.whenReady().then(async () => {
   // "storage", not for an arbitrary directory.
   ipcMain.handle('app:reveal', async (_e, key) => {
     const paths = appPaths();
-    const target = { exeDir: paths.exeDir, userData: paths.userData, storage: paths.storage, backups: paths.backups }[key];
+    const target = { exeDir: paths.exeDir, userData: paths.userData, storage: paths.storage, backups: paths.backups, snapshots: paths.snapshots }[key];
     if (!target) return { ok: false };
     await fs.mkdir(target, { recursive: true }).catch(() => {});
     await shell.openPath(target);
@@ -2133,6 +2460,8 @@ app.whenReady().then(async () => {
   await initUpdater({
     version: APP_VERSION,
     canSelfUpdate: canSelfUpdate(CHANNEL),
+    // A test build follows the newest test build on GitHub and replaces its own exe (2026-11-05).
+    testStamp: TEST_STAMP,
     getWindow: () => mainWindow,
     beforeInstall: async () => {
       await requestRendererSave(mainWindow);

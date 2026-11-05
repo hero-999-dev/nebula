@@ -21,13 +21,44 @@ export function writeImageToClipboard(image, html = null) {
   return clipboard.write([new ClipboardItem(data)]);
 }
 
+/** How many letters must change to make `a` into `b` (a swap of two is one). */
+export function editDistance(a, b) {
+  a = a.toLocaleLowerCase(); b = b.toLocaleLowerCase();
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[a.length][b.length];
+}
+
+/**
+ * The suggestions, nearest first (1.0.3). With every language checked,
+ * Chromium takes one from each dictionary in turn, so for "kitaplarr" the
+ * Turkish "kitaplar" came fourth, after "Kita plärr" and "titular" — the owner
+ * read it as "every language is ticked, but only English comes out".
+ */
+export function rankSuggestions(word, suggestions) {
+  const list = suggestions.map(String);
+  if (!word) return list;
+  return list
+    .map((s, i) => ({ s, i, d: editDistance(word, s) }))
+    .sort((x, y) => x.d - y.d || x.i - y.i)
+    .map((x) => x.s);
+}
+
 /** What the page needs from Chromium's context-menu params, and nothing else. */
 export function menuFacts(params) {
+  const misspelledWord = String(params.misspelledWord || '');
   return {
     x: params.x,
     y: params.y,
-    misspelledWord: String(params.misspelledWord || ''),
-    suggestions: (params.dictionarySuggestions || []).slice(0, 8).map(String),
+    misspelledWord,
+    suggestions: rankSuggestions(misspelledWord, params.dictionarySuggestions || []).slice(0, 8),
     isEditable: !!params.isEditable,
     mediaType: String(params.mediaType || 'none'),
     selectionText: String(params.selectionText || '').slice(0, 200),

@@ -11,13 +11,45 @@
  */
 
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
-import { inlinePictures, stageTravelled } from './note-media.js';
+import { inlinePictures, stageTravelled, zipFolder } from './note-media.js';
+import { unzipTo } from './zip.js';
 
 /** What the installer offers Nebula for, and what a path handed to the app may end in. */
 export const DOCUMENT_EXTENSIONS = ['docx', 'doc', 'odt', 'rtf'];
 /** Everything File → Import reads: these open too when they are handed over. */
-export const OPENABLE = /\.(docx|doc|odt|rtf|md|markdown|html|htm|txt|json|enex)$/i;
+export const OPENABLE = /\.(docx|doc|odt|rtf|md|markdown|html|htm|txt|json|zip|enex)$/i;
+
+/**
+ * A Nebula note exported with its files (main.js note:export): the zip is
+ * unpacked into a folder of its own, its note read as a note file is, its
+ * files taken into the vault (stageTravelled), and the folder removed. Files
+ * that lie anywhere else in the zip — zipped again by hand, in a folder of
+ * another name — are found all the same.
+ */
+async function readNoteZip(file, notesDir) {
+  const name = path.basename(file);
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'nebula-import-'));
+  try {
+    const written = await unzipTo(file, dir);
+    const notes = written.filter((p) => /\.json$/i.test(p));
+    const note = notes.find((p) => path.dirname(p) === dir) ?? notes[0];
+    if (!note) return { ok: false, name, error: 'no Nebula note in this zip' };
+    const home = zipFolder(note);
+    for (const p of written) {
+      if (p === note || path.dirname(p) === home) continue;
+      const to = path.join(home, path.basename(p));
+      await fs.mkdir(home, { recursive: true });
+      await fs.rename(p, to).catch(() => {});
+    }
+    return await readNoteFile(note, notesDir);
+  } catch (err) {
+    return { ok: false, name, error: err.message };
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
 /** A document is read whole into memory to be parsed. A note file may carry its videos: it may be larger. */
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_NOTE_BYTES = 420 * 1024 * 1024;
@@ -52,6 +84,7 @@ export async function readNoteFile(file, notesDir = null) {
     if (!OPENABLE.test(name)) return { ok: false, name, error: 'not a file Nebula reads' };
     const stat = await fs.stat(file);
     if (!stat.isFile()) return { ok: false, name, error: 'not a file' };
+    if (/\.zip$/i.test(name)) return readNoteZip(file, notesDir);
     if (stat.size > (/\.json$/i.test(name) ? MAX_NOTE_BYTES : MAX_BYTES)) return { ok: false, name, error: 'too large' };
     // Word and OpenDocument (0.9.3): the bytes go to the window, which reads
     // them (office.js) and sanitises the result like any HTML file. The old

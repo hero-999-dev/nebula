@@ -1,6 +1,8 @@
 /**
- * The editor of a theme of one's own (0.9.4) — the panel that opens upward
- * over Archive and Trash from the palette button at the right of the themes.
+ * The editor of a theme of one's own (0.9.4). Since 1.0.3 it stands open in
+ * Settings → Appearance, at the right of the preview, as the logo's editor
+ * stands at the right of the logo: no button opens it (the owner: "stil kismini
+ * ikonla acma tamamen kalksin"), and the styles' colours are chosen in it too.
  *
  * Laid out after the custom theme screen of the Pixel Pomo app, as the owner
  * asked: a name and "Save this profile" on top; the profiles to start from
@@ -13,6 +15,7 @@
  * so nothing here draws a sample of its own.
  */
 
+import { on } from './bus.js';
 import { t } from './i18n.js';
 import {
   SLOTS, SWATCHES, READY_PROFILES, readyProfiles, cleanHex, cleanColors, cleanProfiles, cleanProfileName,
@@ -62,13 +65,11 @@ const el = (tag, cls, text) => {
 
 /**
  * @param {object} deps
- * @param {HTMLElement} deps.panel the container over Archive and Trash
- * @param {HTMLElement} deps.button the palette button at the right of the themes
+ * @param {HTMLElement} deps.panel the container, in Settings → Appearance
  * @param {ReturnType<import('./theme.js').initTheme>} deps.theme
- * @param {() => void} [deps.beforeOpen] make room: unfold the sidebar, close the drawers
  */
-export function initThemeEditor({ panel, button, theme, beforeOpen }) {
-  if (!panel || !button || !theme) return null;
+export function initThemeEditor({ panel, theme }) {
+  if (!panel || !theme) return null;
 
   let ready = readReadyProfiles();
   let profiles = readProfiles(ready);
@@ -82,13 +83,7 @@ export function initThemeEditor({ panel, button, theme, beforeOpen }) {
 
   // ---- the panel, built once -------------------------------------------------
   panel.replaceChildren();
-  const head = el('div', 'te-head');
-  const title = el('span', 'te-title', 'Your own theme');
-  const close = el('button', 'te-close', '✕');
-  close.type = 'button';
-  close.title = 'Close';
-  close.setAttribute('aria-label', 'Close');
-  head.append(title, close);
+  panel.hidden = false;
 
   const saveRow = el('div', 'te-save');
   const nameInput = el('input', 'te-name');
@@ -105,6 +100,7 @@ export function initThemeEditor({ panel, button, theme, beforeOpen }) {
   const profilesLabel = el('div', 'te-label', 'Profiles');
   const profilesEl = el('div', 'te-profiles');
 
+  const slotsLabel = el('div', 'te-label', 'Theme colours');
   const slotsEl = el('div', 'te-slots');
   const bar = el('label', 'te-bar');
   bar.title = 'Any colour';
@@ -127,8 +123,39 @@ export function initThemeEditor({ panel, button, theme, beforeOpen }) {
   const grid = el('div', 'te-swatches');
   const warn = el('p', 'te-warn', 'These words are hard to read on this ground.');
   warn.hidden = true;
+  // A second set of colours the same bar and swatches choose (1.0.3: the
+  // background's styles, `useColorSet`), and the colours of a chosen photo.
+  const extraLabel = el('div', 'te-label te-extra-label');
+  const extraEl = el('div', 'te-extra');
+  const offersLabel = el('div', 'te-label te-offers-label', 'Colours inspired by your picture');
+  const offersEl = el('div', 'te-offers');
+  extraLabel.hidden = extraEl.hidden = offersLabel.hidden = offersEl.hidden = true;
 
-  panel.append(head, saveRow, profilesLabel, profilesEl, slotsEl, barRow, hint, grid, warn);
+  // What is chosen on one side, what it is chosen from on the other (1.0.3, the
+  // owner: "renk seçme panelini style colours'un sağına alınsın"); one column where there is no room.
+  const sets = el('div', 'te-pick__sets');
+  sets.append(slotsLabel, slotsEl);
+  const choose = el('div', 'te-pick__colors');
+  // Headed as the side beside it is, level with it (the owner: "color picker başlığı ekle theme colours'un header'ı ile aynı hizaya").
+  const chooseLabel = el('div', 'te-label te-pick-label', 'Colour picker');
+  choose.append(chooseLabel, barRow, hint, grid);
+  // A row of their own under both, so the photo's colours are headed level with
+  // the style's (the owner, 2026-11-04: "from your picture headeri style colours ile aynı hizaya gelsin").
+  const extraBox = el('div', 'te-pick__extra');
+  extraBox.append(extraLabel, extraEl);
+  const offersBox = el('div', 'te-pick__offers');
+  offersBox.append(offersLabel, offersEl);
+  const pickEl = el('div', 'te-pick');
+  pickEl.append(sets, choose, extraBox, offersBox);
+  panel.append(profilesLabel, profilesEl, saveRow, pickEl, warn);
+  /**
+   * @type {null | { label: string, colors: () => string[], pick: (i: number, hex: string) => void,
+   *   add?: () => void, remove?: (i: number) => void, canAdd?: () => boolean, canRemove?: () => boolean,
+   *   offers?: () => string[], most?: number }}
+   */
+  let extra = null;
+  /** The slot being chosen: a theme slot's index, or `{ x: i }` for a colour of the second set. */
+  const isExtra = () => typeof active === 'object' && active !== null;
 
   // ---- painting ----------------------------------------------------------------
   const slotButtons = SLOTS.map((slot, i) => {
@@ -227,13 +254,77 @@ export function initThemeEditor({ panel, button, theme, beforeOpen }) {
     }
   }
 
+  function paintExtra() {
+    extraBox.hidden = extraLabel.hidden = extraEl.hidden = !extra;
+    const offers = extra?.offers?.() ?? [];
+    offersBox.hidden = offersLabel.hidden = offersEl.hidden = !offers.length;
+    offersEl.replaceChildren(...offers.map((hex) => {
+      const cell = el('button', 'te-offer');
+      cell.type = 'button';
+      cell.dataset.hex = hex.toUpperCase();
+      cell.title = hex.toUpperCase();
+      cell.setAttribute('aria-label', hex.toUpperCase());
+      cell.style.background = hex;
+      cell.addEventListener('click', () => setColor(hex));
+      return cell;
+    }));
+    if (!extra) return;
+    const colors = extra.colors();
+    extraLabel.textContent = t(extra.label);
+    // How many there are of how many there may be (1.0.3, the owner: "style up to 5 colours desin").
+    if (extra.most) {
+      const count = el('span', 'te-count', `${colors.length}/${extra.most}`);
+      count.dataset.noI18n = '';
+      extraLabel.append(' ', count);
+    }
+    if (isExtra() && active.x >= colors.length) active = { x: colors.length - 1 };
+    extraEl.replaceChildren(...colors.map((hex, i) => {
+      const wrap = el('span', 'te-dot-wrap');
+      const dot = el('button', `te-dot${isExtra() && active.x === i ? ' on' : ''}`);
+      dot.type = 'button';
+      dot.dataset.x = String(i);
+      dot.style.background = hex;
+      dot.title = `${t('Colour')} ${i + 1}`;
+      dot.setAttribute('aria-label', dot.title);
+      dot.setAttribute('aria-pressed', String(isExtra() && active.x === i));
+      dot.addEventListener('click', () => { active = { x: i }; paint(); });
+      wrap.append(dot);
+      if (extra.remove && extra.canRemove?.()) {
+        const x = el('button', 'te-dot__x', '×');
+        x.type = 'button';
+        x.title = t('Remove this colour');
+        x.setAttribute('aria-label', x.title);
+        x.addEventListener('click', () => {
+          extra.remove(i);
+          if (isExtra() && active.x >= i && active.x > 0) active = { x: active.x - 1 };
+          paint();
+        });
+        wrap.append(x);
+      }
+      return wrap;
+    }));
+    if (extra.add && extra.canAdd?.()) {
+      const plus = el('button', 'te-dot-add', '+');
+      plus.type = 'button';
+      plus.title = t('Add a colour');
+      plus.setAttribute('aria-label', plus.title);
+      plus.addEventListener('click', () => { extra.add(); active = { x: extra.colors().length - 1 }; paint(); });
+      extraEl.append(plus);
+    }
+  }
+
+  /** The colour of the slot being chosen. */
+  const activeHex = () => (isExtra() && extra ? extra.colors()[active.x] : draft.colors[SLOTS[isExtra() ? 0 : active]]).toUpperCase();
+
   function paint() {
+    if (isExtra() && !extra) active = 0;
     SLOTS.forEach((slot, i) => {
       slotButtons[i].classList.toggle('on', i === active);
       slotButtons[i].setAttribute('aria-pressed', String(i === active));
       slotButtons[i].querySelector('.te-slot__box').style.background = draft.colors[slot];
     });
-    const hex = draft.colors[SLOTS[active]];
+    paintExtra();
+    const hex = activeHex();
     bar.style.background = hex;
     // The code is written ON the bar: black or white, whichever reads there.
     barCode.style.color = luminance(hex) > 0.45 ? '#000000' : '#FFFFFF';
@@ -253,14 +344,20 @@ export function initThemeEditor({ panel, button, theme, beforeOpen }) {
 
   function setColor(raw) {
     const hex = cleanHex(raw);
-    if (!hex || draft.colors[SLOTS[active]] === hex) return;
+    if (!hex || activeHex() === hex) return;
+    if (isExtra() && extra) {
+      // A style's colour: the theme is left as it is.
+      extra.pick(active.x, hex.toLowerCase());
+      paint();
+      return;
+    }
     draft.colors[SLOTS[active]] = hex;
     commit();
   }
 
   wheel.addEventListener('input', () => setColor(wheel.value));
   hexInput.addEventListener('input', () => setColor(hexInput.value));
-  hexInput.addEventListener('blur', () => { hexInput.value = draft.colors[SLOTS[active]]; });
+  hexInput.addEventListener('blur', () => { hexInput.value = activeHex(); });
   hexInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); hexInput.blur(); } });
 
   function save() {
@@ -285,7 +382,7 @@ export function initThemeEditor({ panel, button, theme, beforeOpen }) {
   saveBtn.addEventListener('click', save);
   nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
 
-  // ---- opening and closing -------------------------------------------------------
+  // ---- what is on screen ----------------------------------------------------------
   /** The five colours the app is wearing now, read from its tokens. */
   function wornColors() {
     const css = getComputedStyle(document.documentElement);
@@ -294,8 +391,12 @@ export function initThemeEditor({ panel, button, theme, beforeOpen }) {
     return cleanColors(picked);
   }
 
-  function open() {
-    beforeOpen?.();
+  /**
+   * Starts again from what the app wears, on the slot `at` (Settings opened,
+   * a style's colour pressed).
+   * @param {number | { x: number }} [at] a theme slot, or `{ x: i }` for a style's colour
+   */
+  function open(at) {
     // Start from what is on screen, as the Pixel Pomo editor does: the custom
     // theme when it is worn, the fixed theme's own colours when one of those is.
     if (theme.current() === 'custom') {
@@ -307,22 +408,27 @@ export function initThemeEditor({ panel, button, theme, beforeOpen }) {
     const saved = profiles.find((p) => p.name === draft.name);
     nameInput.value = saved ? saved.name : '';
     asking = null;
-    active = 0;
-    panel.hidden = false;
-    button.setAttribute('aria-expanded', 'true');
+    active = (typeof at === 'number' || (at && extra)) ? at : 0;
     paint();
   }
 
-  function shut() {
-    panel.hidden = true;
-    button.setAttribute('aria-expanded', 'false');
-  }
-
-  button.addEventListener('click', () => { if (panel.hidden) open(); else shut(); });
-  close.addEventListener('click', shut);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !panel.hidden && panel.contains(document.activeElement)) { e.preventDefault(); shut(); button.focus(); }
+  // Main, Dark, Light or White pressed: the editor shows that theme's colours
+  // (the owner: "hazir temalara bastim, tema organize kismini güncellemiyor").
+  on('theme-changed', ({ theme: worn } = {}) => {
+    if (worn === 'custom') return;
+    draft = { name: '', colors: wornColors() };
+    nameInput.value = '';
+    asking = null;
+    paint();
   });
 
-  return { open, close: shut, isOpen: () => !panel.hidden };
+  open();
+
+  return {
+    open,
+    /** Give the bar and swatches a second set of colours to choose (null takes it away). */
+    useColorSet(set) { extra = set; paint(); },
+    /** Paint again: the second set changed from outside. */
+    refresh() { paint(); },
+  };
 }

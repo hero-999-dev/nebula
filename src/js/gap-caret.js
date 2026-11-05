@@ -42,13 +42,16 @@
 export const NO_CARET = '.link-block, .blk-code, .blk-table';
 /** A divider: no caret in it; a click ON it picks it (dividers.js), a click in the gap beside it is answered here. */
 const DIVIDER = 'hr.blk-hr';
-const NOT_FLOW = '.shape-layer, .image-layer, .blk-vr';
+const NOT_FLOW = '.shape-layer, .image-layer, .blk-vr, br';
 /** What a caret cannot stand in. */
-const NO_LINE = '[contenteditable="false"], hr, .blk-cols';
+const NO_LINE = '[contenteditable="false"], hr, .blk-cols, br';
+/** What a <br> between two of is a gap, not a line (migrate.js dropGapBreaks). */
+const GAP_SIDE = 'hr, .note-image, .blk-code, .link-block, .blk-table';
 
 const isLine = (el) => !!el && !el.matches(NO_LINE);
 const takesNone = (el) => !!el && el.matches(NO_CARET);
 const isDivider = (el) => !!el && el.matches(DIVIDER);
+const isRow = (el) => !!el && el.matches('.blk-cols');
 
 /**
  * What a click on a flow at that height should do.
@@ -75,11 +78,14 @@ export function placeForClick(flow, y) {
     // under the last divider of the flow, a new one.
     if (isDivider(above)) {
       if (isLine(below)) return { line: below, atEnd: false };
-      return below ? null : { parent: flow, before: null };
+      return below && !isRow(below) ? null : { parent: flow, before: below ?? null };
     }
-    if (isDivider(below)) return isLine(above) ? { line: above, atEnd: true } : null;
+    if (isDivider(below)) return isLine(above) ? { line: above, atEnd: true } : isRow(above) ? { parent: flow, before: below } : null;
     // Under everything a column holds: its own last line.
     if (!below && isLine(above) && flow.classList?.contains('blk-col')) return { line: above, atEnd: true };
+    // Under a picture or a row of columns that ends the flow, on open ground: a
+    // line to write on ("there is room and no caret comes", the owner's Ideas note).
+    if (!below && above && !isLine(above)) return { parent: flow, before: null };
     return null;
   }
   if (isLine(below)) return { line: below, atEnd: false };
@@ -116,8 +122,38 @@ export function initGapCaret(editor, { history, isLocked = () => false, onGeomet
   editor.addEventListener('mousedown', (e) => {
     if (e.button !== 0 || e.shiftKey || e.defaultPrevented || isLocked() || editor.dataset.readonly === 'true') return;
     // Only a press on the flow itself: on a block, the block answers.
-    const flow = e.target === editor ? editor : (e.target.classList?.contains('blk-col') && editor.contains(e.target) ? e.target : null);
+    const flow = e.target === editor ? editor : (e.target.matches?.('.blk-col, .toggle-body') && editor.contains(e.target) ? e.target : null);
     if (!flow) return;
+    // A <br> straight on the flow is a line nobody can stand on: over a divider
+    // the press went out of the note and the caret was lost, and what was typed
+    // landed loose ("birinci satira yazamiyorum", the owner's Bug Find note, 1.0.3).
+    // It becomes the empty line it looks like, before the press is answered.
+    // Between two blocks that are no lines (a divider and a picture) it is no
+    // line either, only a gap ("there should be nothing there", the owner's Ideas note): it goes,
+    // as it goes when a note opens (migrate.js dropGapBreaks).
+    const gap = (br) => {
+      const side = (n, step) => { while (n && ((n.nodeType === 3 && !n.nodeValue.trim()) || n.nodeName === 'BR')) n = n[step]; return n; };
+      const a = side(br.previousSibling, 'previousSibling');
+      const b = side(br.nextSibling, 'nextSibling');
+      return a?.nodeType === 1 && b?.nodeType === 1 && a.matches(GAP_SIDE) && b.matches(GAP_SIDE);
+    };
+    let gone = 0;
+    for (const br of [...flow.children]) if (br.tagName === 'BR' && gap(br)) { br.remove(); gone++; }
+    const bare = [...flow.children].filter((c) => c.tagName === 'BR').map((br) => {
+      const line = document.createElement('p');
+      br.replaceWith(line);
+      line.append(br);
+      return line;
+    });
+    if (bare.length || gone) editor.dispatchEvent(new Event('input', { bubbles: true }));
+    if (bare.length) {
+      const hit = bare.find((line) => { const b = line.getBoundingClientRect(); return e.clientY >= b.top && e.clientY < b.bottom; });
+      if (hit) {
+        e.preventDefault();
+        caretIn(hit, false);
+        return;
+      }
+    }
     const place = placeForClick(flow, e.clientY);
     if (!place) return;
     e.preventDefault();
@@ -135,6 +171,17 @@ export function initGapCaret(editor, { history, isLocked = () => false, onGeomet
       } else caretIn(place.line, place.atEnd);
       return;
     }
+    // The new line waits for the button to come up where it went down: a press
+    // pulled from here is the band that picks blocks (block-handle.js), not a line.
+    pending = { place, x: e.clientX, y: e.clientY };
+  });
+  let pending = null;
+  window.addEventListener('mouseup', (e) => {
+    const p = pending;
+    pending = null;
+    if (!p || Math.abs(e.clientX - p.x) > 4 || Math.abs(e.clientY - p.y) > 4 || isLocked()) return;
+    const { place } = p;
+    if (!place.parent.isConnected) return;
     history?.push();
     const line = document.createElement('p');
     line.innerHTML = '<br>';
@@ -143,4 +190,5 @@ export function initGapCaret(editor, { history, isLocked = () => false, onGeomet
     onGeometry?.();
     editor.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  window.addEventListener('blur', () => { pending = null; });
 }

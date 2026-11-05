@@ -129,6 +129,9 @@ const noteLabels = (n) => [...new Set(n.labels || [])].sort(byString);
  * An orbit: radius in world units, speed in rad/s, phase in radians. A note
  * turns in 60–180 s, a moon in 15–40 s — alive but slow, per the owner.
  */
+/* The rings of notes round a core, a sun or a folder. 200–480 s for a day in
+   1.0.3, and given back to 60–180 at the owner's word ("eski haline getirelim"). */
+const RING_PERIOD = [60, 180];
 function orbitOf(seedStr, r, periodMin, periodMax) {
   const r0 = rng(hashSeed(seedStr));
   const period = periodMin + r0() * (periodMax - periodMin);
@@ -352,7 +355,7 @@ export function buildScene(input = {}) {
   const emitFolderNotes = (plan, list, folderId, hue) => {
     let idx = 0;
     plan.rings.forEach((ring, k) => {
-      const base = orbitOf(`${folderId}:ring:${k + 1}`, ring.radius, 60, 180);
+      const base = orbitOf(`${folderId}:ring:${k + 1}`, ring.radius, ...RING_PERIOD);
       for (let j = 0; j < ring.count; j++) {
         addNoteMoon(list[idx + j], folderId,
           { r: ring.radius, speed: base.speed, phase: base.phase + (TAU * j) / ring.count }, hue);
@@ -364,7 +367,7 @@ export function buildScene(input = {}) {
      singularity): the rings come from loosePlan, one shared speed each. */
   const emitLooseRings = (plan, list, parentId, hue = null) => {
     plan.rings.forEach((ring, k) => {
-      const base = orbitOf(`${parentId}:ring:${k + 1}`, ring.radius, 60, 180);
+      const base = orbitOf(`${parentId}:ring:${k + 1}`, ring.radius, ...RING_PERIOD);
       for (let j = 0; j < ring.count; j++) {
         addNotePlanet(list[k * 8 + j], parentId,
           { r: ring.radius, speed: base.speed, phase: base.phase + (TAU * j) / ring.count }, hue);
@@ -537,6 +540,31 @@ export function buildScene(input = {}) {
   }
 
   return { kind: 'main', holeId: null, bodies, byId };
+}
+
+/**
+ * How far a body's circle has to reach to hold its whole system: every body
+ * whose parent chain leads to it, and round each the circle its own system
+ * gets, `gap` beyond that system's reach — so a project's circle stays inside
+ * the centre's (Bug Find, 1.0.3: "merkezin cemberi projectin cemberinin ic
+ * kisminda kaliyor"). `kidsOf(id)` gives a body's children, `posOf(id)` where
+ * one is now; 0 for a body with nothing bound to it.
+ */
+export function systemReach(rootId, kidsOf, posOf, gap = 0) {
+  const seen = new Set([rootId]);
+  const reachOf = (id, at) => {
+    let reach = 0;
+    for (const x of kidsOf(id)) {
+      const q = posOf(x.id);
+      if (!q || seen.has(x.id)) continue;
+      seen.add(x.id);
+      const own = reachOf(x.id, q);
+      reach = Math.max(reach, Math.hypot(q.x - at.x, q.y - at.y) + Math.max(x.size, own > 0 ? own + gap : 0));
+    }
+    return reach;
+  };
+  const at = posOf(rootId);
+  return at ? reachOf(rootId, at) : 0;
 }
 
 /**

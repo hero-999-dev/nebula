@@ -5,7 +5,7 @@ that keeps every note in your own profile, as a folder of its own: a plain JSON
 file with the note's pictures and videos beside it. Installed Windows builds
 offer in-app updates; macOS and portable builds offer a download link.
 
-**Version v1.0.2** ·
+**Version v1.0.3** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 
@@ -356,3 +356,15 @@ restructuring.
 ### Labels, images and browser sign-in
 
 Note labels appear beside the title and can be searched or assigned from the note menu. Native JSON export preserves labels. Images resize from all four corners. Bookmarks request page titles; failed embeds offer a browser fallback. Google sign-in in the built-in AI tabs opens the provider in the default browser, where the conversation continues. Browser sign-in does not authenticate the embedded tab.
+
+## Credits
+
+The Pomodoro and the Clock ring with two real recordings, both released into the public
+domain by their authors on Wikimedia Commons:
+
+- **Wind chimes** — "Windchimes.ogg" by Esc861 (2009), public domain —
+  <https://commons.wikimedia.org/wiki/File:Windchimes.ogg>
+- **Singing bowl** — "SingingBowl1.ogg" by BambooBeast (2008), public domain —
+  <https://commons.wikimedia.org/wiki/File:SingingBowl1.ogg>
+
+Details in [CREDITS.md](CREDITS.md); the app shows them under About Nebula.

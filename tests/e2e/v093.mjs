@@ -207,7 +207,7 @@ export async function runV093Checks(check) {
     await win.waitForFunction(() => !document.getElementById('ctx-menu')?.hidden, null, { polling: 50, timeout: 5000 }).catch(() => {});
     // One menu everywhere (0.9.4): the suggestions stand in the main menu, under the formatting row.
     check('a misspelt word gets its suggestions, "Add to dictionary" and "Ignore", in the one menu', await win.evaluate(() =>
-      [...document.querySelectorAll('#ctx-menu > button')].map((b) => b.textContent).join('|') === 'text|test|Add to dictionary|Ignore|Cut|Copy|Paste as Nebula format|Paste original format|Select all'
+      [...document.querySelectorAll('#ctx-menu > button')].map((b) => b.textContent).join('|') === 'text|test|Add to dictionary|Ignore|Cut|Copy|Paste as Nebula format|Paste original format|Paste only text|Select all'
       && document.querySelectorAll('#ctx-menu .ctx-format button').length > 0),
       await win.evaluate(() => [document.getElementById('ctx-menu')?.hidden, [...document.querySelectorAll('#ctx-menu > button')].map((b) => b.textContent).join('|')].join(' ')));
     await win.keyboard.press('Escape');
@@ -549,10 +549,14 @@ export async function runV093Checks(check) {
     await win.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
     // ↓ from the end of the heading: the caret landed beside the divider, on
     // no line, and blinked at its left end (the owner, 0.9.3, "halen var").
+    // Since the owner's Ideas note the arrows stop on the divider, picked, one step at a time.
     await caretIn('h1', 'end');
     await win.keyboard.press('ArrowDown');
+    await win.waitForTimeout(150);
+    check('↓ from the heading picks the divider', await win.evaluate(() => !!document.querySelector('#editor hr.armed')));
+    await win.keyboard.press('ArrowDown');
     await win.waitForTimeout(200);
-    check('↓ from the heading goes past the divider to the picture, never beside the divider', await win.evaluate(() => {
+    check('and the next ↓ goes to the picture, never beside the divider', await win.evaluate(() => {
       const ed = document.getElementById('editor');
       const s = getSelection();
       const aboveDivider = s.rangeCount && s.isCollapsed && s.anchorNode === ed && ed.childNodes[s.anchorOffset]?.matches?.('hr');
@@ -571,6 +575,8 @@ export async function runV093Checks(check) {
     // Esc on the picture under the divider: the caret was left beside it on
     // the editor and blinked there once the picture was let go (0.9.3).
     await caretIn('h1', 'end');
+    await win.keyboard.press('ArrowDown');
+    await win.waitForTimeout(100);
     await win.keyboard.press('ArrowDown');
     await win.waitForTimeout(150);
     await win.keyboard.press('Escape');
@@ -944,7 +950,8 @@ export async function runV093Checks(check) {
     await win.waitForTimeout(300);
     const aiHead = await win.evaluate(() => ({
       tabs: [...document.querySelectorAll('#ai-tabs .ai-tab')].map((b) => b.textContent.trim()),
-      head: [...document.querySelector('.ai-head').children].map((c) => c.id),
+      // The scroll track drawn over the strip's foot (1.0.3) has no id: it is no button.
+      head: [...document.querySelector('.ai-head').children].filter((c) => c.id).map((c) => c.id),
     }));
     check('MathGPT follows Mistral; Perplexity and DeepSeek are gone', aiHead.tabs.indexOf('MathGPT') === aiHead.tabs.indexOf('Mistral') + 1 && !aiHead.tabs.includes('Perplexity') && !aiHead.tabs.includes('DeepSeek'), aiHead.tabs.join(', '));
     check('reload, then +, stand right of the tab strip, outside it', aiHead.head.join(',') === 'ai-tabs,ai-reload,ai-add,ai-close', aiHead.head.join(','));

@@ -64,8 +64,8 @@ export async function runWidgetChecks(check) {
       const m = document.getElementById('widget-menu');
       return { kinds: [...m.querySelectorAll('[data-widget-kind]')].map((b) => `${b.dataset.widgetKind}:${b.textContent.trim()}:${!!b.querySelector('.fm-ic svg')}`), slashLeft: (document.getElementById('b').textContent || '').includes('/') };
     });
-    check('the chooser offers the calculator, the scientific one, the calendar and the Universe, each with its icon',
-      JSON.stringify(picker.kinds) === JSON.stringify(['calc:Calculator:true', 'sci:Scientific calculator:true', 'calendar:Calendar:true', 'universe:Universe:true']) && !picker.slashLeft, JSON.stringify(picker));
+    check('the chooser offers the calculator, the scientific one, the calendar, the Universe, the Pomodoro and the Clock, each with its icon',
+      JSON.stringify(picker.kinds) === JSON.stringify(['calc:Calculator:true', 'sci:Scientific calculator:true', 'calendar:Calendar:true', 'universe:Universe:true', 'pomodoro:Pomodoro:true', 'clock:Clock:true']) && !picker.slashLeft, JSON.stringify(picker));
     await win.keyboard.press('Escape');
     await win.waitForTimeout(100);
     check('Escape closes the chooser and adds nothing', await win.evaluate(() => !document.getElementById('widget-menu') && !document.querySelector('#editor .note-widget')));
@@ -183,8 +183,36 @@ export async function runWidgetChecks(check) {
     const next = await win.evaluate(() => document.querySelector('#editor .note-widget[data-widget="calendar"] .wg-month').textContent);
     check('› goes to the next month', next !== cal.month, `${cal.month} -> ${next}`);
     await clickAt('#editor .note-widget[data-widget="calendar"] [data-day$="-15"]');
+    const chosen = await win.evaluate(() => ({
+      sel: document.querySelector('#editor .note-widget[data-widget="calendar"] .wg-day--sel')?.dataset.day,
+      marks: document.querySelectorAll('#editor .note-widget[data-widget="calendar"] .wg-day--mark').length,
+    }));
+    check('a day clicked is chosen, not marked', chosen.sel?.endsWith('-15') && chosen.marks === 0, JSON.stringify(chosen));
+    await clickAt('#editor .note-widget[data-widget="calendar"] [data-k="mark"]');
     const marked = await win.evaluate(() => [...document.querySelectorAll('#editor .note-widget[data-widget="calendar"] .wg-day--mark')].map((d) => d.dataset.day));
-    check('a day clicked is marked', marked.length === 1 && marked[0].endsWith('-15'), JSON.stringify(marked));
+    check('Mark marks the chosen day', marked.length === 1 && marked[0].endsWith('-15'), JSON.stringify(marked));
+    // An event on that day, with its alarm: written in the box under + Event.
+    await clickAt('#editor .note-widget[data-widget="calendar"] [data-k="add"]');
+    await win.waitForSelector('#event-menu');
+    await win.keyboard.type('Dentist');
+    // The time typed and stepped the Clock widget's way: 14:25, then ▲ on the minutes.
+    await win.fill('#event-menu .event-menu__h', '14');
+    await win.fill('#event-menu .event-menu__m', '25');
+    await win.click('#event-menu [data-s="m+"]');
+    await win.click('#event-menu .event-menu__alarm');
+    await win.keyboard.press('Enter');
+    await win.waitForSelector('#event-menu', { state: 'detached' });
+    const event = await win.evaluate(() => {
+      const w = document.querySelector('#editor .note-widget[data-widget="calendar"]');
+      return { list: [...w.querySelectorAll('.wg-event')].map((b) => `${b.querySelector('.wg-ev-time').textContent} ${b.querySelector('.wg-ev-text').textContent} ${!!b.querySelector('.wg-ev-bell')}`), dot: w.querySelector('.wg-day--event')?.dataset.day };
+    });
+    check('+ Event adds an event with its time and bell, and the day gets a dot', JSON.stringify(event.list) === '["14:30 Dentist true"]' && event.dot?.endsWith('-15'), JSON.stringify(event));
+    await clickAt('#editor .note-widget[data-widget="calendar"] .wg-event');
+    await win.waitForSelector('#event-menu .event-menu__del');
+    const opened = await win.evaluate(() => ({ text: document.querySelector('#event-menu .event-menu__text').value, time: `${document.querySelector('#event-menu .event-menu__h').value}:${document.querySelector('#event-menu .event-menu__m').value}`, alarm: document.querySelector('#event-menu .event-menu__alarm').getAttribute('aria-checked') === 'true' }));
+    check('an event clicked opens again as it was, with Delete', opened.text === 'Dentist' && opened.time === '14:30' && opened.alarm, JSON.stringify(opened));
+    await win.keyboard.press('Escape');
+    await win.waitForSelector('#event-menu', { state: 'detached' });
     await clickAt('#editor .note-widget[data-widget="calendar"] [data-k="today"]');
     const home = await win.evaluate(() => document.querySelector('#editor .note-widget[data-widget="calendar"] .wg-month').textContent);
     check('the month name brings it back to this month', home === cal.month, home);
@@ -209,7 +237,7 @@ export async function runWidgetChecks(check) {
     const file = [path.join(notes, 'wg', 'wg.json'), path.join(notes, 'wg.json')].find((f) => fs.existsSync(f));
     const saved = JSON.parse(fs.readFileSync(file, 'utf8')).content;
     check('the note is saved with its widgets and what they hold',
-      (saved.match(/note-widget/g) || []).length === 3 && saved.includes('data-wg-out="3.5"') && /data-wg-marks="\d{4}-\d{2}-15"/.test(saved), saved.slice(0, 300));
+      (saved.match(/note-widget/g) || []).length === 3 && saved.includes('data-wg-out="3.5"') && /data-wg-marks="\d{4}-\d{2}-15"/.test(saved) && saved.includes('data-wg-events=') && saved.includes('Dentist'), saved.slice(0, 300));
     await openNote('other');
     await win.waitForTimeout(400);
     await openNote('wg');
@@ -265,6 +293,38 @@ export async function runWidgetChecks(check) {
     await win.waitForTimeout(200);
     const lastCalc = await win.evaluate(() => [...document.querySelectorAll('#editor .note-widget[data-widget="calc"]')].map((w) => w.previousElementSibling?.id));
     check('after a pasted picture, /widget still lands under the line it was typed on', lastCalc.includes('e'), JSON.stringify(lastCalc));
+
+    // A Pomodoro going in another note: a live card in the corner, Pause/Continue on it, a click back to it (1.0.3).
+    await win.keyboard.press('Escape');
+    await openNote('other');
+    await win.waitForTimeout(400);
+    await win.click('#editor');
+    await win.keyboard.press('Control+End');
+    await win.keyboard.press('Enter');
+    await win.keyboard.type('/widget');
+    await win.waitForTimeout(150);
+    await win.keyboard.press('Enter');
+    await win.waitForSelector('#widget-menu');
+    await win.click('#widget-menu [data-widget-kind="pomodoro"]');
+    await win.waitForSelector('#editor .note-widget[data-widget="pomodoro"]');
+    await clickAt('#editor .note-widget[data-widget="pomodoro"] [data-k="start"]');
+    check('no corner card while the Pomodoro is in sight', await win.evaluate(() => { const c = document.getElementById('pomo-card'); return !c || c.hidden; }));
+    await openNote('wg');
+    await win.waitForFunction(() => { const c = document.getElementById('pomo-card'); return c && !c.hidden; }, null, { polling: 50, timeout: 3000 }).catch(() => {});
+    const card = await win.evaluate(() => { const c = document.getElementById('pomo-card'); return c && { hidden: c.hidden, time: c.querySelector('.corner-card__time').textContent, key: c.querySelector('.corner-card__key').textContent }; });
+    check('in another note, the Pomodoro shows live in the corner with Pause', card && !card.hidden && /^2[45]:\d\d$/.test(card.time) && card.key === 'Pause', JSON.stringify(card));
+    await win.click('#pomo-card .corner-card__key');
+    await win.waitForTimeout(600);
+    const paused = await win.evaluate(() => { const c = document.getElementById('pomo-card'); return { hidden: c.hidden, key: c.querySelector('.corner-card__key').textContent, time: c.querySelector('.corner-card__time').textContent }; });
+    await win.waitForTimeout(1200);
+    const still = await win.evaluate(() => document.querySelector('#pomo-card .corner-card__time').textContent);
+    check('Pause on the card stops it and stays as Continue', !paused.hidden && paused.key === 'Continue' && still === paused.time, JSON.stringify({ paused, still }));
+    await win.click('#pomo-card .corner-card__key');
+    await win.click('#pomo-card .corner-card__time');
+    await win.waitForFunction(() => document.querySelector('#editor .note-widget[data-widget="pomodoro"]'), null, { polling: 50, timeout: 3000 }).catch(() => {});
+    await win.waitForTimeout(900);
+    const returned = await win.evaluate(() => ({ title: document.getElementById('title')?.value, key: document.querySelector('#editor .note-widget[data-widget="pomodoro"] [data-k="start"]')?.textContent, card: document.getElementById('pomo-card').hidden }));
+    check('a click on the card opens its note at the Pomodoro, going again, and the card goes', returned.title === 'other' && returned.key === 'Pause' && returned.card, JSON.stringify(returned));
   } finally {
     try { await app?.close(); } catch { /* closed */ }
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* in use */ }

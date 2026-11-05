@@ -191,12 +191,13 @@ export function initContextMenu(editorEl, { history, images, miniBarAt, format, 
   }
 
   /**
-   * Two ways to paste, at `at` — a caret, or words to replace (the owner, 0.9.4;
-   * a third, "Paste only text", was taken away again: "for now, like this").
+   * Three ways to paste, at `at` — a caret, or words to replace (the owner, 0.9.4;
+   * "Paste only text" was taken away "for now" and came back in 1.0.3).
    */
   function pasteItems(at) {
     item(t('Paste as Nebula format'), () => { void images?.paste?.('nebula', at); });
     item(t('Paste original format'), () => { void images?.paste?.('original', at); });
+    item(t('Paste only text'), () => { void images?.paste?.('text', at); });
   }
 
   function selectAllItem() {

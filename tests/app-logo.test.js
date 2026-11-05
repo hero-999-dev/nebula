@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { ICON_SIZES, cleanLogoColors, pngOfSize, icoOf, readLogo, writeLogo, clearLogo, listShortcuts, pointShortcuts, makeShortcut, logoAppId, pinnedAppId, taskbarDetails } from '../electron/app-logo.js';
+import { ICON_SIZES, cleanLogoColors, pngOfSize, icoOf, readLogo, writeLogo, clearLogo, logoPictureUrl, keepLogoPicture, readLogoPicture, forgetLogoPicture, listShortcuts, pointShortcuts, makeShortcut, logoAppId, pinnedAppId, taskbarDetails } from '../electron/app-logo.js';
 
 /** A real PNG of one colour, `size` a side. */
 function png(size, value = 0x7c) {
@@ -88,7 +88,20 @@ describe('a logo kept in the profile', () => {
     expect(path.basename(res.ico)).toMatch(/^icon-[0-9a-f]{12}\.ico$/);
     expect(fs.readFileSync(res.png).equals(png(256))).toBe(true);
     expect(fs.readdirSync(dir).sort()).toEqual([path.basename(res.ico), 'icon.png', 'logo.json'].sort());
-    expect(readLogo(dir)).toEqual({ colors: res.colors, ico: res.ico, png: res.png });
+    expect(readLogo(dir)).toEqual({ colors: res.colors, ico: res.ico, png: res.png, picture: false });
+    expect(logoPictureUrl(readLogo(dir))).toBeNull();
+  });
+
+  it('a picture of the user\'s own is named after the picture, and comes back to the editor as an address', () => {
+    const first = writeLogo(dir, COLORS, pictures(0x10), true);
+    expect(first.ok).toBe(true);
+    const kept = readLogo(dir);
+    expect(kept.picture).toBe(true);
+    expect(logoPictureUrl(kept)).toBe(`data:image/png;base64,${png(256, 0x10).toString('base64')}`);
+    const second = writeLogo(dir, COLORS, pictures(0x20), true);
+    expect(second.ico).not.toBe(first.ico);
+    writeLogo(dir, COLORS, pictures());
+    expect(readLogo(dir).picture).toBe(false);
   });
 
   it('another logo has another file name — the desktop remembers a picture by its name — and the one before is removed', () => {
@@ -127,6 +140,31 @@ describe('a logo kept in the profile', () => {
     expect(fs.existsSync(dir)).toBe(false);
     expect(readLogo(dir)).toBeNull();
     clearLogo(dir);                       // nothing there: nothing to do
+  });
+});
+
+describe('the user\'s own picture, kept apart (1.0.3)', () => {
+  it('comes back in every size as it went in, outlives the logo worn, and goes when removed', () => {
+    const kept = path.join(dir, 'logo-picture');
+    expect(readLogoPicture(kept)).toBeNull();
+    const images = pictures(0x33);
+    expect(keepLogoPicture(kept, images).ok).toBe(true);
+    clearLogo(path.join(dir, 'logo'));
+    expect(readLogoPicture(kept)).toEqual(images);
+    forgetLogoPicture(kept);
+    expect(fs.existsSync(kept)).toBe(false);
+    expect(readLogoPicture(kept)).toBeNull();
+  });
+
+  it('is not kept without every size, and one not whole is none', () => {
+    const kept = path.join(dir, 'logo-picture');
+    const some = pictures();
+    delete some[16];
+    expect(keepLogoPicture(kept, some).ok).toBe(false);
+    expect(fs.existsSync(kept)).toBe(false);
+    keepLogoPicture(kept, pictures());
+    fs.rmSync(path.join(kept, 'picture-24.png'));
+    expect(readLogoPicture(kept)).toBeNull();
   });
 });
 

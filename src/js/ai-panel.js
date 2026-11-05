@@ -391,6 +391,56 @@ export function initAiPanel({ askText } = {}) {
     tabsEl.scrollLeft += e.deltaY;
   }, { passive: false });
 
+  // The strip's own bar is hidden: a thin line laid over the head's foot shows
+  // where it has scrolled, taking no room (the owner: "daha ince cizgi olsun,
+  // bu sekilde kaymasin alta dogru" — the bar pushed the tabs up and the page down).
+  // The owner, next: "cok dar, algilamiyor mouse" — the line sits in a taller
+  // track that takes the mouse: drag the line, or press the track to jump.
+  const track = document.createElement('span');
+  track.className = 'ai-tabs-track';
+  track.setAttribute('aria-hidden', 'true');
+  const bar = document.createElement('span');
+  bar.className = 'ai-tabs-bar';
+  track.append(bar);
+  tabsEl.parentElement?.append(track);
+  const paintBar = () => {
+    const { scrollWidth: all, clientWidth: shown, scrollLeft: at } = tabsEl;
+    track.hidden = all <= shown + 1;
+    if (track.hidden) return;
+    track.style.left = `${tabsEl.offsetLeft}px`;
+    track.style.width = `${shown}px`;
+    bar.style.left = `${(at / all) * shown}px`;
+    bar.style.width = `${Math.max(24, (shown / all) * shown)}px`;
+  };
+  track.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const { scrollWidth: all, clientWidth: shown } = tabsEl;
+    if (e.target !== bar) {
+      const r = track.getBoundingClientRect();
+      const w = bar.offsetWidth;
+      tabsEl.scrollLeft = ((e.clientX - r.left - w / 2) / shown) * all;
+    }
+    const x0 = e.clientX;
+    const s0 = tabsEl.scrollLeft;
+    track.setPointerCapture(e.pointerId);
+    track.classList.add('drag');
+    const move = (ev) => { tabsEl.scrollLeft = s0 + ((ev.clientX - x0) * all) / shown; };
+    const up = () => {
+      track.classList.remove('drag');
+      track.removeEventListener('pointermove', move);
+      track.removeEventListener('pointerup', up);
+      track.removeEventListener('pointercancel', up);
+    };
+    track.addEventListener('pointermove', move);
+    track.addEventListener('pointerup', up);
+    track.addEventListener('pointercancel', up);
+  });
+  tabsEl.addEventListener('scroll', paintBar, { passive: true });
+  if (typeof ResizeObserver === 'function') new ResizeObserver(paintBar).observe(tabsEl);
+  new MutationObserver(paintBar).observe(tabsEl, { childList: true });
+  paintBar();
+
   // drag the left edge to resize
   const grip = document.getElementById('ai-resize');
   if (grip) {

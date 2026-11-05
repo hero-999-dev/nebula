@@ -304,7 +304,7 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '1.0.2';
+export const GUIDE_VERSION = '1.0.3';
 
 /**
  * The guide's words, without its markup, shapes, code or equations — so a
@@ -552,6 +552,123 @@ export const GUIDE_SIGNATURES = {
   '1.0.2 de': '3cc83dfb',
   '1.0.2 pl': '9f6e7b4b',
   '1.0.2 tr': '6bacf9d5',
+  '1.0.3 before the zip': '6baf96bc',
+  '1.0.3 before the zip de': '64cb066a',
+  '1.0.3 before the zip pl': 'd444ffb7',
+  '1.0.3 before the zip tr': 'f614f908',
+  '1.0.3 before taller columns': 'eb1018ff',
+  '1.0.3 before taller columns de': '5c9710b3',
+  '1.0.3 before taller columns pl': '80bcc2fd',
+  '1.0.3 before taller columns tr': '5057371a',
+  '1.0.3 before the Bug Find note': '9ef68a59',
+  '1.0.3 before the Bug Find note de': 'cc0abc65',
+  '1.0.3 before the Bug Find note pl': 'd04bf1e8',
+  '1.0.3 before the Bug Find note tr': '960c3ada',
+  // Words or blocks, Paste only text, row pictures, the Universe ring; no Mention for links (owner's Bug Find note).
+  '1.0.3 before the Pomodoro': '8a8c0efc',
+  '1.0.3 before the Pomodoro de': '990a3337',
+  '1.0.3 before the Pomodoro pl': '666f5894',
+  '1.0.3 before the Pomodoro tr': 'e0bd49c1',
+  // A Pomodoro and a Clock, a background of colours (owner's Bug Find note).
+  '1.0.3 before Pomodoro your way': '914fc705',
+  '1.0.3 before Pomodoro your way de': '3859ef6a',
+  '1.0.3 before Pomodoro your way pl': 'ce551809',
+  '1.0.3 before Pomodoro your way tr': 'fc5e5a37',
+  // Pomodoro your way (rounds, auto-continue, sounds), a pinned Universe map.
+  '1.0.3 before the map fit': '0c1ba3a6',
+  '1.0.3 before the map fit de': 'c7753b20',
+  '1.0.3 before the map fit pl': 'dc51cc79',
+  '1.0.3 before the map fit tr': '4607347e',
+  // Fit beside the Universe widget's lock.
+  '1.0.3 before the recorded sounds': '7e33ffaf',
+  '1.0.3 before the recorded sounds de': '301bc1b6',
+  '1.0.3 before the recorded sounds pl': '5a62f0b0',
+  '1.0.3 before the recorded sounds tr': 'b52dd889',
+  // Wind chimes and a singing bowl, real recordings, in place of the drawn tones.
+  '1.0.3 before themes in Settings': 'd5a07bfe',
+  '1.0.3 before themes in Settings de': 'e637696d',
+  '1.0.3 before themes in Settings pl': 'abfe7675',
+  '1.0.3 before themes in Settings tr': '6f71745c',
+  // Themes at the top of Settings with Matcha, and Follow on the Universe widget.
+  '1.0.3 before Tailscale sync': '132bd54f',
+  '1.0.3 before Tailscale sync de': '4b382a2e',
+  '1.0.3 before Tailscale sync pl': '7abfa971',
+  '1.0.3 before Tailscale sync tr': 'eaddf66d',
+  // The Tools menu, and Tailscale sync in it.
+  '1.0.3 before Settings tabs': 'e7bb9615',
+  '1.0.3 before Settings tabs de': '3147ab2c',
+  '1.0.3 before Settings tabs pl': 'edb07325',
+  '1.0.3 before Settings tabs tr': '44ffe56b',
+  // Settings in tabs with Storage, and the Tailscale steps in Tools.
+  '1.0.3 before Appearance preview': 'fcb663cb',
+  '1.0.3 before Appearance preview de': '8c4c6ce2',
+  '1.0.3 before Appearance preview pl': '43aa8051',
+  '1.0.3 before Appearance preview tr': '5cc8d5e2',
+  // The Appearance preview, the Theme organizer and four more styles.
+  '1.0.3 before one editor': '3a3a53b3',
+  '1.0.3 before one editor de': 'b5f3395d',
+  '1.0.3 before one editor pl': 'e205d248',
+  '1.0.3 before one editor tr': '1ad38c81',
+  // Appearance laid out as the logo's editor: a whole small Nebula, one editor of the colours, no palette button.
+  '1.0.3 before three more styles': '9322da31',
+  '1.0.3 before three more styles de': 'd5cd000b',
+  '1.0.3 before three more styles pl': '7ffaf1eb',
+  '1.0.3 before three more styles tr': 'eee2f09d',
+  // Three more styles, up to five style colours beside the bar, the picture at the left, softened for the screen.
+  '1.0.3 before Soften on Never': '4ad9af02',
+  '1.0.3 before Soften on Never de': 'd26750ea',
+  '1.0.3 before Soften on Never pl': '258b3a7d',
+  '1.0.3 before Soften on Never tr': '549fffac',
+  // Soften for the screen on Never until chosen, and the card on an external screen.
+  '1.0.3 before the kept pictures': '9befdb1c',
+  '1.0.3 before the kept pictures de': 'b56daef8',
+  '1.0.3 before the kept pictures pl': 'b32fe696',
+  '1.0.3 before the kept pictures tr': '836ca8fe',
+  // The picture cut to the window's shape and kept with the others; a style keeps it; no grain.
+  '1.0.3 before the same-version sync': 'f743ef46',
+  '1.0.3 before the same-version sync de': '5542ea66',
+  '1.0.3 before the same-version sync pl': '9ed612e2',
+  '1.0.3 before the same-version sync tr': 'b210bac5',
+  // Sync only between copies of the same version; the one behind is named.
+  '1.0.3 before all your devices': '017441bd',
+  '1.0.3 before all your devices de': '16765229',
+  '1.0.3 before all your devices pl': 'b7be0a14',
+  '1.0.3 before all your devices tr': 'b0bdbdff',
+  // Sync with any number of devices, each saying whether it is connected; My picture renamed with a double click.
+  '1.0.3 before Reset to default': '7117240b',
+  '1.0.3 before Reset to default de': '926b08cf',
+  '1.0.3 before Reset to default pl': 'f9efc5f7',
+  '1.0.3 before Reset to default tr': '9d17566a',
+  // How much it shows gets Reset to default, back to 30%.
+  '1.0.3 before the sync card': '200dbc9b',
+  '1.0.3 before the sync card de': '20c467d8',
+  '1.0.3 before the sync card pl': '758a224b',
+  '1.0.3 before the sync card tr': '0fd90eb8',
+  // Sync now both ways, inside Tools → Tailscale, with a card at the bottom right; parting asks first.
+  '1.0.3 before Tailscale alone': '5111684a',
+  '1.0.3 before Tailscale alone de': 'bfeaa710',
+  '1.0.3 before Tailscale alone pl': 'c00bac9d',
+  '1.0.3 before Tailscale alone tr': 'bdbe2fce',
+  // Tools holds Tailscale alone; Sync now is in its sheet only.
+  '1.0.3 before Hide the code': '148452cb',
+  '1.0.3 before Hide the code de': '371920aa',
+  '1.0.3 before Hide the code pl': '1c6cde2a',
+  '1.0.3 before Hide the code tr': '714bf343',
+  // Show the code hides again with the same button.
+  '1.0.3 before calendar events': 'cf35fb27',
+  '1.0.3 before calendar events de': 'c5b86e8b',
+  '1.0.3 before calendar events pl': 'a9e21363',
+  '1.0.3 before calendar events tr': '1967f2d6',
+  // A calendar's days hold events with alarms; a Pomodoro out of sight shows in the corner.
+  '1.0.3 before names on the Universe widget': '1c3090cf',
+  '1.0.3 before names on the Universe widget de': 'fac96d84',
+  '1.0.3 before names on the Universe widget pl': 'a8134ad4',
+  '1.0.3 before names on the Universe widget tr': '3b470f6e',
+  // Hide names on the Universe widget, its four buttons.
+  '1.0.3': '176b5707',
+  '1.0.3 de': '54c04070',
+  '1.0.3 pl': 'b2acf411',
+  '1.0.3 tr': '6765518a',
 };
 
 /** Whether a vault's guide is one we shipped and nobody has typed in. */
@@ -586,6 +703,22 @@ export const GUIDE_NOTE = {
     // Each release adds its features here (features, not fixes) and in the
     // section they belong to. See GUIDE_SIGNATURES before changing any text.
     // A divider closes each section before the next heading (owner, 0.8.9).
+    '<hr class="blk-hr">' +
+    '<h2>New in 1.0.3</h2>' +
+    '<p><strong>Several blocks at once.</strong> Pick a block by its grip, then Shift+click another grip, press Shift+↑ or Shift+↓, or drag a box from the empty side of the page. Copy, cut, delete and move what you picked together — section 15. Empty lines at the ends of a pick are left out. A drag begun in a line’s words selects words while it stays in that line; once it reaches another line it picks whole blocks, and back in its line it is words again.</p>' +
+    '<p><strong>Pictures of your own.</strong> A picture behind your notes, and a picture as the logo, cropped inside the app — section 16. Settings → Appearance opens on a small Nebula that shows how your words look over it.</p>' +
+    '<p><strong>A note with its files, as one zip.</strong> Export → Nebula note saves a note with videos, PDFs or other files as one zip, the note and its files in it. Import the zip on another computer and the files come along into your notes, linked again.</p>' +
+    '<p><strong>Taller columns.</strong> The upright line between two columns has a small grip at its foot. Pull it down and the columns grow, taking in the lines under them; pull it up and they shrink again.</p>' +
+    '<p><strong>A Pomodoro and a Clock.</strong> Type <span class="inline-code">/widget</span> and choose Pomodoro: focus, a break, and a long break after a number of sessions, each with its own minutes, and a stopwatch on its other tab. The Clock shows the time and the date and has an alarm: set its hour and minutes and turn the bell on. Both ring with Settings → Alarm sound: wind chimes, a sound of your computer, an mp3 of your own, or Off.</p>' +
+    '<p><strong>Pomodoro, your way.</strong> Say after how many sessions the long break comes. Auto-continue starts the next break or focus by itself. A focus and a break end with different sounds — wind chimes and a singing bowl, two real recordings credited in About Nebula — and the ♪ buttons in the Pomodoro and the Clock choose them right there: Nebula’s, any sound your computer has, or sounds of your own, as many as twenty. Settings → Sounds has the same three.</p>' +
+    '<p><strong>Days with events, a Pomodoro that follows you.</strong> Click a day in a Calendar widget to choose it: under the month are its events, Mark marks the day, and + Event writes one with a time and, if you like, an alarm. The alarm rings at its time whichever note is open, and a card in the bottom-right corner says what it is; click it and Nebula opens that calendar on that day. A Pomodoro running out of sight, further down the note or in another note, shows live in the same corner with Pause and Continue; click it to go back to it.</p>' +
+    '<p><strong>A map that stays put.</strong> The lock in the corner of a Universe widget pins its map where it is: it no longer drags or zooms, the wheel scrolls the note past it, and the note keeps the view. The left of its four buttons hides the names, as Hide names does on the big map, and the widget keeps that choice; a picked body still names its own system. The next one fits the whole map in view; on a pinned map it pins that view. The third one follows a body: click a planet or a star on the map, press it, and the camera keeps that body in the middle as it goes round; a drag, Fit or another body lets go. Locked while it follows, the map keeps following, and the round marks of the pick are gone.</p>' +
+    '<p><strong>Themes in Settings.</strong> The themes moved from the foot of the sidebar to the top of Settings, with a fifth in the middle: <strong>Matcha</strong>, dark green with white words. Your own theme stands open beside them, with no button to open it.</p>' +
+    '<p><strong>Your notes on all your devices.</strong> The new Tools menu beside Settings holds Nebula’s connections with other apps. The first, Tailscale sync, keeps the notes of your computers alike over your own tailnet — two of them or more, and a phone once Nebula comes to phones — straight from one to the other with no cloud between. Turn it on on each, make a pairing code on one and type it into each of the others: all your devices share that one code. Then list the other devices on each one by their Tailscale name or address; beside each, Tools says whether it is connected, and at the top whether Tailscale is. A device added later takes the same code: on a paired one press Show the code, and Hide the code puts it away again. Each fetches what changed on the others when it opens, when another closes, and at Sync now; a device that is off is simply skipped until next time. Sync now, in the sheet that Tools → Tailscale opens, goes both ways: the devices it reaches fetch from this one too, and a card at the bottom right shows how far it has come and ends with Synced on all your devices. Unpair, or taking a connected device off the list, asks first. A note changed on two of them is kept twice, side by side; a note deleted for good on one goes on all the others too, even those that hear of it only through another. Black holes and this guide stay on each device, and big videos come over afterwards, in the background. Devices sync only on the same version of Nebula: if one is behind, it says which, and to update it first. How to set it up — for two devices, a third or a phone, and what to do with one lost — is in the Tools sheet itself, step by step.</p>' +
+    /* new */ '<p><strong>Settings in tabs.</strong> Settings opens in tabs now — General, Appearance, Sounds, App lock and Storage — on the one used last; the themes are under Appearance. Storage shows how much room Nebula takes on this computer: the notes, their words and their pictures apart, the five biggest, the black holes, the backups, the Trash and the program itself. The Trash can be emptied there, as with its own Delete.</p>' +
+    '<p><strong>A background of colours.</strong> No picture at hand? The Theme organizer makes one of colours: pick a few, then a style — waves, clouds, rings and more — section 16. The picture now fills the whole window, behind the list too, and takes on the theme’s colour.</p>' +
+    '<p><strong>Appearance, seen first.</strong> Settings → Appearance is laid out like the logo’s editor. At the left a whole small Nebula — the title strip, the note list with its foot, the note’s head, the editing bar and a note — in the theme, the background, the font and the size you chose; point at a style and it shows there before you wear it. Under it the picture, with How much it shows and Soften for the screen. At the right one editor keeps the themes; in it the colours of Your own theme and the style colours — up to five — stand at the left, the bar and the colours to choose from beside them, then the styles. Seven styles are new: Aurora, Rings, Mesh, Facets, Horizon, Dunes and Bubbles; the colours of your picture are offered to them too. Your own picture, kept first among the themes as My picture, takes a name of yours with a double click on it; and once a style is chosen, the colours of your picture are no longer offered.</p>' +
+    '<p><strong>Smaller things.</strong> Beside New folder there is a New project button. The Universe search takes as many labels as you like. Planets turn at the same pace on every computer and no longer speed up under the mouse. A window snapshot says where it was saved, and a click on the message opens the folder. One press clears the Universe search. An open black hole shows its whole name on the map, a locked one only its initials.</p>' +
     '<hr class="blk-hr">' +
     '<h2>New in 1.0.2</h2>' +
     '<p><strong>Names layer by layer.</strong> In the Universe, names come in as you zoom in: projects first, then folders and black holes, then notes, then labels, and zooming out hides them in the same order. A click on a body names everything in its orbit. Labels are small planets now, and the map’s stars twinkle like the lock screen’s, which now fill the whole lock screen — section 11.</p>' +
@@ -653,7 +786,7 @@ export const GUIDE_NOTE = {
     '<li><strong>−</strong> hides the bar for a clean page</li>' +
     '</ul>' +
     '<p><strong>Languages.</strong> Right beside the version number at the bottom of the sidebar stand the four languages — <strong>English</strong>, <strong>Deutsch</strong>, <strong>Polski</strong>, <strong>Türkçe</strong> — each in its own language, the one in use lit. Pick one and every menu, button and hint follows at once; with the note list folded they stand one under another as EN, DE, PL, TR. Your notes are never translated; this guide is the one page that follows the language, and only while you have not written in it. The spelling check does not follow it: it checks every language ticked under <em>Settings → Spelling</em>.</p>' +
-    '<p>Four themes at the bottom of the sidebar: <strong>Main</strong>, <strong>Dark</strong>, <strong>Light</strong> and <strong>White</strong> — and the palette button at their right opens <strong>your own</strong>: pick the background, the sidebar’s tone, the lines, the accent and the text, and the app changes as you do; give it a name and <em>Save this profile</em> to keep it. Matcha, dark green with white words, and Contrast, near-black on near-white, are there as ready profiles; a ready profile can be deleted like any other, and brought back. The layout and the theme both survive a restart. <span class="inline-code">F11</span> is full screen, and the View menu zooms the whole window and hides the note list.</p>' +
+    '<p>Five themes at the top of Settings: <strong>Main</strong>, <strong>Dark</strong>, <strong>Matcha</strong>, <strong>Light</strong> and <strong>White</strong> — and under them <strong>your own</strong> stands open: pick the background, the sidebar’s tone, the lines, the accent and the text, and the app changes as you do; give it a name and <em>Save this profile</em> to keep it. Matcha, dark green with white words, and Contrast, near-black on near-white, are there as ready profiles; a ready profile can be deleted like any other, and brought back. The layout and the theme both survive a restart. <span class="inline-code">F11</span> is full screen, and the View menu zooms the whole window and hides the note list.</p>' +
     '<p><strong>Settings</strong>, beside Help at the top, opens a sheet with five parts. <em>New notes</em>: the font, the text size and the page a new note starts with — the notes you have keep their own. <em>Show and hide</em>: put the AI panel away, with its button, or the black holes, with their section and their button; nothing is deleted, and both are back when the box is cleared. <em>Spelling</em>: the languages the spelling check knows — all four ticked at first; untick one and its words are no longer marked. <em>Lock on opening</em>: set a 6-digit PIN and Nebula asks for it each time it opens; a passkey can be added beside it, and then either one opens the app — the passkey at a press of <em>Log in with passkey</em>. <em>File → Lock Nebula</em> shuts it at once; while it waits for the PIN, a faint sky of stars and a ringed planet drifts behind it. <em>Turn the lock off</em> stops the asking and keeps the lock; <em>Remove lock</em> deletes it. A recovery key, shown once, opens Nebula when the PIN is forgotten. The lock keeps the app shut on this computer — it does not encrypt the notes’ files; a black hole does that. <em>Logo</em>: Nebula’s logo in colours of your own — its background, its border, the moon and its shade, the star — or with a theme put on it: a fixed one, a ready profile like Contrast, or one you saved; <strong>+</strong> keeps the colours on it as a theme of the logo’s own, under a name, and a change made to a ready one is kept as a new theme. This window, the taskbar and the shortcuts that start Nebula — on the desktop, in the Start menu, pinned to the taskbar — wear it; the mark at the top left of the app stays in the app’s theme.</p>' +
     '<p><strong>F12</strong> takes a picture of the window: it is saved as a PNG in <em>Pictures\\Nebula</em> and copied, ready to paste anywhere. A note at the bottom says where it went.</p>' +
     '<p><strong>Try it:</strong> send the bar to the left rail, restart the app, and it is still there.</p>' +
@@ -709,7 +842,7 @@ export const GUIDE_NOTE = {
     '<h3>Arrows as you type</h3>' +
     '<p>Type <span class="inline-code">--&gt;</span> and it becomes →; type <span class="inline-code">&lt;--</span> and it becomes ←. One Ctrl+Z gives the typed characters back; in code they are left as they are.</p>' +
     '<h3>The / menu</h3>' +
-    '<p>Type <span class="inline-code">/</span> at the start of a line (or after a space) and a menu of blocks opens; keep typing to narrow it, ↑ ↓ to choose, Enter to use. It turns the line you are on into <strong>Text</strong>, <strong>Heading 1–3</strong>, a <strong>bulleted</strong> or <strong>numbered</strong> list, a <strong>toggle list</strong>, a <strong>toggle heading</strong> or a <strong>quote</strong>, and it inserts a <strong>to-do</strong>, a <strong>code block</strong>, a <strong>divider</strong>, a <strong>shape</strong>, or a link as an <strong>embed</strong>, a <strong>bookmark</strong>, a <strong>URL</strong> or a <strong>mention</strong>.</p>' +
+    '<p>Type <span class="inline-code">/</span> at the start of a line (or after a space) and a menu of blocks opens; keep typing to narrow it, ↑ ↓ to choose, Enter to use. It turns the line you are on into <strong>Text</strong>, <strong>Heading 1–3</strong>, a <strong>bulleted</strong> or <strong>numbered</strong> list, a <strong>toggle list</strong>, a <strong>toggle heading</strong> or a <strong>quote</strong>, and it inserts a <strong>to-do</strong>, a <strong>code block</strong>, a <strong>divider</strong>, a <strong>shape</strong>, or a link as an <strong>embed</strong>, a <strong>bookmark</strong> or a <strong>URL</strong>.</p>' +
     '<p><strong>Try it:</strong> in a new note type <span class="inline-code">/h2</span> and Enter, then a title — only that line becomes a heading.</p>' +
 
     '<hr class="blk-hr">' +
@@ -791,13 +924,12 @@ export const GUIDE_NOTE = {
 
     '<hr class="blk-hr">' +
     '<h2>7 · Links, pictures, videos and files</h2>' +
-    '<p><strong>Pasted words take this note’s font.</strong> Text copied from a web page or a document arrives in the note’s writing font and colours; its paragraphs, headings, lists, links, bold and italic stay. Words copied from another Nebula note keep a font that was chosen for them — a line in Consolas stays in Consolas. A right-click pastes it the other two ways: with its original format, or as text only (section 2). <strong>Try it:</strong> copy a paragraph from any web page and paste it into a note — it looks like the rest of the note.</p>' +
-    '<p><strong>Paste a web address</strong> on its own (or type <span class="inline-code">/embed</span>, <span class="inline-code">/bookmark</span>, <span class="inline-code">/url</span> or <span class="inline-code">/mention</span>) and Nebula asks how to show it:</p>' +
+    '<p><strong>Pasted words take this note’s font.</strong> Text copied from a web page or a document arrives in the note’s writing font and colours; its paragraphs, headings, lists, links, bold and italic stay. Words copied from another Nebula note keep a font that was chosen for them — a line in Consolas stays in Consolas. A right-click pastes it the other two ways: with its original format, or as text only (section 2); Ctrl+Shift+V pastes text only too. Lines pasted into a quote run on as one quote. <strong>Try it:</strong> copy a paragraph from any web page and paste it into a note — it looks like the rest of the note.</p>' +
+    '<p><strong>Paste a web address</strong> on its own (or type <span class="inline-code">/embed</span>, <span class="inline-code">/bookmark</span> or <span class="inline-code">/url</span>) and Nebula asks how to show it, in a menu beside where you pasted:</p>' +
     '<ul>' +
     '<li><strong>Embed</strong> — the page itself, live inside the note, with its own scrolling and sign-in forms. A YouTube or Vimeo link embeds its player. If a site refuses to be shown this way, the card’s link opens it in your browser.</li>' +
     '<li><strong>Bookmark</strong> — a card with the site’s title and address. Nebula requests just the page title; if it is unavailable, the address stays as its title.</li>' +
     '<li><strong>URL</strong> — the address as a link in the line of text.</li>' +
-    '<li><strong>Mention</strong> — a short @site tag in the line, for when the address itself is noise.</li>' +
     '</ul>' +
     '<p>An embed is resized from any of its four sides or corners — they light up when the pointer is over it — wider or narrower, taller or shorter; a video keeps its shape. A card is moved like a picture: take it by its title line — a video of your own by its picture too — and a mark shows the place between two lines where it will lie; a code block is taken by its top line. The ✕ on a card removes it. Bookmark requests page metadata without browser cookies. Embed loads the page; its fallback link stays available, and a failed-load message appears only if the preview reports a loading failure.</p>' +
 
@@ -805,7 +937,7 @@ export const GUIDE_NOTE = {
     '<p><strong>Try it:</strong> copy any web address, paste it on an empty line, then ↓ → → Enter.</p>' +
     '<p><strong>Link any words:</strong> select them and paste a URL over them, or use the link button in the toolbar. <strong>Ctrl+click</strong> a link to open it; choosing the link button again with an empty address takes the link off.</p>' +
     '<p><strong>Videos:</strong> embed a YouTube or Vimeo link and you get the player itself, as wide as the text (up to a comfortable size) so the picture is sharp, black while it loads like on any site — a start time in the link is kept. A video file of your own — MP4, WebM, MOV, MKV, and AVI, WMV and the other kinds too — dropped on a note, or chosen from the computer with /video, is copied into the note’s folder and played from there, with its name under it and a bar of its own: back and on by ten seconds, the speed, the whole screen. A kind the app’s player cannot play is kept all the same, and its card offers to open it in another program. A file for another program shows a line with the video’s name in its place; a note exported as a Nebula note takes its videos along. In a black hole the video is sealed beside its note, like the note itself, and plays while the black hole is open.</p>' +
-    '<p><strong>Pictures:</strong> paste an image and it goes on the line you are on, part of the text, so it moves with the words at any window size. Click it for its bar, where three buttons say where it lives and the current one is lit: <em>▾</em> behind the text, <em>▴</em> above the text (floating, on top), <em>≡</em> in the text. <em>Aa</em> writes a caption under it — so does a <strong>double-click</strong> on the picture — <em>✂</em> crops it (drag the frame’s edges or corners, Enter crops, Esc leaves it whole, one Ctrl+Z brings the whole picture back), <em>✕</em> deletes it, and any of its four corner handles resizes it proportionally. <strong>Ctrl+C</strong> with a picture selected (or <em>Copy image</em> on a right-click) copies the picture itself, ready for any program. In the text, Backspace at the start of the line under a picture, or Delete at the end of the line above, first selects the picture and only a second press deletes it; an empty line beside a picture simply goes. With a picture in the text selected, Enter opens a line under it and Alt+↑ / Alt+↓ move it up or down a line. On floating pictures, the opposite corner stays in place. An image dropped from a folder floats where you drop it. A picture in the text has five more buttons on its bar: left, middle and right say where it stands on its line, and the fourth puts it beside the picture before it — two pictures on one line, which get smaller in a narrow window rather than cut off. Dragging does the same: pulled sideways it snaps left, middle or right; held over another picture a mark stands at that picture’s side; held between two lines a mark lies there — let go, and it moves. The last button, a▫a, stands the picture inside a line of words, as a letter of that line: drag it and a mark shows the caret it will go to; press Enter and you type on right after it. Such a picture has no caption; the same button, or left, middle or right, takes it out of the line again.</p>' +
+    '<p><strong>Pictures:</strong> paste an image and it goes on the line you are on, part of the text, so it moves with the words at any window size. Click it for its bar, where three buttons say where it lives and the current one is lit: <em>▾</em> behind the text, <em>▴</em> above the text (floating, on top), <em>≡</em> in the text. <em>Aa</em> writes a caption under it — so does a <strong>double-click</strong> on the picture — <em>✂</em> crops it (drag the frame’s edges or corners, Enter crops, Esc leaves it whole, one Ctrl+Z brings the whole picture back), <em>✕</em> deletes it, and any of its four corner handles resizes it proportionally. <strong>Ctrl+C</strong> with a picture selected (or <em>Copy image</em> on a right-click) copies the picture itself, ready for any program. In the text, Backspace at the start of the line under a picture, or Delete at the end of the line above, first selects the picture and only a second press deletes it; an empty line beside a picture simply goes. With a picture in the text selected, Enter opens a line under it and Alt+↑ / Alt+↓ move it up or down a line. On floating pictures, the opposite corner stays in place. An image dropped from a folder floats where you drop it. A picture in the text has five more buttons on its bar: left, middle and right say where it stands on its line, and the fourth puts it beside the picture before it — two pictures on one line, which get smaller in a narrow window rather than cut off. Dragging does the same: pulled sideways it snaps left, middle or right; held over another picture a mark stands at that picture’s side; held between two lines a mark lies there — let go, and it moves. The last button, a▫a, stands the picture inside a line of words, as a letter of that line: drag it and a mark shows the caret it will go to; press Enter and you type on right after it. Such a picture has no caption; the same button, or left, middle or right, takes it out of the line again. Two pictures side by side, resized to nearly the same height, take the same height, and a dashed line along their feet shows they are even.</p>' +
     '<p><strong>Try it:</strong> copy any picture, click at the end of this line and paste. Give it a caption, then make the window narrow and wide — the picture stays between the same two lines.</p>' +
     '<p><strong>Files:</strong> drag any file from Explorer or Finder onto a note, or type <span class="inline-code">/file</span> and choose one. Nebula keeps its own copy inside the note — the original stays where it was — and shows it as a card: the logo of its kind (PDF red, Word blue, Excel green…), its name and its size. A click on the card saves a copy wherever you choose; <em>Open</em> opens it in its own program — changes made there do not go back into the note; × takes it out of the note. Pictures and videos dropped on their own still go in as pictures and videos. A file copied in Explorer or Finder is pasted the same way: Ctrl+V puts it under the line the caret is in — a video as a video, any other file as its card.</p>' +
     '<p><strong>Try it:</strong> in a note of your own, drag a PDF from your Downloads folder onto an empty line, then click the card and save the copy to your desktop.</p>' +
@@ -834,7 +966,7 @@ export const GUIDE_NOTE = {
     '<h2>11 · Projects and the Universe</h2>' +
     '<p><strong>Projects.</strong> Drag a folder by its row and let go on the middle of another folder: the two go into a new project, a row like a folder’s one step up. A folder let go on a project joins it. An open project shows <em>+ Add a note</em> and <em>+ Add a folder</em>; a note made there, or dragged onto the project, sits in the project itself, beside its folders. Double-click a project to rename it; its ⋯ menu holds the rest. Projects are kept beside your folders, and there are none inside black holes.</p>' +
     '<p><strong>The Universe.</strong> The small window above Archive and Trash is your notes as a galaxy. Each project is a star, each folder a planet — round its project’s star, or on its own — and a folder’s notes are its moons. Notes in no folder are planets round the bright core in the middle, and once a ring is full the next ones go round farther out. Each of a note’s labels is a small moon of it. Every project and folder has a colour of its own, its notes wear it, and a label is the same colour on every note; notes in no folder stay in the theme’s own ink, a shade under the white core, and a project’s own loose notes wear its colour. Bodies sharing a ring are spread evenly round it. Everything turns slowly round the middle. The Universe follows the note you open. A shooting star crosses it about once a minute, and every five minutes a small rocket leaves a planet: click it and the camera rides along, and once it is gone the Universe fits itself again. Drag to look around; the wheel or the touchpad zooms. A click flies to a body and rings it, and a second, wider circle takes in everything that goes round it. Right-click → <em>Open</em> opens the note.</p>' +
-    '<p><strong>⤢</strong> at the top of the Universe puts it over the whole page; there, at the top right, are the search for labels and mentions, <em>Fit Universe</em>, <em>Hide names</em> — every name off the Universe until it is pressed again, then <em>Show names</em> — and the whole-screen button. The small Universe under the list only watches: it glides to the note you open and takes no clicks. Type a label and pick it: its notes are ringed in its colour and joined in thin lines, a constellation, while the rest fades; pick more and each is drawn in its own colour, × takes one away. Type @ or a note’s title to pick a mention: that note and every note it mentions or is mentioned by light up, joined by arrows from the note that mentions to the note mentioned. Open a note from the Universe and the note comes beside it; another one makes three. Drag the Universe by its name onto a note and the page is shared between them, as with notes side by side; its ✕ closes it. Right-click a black hole: a locked one offers <em>Open</em>, which asks for its PIN or passkey and then pulls you in — a double-click does the same; an open one offers <em>Enter the black hole</em> and <em>Lock</em>. Inside, a space of its own holds only its notes, with main space faint around it. A black hole shows its initials, open or locked, and a locked one nothing else. <em>Back to main space</em> brings you out. Names come in as you zoom in, a layer at a time: projects first, then folders and black holes, then notes, then labels; zooming out hides them again in the same order. Click a body and everything in its orbit shows its name. The Universe reads titles, folders, labels and @mentions — nothing else of what is written in a note.</p>' +
+    '<p><strong>⤢</strong> at the top of the Universe puts it over the whole page; there, at the top right, are the search for labels and mentions, <em>Fit Universe</em>, <em>Hide names</em> — every name off the Universe until it is pressed again, then <em>Show names</em> — and the whole-screen button. The small Universe under the list only watches: it glides to the note you open and takes no clicks. Type a label and pick it: its notes are ringed in its colour and joined in thin lines, a constellation, while the rest fades; pick more and each is drawn in its own colour, × takes one away. Type @ or a note’s title to pick a mention: that note and every note it mentions or is mentioned by light up, joined by arrows from the note that mentions to the note mentioned. Open a note from the Universe and the note comes beside it; another one makes three. Drag the Universe by its name onto a note and the page is shared between them, as with notes side by side; its ✕ closes it. Right-click a black hole: a locked one offers <em>Open</em>, which asks for its PIN or passkey and then pulls you in — a double-click does the same; an open one offers <em>Enter the black hole</em> and <em>Lock</em>. Inside, a space of its own holds only its notes, with main space faint around it. An open black hole shows its whole name, and a locked one only its initials. <em>Back to main space</em> brings you out. Names come in as you zoom in, a layer at a time: projects first, then folders and black holes, then notes, then labels; zooming out hides them again in the same order. Click a body and everything in its orbit shows its name — with the names hidden too. The ring of the picked body follows the note you open beside the Universe. The Universe reads titles, folders, labels and @mentions — nothing else of what is written in a note.</p>' +
     '<p><strong>Try it:</strong> drag one folder onto the middle of another to make a project. Then press ⤢ on the Universe, type a label into the search at the top right and pick it, then right-click a planet and choose <em>Open</em>.</p>' +
     '<hr class="blk-hr">' +
     '<h2>12 · A Universe of your own</h2>' +
@@ -849,7 +981,18 @@ export const GUIDE_NOTE = {
     '<p>The Black holes section, under your notes, has its own scroll: it stays in sight however many notes you have, and new notes never push it down. The notes above it scroll on their own; the Universe and Archive and Trash stay where they are.</p>' +
     '<p><strong>Try it:</strong> scroll the note list and the Black holes section apart — each keeps its own place.</p>' +
     '<hr class="blk-hr">' +
-    '<h2>15 · Where your notes live</h2>' +
+    '<h2>15 · Several blocks at once</h2>' +
+    '<p>A click on a block’s grip picks it. To pick more, Shift+click the grip of another block and everything between the two is picked; Shift+↑ and Shift+↓ grow or shrink the pick; or press the mouse on the empty side of the page and drag a box over the lines.</p>' +
+    '<p>What you picked stays together: Ctrl+C copies the blocks in their order, Ctrl+X cuts them, Ctrl+D puts a copy under them, Delete removes them, and Ctrl+Shift+↑ and Ctrl+Shift+↓ move them. Esc lets them go. Hold and drag the grip of any picked block, and they all go along.</p>' +
+    '<p><strong>Try it:</strong> choose Edit mode, click the grip of this line, press Shift+↑ twice, then Ctrl+Shift+↑ — and Ctrl+Z to bring it all back.</p>' +
+    '<hr class="blk-hr">' +
+    '<h2>16 · A picture of your own</h2>' +
+    '<p><strong>Behind your notes.</strong> Settings → Appearance → Theme organizer → Choose a picture puts a picture behind every note, and How much it shows sets how strongly it shows through; Reset to default beside it puts it back to 30%. First it opens in a frame of the window’s shape: pull it and zoom to choose the part that lies behind your notes, and if that part is small, it says so. Every picture you choose is kept as a little picture beside Choose a picture: press one to put it back on, or its × to delete it. Remove the picture takes off what is behind your notes, a picture or a style, and keeps it. The pictures stay on this computer in files of their own, inside no note.</p>' +
+    '<p><strong>As the logo.</strong> Settings → Logo → Use a picture of mine opens the picture in a square: pull it into place, zoom with the slider or the mouse wheel, and Use this picture makes it the logo. Remove the picture brings the coloured logo back.</p>' +
+    '<p><strong>Of colours.</strong> In Style colours, pick up to five colours and press a style: Diagonal, Across, Glow, Swirl, Stripes, Blocks, Clouds, Waves, Aurora, Rings, Mesh, Facets, Horizon, Dunes or Bubbles. Press a colour to choose it with the theme’s bar and colours beside it, or from Colours inspired by your picture, and point at a style to see it in the preview first. Wearing a style keeps your picture. The picture is made from them and goes behind your notes like any other. If it shows green specks or steps on a screen, Soften for the screen draws it smaller and a little blurred: choose Always, or On an external screen. It is Never until you choose. Moved onto an external screen, Nebula says where it is in a card at the bottom right; Don’t show again for this screen keeps it away from that screen.</p>' +
+    '<p><strong>Try it:</strong> choose a picture for the background, then move How much it shows from one end to the other.</p>' +
+    '<hr class="blk-hr">' +
+    '<h2>17 · Where your notes live</h2>' +
     '<p>Click the version number at the bottom of the sidebar to see every folder this copy uses. Each note is a folder of its own: in it the note’s JSON file, written atomically, and its pictures and videos as files — a picture is written once, so typing saves only the words. A dated snapshot of the whole vault is kept alongside, one a day, and only the newest is kept: it copies the notes’ own files and shares their pictures and videos with the vault instead of copying them, so a video is on the disk once. On a disk that cannot share a file — a flash drive, a network folder — the copy holds them itself, so they are there twice. Of the copies made before an update and before a repair, the newest of each kind is kept. A note deleted from the Trash takes its folder with it, in every snapshot too. Black holes are beside the notes, in blackholes: one folder each, every note in it one sealed file.</p>' +
     '<p>An update replaces the application folder only. The vault is copied into Backups before anything installs, and <strong>nothing in it is ever deleted</strong>. The installed app, the portable copy, the test build and the dev build each keep their own separate notes.</p>' +
     '<p><strong>File → Open notes folder</strong> shows that folder in Explorer. Pictures taken with F12 go to <em>Pictures\\Nebula</em>, outside the vault.</p>' +
@@ -858,7 +1001,7 @@ export const GUIDE_NOTE = {
     '<p><strong>Try it:</strong> after the next update, open the Backups folder from the version number: beside the dated copy there is one called <em>pre-heal-</em> with the version it was taken for.</p>' +
 
     '<hr class="blk-hr">' +
-    '<h2>16 · Code blocks</h2>' +
+    '<h2>18 · Code blocks</h2>' +
     '<p>Markdown-style: pick a language and the colours follow, the way GitHub, Discord or Notion do it. Click into the code to edit it; changing the language repaints the same text; <em>Copy</em> takes the raw source. Every language Nebula knows has a sample below.</p>' +
     '<h3>Markdown</h3>' + code(MD_SRC, 'markdown') +
     '<h3>JavaScript</h3>' + code(JS_SRC, 'javascript') +

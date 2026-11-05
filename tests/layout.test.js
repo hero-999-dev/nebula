@@ -8,7 +8,7 @@ import { alignOf, setAlign, putBeside, leaveRow, rowOf, inRow, tidyRows, picture
 import JSZip from 'jszip';
 import {
   cleanSplit, sectionOf, splitAt, unsplit, healColumns, setSplit, MIN_SPLIT, MAX_SPLIT,
-  splitsOf, cleanSplits, splitPoint, splitColumn, moveRule, removeRule, leastShare, MAX_COLS, MIN_COL,
+  splitsOf, cleanSplits, splitPoint, aimAt, aimOnNote, splitColumn, moveRule, removeRule, leastShare, MAX_COLS, MIN_COL,
 } from '../src/js/columns.js';
 import { migrateNote } from '../src/js/migrate.js';
 import { healHtml } from '../src/js/heal.js';
@@ -182,12 +182,13 @@ describe('splitting', () => {
 
   it('makes two columns with the divider upright between them, what was there at the left', () => {
     const { cols, empty } = splitAt(sectionOf($('h')), $('h'), 50);
-    expect(order()).toBe('a,h0,div,blank,e');
+    expect(order()).toBe('a,h0,div,e');
     expect(cols.className).toBe('blk-cols');
     expect(cols.dataset.split).toBe('50');
     expect(cols.style.getPropertyValue('--split')).toBe('50%');
     expect([...cols.children].map((e) => `${e.tagName}.${e.className}`)).toEqual(['DIV.blk-col', 'HR.blk-vr', 'DIV.blk-col']);
-    expect([...cols.children[0].children].map((e) => e.id)).toEqual(['b', 'c']);   // the empty line at the end stays a line under the columns
+    // The dragged divider closes the box: its empty line at the end is cut with it (1.0.3, eleventh try).
+    expect([...cols.children[0].children].map((e) => e.id)).toEqual(['b', 'c', 'blank']);
     expect(empty).toBe(cols.children[2]);
     expect(empty.innerHTML).toBe('<p><br></p>');
     expect(root.querySelector('#h')).toBeNull();               // the dragged divider is the upright one now
@@ -198,7 +199,7 @@ describe('splitting', () => {
     const { cols, empty } = splitAt(sectionOf($('h')), $('h'), 30);
     expect(cols.dataset.split).toBe('30');
     expect(empty).toBe(cols.children[0]);
-    expect([...cols.children[2].children].map((e) => e.id)).toEqual(['b', 'c']);
+    expect([...cols.children[2].children].map((e) => e.id)).toEqual(['b', 'c', 'blank']);
   });
 
   it('with nothing to split still makes two columns to write in, and a line under them at the end of the note', () => {
@@ -278,11 +279,21 @@ describe('columns put right', () => {
     expect(cols.dataset.split).toBe('80');
   });
 
-  it('does not let columns stand inside columns', () => {
+  it('lets columns stand inside a column twice, never deeper (1.0.3)', () => {
     note(`<div class="blk-cols" data-split="50"><div class="blk-col">${COLS}</div><hr class="blk-vr"><div class="blk-col"><p>x</p></div></div>`);
     healColumns(root);
-    expect(root.querySelectorAll('.blk-cols')).toHaveLength(1);
-    expect(root.querySelector('.blk-col').textContent).toBe('leftright');
+    expect(root.querySelectorAll('.blk-cols')).toHaveLength(2);
+    expect(root.querySelector('.blk-col .blk-cols').dataset.split).toBe('40');
+    const pair = (a, b) => `<div class="blk-cols" data-split="50"><div class="blk-col">${a}</div><hr class="blk-vr"><div class="blk-col">${b}</div></div>`;
+    note(pair(pair(pair('<p>a</p>', '<p>b</p>'), '<p>y</p>'), '<p>x</p>'));
+    healColumns(root);
+    expect(root.querySelectorAll('.blk-cols')).toHaveLength(3);
+    expect(root.querySelector('.blk-col .blk-col .blk-cols').textContent).toContain('ab');
+    note(pair(pair(pair(pair('<p>a</p>', '<p>b</p>'), '<p>z</p>'), '<p>y</p>'), '<p>x</p>'));
+    healColumns(root);
+    expect(root.querySelectorAll('.blk-cols')).toHaveLength(3);
+    expect(root.querySelector('.blk-col .blk-col .blk-col .blk-cols')).toBeNull();
+    expect(root.querySelector('.blk-col .blk-col .blk-cols').textContent).toContain('ab');
   });
 
   it('survives the migration of old notes untouched, empty columns included', () => {
@@ -401,6 +412,18 @@ describe('more than two columns', () => {
     expect(made.cols.dataset.split).toBe('15,50,80');
     expect($('L').style.getPropertyValue('--w')).toBe('35%');
     expect(healColumns(root)).toBe(0);
+  });
+
+  it('cuts in the middle when the divider is taken to a side edge, never a sliver (the owner, 1.0.3)', () => {
+    two();
+    expect(aimAt($('R'), 80)).toBe(80);
+    expect(aimAt($('R'), 99)).toBe(75);                         // the outer fifth of the column is its edge
+    expect(aimAt($('R'), 52)).toBe(75);
+    expect(aimAt($('L'), 2)).toBe(25);
+    expect(aimAt($('L'), 10, 26)).toBeNull();
+    expect(aimOnNote(40)).toBe(40);
+    expect(aimOnNote(8)).toBe(50);                              // at the note's side: the middle, not the least
+    expect(aimOnNote(95)).toBe(50);
   });
 
   it('holds as many columns as the line has room for: none is made narrower than its least', () => {

@@ -31,7 +31,20 @@ export const DEFAULT_SETTINGS = Object.freeze({
   hideHoles: false,
   /** The languages the spell checker knows (1.0.0): every language of the app unless one is taken off. */
   spell: Object.freeze(['en', 'de', 'pl', 'tr']),
+  /** How much of the picture behind the note shows (1.0.3, backdrop.js), 0.05–1. */
+  backdrop: 0.3,
+  /** Whether the picture is softened for the screen (1.0.3, backdrop.js): auto (on an external screen), on or off.
+   * Never until asked (the owner: "soften for the screen never olsun doğal ayarı"); screen-tip.js says where to ask. */
+  smoothScreen: 'off',
+  /** What the Clock widget's alarm rings with (1.0.3, alarm-sound.js): off, chime, bell, system:<name>, own or own:<id>. */
+  alarmSound: 'chime',
+  /** What a Pomodoro rings with when a focus ends, and when a break ends: two sounds, told apart. */
+  focusSound: 'chime',
+  breakSound: 'bell',
 });
+
+/** A sound setting's value, or null for one that is not a sound. Pure — tested. */
+export const cleanSound = (v) => (typeof v === 'string' && /^(off|chime|bell|own(:[a-z0-9]{6,24})?|system:[^/\\:*?"<>|]{1,200})$/.test(v) ? v : null);
 
 /** The languages the spell checker can be given, in the order Settings shows them. */
 export const SPELL_LANGUAGES = [['en', 'English'], ['de', 'Deutsch'], ['pl', 'Polski'], ['tr', 'Türkçe']];
@@ -45,6 +58,7 @@ export function cleanSettings(raw) {
   const from = raw && typeof raw === 'object' ? raw : {};
   const font = typeof from.font === 'string' ? from.font.replace(/[;{}<>\\]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200) : '';
   const size = Math.round(Number(from.size));
+  const backdrop = from.backdrop == null ? NaN : Number(from.backdrop);
   return {
     font: font || null,
     size: Number.isFinite(size) && size >= 6 && size <= 400 ? size : null,
@@ -54,6 +68,11 @@ export function cleanSettings(raw) {
     spell: Array.isArray(from.spell)
       ? SPELL_LANGUAGES.map(([code]) => code).filter((code) => from.spell.includes(code))
       : [...DEFAULT_SETTINGS.spell],
+    backdrop: Number.isFinite(backdrop) ? Math.min(1, Math.max(0.05, backdrop)) : DEFAULT_SETTINGS.backdrop,
+    smoothScreen: ['auto', 'on', 'off'].includes(from.smoothScreen) ? from.smoothScreen : DEFAULT_SETTINGS.smoothScreen,
+    alarmSound: cleanSound(from.alarmSound) ?? DEFAULT_SETTINGS.alarmSound,
+    focusSound: cleanSound(from.focusSound) ?? DEFAULT_SETTINGS.focusSound,
+    breakSound: cleanSound(from.breakSound) ?? DEFAULT_SETTINGS.breakSound,
   };
 }
 
