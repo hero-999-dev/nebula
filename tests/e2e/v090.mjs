@@ -4,6 +4,7 @@ import os from 'node:os';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { putFromBar } from './put.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 export async function runV090Checks(check) {
@@ -57,8 +58,8 @@ export async function runV090Checks(check) {
       check(kind+' text corners remain inside its silhouette on old-note load',contained.ok,JSON.stringify(contained));
     }
     await open('triangle');
+    await putFromBar(win,'arrow','straight');
     await win.evaluate(()=>{
-      document.querySelector('[data-arrow-add="straight"]').click();
       const a=document.querySelector('#editor .note-arrow'),shape=document.querySelector('#editor .shape');
       shape.dataset.anchor ||= 'triangle-test-anchor';a.dataset.to=shape.dataset.anchor;a.dataset.x1='450';a.dataset.y1='160';
       document.getElementById('editor').dispatchEvent(new Event('input',{bubbles:true}));

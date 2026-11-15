@@ -8,6 +8,7 @@
  * same mark, onto the note or into a column.
  *
  * What a block is taken by:
+ *   – a file's card: anywhere on it but its buttons (1.0.4);
  *   – a card (a bookmark, an embedded page, an embedded video, a video file):
  *     its title line. An embedded page is another page inside the note and
  *     keeps the mouse to itself, so only the line over it can take the card;
@@ -24,6 +25,7 @@
 
 import { showDropMark, hideDropMark } from './drop-mark.js';
 import { flowAt, gapAwayFrom } from './image-place.js';
+import { showGhost, hideGhost } from './drag-ghost.js';
 
 /** The blocks that are moved this way. */
 export const DRAG_BLOCK = '.link-block, .blk-code, .blk-table';
@@ -42,7 +44,8 @@ const TAKE = 8;
 export function gripOf(target, y) {
   const block = target?.closest?.(DRAG_BLOCK);
   if (!block || target.closest('button, select, input')) return null;
-  if (target.closest(GRIP)) return block;
+  // A file's card is taken anywhere on it (1.0.4, the owner: "not only by the middle of it").
+  if (target.closest(GRIP) || block.matches('.link-attach')) return block;
   const player = target.closest('.link-file > video');
   if (!player) return null;
   const box = player.getBoundingClientRect();
@@ -134,6 +137,7 @@ export function initBlockDrag(editor, { history, isLocked = () => false, onGeome
     const d = drag;
     drag = null;
     hideDropMark();
+    hideGhost();
     document.body.classList.remove('block-dragging');
     if (!d?.moved) return;
     eatClick = held;
@@ -171,6 +175,8 @@ export function initBlockDrag(editor, { history, isLocked = () => false, onGeome
     if (!drag.block.isConnected || !(e.buttons & 1)) { finish(false, { held: false }); return; }
     drag.moved = true;
     document.body.classList.add('block-dragging');
+    // What is pulled goes with the pointer (1.0.4).
+    showGhost(drag.block, e.clientX, e.clientY);
     drag.target = over(e.clientX, e.clientY);
   });
   window.addEventListener('mouseup', () => {
@@ -184,6 +190,9 @@ export function initBlockDrag(editor, { history, isLocked = () => false, onGeome
     e.stopPropagation();
   }, true);
   window.addEventListener('blur', () => { if (drag) finish(false, { held: false }); });
+  // The system's drag took the file out of the window (file-attach.js): this pull is over, and its veil with it —
+  // no mouse is seen until that drag ends, and the next move would draw the veil again.
+  window.addEventListener('nebula-carried-out', () => { if (drag) finish(false, { held: false }); });
   // Esc: as it was.
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape' || !drag?.moved) return;

@@ -148,6 +148,19 @@ const blankLine = (doc) => {
   return p;
 };
 
+/**
+ * The line under a column's last picture, card or divider was taken away on
+ * purpose (1.0.4). healColumns gave it back a moment later, so it could not be
+ * deleted at all ("üc alanda da bos satiri silemedim", the owner's Nebula
+ * note). The column remembers, until it ends with a line again; Enter on the
+ * picture, or a click under it, opens one.
+ * @param {Element|null} col
+ */
+export function tightenColumn(col) {
+  if (!col?.classList?.contains(COL)) return;
+  if (col.lastElementChild?.matches(NO_CARET_UNDER)) col.dataset.tight = '1';
+}
+
 /** The blocks of a flow that take part in the text. */
 const BODY = 'toggle-body';
 const blocksOf = (parent) => [...parent.children].filter((el) => !el.matches(LAYER));
@@ -695,7 +708,9 @@ export function healColumns(root) {
       // A column ends with a line to write on: under a picture, an embed, a
       // code block or a divider there was nowhere to put the caret ("I cannot
       // write under this", the owner, of a picture alone in its column).
-      else if (col.lastElementChild.matches(NO_CARET_UNDER)) col.append(blankLine(doc));
+      // Not one the owner deleted (tightenColumn).
+      else if (col.lastElementChild.matches(NO_CARET_UNDER)) { if (!col.dataset.tight) col.append(blankLine(doc)); }
+      else if (col.dataset.tight) delete col.dataset.tight;
     }
     setSplits(cols, splitsOf(cols));
     cols.dataset.blockType = 'columns';

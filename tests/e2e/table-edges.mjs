@@ -1015,12 +1015,12 @@ export async function runTableEdgeChecks(check) {
       await rightClick('#p0');
       menu = await menuNow();
       await press('Escape');
-    }, () => menu.row > 5 && menu.items === 'Cut·|Copy·|Paste as Nebula format|Paste original format|Paste only text|Select all');
+    }, () => menu.row > 5 && menu.items === 'Cut·|Copy·|Paste as Nebula format|Paste original format|Paste only text|Send to…|Select all');
     await scene('in a cell the table\'s choices stand in it, over cut and copy', async () => {
       await rightClick(cellAt(1, 1));
       menu = await menuNow();
       await press('Escape');
-    }, () => menu.row > 5 && menu.items === 'Insert row above|Insert row below|Insert column left|Insert column right|Delete row|Delete column|Delete table|Cut·|Copy·|Paste as Nebula format|Paste original format|Paste only text|Select all');
+    }, () => menu.row > 5 && menu.items === 'Insert row above|Insert row below|Insert column left|Insert column right|Delete row|Delete column|Delete table|Cut·|Copy·|Paste as Nebula format|Paste original format|Paste only text|Send to…|Select all');
     await scene('with cells selected, Cut and Copy are for the cells', async () => {
       await drag(await centre(cellAt(0, 0)), await centre(cellAt(1, 1)));
       await rightClick(cellAt(0, 0));

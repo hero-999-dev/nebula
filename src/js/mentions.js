@@ -2,9 +2,9 @@
  * @ and # inside a note (0.9.3, the owner's Ideas note: "mentioning notes in
  * the notes with @, and with # adding label points inside the note").
  *
- *   @  opens a list of the other notes, filtered as you type; the one picked
+ *   @  opens a list of the notes, filtered as you type; the one picked
  *      becomes a chip, <a class="note-mention" data-note="id">@Title</a>, and
- *      a click on it opens that note.
+ *      a click on it opens that note — as a tab over this one since 1.0.4.
  *   #word followed by a space (or Enter) becomes a label chip,
  *      <span class="note-tag" data-tag="word">#word</span>, and the note gets
  *      that label. A click on the chip shows the notes with that label.
@@ -172,10 +172,11 @@ export function matchNotes(notes, query, { exclude = null, limit = 8 } = {}) {
  * @param {import('./notes.js').NoteStore} deps.store
  * @param {{push: () => void}} [deps.history]
  * @param {(id: string) => void} [deps.openNote]
+ * @param {(id: string) => void} [deps.openTab] keep the note as a tab, the page staying where it is
  * @param {(label: string) => void} [deps.showLabel] filter the note list by a label
  * @param {() => boolean} [deps.isLocked]
  */
-export function initMentions(editorEl, { store, history, openNote, showLabel, isLocked = () => false } = {}) {
+export function initMentions(editorEl, { store, history, openNote, openTab, showLabel, isLocked = () => false } = {}) {
   if (!editorEl || !store) return null;
   const dirty = () => editorEl.dispatchEvent(new Event('input', { bubbles: true }));
 
@@ -450,7 +451,8 @@ export function initMentions(editorEl, { store, history, openNote, showLabel, is
     if (!hit) return hide();
     mode = 'mention';
     ctx = { node, start: hit.start, end: sel.anchorOffset };
-    items = matchNotes(store.sorted(), hit.query, { exclude: store.activeId });
+    // The note being written in is offered too (1.0.4, the owner: "@ yapinca oldugum notu mentionlayamiyorum").
+    items = matchNotes(store.sorted(), hit.query);
     index = 0;
     paint();
     menu.hidden = false;
@@ -521,7 +523,12 @@ export function initMentions(editorEl, { store, history, openNote, showLabel, is
     if (mention && editorEl.contains(mention)) {
       e.preventDefault();
       const id = mention.dataset.note;
-      if (id && store.get(id) && !store.get(id).deletedAt) openNote?.(id);
+      // As a tab over this note, to go to when wanted (1.0.4, the owner: "yukarda yeni sekme
+      // acilacak, kullanici sonra isterse ona gecebilecek"); with Ctrl held, straight to it.
+      if (id && store.get(id) && !store.get(id).deletedAt) {
+        if (openTab && !e.ctrlKey && !e.metaKey && !store.get(id).archivedAt) openTab(id);
+        else openNote?.(id);
+      }
       else window.dispatchEvent(new CustomEvent('nebula-toast', { detail: 'No note has that name' }));
       return;
     }

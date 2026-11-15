@@ -9,9 +9,14 @@ import {
   evaluate, formatNumber, press, keyFor, monthGrid, shiftMonth, makeWidget, renderWidget, stateOf,
   hasWidgets, withoutWidgets, getWidgetPrint, setWidgetPrint, WIDGET_PRINT_KEY,
   phaseAfter, stepMinutes, stepPomo, stepAlarm, alarmDue, durationText, POMO_LIMITS, gridStep, initWidgets, pinOf,
-  parseEvents, eventAt, chosenDay, showCalendarDay, cornerRun, toggleRun, widgetRuns,
+  parseEvents, eventAt, chosenDay, showCalendarDay, cornerRun, toggleRun, widgetRuns, pickWidget, pickTile, WIDGETS,
 } from '../src/js/widgets.js';
+import { SHAPE_TILES, ARROW_TILES } from '../src/js/toolbar.js';
 import { alarmsIn, dueAlarms } from '../src/js/reminders.js';
+import { readFileSync } from 'node:fs';
+import { STRINGS } from '../src/js/i18n.js';
+import { ICONS } from '../src/js/icons.js';
+import { RELEASE_NOTES, RELEASE_NOTES_I18N } from '../src/js/release-notes.js';
 
 const M = '−';
 const typeKeys = (keys, state = {}) => keys.reduce((s, k) => press(s, k), state);
@@ -213,7 +218,8 @@ describe('the Pomodoro and the Clock (1.0.3)', () => {
     expect(stepMinutes(5, -1, POMO_LIMITS.short)).toBe(4);
     expect(stepMinutes(4, 1, POMO_LIMITS.short)).toBe(5);
     expect(stepMinutes(1, -1, POMO_LIMITS.short)).toBe(1);
-    expect(stepMinutes(180, 1, POMO_LIMITS.focus)).toBe(180);
+    expect(stepMinutes(180, 1, POMO_LIMITS.focus)).toBe(185);
+    expect(stepMinutes(360, 1, POMO_LIMITS.focus)).toBe(360);
   });
 
   it('sets its minutes, sessions and mode, and leaves other keys alone', () => {
@@ -256,7 +262,7 @@ describe('the Pomodoro and the Clock (1.0.3)', () => {
     expect(fig.querySelector('.wg-time').textContent).toBe('25:00');
     for (const k of ['start', 'reset', 'skip', 'focus+', 'rounds-', 'mode-watch']) expect(fig.querySelector(`[data-k="${k}"]`)).not.toBeNull();
     fig.dataset.wgFocus = '999';
-    expect(stateOf(fig).focus).toBe(180);
+    expect(stateOf(fig).focus).toBe(360);
     const clock = makeWidget('clock');
     expect(stateOf(clock)).toMatchObject({ alarm: '07:00', alarmOn: false });
     expect(clock.querySelector('[data-k="alarm"]')).not.toBeNull();
@@ -421,5 +427,114 @@ describe('the Pomodoro in the corner (1.0.3)', () => {
     expect(runs.get('zz2')).toMatchObject({ watch: 3000, watchAt: null });
     runs.delete('zz1');
     runs.delete('zz2');
+  });
+});
+
+// 1.0.4, the owner: a widget menu in the editing bar — the picker of /widget, a press away.
+describe('the widget button of the editing bar', () => {
+  const page = new DOMParser().parseFromString(readFileSync('src/index.html', 'utf8'), 'text/html');
+  const row = page.querySelector('#toolbar .tb-row');
+  const button = row.querySelector('[data-act="widget"]');
+
+  // The same day: "insert shape should be like widget, and the widget left of it".
+  it('stands in the first row left of the shape button, with the tile of /widget on it', () => {
+    expect(page.querySelectorAll('[data-act="widget"]')).toHaveLength(1);
+    expect(button.parentElement).toBe(row);
+    expect(button.previousElementSibling.matches('.tb-sep')).toBe(true);
+    expect(button.nextElementSibling.dataset.act).toBe('shape');
+    expect(row.lastElementChild.dataset.act).toBe('table');
+    expect(button.type).toBe('button');
+    expect(button.querySelector('[data-icon]').dataset.icon).toBe('widget');
+    expect(ICONS.widget).toContain('<svg');
+  });
+
+  it('is named in every language, and told of in What’s new', () => {
+    expect(button.title).toBe('Add a widget');
+    expect(STRINGS['Add a widget']).toHaveLength(3);
+    expect(RELEASE_NOTES['1.0.4'].items.map((it) => it.title)).toContain('Widgets from the editing bar');
+    for (const lang of ['de', 'pl', 'tr']) {
+      expect(RELEASE_NOTES_I18N['1.0.4'][lang].items, lang).toHaveLength(RELEASE_NOTES['1.0.4'].items.length);
+    }
+  });
+});
+
+// 1.0.4, the owner: "insert shape should be like widget" — one button, and tiles under it.
+describe('the tiles of the editing bar', () => {
+  const page = new DOMParser().parseFromString(readFileSync('src/index.html', 'utf8'), 'text/html');
+  const at = { left: 10, top: 10, bottom: 30 };
+
+  it('the shape button is one button: no ▾ beside it and no list in the bar', () => {
+    const shape = page.querySelector('#toolbar [data-act="shape"]');
+    expect(shape.title).toBe('Insert shape');
+    expect(shape.querySelector('[data-icon]').dataset.icon).toBe('shapes');
+    expect(shape.parentElement.matches('.tb-row')).toBe(true);
+    expect(page.querySelector('#menu-shapes, [data-menu="menu-shapes"], [data-act="shape-rect"], #toolbar [data-shape-add]')).toBeNull();
+  });
+
+  // The same day: "the insert arrow part should be fixed the same way".
+  it('the arrow button is one button too, right of the shape button', () => {
+    const arrow = page.querySelector('#toolbar [data-act="arrow"]');
+    expect(arrow.title).toBe('Insert arrow');
+    expect(arrow.querySelector('.tb-svg svg')).not.toBeNull();
+    expect(arrow.previousElementSibling.dataset.act).toBe('shape');
+    expect(arrow.nextElementSibling.dataset.act).toBe('divider');
+    expect(page.querySelector('#menu-arrows, [data-menu="menu-arrows"], #toolbar [data-arrow-add]')).toBeNull();
+    expect(ARROW_TILES.map((tile) => tile.kind)).toEqual(['straight', 'elbow', 'curve']);
+    for (const tile of ARROW_TILES) expect(STRINGS[tile.label], tile.label).toHaveLength(3);
+  });
+
+  it('opens the three arrows in one row of tiles and gives the one pressed', async () => {
+    const asked = pickTile(at, { id: 'arrow-menu', label: 'Insert arrow', data: 'arrowAdd', items: ARROW_TILES, selected: 1 });
+    const box = document.getElementById('arrow-menu');
+    expect(box.querySelector('.link-menu__title').textContent).toBe('Insert arrow');
+    expect([...box.querySelectorAll('[data-arrow-add]')].map((b) => b.textContent)).toEqual(['Straight arrow', 'Elbow arrow', 'Curved arrow']);
+    expect(box.querySelector('.sel').dataset.arrowAdd).toBe('elbow');
+    box.querySelector('[data-arrow-add="curve"]').click();
+    expect(await asked).toBe('curve');
+    expect(document.getElementById('arrow-menu')).toBeNull();
+  });
+
+  it('has a text box, a work area and the six shapes, each named in every language', () => {
+    expect(SHAPE_TILES.map((tile) => tile.kind)).toEqual(['textbox', 'area', 'rect', 'square', 'ellipse', 'circle', 'diamond', 'triangle']);
+    for (const tile of SHAPE_TILES) {
+      expect(STRINGS[tile.label], tile.label).toHaveLength(3);
+      expect(tile.mark.startsWith('<svg ')).toBe(true);
+    }
+  });
+
+  it('opens the shapes with the one chosen last lit, and Enter gives it', async () => {
+    const asked = pickTile(at, { id: 'shape-menu', label: 'Insert shape', data: 'shapeAdd', items: SHAPE_TILES, selected: 5 });
+    const box = document.getElementById('shape-menu');
+    expect(box.querySelector('.link-menu__title').textContent).toBe('Insert shape');
+    expect([...box.querySelectorAll('[data-shape-add]')].map((b) => b.dataset.shapeAdd)).toEqual(SHAPE_TILES.map((tile) => tile.kind));
+    expect(box.querySelectorAll('button svg')).toHaveLength(8);
+    expect(box.querySelector('.sel').dataset.shapeAdd).toBe('circle');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(box.querySelector('.sel').dataset.shapeAdd).toBe('diamond');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(await asked).toBe('diamond');
+    expect(document.getElementById('shape-menu')).toBeNull();
+  });
+
+  it('gives the tile pressed, and nothing on Escape', async () => {
+    const asked = pickTile(at, { id: 'shape-menu', label: 'Insert shape', data: 'shapeAdd', items: SHAPE_TILES });
+    document.querySelector('#shape-menu [data-shape-add="triangle"] svg').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(await asked).toBe('triangle');
+    const left = pickTile(at, { id: 'shape-menu', label: 'Insert shape', data: 'shapeAdd', items: SHAPE_TILES });
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(await left).toBeNull();
+    expect(document.getElementById('shape-menu')).toBeNull();
+  });
+
+  it('the widgets open in the same tiles, as they did, and one picker shuts the other', async () => {
+    const shapes = pickTile(at, { id: 'shape-menu', label: 'Insert shape', data: 'shapeAdd', items: SHAPE_TILES });
+    const widgets = pickWidget(at);
+    expect(await shapes).toBeNull();
+    expect(document.getElementById('shape-menu')).toBeNull();
+    const box = document.getElementById('widget-menu');
+    expect([...box.querySelectorAll('[data-widget-kind]')].map((b) => b.dataset.widgetKind)).toEqual(WIDGETS.map((w) => w.kind));
+    expect(box.querySelector('.sel').dataset.widgetKind).toBe('calc');
+    box.querySelector('[data-widget-kind="clock"]').click();
+    expect(await widgets).toBe('clock');
   });
 });

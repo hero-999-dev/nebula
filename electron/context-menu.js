@@ -169,7 +169,9 @@ export function registerEditingHandlers(ipcMain, getWindow, ignored = null, pict
     if (typeof source !== 'string' || !source.startsWith('data:image/')) return false;
     const image = nativeImage.createFromDataURL(source);
     if (image.isEmpty()) return false;
-    await writeImageToClipboard(image, typeof html === 'string' && html ? html : null);
+    // A picture held for a black hole's note has an address that means nothing once it is locked: the copy carries the picture.
+    const carried = typeof html === 'string' && html ? html : null;
+    await writeImageToClipboard(image, carried && /^nebula-media:\/\/hole\//.test(String(url ?? '')) ? carried.split(url).join(source) : carried);
     return true;
   });
 }

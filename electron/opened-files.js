@@ -15,8 +15,9 @@
  * of these, at the latest at the quit or the next start.
  */
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { shredTree, shredTreeAsync } from './backup-purge.js';
-import { isAttachmentName } from './note-media.js';
+import { isAttachmentName, isPicture } from './note-media.js';
 
 const ID = /^[\w-]{1,120}$/;
 const PLAIN = /^nebula-media:\/\/note\/([\w-]{1,120})\/([\w-]{1,80}\.[a-z0-9]{2,5})$/;
@@ -33,6 +34,42 @@ export function attachedOf(url) {
   if (sealed) return isAttachmentName(sealed[3]) ? { holeId: sealed[1], noteId: sealed[2], file: sealed[3] } : null;
   const plain = PLAIN.exec(raw);
   return plain && isAttachmentName(plain[2]) ? { holeId: null, noteId: plain[1], file: plain[2] } : null;
+}
+
+/** A picture still written into the note's text: one just pasted, or one of a note in a black hole. */
+const DATA_PICTURE = /^data:image\/(png|jpe?g|gif|webp|bmp|avif|svg\+xml);base64,([A-Za-z0-9+/]+={0,2})$/;
+const PICTURE_END = { png: 'png', jpeg: 'jpg', jpg: 'jpg', gif: 'gif', webp: 'webp', bmp: 'bmp', avif: 'avif', 'svg+xml': 'svg' };
+
+/**
+ * A picture pulled out of a note (1.0.4): where its copy lies, among the
+ * copies Open makes, so it goes as they go — with its note, and a black
+ * hole's when the black hole is shut. A picture kept as a file of the note is
+ * copied from it (`bytes` null); one written into the text is written out,
+ * under a name made of what it holds. Null for anything that is not a picture
+ * of a note.
+ * @param {string} root the folder of the opened copies
+ * @param {string} src the picture's address in the note
+ * @param {{id?: string|null, hole?: string|null}} owner the open note
+ * @returns {{dest: string, noteId: string, holeId: string|null, file: string|null, bytes: Buffer|null}|null}
+ */
+export function carriedPicture(root, src, owner = {}) {
+  const raw = String(src ?? '');
+  const holeId = owner?.hole == null ? null : String(owner.hole);
+  if (holeId != null && !ID.test(holeId)) return null;
+  const stored = holeId == null ? PLAIN.exec(raw) : null;
+  if (stored) {
+    if (!isPicture(stored[2])) return null;
+    const stem = stored[2].replace(/\.[a-z0-9]+$/, '');
+    return { dest: path.join(root, 'note', stored[1], stem, stored[2]), noteId: stored[1], holeId: null, file: stored[2], bytes: null };
+  }
+  const data = DATA_PICTURE.exec(raw);
+  const noteId = String(owner?.id ?? '');
+  if (!data || !ID.test(noteId)) return null;
+  const bytes = Buffer.from(data[2], 'base64');
+  if (!bytes.length) return null;
+  const stem = `picture-${crypto.createHash('sha256').update(bytes).digest('hex').slice(0, 12)}`;
+  const folder = holeId ? path.join(root, 'hole', holeId, noteId, stem) : path.join(root, 'note', noteId, stem);
+  return { dest: path.join(folder, `${stem}.${PICTURE_END[data[1]]}`), noteId, holeId, file: null, bytes };
 }
 
 /** An ending a file is stored under as itself, as attachmentExt keeps it (note-media.js). */

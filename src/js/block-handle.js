@@ -37,13 +37,16 @@
 
 import { showDropMark, hideDropMark } from './drop-mark.js';
 import { contentBox, ROW, tidyRows } from './image-place.js';
-import { columnsBeside, columnBeside, canShare, dropColumn, columnIsEmpty, leastShare, healColumns, COL, COLS } from './columns.js';
+import { columnsBeside, columnBeside, canShare, dropColumn, columnIsEmpty, leastShare, healColumns, tightenColumn, COL, COLS } from './columns.js';
 import { editorZoom } from './page-zoom.js';
+import { pressTaken } from './shapes.js';
 
 /** Children of a flow that are not blocks of it. */
 const NOT_BLOCK = '.shape-layer, .image-layer, .blk-vr, .tbl-ui, .video-bar, .attach-bar, br, script, style';
 /** Blocks under which a flow needs a line to go on writing. */
 const NO_CARET = '.note-image, .link-block, .blk-code, .blk-table, hr, .blk-cols';
+/** What is not words: these go beside each other by a third of their width (dropTarget). */
+const SOLID = '.note-image, .link-block, .blk-code, .blk-table';
 /** How far left of a block the pointer still counts as being on it (its grip stands there). */
 export const GUTTER = 36;
 /** How far a press on the grip must move to be a pull. */
@@ -158,7 +161,8 @@ function leastOf(cols) {
  * Null where it would change nothing.
  * @param {HTMLElement} editor
  * @param {HTMLElement|null} dragged the block, or null for something coming from outside (files)
- * @param {{sides?: boolean}} [opts] sides: false — between blocks only
+ * @param {{sides?: boolean|'solid'}} [opts] sides: false — between blocks only; 'solid' — beside a block only
+ *   where neither it nor the dragged one is words (a card, a table, a picture taken by itself)
  * @returns {null | {kind: 'gap', parent: HTMLElement, ref: Node|null, line: object}
  *                | {kind: 'side', block: HTMLElement, side: 'left'|'right', line: object}}
  */
@@ -186,14 +190,21 @@ export function dropTarget(editor, dragged, x, y, { sides = true } = {}) {
   const parent = block.parentElement;
 
   // At the left or right edge: beside it, in columns.
-  if (sides && dragged && !hasCols && (parent === editor || parent.classList.contains(COL)) && !block.classList.contains(COLS)) {
+  // What is not words taken over what is not words: a third of it at each side
+  // is beside it, as a picture's halves are for a picture (1.0.4 — the owner:
+  // "tables too should be pulled to each other's sides, as pictures are").
+  // A picture in a row of pictures is left to its row.
+  const wide = !!dragged?.matches(SOLID) && block.matches(SOLID) && !block.classList.contains(ROW);
+  if ((sides === true || (sides === 'solid' && wide)) && dragged && !hasCols && (parent === editor || parent.classList.contains(COL)) && !block.classList.contains(COLS)) {
     const w = r.width;
     // Notion's edges: at the very start of the block (or out left of it, in its
     // gutter), and the last stretch of its line at the right. Anywhere between
     // is above or below it — a card let go over the first words of a line goes
     // over that line, as it always did (tests/e2e/layout.mjs).
-    const side = x >= r.left - GUTTER && x < r.left + Math.min(14, w * 0.05) ? 'left'
-      : x > r.right - Math.min(56, w * 0.12) ? 'right' : null;
+    const side = wide
+      ? (x >= r.left - GUTTER && x < r.left + w / 3 ? 'left' : x > r.right - w / 3 ? 'right' : null)
+      : x >= r.left - GUTTER && x < r.left + Math.min(14, w * 0.05) ? 'left'
+        : x > r.right - Math.min(56, w * 0.12) ? 'right' : null;
     const room = side && (parent === editor || canShare(parent, leastOf(parent.parentElement)));
     // Beside itself in its own column is where it is.
     const same = parent.classList.contains(COL) && dragged.parentElement === parent && blocksOf(parent).length === 1;
@@ -285,6 +296,31 @@ export function pickOf(run) {
   if (first < 0) return { blocks: run.slice(0, 1), marked: run.slice(0, 1) };
   const blocks = run.slice(first, run.findLastIndex((block) => !isBlankLine(block)) + 1);
   return { blocks, marked: blocks.filter((block) => !isBlankLine(block)) };
+}
+
+/**
+ * The blocks a band drawn on the page crosses. A band that stays within one
+ * column of a row picks that column's blocks, not the whole row: drawn around
+ * the rightmost picture and its notes, it took every column (the owner's
+ * Nebula note, 1.0.4: "herseyi aldi"). Across two columns it is the row.
+ * @param {HTMLElement} flow the note, or a column of it
+ * @param {{left: number, right: number, top: number, bottom: number}} box in the window
+ * @returns {HTMLElement[]}
+ */
+export function blocksInBand(flow, box) {
+  const crossed = blocksOf(flow).filter((block) => { const b = boxOf(block); return !isBlankLine(block) && b.bottom > box.top && b.top < box.bottom; });
+  // Pictures and cards side by side are one line of the note: a band that
+  // crosses nothing but that line takes those it reaches, not all of them
+  // (the owner's Nebula note, 1.0.4: "yan yana yerlestirilmis resimlerde en
+  // ufak secim alaninda hepsi secilmis").
+  if (crossed.length > 1 && crossed.every((block) => block.classList.contains('note-image--row'))) {
+    return crossed.filter((block) => { const b = boxOf(block); return b.right > box.left && b.left < box.right; });
+  }
+  if (crossed.length !== 1 || !crossed[0].classList.contains(COLS)) return crossed;
+  const cols = [...crossed[0].querySelectorAll(`:scope > .${COL}`)].filter((col) => { const b = boxOf(col); return b.right > box.left && b.left < box.right; });
+  if (cols.length !== 1) return crossed;
+  const inner = blocksInBand(cols[0], box);
+  return inner.length ? inner : crossed;
 }
 
 /** Fresh copies of blocks as one piece of HTML: list items stay in a list of their kind. */
@@ -644,7 +680,7 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
     const blocks = copying;
     copying = null;
     let html = blocksCopyHtml(blocks);
-    if (window.nebula?.media?.inlineSync && /nebula-media:\/\/note\//.test(html)) {
+    if (window.nebula?.media?.inlineSync && /nebula-media:\/\/(?:note|hole)\//.test(html)) {
       try { html = window.nebula.media.inlineSync(html); } catch { /* the note's own addresses */ }
     }
     e.clipboardData.setData('text/html', html);
@@ -671,6 +707,8 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
     release();
     for (const block of blocks) block.remove();
     tidyFrom(editor, from);
+    // A line taken from the foot of a column stays away (columns.js tightenColumn).
+    if (from.isConnected) tightenColumn(from);
     healColumns(editor);
     if (after?.isConnected) pick(after); else caretAfter(blocksOf(editor).at(-1));
     onGeometry?.();
@@ -804,10 +842,22 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
     const line = lines.filter((q) => dist(q) - near < 1);
     return x > Math.max(...line.map((q) => q.right)) + PAST;
   }
+  // A press over a shape behind the text is the shape's (shapes.js takes it from under the words
+  // and moves the shape): it starts no box and no sweep. It started both, and moving such a shape
+  // picked the lines it passed ("moving shapes gets mixed up with the mouse's catching", the owner, 1.0.4).
+  function overBehindShape(x, y) {
+    for (const s of editor.querySelectorAll('.shape-layer--behind .shape')) {
+      const r = s.getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return true;
+    }
+    return false;
+  }
   let band = null;
   editor.addEventListener('mousedown', (e) => {
-    if (e.button !== 0 || e.shiftKey || e.detail > 1 || locked()) return;
-    if (e.target !== editor && !pastWords(e.target, e.clientX, e.clientY)) return;
+    if (e.button !== 0 || e.shiftKey || e.detail > 1 || locked() || overBehindShape(e.clientX, e.clientY) || pressTaken(e)) return;
+    // The open ground of a column is the page's too (1.0.4).
+    const ground = e.target === editor || (e.target.classList?.contains(COL) && editor.contains(e.target));
+    if (!ground && !pastWords(e.target, e.clientX, e.clientY)) return;
     const r = boxOf(editor);
     const scale = r.width / (editor.offsetWidth || 1);
     if (e.clientX > r.left + editor.clientWidth * scale) return;    // the scrollbar
@@ -835,7 +885,7 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
       left: `${Math.min(band.x, e.clientX)}px`, width: `${Math.abs(e.clientX - band.x)}px`,
       top: `${Math.max(frame.top, top)}px`, height: `${Math.max(0, Math.min(frame.bottom, bottom) - Math.max(frame.top, top))}px`,
     });
-    const crossed = blocksOf(editor).filter((block) => { const b = boxOf(block); return !isBlankLine(block) && b.bottom > top && b.top < bottom; });
+    const crossed = blocksInBand(editor, { left: Math.min(band.x, e.clientX), right: Math.max(band.x, e.clientX), top, bottom });
     if (crossed.length) pickRange(crossed[0], crossed.at(-1)); else { release(); window.getSelection()?.removeAllRanges(); }
   });
   function endBand() {
@@ -857,7 +907,7 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
   editor.addEventListener('mousedown', (e) => {
     sweep = null;
     if (e.button !== 0 || e.shiftKey || e.detail > 1 || e.target === editor || band || locked()) return;
-    if (!(e.target instanceof Element) || e.target.closest(NO_SWEEP)) return;
+    if (!(e.target instanceof Element) || e.target.closest(NO_SWEEP) || overBehindShape(e.clientX, e.clientY) || pressTaken(e)) return;
     const block = blockAt(editor, e.clientX, e.clientY);
     const at = document.caretRangeFromPoint?.(e.clientX, e.clientY);
     if (block && at) sweep = { block, at, blocks: false };
@@ -1050,7 +1100,7 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
     if (!sel?.rangeCount || sel.isCollapsed || !e.clipboardData) return;
     let html = toggleCopyHtml(sel.getRangeAt(0));
     if (!html) return;
-    if (window.nebula?.media?.inlineSync && /nebula-media:\/\/note\//.test(html)) {
+    if (window.nebula?.media?.inlineSync && /nebula-media:\/\/(?:note|hole)\//.test(html)) {
       try { html = window.nebula.media.inlineSync(html); } catch { /* the note's own addresses */ }
     }
     e.clipboardData.setData('text/html', html);
@@ -1066,7 +1116,7 @@ export function initBlockHandles(editor, { history, isLocked = () => false, onGe
     dragging: () => !!drag?.moved,
     hide: hideGrip,
     /** For a card or a code block taken by its own top line (block-drag.js): the same targets. */
-    target: (block, x, y) => dropTarget(editor, block, x, y, { sides: false }),
+    target: (block, x, y) => dropTarget(editor, block, x, y, { sides: 'solid' }),
     move: (block, target, opts) => moveBlock(editor, block, target, opts),
   };
 }

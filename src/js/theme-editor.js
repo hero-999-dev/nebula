@@ -19,7 +19,7 @@ import { on } from './bus.js';
 import { t } from './i18n.js';
 import {
   SLOTS, SWATCHES, READY_PROFILES, readyProfiles, cleanHex, cleanColors, cleanProfiles, cleanProfileName,
-  saveProfile, profileOf, hardToRead, luminance,
+  saveProfile, renameProfile, profileOf, hardToRead, luminance, randomColors, freeProfileName, MOST_PROFILES,
 } from './theme-custom.js';
 
 const PROFILES_KEY = 'nebula:theme-profiles';
@@ -216,8 +216,8 @@ export function initThemeEditor({ panel, theme }) {
       pick.style.setProperty('--dot-bg', profile.colors.bg);
       pick.addEventListener('click', () => {
         draft = { name: ours ? '' : profile.name, colors: { ...profile.colors } };
-        // Only a profile the reader saved is saved again under its name.
-        nameInput.value = own ? profile.name : '';
+        // Its name is on its chip: the field is for a new one ("tekrardan sol altta try yazmasına gerek yok").
+        nameInput.value = '';
         commit();
       });
       wrap.append(pick);
@@ -239,6 +239,23 @@ export function initThemeEditor({ panel, theme }) {
     if (!profileOf(last.colors, profiles, ready)) {
       chip({ name: 'Last edited', colors: last.colors }, { removable: false, ours: true, lit: theme.current() === 'custom' && !worn });
     }
+    // After the last of them a +: a theme nobody chose, saved under a name of its own and worn at once.
+    const add = el('button', 'te-chip te-add', '+');
+    add.type = 'button';
+    add.title = 'Add a random theme';
+    add.setAttribute('aria-label', 'Add a random theme');
+    add.addEventListener('click', () => {
+      if (profiles.length >= MOST_PROFILES) { toast('There is no room for another profile — delete one first'); return; }
+      const name = freeProfileName(t('Random'), profiles, ready);
+      const result = saveProfile(profiles, name, randomColors(), ready);
+      if (result.error) return;
+      profiles = result.profiles;
+      writeProfiles(profiles);
+      draft = { name, colors: { ...profiles.find((p) => p.name === name).colors } };
+      nameInput.value = '';
+      commit();
+    });
+    profilesEl.append(add);
     // A ready profile that was deleted is one press from being back.
     if (ready.length < READY_PROFILES.length) {
       const back = el('button', 'te-chip te-chip--back', 'Bring back the ready profiles');
@@ -333,6 +350,9 @@ export function initThemeEditor({ panel, theme }) {
     if (document.activeElement !== hexInput) hexInput.value = hex;
     for (const cell of swatchButtons) cell.classList.toggle('on', cell.dataset.hex === hex);
     warn.hidden = !hardToRead(draft.colors);
+    // A saved profile left as it is has nothing to save but a name.
+    const mode = unchanged() ? 'Save new name' : 'Save this profile';
+    if (saveBtn.dataset.mode !== mode) { saveBtn.dataset.mode = mode; saveBtn.textContent = mode; }
     paintProfiles();
   }
 
@@ -360,8 +380,41 @@ export function initThemeEditor({ panel, theme }) {
   hexInput.addEventListener('blur', () => { hexInput.value = activeHex(); });
   hexInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); hexInput.blur(); } });
 
+  /** The saved profile the draft is, colour for colour — the one it was taken from first — or null. */
+  function unchanged() {
+    const is = (p) => profileOf(draft.colors, [p], []) === p.name;
+    return profiles.find((p) => p.name === draft.name && is(p)) ?? profiles.find(is) ?? null;
+  }
+
+  /** Nothing changed on a saved profile: the name typed is its new name, and no second profile is made. */
+  function rename(kept) {
+    const typed = cleanProfileName(nameInput.value);
+    if (!typed) {
+      toast('Nothing has changed — type a new name for the profile');
+      nameInput.focus();
+      return;
+    }
+    const result = renameProfile(profiles, kept.name, typed, ready);
+    if (result.error) {
+      toast(result.error === 'ready' ? 'That is a ready profile — give yours another name' : 'That name is taken — give it another');
+      nameInput.focus();
+      nameInput.select();
+      return;
+    }
+    profiles = result.profiles;
+    writeProfiles(profiles);
+    draft.name = result.name;
+    nameInput.value = '';
+    commit();
+    toast('Name saved');
+  }
+
   function save() {
-    const result = saveProfile(profiles, nameInput.value, draft.colors, ready);
+    const kept = unchanged();
+    if (kept) { rename(kept); return; }
+    // No name typed: a saved profile that was changed is saved again under its own.
+    const typed = cleanProfileName(nameInput.value) || (profiles.find((p) => p.name === draft.name)?.name ?? '');
+    const result = saveProfile(profiles, typed, draft.colors, ready);
     if (result.error === 'name') {
       toast('Give the profile a name first');
       nameInput.focus();
@@ -375,7 +428,8 @@ export function initThemeEditor({ panel, theme }) {
     }
     profiles = result.profiles;
     writeProfiles(profiles);
-    draft.name = cleanProfileName(nameInput.value);
+    draft.name = typed;
+    nameInput.value = '';
     commit();
     toast('Profile saved');
   }
@@ -405,8 +459,7 @@ export function initThemeEditor({ panel, theme }) {
     } else {
       draft = { name: '', colors: wornColors() };
     }
-    const saved = profiles.find((p) => p.name === draft.name);
-    nameInput.value = saved ? saved.name : '';
+    nameInput.value = '';
     asking = null;
     active = (typeof at === 'number' || (at && extra)) ? at : 0;
     paint();

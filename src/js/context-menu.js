@@ -21,6 +21,8 @@
  *     format, as the original, only the text) and select all.
  *
  * Apart from it: a picture has its own (copy it, its caption, delete); a
+ * file's card "Send to…" (send-file.js, 1.0.4) — which every menu here has
+ * since: a picture, a widget, the words selected, the block under the pointer; a
  * table's numbering offers that row's or column's choices alone, and its
  * corner "Delete table"; a locked note offers Copy.
  *
@@ -29,6 +31,10 @@
  */
 
 import { t } from './i18n.js';
+import { blockAt } from './block-handle.js';
+
+/** What a block with no words in it may still hold to send. */
+const HOLDS = 'img, video, table, .link-block, .note-image, .inline-eq';
 
 /**
  * @param {HTMLElement} editorEl
@@ -38,9 +44,10 @@ import { t } from './i18n.js';
  * @param {(x: number, y: number) => void} [deps.miniBarAt] the formatting bar on its own (no `format`)
  * @param {{bar: HTMLElement, run: (act: string) => void}} [deps.format] the formatting bar and its commands
  * @param {{menu: (target: Element) => Array|null}} [deps.tables] table.js: what a table offers for the cell that was clicked
+ * @param {{sendTo: (what: Element|Range, x: number, y: number) => void}} [deps.files] send-file.js: a file's card, a picture, a block or the words selected sent to another note
  * @param {() => boolean} [deps.isLocked] Only view
  */
-export function initContextMenu(editorEl, { history, images, miniBarAt, format, tables, isLocked = () => false } = {}) {
+export function initContextMenu(editorEl, { history, images, miniBarAt, format, tables, files, isLocked = () => false } = {}) {
   const bridge = window.nebula?.contextMenu;
   if (!editorEl || !bridge?.on) return null;
 
@@ -111,6 +118,7 @@ export function initContextMenu(editorEl, { history, images, miniBarAt, format, 
       // A widget is no picture (1.0.0, the owner): it has no caption, and it is copied and deleted as a widget.
       if (picture.matches('.note-widget')) {
         item(t('Copy widget'), () => { void images?.copyImage?.(picture); });
+        sendItem(picture, x, y);
         if (!locked) {
           rule();
           item(t('Delete widget'), () => images?.deleteImage?.(picture));
@@ -119,12 +127,21 @@ export function initContextMenu(editorEl, { history, images, miniBarAt, format, 
         return;
       }
       item(t('Copy image'), () => { void images?.copyImage?.(picture); });
+      sendItem(picture, x, y);
       if (!locked) {
         const hasCaption = !!picture.querySelector('.image-caption')?.textContent.trim();
         item(t(hasCaption ? 'Edit caption' : 'Add caption'), () => images?.editCaption?.(picture));
         rule();
         item(t('Delete image'), () => images?.deleteImage?.(picture));
       }
+      place(x, y);
+      return;
+    }
+
+    // A file's card (1.0.4): a copy of the file to another note. In an Only view note too — this note is not changed.
+    const fileCard = target.closest('.link-block.link-attach');
+    if (fileCard && files?.sendTo && !target.closest('[data-link-remove]')) {
+      item(t('Send to…'), () => files.sendTo(fileCard, x, y));
       place(x, y);
       return;
     }
@@ -137,8 +154,12 @@ export function initContextMenu(editorEl, { history, images, miniBarAt, format, 
 
     const range = selectionInEditor();
     const words = !!range && !range.collapsed;
+    // What "Send to…" would send (1.0.4): the words selected, else the block under the pointer — a table, a code
+    // block and a card whole, a line of text as that line.
+    const sent = words ? range.cloneRange() : (target.closest('.blk-table, .blk-code, .link-block') ?? blockAt(editorEl, x, y));
     if (locked) {
-      if (words) { item(t('Copy'), () => document.execCommand('copy')); place(x, y); }
+      if (words) item(t('Copy'), () => document.execCommand('copy'));
+      if (sendItem(sent, x, y) || words) place(x, y);
       return;
     }
     // The caret is remembered now: the paste must land where the click was.
@@ -169,10 +190,25 @@ export function initContextMenu(editorEl, { history, images, miniBarAt, format, 
     item(t('Copy'), () => document.execCommand('copy'), { disabled: !some });
     pasteItems(at);
     rule();
+    if (sendItem(sent, x, y)) rule();
     selectAllItem();
     // The words stay selected while it is open — nothing in it takes the focus.
     place(x, y, { focus: !words });
   });
+
+  /**
+   * "Send to…" (1.0.4, send-file.js): a copy of that to another note. Offered
+   * in an Only view note too — this note is not changed. Nothing to send (an
+   * empty line), nothing offered.
+   * @param {Element|Range|null} what
+   * @returns {boolean} whether it was offered
+   */
+  function sendItem(what, x, y) {
+    if (!files?.sendTo || !what) return false;
+    if (what.nodeType === 1 && !what.textContent.trim() && !what.matches(HOLDS) && !what.querySelector(HOLDS)) return false;
+    item(t('Send to…'), () => files.sendTo(what, x, y));
+    return true;
+  }
 
   /**
    * In a table: rows and columns put in beside the cell that was clicked, or

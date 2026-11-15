@@ -29,8 +29,9 @@
  */
 
 import { buildScene, positionAt, systemReach, boundsOf, focusFor, hueOf, labelsOf, mentionLinks } from './galaxy-model.js';
-import { RAMP, sphere, sun, vortex, core, stars, shot, cacheKey, frameIndex,
+import { RAMP, sphere, sun, vortex, core, cube, disk, wire, enso, gem, gear, cellsByShade, stars, shot, cacheKey, frameIndex,
   ROCKET_BODY, ROCKET_BURN, twinkle } from './galaxy-ascii.js';
+import { currentDesign } from './design.js';
 
 const TICK_MS = 70;          // ASCII frames at ~14 fps, like Constellation
 const FRAME_CACHE_MAX = 400; // LRU cap on ASCII frames (addendum #3)
@@ -179,11 +180,21 @@ export const NAME_LAYERS = [
   // going farther out like every other layer (1.0.3, the owner: "project ismi ne
   // kadar uzaklassanda gözüküyor … mesafeye uygun degil"), and not long before
   // the whole-map view ("project klasör ismi cok erken gözüküyor"): about half
-  // the next rung, the way each rung is about half the one after it.
-  { roles: ['project'], fit: 0.85, px: 0.8 },
-  { roles: ['folder', 'hole'], fit: 1.6, px: 2 },
-  { roles: ['note'], fit: 3, px: 5 },
-  { roles: ['label'], fit: 6, px: 12 },
+  // the next rung, the way each rung is about half the one after it. That was
+  // still too early (1.0.4, the owner: "projeler gene cok erken görünüyor,
+  // dosyalardan cok az önce görünmeye baslasin"): the whole map is unnamed, and
+  // a project's name comes only a little before its folders'. A map of a few
+  // bodies is drawn large when whole, and there the two outer layers are named
+  // as before (`near`: px a unit from which the layer shows whatever the fit).
+  // Tried, it was early again ("hala erken gözüküyor project kismi"): the
+  // project's rung now stands a step short of the folders'.
+  // With the projects that late, the layers under them came very late beside
+  // them (the owner: "diger dosyalar cok gec gözüküyor … hiyerarsi korunsun ama
+  // aradaki fark azalsin"): notes and labels each come a notch sooner.
+  { roles: ['project'], fit: 1.5, px: 1.85, near: 7.5 },
+  { roles: ['folder', 'hole'], fit: 1.6, px: 2, near: 8 },
+  { roles: ['note'], fit: 2.4, px: 3.4 },
+  { roles: ['label'], fit: 4.5, px: 8 },
 ];
 /** Whether role's names show at k px per world unit, the whole map being at
  * fitK; `first` is the scene's outermost layer with bodies in it. */
@@ -191,7 +202,7 @@ export function nameShownAt(role, k, fitK, first = 0) {
   const i = NAME_LAYERS.findIndex((l) => l.roles.includes(role));
   if (i < 0) return false;
   const rung = NAME_LAYERS[Math.max(0, i - first)];
-  return k >= rung.px && k >= fitK * rung.fit;
+  return k >= rung.px && (k >= fitK * rung.fit || k >= (rung.near ?? Infinity));
 }
 
 /**
@@ -219,6 +230,91 @@ function artKind(b) {
   if (b.kind === 'core') return 'core';
   return 'sphere';
 }
+/* The designs (1.0.4; the owner: "pikselde dünyalar kare küpler olsun,
+   cyber'de neon parlasın dünyalar, medieval'da disk şeklinde olsun hepsi"). A
+   design changes what a world is drawn as and how, never where it is or what it
+   is: Pixel makes planets and suns turning cubes and paints every frame as
+   square blocks, Medieval makes them flat disks, Neon keeps the globes and
+   lights them. Nebula's own look draws what it always drew, and its frames
+   keep the keys they always had. */
+const ARTS = { sphere, sun, vortex, core };
+/* Five more (1.0.4, the owner: "bu konuştuğumuz 5'ini de yap"): Blueprint's
+   worlds are wire globes, Ink's one stroke of a brush, Art Deco's cut stones,
+   Clockwork's fine wheels. `paint` is how a design lays a frame down: 'blocks'
+   as square blocks and nothing else (Pixel), 'solid' as the body filled in
+   under its glyphs (Medieval since the owner asked for its drums "pixel gibi
+   dolu"), else glyphs. Steampunk had heavy wheels painted solid; it is part
+   of Clockwork now, and the map is Clockwork's (the owner: "map de clockwork
+   olsun"). */
+const LOOKS = {
+  pixel: { shape: 'cube', paint: 'blocks' },
+  medieval: { shape: 'disk', paint: 'solid' },
+  blueprint: { shape: 'wire' },
+  ink: { shape: 'enso' },
+  deco: { shape: 'gem' },
+  clockwork: { shape: 'gear' },
+};
+/* How far Neon's light reaches, in pixels of blur: a world too small for a frame, a world, a sun.
+   They were 14, 18 and 26 (the owner: "neonda biraz daha parlasın gezegenler, daha geniş"). */
+const NEON_GLOW = { small: 22, world: 30, sun: 42 };
+const paintOf = (look) => LOOKS[look]?.paint || 'glyphs';
+const shapeOf = (kind, look) => (kind !== 'sphere' && kind !== 'sun' ? kind : LOOKS[look]?.shape || kind);
+const SHAPES = { wire, enso, gem, gear, disk };
+/**
+ * A frame's rows: `kind` as `look` draws it. `args` as the art takes them, a turning body's with `spin` and a
+ * sun's with `t`. `bare`: the body alone, without what stands round it — what a design that paints solid fills in.
+ */
+function artRows(kind, look, args, bare = false) {
+  const shape = shapeOf(kind, look);
+  if (shape === 'cube') return cube({ cols: args.cols, rows: args.rows, seed: args.seed, spin: args.spin, sun: kind === 'sun', t: args.t, aspect: 1 });
+  if (SHAPES[shape]) return SHAPES[shape]({ cols: args.cols, rows: args.rows, seed: args.seed, spin: args.spin, sun: kind === 'sun', t: args.t, bare });
+  return ARTS[kind](args);
+}
+/** hsl(h, s%, l%) as [r, g, b], or null: a body's own colour is written so (hueColor). */
+function hslOf(css) {
+  const m = /^hsl\(\s*(-?[\d.]+)[ ,]+([\d.]+)%[ ,]+([\d.]+)%\s*\)$/i.exec(String(css ?? '').trim());
+  if (!m) return null;
+  const h = ((+m[1] % 360) + 360) % 360, s = +m[2] / 100, l = +m[3] / 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => {
+    const k = (n + h / 30) % 12;
+    return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))));
+  };
+  return [f(0), f(8), f(4)];
+}
+/** A colour's steps for a body painted as blocks: the ramp's brightness as the
+ * colour's way out of the paper, so a cube is solid and nothing shows through. */
+const shadeCache = new Map();
+function shadesOf(color, paper) {
+  const key = color + '|' + paper;
+  let list = shadeCache.get(key);
+  if (list) return list;
+  const p = rgbOf(color) || hslOf(color), q = rgbOf(paper) || hslOf(paper);
+  list = Array.from(RAMP, (_, i) => {
+    const t = 0.74 * (1 - i / (RAMP.length - 1));
+    return p && q ? `rgb(${p.map((v, j) => Math.round(v + (q[j] - v) * t)).join(', ')})` : color;
+  });
+  if (shadeCache.size > 240) shadeCache.clear();
+  shadeCache.set(key, list);
+  return list;
+}
+/** A body's colour as Neon lights it: the tube — its own hue, burning — and the
+ * light it throws on the sky round it. A colour that is not a hue (the core's
+ * ink) is its own tube and its own light. */
+const neonCache = new Map();
+export function neonOf(color, paper) {
+  const key = color + '|' + paper;
+  let pair = neonCache.get(key);
+  if (pair) return pair;
+  const m = /^hsl\(\s*(-?[\d.]+)/i.exec(String(color ?? '').trim());
+  const dark = luminance(paper) < 0.5;
+  pair = m
+    ? { tube: `hsl(${m[1]}, 100%, ${dark ? 76 : 40}%)`, light: `hsl(${m[1]}, 100%, ${dark ? 56 : 46}%)` }
+    : { tube: color, light: color };
+  if (neonCache.size > 2000) neonCache.clear();
+  neonCache.set(key, pair);
+  return pair;
+}
 
 export function createGalaxyMap(canvas, opts = {}) {
   const ctx = canvas.getContext('2d');
@@ -230,12 +326,15 @@ export function createGalaxyMap(canvas, opts = {}) {
   const onEnterHole = opts.onEnterHole || (async () => true);
   const onDimension = opts.onDimension || (() => {});
   const mini = !!opts.mini;
+  const getLook = opts.design || currentDesign;   // the design worn now (1.0.4)
   const reduced = typeof matchMedia === 'function'
     && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------- state ---------- */
   let W = 0, H = 0, dpr = 1;
   let cellW = 8, cellH = 14, baseFont = '';
+  let look = getLook();              // asked again on every draw: a design is changed while the map is up
+  let faceAsked = '';                // the face the browser was last asked to load
   let scene = null;
   let holeId = null;                 // current dimension (addendum #2/#8)
   let cam = { x: 0, y: 0, zoom: 0.05 };
@@ -291,36 +390,52 @@ export function createGalaxyMap(canvas, opts = {}) {
      Ideas note, 1.0.3). It does not turn: at a few pixels a turn cannot be seen,
      and one picture per body keeps the cache small. */
   const SPRITE_FONT = 12;
+  const SPRITE_BLOCK = 6;            // a block's side in a small body's picture (Pixel)
   const sprites = new Map();
   function sprite(b, color) {
     const kind = artKind(b);
-    const ring = kind === 'sphere' && b.kind === 'planet' && (b.ringed ?? b.seed % 4 === 0);
+    const shape = shapeOf(kind, look);
+    const blocks = look === 'pixel';
+    // Painted solid, a small body is its filling and no glyphs: at a few pixels the glyphs are noise.
+    const solid = paintOf(look) === 'solid' && shape !== kind;
+    const ring = shape === 'sphere' && b.kind === 'planet' && (b.ringed ?? b.seed % 4 === 0);
     const rollStep = ring ? Math.round(((b.roll ?? 0.26) / (Math.PI / 4)) * 8) : 0;
     const seed = b.seed % 8;
-    const key = kind + '|' + color + '|' + seed + '|' + (ring ? rollStep : '-');
+    // A design's own picture has its own key; blocks are mixed with the paper, so theirs carries it.
+    const key = (blocks ? 'px|' + C.paper + '|' : solid ? 'sd|' + C.paper + '|' : '') + shape + '|' + color + '|' + seed + '|' + (ring ? rollStep : '-');
     const hit = sprites.get(key);
     if (hit !== undefined) { sprites.delete(key); sprites.set(key, hit); return hit; }
-    const rows = kind === 'sphere' ? 4 : 5;
-    const cols = rows * 2;
+    const rows = blocks ? 8 : shape === 'sphere' ? 4 : 5;
+    const cols = blocks ? rows : rows * 2;
     const turn = ((b.seed % 48) / 48) * Math.PI * 2;
     const args = { cols, rows, seed };
     if (kind === 'sphere') Object.assign(args, { spin: turn, ring, roll: (rollStep / 8) * (Math.PI / 4) });
     else if (kind === 'sun') Object.assign(args, { t: 0, spin: turn });
     else Object.assign(args, { t: 0 });
-    const art = { sphere, sun, vortex, core }[kind](args);
+    const art = artRows(kind, look, args, solid);
     const fsBase = parseFloat(baseFont) || 13;
-    const cw = cellW * (SPRITE_FONT / fsBase);
-    const ch = cellH * (SPRITE_FONT / fsBase);
+    const cw = blocks ? SPRITE_BLOCK : cellW * (SPRITE_FONT / fsBase);
+    const ch = blocks ? SPRITE_BLOCK : cellH * (SPRITE_FONT / fsBase);
     let made = null;
     const el = typeof document !== 'undefined' ? document.createElement('canvas') : null;
     const g = el?.getContext?.('2d');
     if (g) {
       el.width = Math.ceil(cols * cw);
       el.height = Math.ceil(rows * ch);
-      g.font = SPRITE_FONT + 'px ' + (baseFont.slice(baseFont.indexOf('px ') + 3) || 'monospace');
-      g.textBaseline = 'middle';
-      g.fillStyle = color;
-      art.forEach((row, i) => { if (row.trim()) g.fillText(row, 0, (i + 0.5) * ch); });
+      if (blocks || solid) {
+        const shades = shadesOf(color, C.paper);
+        // Cells that are not whole pixels wide lap over each other by a hair, so no seam shows between them.
+        const lap = blocks ? 0 : 0.5;
+        cellsByShade(art).forEach((list, i) => {
+          g.fillStyle = shades[i];
+          for (let j = 0; j < list.length; j += 2) g.fillRect(list[j] * cw, list[j + 1] * ch, cw + lap, ch + lap);
+        });
+      } else {
+        g.font = SPRITE_FONT + 'px ' + (baseFont.slice(baseFont.indexOf('px ') + 3) || 'monospace');
+        g.textBaseline = 'middle';
+        g.fillStyle = color;
+        art.forEach((row, i) => { if (row.trim()) g.fillText(row, 0, (i + 0.5) * ch); });
+      }
       // Halved step by step down to a few pixels: shrunk in one step, the thin
       // strokes fell between the pixels sampled, and a far body moving by part
       // of a pixel went out and came back (the owner's Ideas note, 1.0.3:
@@ -476,6 +591,15 @@ export function createGalaxyMap(canvas, opts = {}) {
     canvas.width = Math.max(1, Math.round(W * dpr));
     canvas.height = Math.max(1, Math.round(H * dpr));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    measure();
+    starCache = null;
+    draw(performance.now(), true);
+  }
+  /* The face and its cell. A design brings its own mono face (1.0.4), which the
+     browser may not have loaded when the map first measures it: it is asked
+     for, and measured again once it is there, with everything drawn in the
+     stand-in face dropped. */
+  function measure() {
     const style = getComputedStyle(canvas);
     const mono = (style.getPropertyValue('--mono') || '').trim() || 'ui-monospace, Consolas, monospace';
     const fs = mini ? 9 : 13;
@@ -483,8 +607,20 @@ export function createGalaxyMap(canvas, opts = {}) {
     ctx.font = baseFont;
     cellW = ctx.measureText('M').width || fs * 0.6;
     cellH = Math.round(fs * 1.1);
-    starCache = null;
-    draw(performance.now(), true);
+    if (baseFont === faceAsked) return;
+    const asked = baseFont;
+    faceAsked = asked;
+    let loading = null;
+    try { loading = typeof document !== 'undefined' ? document.fonts?.load?.(asked, 'Mğł') : null; } catch { /* no font loader: the stand-in stays */ }
+    loading?.then?.(() => {
+      if (destroyed || asked !== baseFont) return;
+      ctx.font = baseFont;
+      const w = ctx.measureText('M').width || cellW;
+      if (w === cellW) return;
+      cellW = w;
+      dropCaches();
+      wake();
+    }, () => {});
   }
 
   /* ---------- drawing ---------- */
@@ -579,21 +715,69 @@ export function createGalaxyMap(canvas, opts = {}) {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = opts2.color || colors.ink;
-    if (opts2.glow) { ctx.shadowColor = opts2.color || colors.ink; ctx.shadowBlur = opts2.glow; }
+    if (opts2.glow) { ctx.shadowColor = opts2.light || opts2.color || colors.ink; ctx.shadowBlur = opts2.glow; }
     const x0 = x - (rows[0].length * cw) / 2;
     const y0 = y - (rows.length * ch) / 2;
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      if (!row.trim()) continue;
-      ctx.fillText(row, x0, y0 + (i + 0.5) * ch);
+    // A glyph is thin and throws little light: Neon writes a frame three times,
+    // a wide halo, a nearer one and then a close one, and the world stands in
+    // its own glow (twice at first; the third is what makes it burn brighter).
+    for (let pass = opts2.light ? 3 : 1; pass > 0; pass--) {
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        if (!row.trim()) continue;
+        ctx.fillText(row, x0, y0 + (i + 0.5) * ch);
+      }
+      if (pass > 1) ctx.shadowBlur = opts2.glow * (pass === 3 ? 0.5 : 0.2);
     }
     ctx.shadowBlur = 0;
     ctx.font = baseFont;
     return { w: rows[0].length * cw, h: rows.length * ch };
   }
+  /* A frame as blocks (the Pixel design): every cell a square of side `s` in
+     one of the colour's steps, one path a step, all of it on whole device
+     pixels so no edge is soft. */
+  function drawBlocks(art, x, y, s, color) {
+    const rows = art.rows;
+    const cells = art.cells || (art.cells = cellsByShade(rows));
+    const shades = shadesOf(color, C.paper);
+    const snap = (v) => Math.round(v * dpr) / dpr;
+    const side = Math.max(1 / dpr, snap(s));
+    const x0 = snap(x - (rows[0].length * side) / 2);
+    const y0 = snap(y - (rows.length * side) / 2);
+    for (let i = 0; i < cells.length; i++) {
+      const list = cells[i];
+      if (!list.length) continue;
+      ctx.fillStyle = shades[i];
+      ctx.beginPath();
+      for (let j = 0; j < list.length; j += 2) ctx.rect(x0 + list[j] * side, y0 + list[j + 1] * side, side, side);
+      ctx.fill();
+    }
+  }
+  /* A frame's body filled in (the designs that paint solid): every cell of
+     `art.body` a glyph's cell wide and high, in the colour's steps, exactly
+     under the glyphs written over it afterwards. The cells are not whole
+     pixels, so each laps over the next by a hair and no seam shows. */
+  function drawBody(art, x, y, cw, ch, color) {
+    const rows = art.body;
+    const cells = art.bodyCells || (art.bodyCells = cellsByShade(rows));
+    const shades = shadesOf(color, C.paper);
+    const x0 = x - (rows[0].length * cw) / 2;
+    const y0 = y - (rows.length * ch) / 2;
+    for (let i = 0; i < cells.length; i++) {
+      const list = cells[i];
+      if (!list.length) continue;
+      ctx.fillStyle = shades[i];
+      ctx.beginPath();
+      for (let j = 0; j < list.length; j += 2) ctx.rect(x0 + list[j] * cw, y0 + list[j + 1] * ch, cw + 0.5, ch + 0.5);
+      ctx.fill();
+    }
+  }
 
   function draw(now, force) {
     if (!scene || !W || !H) return;
+    // Another design since the last frame: its face, and nothing kept from the old one.
+    const worn = getLook();
+    if (worn !== look) { look = worn; measure(); dropCaches(); }
     const colors = getColors() || {};
     const c = C;
     c.ink = colors.ink || '#cfcfcf'; c.faint = colors.faint || '#8a8a8a';
@@ -698,6 +882,9 @@ export function createGalaxyMap(canvas, opts = {}) {
     let fill = null;
     let glyphPx = 0;
     const glyphFace = baseFont.slice(baseFont.indexOf('px ') + 3) || 'monospace';
+    const neon = look === 'neon';
+    const blocks = look === 'pixel';
+    const solid = paintOf(look) === 'solid';
     const focusedPlanet = selected && scene.byId.get(selected);
     const names = [];
     const arts = [];
@@ -718,7 +905,9 @@ export function createGalaxyMap(canvas, opts = {}) {
         arts.push(v);
         continue;
       }
-      const col = colorOf(b);
+      const own = colorOf(b);
+      const lit = neon ? neonOf(own, C.paper) : null;
+      const col = lit ? lit.tube : own;
       const dim = dimmed(b);
       if (v.r < 2) {
         const bucket = tiny[dim ? 1 : 0];
@@ -731,8 +920,9 @@ export function createGalaxyMap(canvas, opts = {}) {
       }
       if (col !== fill) { ctx.fillStyle = col; fill = col; }
       if (dim) ctx.globalAlpha = DIM_ALPHA;
-      const glowBody = b.kind === 'sun' || b.kind === 'hole';
-      if (glowBody) { ctx.shadowColor = col; ctx.shadowBlur = 6; }
+      // Neon lights every world it can afford to: a shadow a body is dear, so the specks go without.
+      const glowBody = b.kind === 'sun' || b.kind === 'hole' || (neon && v.r >= 4);
+      if (glowBody) { ctx.shadowColor = lit ? lit.light : col; ctx.shadowBlur = neon ? NEON_GLOW.small : 6; }
       // A little globe at the body's own size, like the art bodies beside it
       // (the owner, 1.0.3: an '@' next to a planet of the same size, and a far
       // 'o' that read as a 0). A glyph only where no canvas can be made.
@@ -773,18 +963,23 @@ export function createGalaxyMap(canvas, opts = {}) {
     for (const v of arts) {
       const b = v.b;
       const kind = artKind(b);
-      const minRows = kind === 'sphere' ? 4 : 5;
+      const shape = shapeOf(kind, look);
+      const minRows = shape === 'sphere' ? 4 : 5;
       let rows2 = Math.round((v.r * 2) / cellH);
       let scale = 1;
       // Smaller than the smallest face can draw: the same little globe as the
       // bodies beyond the budget, at its true size, so that two bodies alike
       // in size look alike (the owner's Ideas note, 1.0.3).
-      const spr = rows2 < minRows && (v.r * 2.6) / (minRows * cellH) < 6 / fsBase ? sprite(b, colorOf(b)) : null;
+      const own = colorOf(b);
+      const lit = neon ? neonOf(own, C.paper) : null;
+      const color = lit ? lit.tube : own;
+      const spr = rows2 < minRows && (v.r * 2.6) / (minRows * cellH) < 6 / fsBase ? sprite(b, color) : null;
       if (spr) {
         const h = v.r * 2.6;
         const dimS = dimmed(b);
         if (dimS) ctx.globalAlpha = DIM_ALPHA;
-        if (kind === 'sun') { ctx.shadowColor = colorOf(b); ctx.shadowBlur = 8; }
+        if (lit) { ctx.shadowColor = lit.light; ctx.shadowBlur = NEON_GLOW.small; }
+        else if (kind === 'sun' && !blocks) { ctx.shadowColor = color; ctx.shadowBlur = 8; }
         ctx.drawImage(spr.at(h), v.sx - (h * spr.aspect) / 2, v.sy - h / 2, h * spr.aspect, h);
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
@@ -801,7 +996,8 @@ export function createGalaxyMap(canvas, opts = {}) {
       // Rings and their tilt come from the model: a quarter of the planets,
       // each ring rolled 0–45° (owner, 2026-10-21). The roll goes in the
       // cache key in 9 steps, so frames are still shared.
-      const ring = kind === 'sphere' && b.kind === 'planet' && (b.ringed ?? b.seed % 4 === 0);
+      // A cube and a disk carry no ring: a design's world is the one shape.
+      const ring = shape === 'sphere' && b.kind === 'planet' && (b.ringed ?? b.seed % 4 === 0);
       const rollStep = ring ? Math.round(((b.roll ?? 0.26) / (Math.PI / 4)) * 8) : 0;
       const roll = (rollStep / 8) * (Math.PI / 4);
       const spin = animT * spinRate(b) + (b.seed % 628) / 100;
@@ -810,19 +1006,30 @@ export function createGalaxyMap(canvas, opts = {}) {
       // A sun's corona flickers in step with its turn, so a sun has 48 frames
       // like a planet and never fills the shared cache with one-off frames.
       const turning = kind === 'sphere' || kind === 'sun';
-      const art = cached(cacheKey(kind, cols2, rows2, turning ? fi : tFrame, ring ? 'r' + rollStep : 0, b.seed % 8), () => {
-        const args = { cols: cols2, rows: rows2, seed: b.seed % 8 };
+      // Blocks are square, two to a glyph's height: the same body, twice the rows.
+      const gridRows = blocks ? rows2 * 2 : rows2;
+      const gridCols = blocks ? gridRows : cols2;
+      // Nebula's own frames keep their keys; a design's own shape has its own
+      // name, and a frame made for blocks never passes for one made for glyphs.
+      const keyKind = blocks ? 'px:' + kind : shape === kind ? kind : shape + ':' + kind;
+      const filled = solid && shape !== kind;
+      const art = cached(cacheKey(keyKind, gridCols, gridRows, turning ? fi : tFrame, ring ? 'r' + rollStep : 0, b.seed % 8), () => {
+        const args = { cols: gridCols, rows: gridRows, seed: b.seed % 8 };
         if (kind === 'sphere') Object.assign(args, { spin: turn, ring, roll });
         else if (kind === 'sun') Object.assign(args, { t: fi * 0.42, spin: turn });
         else Object.assign(args, { t: tFrame * 0.14 * ART_PACE });
-        return { rows: { sphere, sun, vortex, core }[kind](args) };
+        return filled ? { rows: artRows(kind, look, args), body: artRows(kind, look, args, true) } : { rows: artRows(kind, look, args) };
       });
-      const color = colorOf(b);
-      const glowPx = kind === 'sun' ? 8 : 0;
+      const glowPx = neon ? (kind === 'sun' ? NEON_GLOW.sun : NEON_GLOW.world) : kind === 'sun' ? 8 : 0;
       const small = scale < 1 ? { font: (fsBase * scale).toFixed(1) + 'px ' + face, cw: cellW * scale, ch: cellH * scale } : {};
       const dim = dimmed(b);
       if (dim) ctx.globalAlpha = DIM_ALPHA;
-      drawFrame(art, c, v.sx, v.sy, { color, glow: glowPx, ...small });
+      if (blocks) drawBlocks(art, v.sx, v.sy, (cellH * scale) / 2, color);
+      else if (filled) {
+        // The body filled in, and over it what the glyphs add: the lands' grain, a dome, a sun's flames.
+        drawBody(art, v.sx, v.sy, cellW * scale, cellH * scale, color);
+        drawFrame(art, c, v.sx, v.sy, { color, glow: glowPx, light: lit ? lit.light : '', ...small });
+      } else drawFrame(art, c, v.sx, v.sy, { color, glow: glowPx, light: lit ? lit.light : '', ...small });
       if (b.kind === 'hole' && b.locked && b.initials && v.r >= 8) {
         // A locked hole shows its initials in its dark middle and nothing else.
         // In the hole's own colour: in the paper's they could not be seen.

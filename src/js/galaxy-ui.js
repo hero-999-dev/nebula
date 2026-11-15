@@ -179,7 +179,7 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
       item(t('Enter the black hole'), () => goIn(map, body));
       item(t('Lock'), () => { void blackHoles?.lock?.(body.ref); });
     }
-    item(t('Show all of Universe'), () => map.overview?.());
+    item(t('Show all of Universe'), () => { map.overview?.(); paintFollow(); });
     // The way out of a hole on every map, the sidebar's too (Codex 25 #1).
     if (inside) item(t('Back to main space'), () => map.leaveHole?.());
     menu.hidden = false;
@@ -242,7 +242,28 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
   miniFit.title = t('Fit');
   miniFit.setAttribute('aria-label', t('Fit'));
   miniFit.addEventListener('click', () => miniMap?.fit?.({ glide: true }));
-  head.append(grip, miniFit, full);
+  // Folded, only its head is left (the owner, 1.0.4: "universe kapatılabilsin, yer kaplıyor"). Kept.
+  const FOLD_KEY = 'nebula:universe-folded';
+  const fold = el('button', 'galaxy-fold');
+  fold.type = 'button';
+  fold.append(el('span', 'fr-caret'));
+  function paintFold() {
+    const folded = mini.classList.contains('folded');
+    fold.setAttribute('aria-expanded', String(!folded));
+    fold.title = t(folded ? 'Show the Universe' : 'Hide the Universe');
+    fold.setAttribute('aria-label', fold.title);
+    miniFit.hidden = folded;
+  }
+  fold.addEventListener('click', () => {
+    const folded = mini.classList.toggle('folded');
+    write(FOLD_KEY, folded);
+    paintFold();
+    // Its canvas was not there to be measured while it was folded.
+    if (!folded) requestAnimationFrame(() => miniMap?.resize?.());
+  });
+  mini.classList.toggle('folded', read(FOLD_KEY) === true);
+  paintFold();
+  head.append(fold, grip, miniFit, full);
   const miniCanvas = el('canvas', 'galaxy-canvas');
   miniCanvas.tabIndex = 0;
   miniCanvas.setAttribute('role', 'img');
@@ -293,8 +314,35 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
     big?.setNames?.(namesOn);
   };
   namesBtn.addEventListener('click', () => { namesOn = !namesOn; write(NAMES_KEY, namesOn); paintNames(); });
+  // Before Fit, the widget's Follow (1.0.4, the owner: "universe takip modu,
+  // widget'taki olduğu gibi"): the camera rides the body picked on the map as
+  // it goes round; a drag, Fit or another body lets go, and so does closing the map.
+  const followBtn = iconBtn('galaxy-follow', '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><path d="M8 1v2.5M8 12.5V15M1 8h2.5M12.5 8H15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>', t('Follow the body picked'));
+  const paintFollow = () => {
+    const on = !!big?.tracked?.();
+    const label = t(on ? 'Stop following' : 'Follow the body picked');
+    followBtn.title = label;
+    followBtn.setAttribute('aria-label', label);
+    followBtn.setAttribute('aria-pressed', String(on));
+    followBtn.classList.toggle('on', on);
+  };
+  followBtn.addEventListener('click', () => {
+    if (!big) return;
+    if (big.tracked?.()) big.track?.(null);
+    else {
+      const id = big.selected?.();
+      if (!id || !big.track?.(id)) {
+        window.dispatchEvent(new CustomEvent('nebula-toast', { detail: t('Click a body on the map first') }));
+        return;
+      }
+    }
+    paintFollow();
+  });
+  followBtn.setAttribute('aria-pressed', 'false');
+  // A drag or another body clicked lets go of the one followed: the button says so.
+  bigCanvas.addEventListener('pointerup', () => requestAnimationFrame(paintFollow));
   const search = labelSearch();
-  tools.append(search.el, back, whole, namesBtn, fullToo);
+  tools.append(search.el, back, followBtn, whole, namesBtn, fullToo);
   // What the map shows, as a list: for the keyboard and screen readers (visually hidden).
   const list = el('ul', 'galaxy-list sr-only');
   list.setAttribute('aria-label', t('Universe — your notes as a galaxy'));
@@ -430,6 +478,7 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
       viewKey: VIEW_KEY,
       onDimension: (holeId) => {
         back.hidden = !holeId;
+        paintFollow();                        // another space lets go of the body followed
         paintList();
         if ((holeId || null) !== lastDim) { lastDim = holeId || null; search.clear(); } else search.sync();
       },
@@ -438,7 +487,7 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
     return big;
   }
   back.addEventListener('click', () => big?.leaveHole?.());
-  whole.addEventListener('click', () => big?.overview?.());
+  whole.addEventListener('click', () => { big?.overview?.(); paintFollow(); });
   fullToo.addEventListener('click', () => { split?.mapFull?.(); paintFull(); });
 
   function paintList() {
@@ -469,7 +518,7 @@ export function initGalaxy({ mount, createMap, store, folders, projects, blackHo
       const m = bigMap();
       if (!m) return;
       // Opened, the map fills its pane (owner, 2026-10-20); resized() refits it.
-      requestAnimationFrame(() => { m.resize(); m.resume?.(); m.fit?.(); m.follow?.(store.activeId); paintList(); });
+      requestAnimationFrame(() => { m.resize(); m.resume?.(); m.fit?.(); m.follow?.(store.activeId); paintList(); paintFollow(); });
       paintFull();
     },
     hidden() {

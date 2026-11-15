@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron';
 
 contextBridge.exposeInMainWorld('nebula', {
   platform: process.platform,
+  weather: { get: (place) => ipcRenderer.invoke('weather:get', place) },
   links: { title: (url) => ipcRenderer.invoke('links:title', url), videoPoster: (url) => ipcRenderer.invoke('links:video-poster', url) },
   // Real size (0.9.3): the zoom that makes a CSS millimetre a real one on this
   // screen, and the window's own zoom (Ctrl + / Ctrl −) it is corrected for.
@@ -179,6 +180,11 @@ contextBridge.exposeInMainWorld('nebula', {
     saveFile: (url, name) => ipcRenderer.invoke('media:save-file', String(url ?? ''), String(name ?? '')),
     openFile: (url, name) => ipcRenderer.invoke('media:open-file', String(url ?? ''), String(name ?? '')),
     forgetFile: (url) => ipcRenderer.invoke('media:forget-file', String(url ?? '')),
+    // A file's card pulled out of the window (1.0.4): its copy made ready, handed to the system's drag, or let go.
+    carryFile: (url, name) => ipcRenderer.invoke('media:carry-file', String(url ?? ''), String(name ?? '')),
+    dragFile: (url, name) => ipcRenderer.invoke('media:drag-file', String(url ?? ''), String(name ?? '')),
+    carryEnd: () => ipcRenderer.invoke('media:carry-end'),
+    dragPicture: (src, owner) => ipcRenderer.invoke('media:drag-picture', String(src ?? ''), { id: owner?.id ?? null, hole: owner?.hole ?? null }),
     // A copy made for a note the window has left meanwhile: gone at the next start, unasked (hunt B18).
     releaseAdded: (noteId, url) => ipcRenderer.invoke('media:release-added', String(noteId ?? ''), String(url ?? '')),
     // A card pasted from another note: its file copied into this note at once (B4).
@@ -252,6 +258,8 @@ contextBridge.exposeInMainWorld('nebula', {
     check: () => ipcRenderer.invoke('sync:check'),
     now: () => ipcRenderer.invoke('sync:now'),
     keepOut: (ids) => ipcRenderer.invoke('sync:keep-out', ids),
+    // The big files still on their way, for the players that wait for them (1.0.4).
+    coming: () => ipcRenderer.invoke('sync:coming'),
     // The main process asks the window to write what it holds, or to take what came.
     onAsk: (fn) => {
       const handler = async (_e, { requestId, kind, payload }) => {

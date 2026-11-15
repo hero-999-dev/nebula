@@ -150,6 +150,11 @@ export async function runSettingsChecks(check) {
 
     // ---- The font menu: as long as its fonts ------------------------------------
     await openNote('plain');
+    // 1.0.4: the app's own fonts and the faces packed with it, 58 in all. The designs'
+    // faces stand first, each naming its design, then the pinned ones, then the rest by name.
+    const FONT_COUNT = 58;
+    const FACES = ['Serif (Nebula)', 'Fondamento (Medieval)', 'VT323 (Pixel)', 'Oxanium (Neon)', 'Patrick Hand (Blueprint)', 'Courgette (Ink)', 'Marcellus (Art Deco)', 'Bodoni Moda (Clockwork)'];
+    const byName = (list) => list.every((name, i) => i === 0 || list[i - 1].localeCompare(name, 'en', { sensitivity: 'base', numeric: true }) <= 0);
     const openFonts = async () => {
       await win.evaluate(() => { if (document.getElementById('menu-font').hidden) document.querySelector('[data-menu="menu-font"]').click(); });
       await win.waitForFunction(() => !document.getElementById('menu-font').hidden, null, { polling: 50 });
@@ -170,14 +175,18 @@ export async function runSettingsChecks(check) {
         lastSeen: last.bottom <= r.bottom + 1 && last.top >= r.top - 1,
         inside: m.top >= 0 && m.bottom <= window.innerHeight && m.left >= 0 && m.right <= window.innerWidth,
         rule: !!rows.querySelector('.tb-menu__rule'),
+        rules: rows.querySelectorAll('.tb-menu__rule').length,
+        faces: buttons.filter((b) => b.classList.contains('of-design')).map((b) => `${b.querySelector('.label').textContent} ${b.querySelector('.tb-menu__of')?.textContent}`),
         open: !menu.hidden,
       };
     });
     for (const side of ['left', 'right', 'top']) {
       if (side !== 'left') await win.click(`[data-pad="${side}"]`);
       await openFonts();
+      // Too many to stand in one window now: the list scrolls inside the menu, down to its last font.
+      await win.evaluate(() => { const rows = document.getElementById('font-rows'); rows.scrollTop = rows.scrollHeight; });
       const f = await fonts();
-      check(`the font menu shows every font of the app without scrolling, Cascadia Code too — bar at the ${side}`, f.labels.length === 15 && f.labels.at(-1) === 'Cascadia Code' && !f.scrolls && f.lastSeen && f.inside, JSON.stringify({ ...f, labels: f.labels.length }));
+      check(`the font menu lists every font of the app, the designs’ faces first and the rest by name, and its last font is reached inside the window — bar at the ${side}`, f.labels.length === FONT_COUNT && f.faces.join('|') === FACES.join('|') && f.labels.slice(0, FACES.length).join('|') === FACES.map((face) => face.replace(/ \(.*$/, '')).join('|') && byName(f.labels.slice(FACES.length)) && f.lastSeen && f.inside, JSON.stringify({ ...f, labels: f.labels.length, seen: undefined }));
       await win.keyboard.press('Escape');
     }
 
@@ -186,7 +195,8 @@ export async function runSettingsChecks(check) {
     await win.mouse.move(5, 5);
     await win.waitForTimeout(150);
     const before = await fonts();
-    check('the serif is "Serif", no longer "Serif (default)"; every font has a pin and none is pinned', before.labels[0] === 'Serif' && before.pins === 15 && before.pinned.length === 0 && !before.rule, before.labels[0]);
+    check('the serif is "Serif", no longer "Serif (default)"; every font has a pin, none is pinned, one thin line under the designs’ faces', before.labels[0] === 'Serif' && before.pins === FONT_COUNT && before.pinned.length === 0 && before.rules === 1, `${before.labels[0]} ${before.pins} ${before.rules}`);
+    const firstByName = before.labels[FACES.length];
     check('no pin is drawn while the pointer is elsewhere', before.seen.length === 0, before.seen.join('|'));
     const rowOf = (label) => `#font-rows > button:has(.label:text-is("${label}"))`;
     await win.hover(rowOf('Consolas'));
@@ -198,20 +208,20 @@ export async function runSettingsChecks(check) {
     await win.mouse.move(5, 5);
     await win.waitForTimeout(150);
     const pinned = await fonts();
-    check('a pinned font stands at the top, in the order pinned, a thin line under the pinned ones', pinned.labels.slice(0, 3).join('|') === 'Consolas|Georgia|Serif' && pinned.pinned.join('|') === 'Consolas|Georgia' && pinned.rule && pinned.labels.length === 15, pinned.labels.slice(0, 4).join('|'));
+    check('a pinned font stands right under the designs’ faces, in the order pinned, a thin line under the pinned ones', pinned.labels.slice(FACES.length, FACES.length + 3).join('|') === `Consolas|Georgia|${firstByName}` && pinned.faces.join('|') === FACES.join('|') && pinned.pinned.join('|') === 'Consolas|Georgia' && pinned.rules === 2 && pinned.labels.length === FONT_COUNT, pinned.labels.slice(0, FACES.length + 4).join('|'));
     check('a pinned font keeps its pin drawn, pointer or not', pinned.seen.join('|') === 'Consolas|Georgia', pinned.seen.join('|'));
     check('pressing a pin picks no font and leaves the menu open', pinned.open && await win.evaluate(() => !document.querySelector('#editor [style*="font-family"]')));
     await win.keyboard.press('Escape');
     await openFonts();
     const again = await fonts();
-    check('the pins are still there when the menu is opened again', again.labels.slice(0, 2).join('|') === 'Consolas|Georgia');
+    check('the pins are still there when the menu is opened again', again.labels.slice(FACES.length, FACES.length + 2).join('|') === 'Consolas|Georgia');
     await win.fill('#font-search', 'geo');
     const found = await fonts();
     check('and a search finds a pinned font as any other', found.labels.join('|') === 'Georgia' && found.pinned.join('|') === 'Georgia', found.labels.join('|'));
     await win.fill('#font-search', '');
     await win.click(`${rowOf('Consolas')} .tb-menu__pin`);
     const unpinned = await fonts();
-    check('a second press takes a font down to its place again', unpinned.labels.slice(0, 2).join('|') === 'Georgia|Serif' && unpinned.labels.indexOf('Consolas') === 13, unpinned.labels.join('|'));
+    check('a second press takes a font down to its place again', unpinned.labels.slice(FACES.length, FACES.length + 2).join('|') === `Georgia|${firstByName}` && byName(unpinned.labels.slice(FACES.length + 1)) && unpinned.labels.includes('Consolas'), unpinned.labels.join('|'));
     await win.click(`${rowOf('Georgia')} .tb-menu__pin`);
     await win.keyboard.press('Escape');
 
@@ -297,8 +307,8 @@ export async function runSettingsChecks(check) {
         menus: document.querySelectorAll('#app-menu .am-menu:not([hidden])').length,
       };
     });
-    check('a press opens the sheet in tabs, on General — nothing chosen yet', sheet.tabs.join('|') === 'General|Appearance|Sounds|App lock|Storage' && sheet.shown.join('|') === 'set-panel-general' && sheet.font === '' && sheet.size === '14' && sheet.page === 'nw' && !sheet.ai && !sheet.holes && sheet.inside && sheet.menus === 0, JSON.stringify(sheet));
-    check('each tab holds its own: new notes, show and hide, spelling; the theme organizer with its preview, and the logo; the sounds; the lock; the room on this computer', sheet.heads.join('|') === 'general:New notes,Show and hide,Spelling|look:Theme organizer,Logo|sounds:Sounds|lock:Lock on opening|storage:On this computer', sheet.heads.join('|'));
+    check('a press opens the sheet in tabs, on General — nothing chosen yet', sheet.tabs.join('|') === 'General|Appearance|Sounds|App lock|Storage' && sheet.shown.join('|') === 'set-panel-general' && /^"Charter"/.test(sheet.font) && sheet.size === '14' && sheet.page === 'nw' && !sheet.ai && !sheet.holes && sheet.inside && sheet.menus === 0, JSON.stringify(sheet));
+    check('each tab holds its own: new notes, show and hide, spelling; the designs (1.0.4), the theme organizer with its preview, and the logo; the sounds; the lock; the room on this computer', sheet.heads.join('|') === 'general:New notes,Show and hide,Spelling|look:Design,Theme organizer,Logo|sounds:Sounds|lock:Lock on opening|storage:On this computer', sheet.heads.join('|'));
     await win.evaluate(() => document.getElementById('set-tab-general').focus());
     await win.keyboard.press('ArrowRight');
     const moved = await win.evaluate(() => ({ focus: document.activeElement?.id, shown: [...document.querySelectorAll('#settings-body .set-panel')].filter((p) => !p.hidden).map((p) => p.id).join(), sel: document.getElementById('set-tab-look').getAttribute('aria-selected') }));
@@ -315,8 +325,8 @@ export async function runSettingsChecks(check) {
     await openSettings(null);
     check('the sheet opens again on the tab used last', await win.evaluate(() => !document.getElementById('set-panel-storage').hidden));
     await win.evaluate(() => document.getElementById('set-tab-general').click());
-    check('nothing chosen shows the font by its name and the size as a number (no "Nebula’s own", 1.0.0)', sheet.ownFont === 'Serif' && sheet.ownSize === `${sheet.base}` && sheet.base === 14, `${sheet.ownFont} | ${sheet.ownSize} | ${sheet.base}`);
-    check('it offers the app’s fonts and every page', sheet.fonts === 15 && sheet.pages === 'nw,a3,a4,a5,nn,b3,b4,b5', `${sheet.fonts} ${sheet.pages}`);
+    check('nothing chosen shows the font by its name and the size as a number (no "Nebula’s own", 1.0.0)', sheet.ownFont === 'Serif (Nebula)' && sheet.ownSize === `${sheet.base}` && sheet.base === 14, `${sheet.ownFont} | ${sheet.ownSize} | ${sheet.base}`);
+    check('it offers the app’s fonts and every page', sheet.fonts === 58 && sheet.pages === 'nw,a3,a4,a5,nn,b3,b4,b5', `${sheet.fonts} ${sheet.pages}`);
     check('there is no lock, and one button to set one', (await lockState()) === 'Nebula opens without asking.' && (await lockButtons()) === 'set', `${await lockState()} | ${await lockButtons()}`);
 
     // ---- What a new note starts with -------------------------------------------
@@ -360,7 +370,8 @@ export async function runSettingsChecks(check) {
     await openSettings();
     const remembered = await win.evaluate(() => [document.getElementById('set-font').selectedOptions[0].textContent, document.getElementById('set-size').value, document.getElementById('set-page').value].join('|'));
     check('the sheet shows what was chosen', remembered === 'Verdana|18|a4', remembered);
-    await win.selectOption('#set-font', '');
+    // No "no font" row to go back to (1.0.4): Serif is chosen as Verdana was, and is the new note's own font.
+    await win.selectOption('#set-font', { label: 'Serif (Nebula)' });
     await win.selectOption('#set-size', '14');
     await win.selectOption('#set-page', 'nw');
     await closeSettings();
@@ -372,7 +383,7 @@ export async function runSettingsChecks(check) {
     await win.keyboard.press('Control+S');
     await win.waitForTimeout(700);
     const plainMade = noteOnDisk('Made plain');
-    check('back at Nebula’s own, a new note has no font and no page of its own', !!plainMade && plainMade.font === undefined && plainMade.page === undefined && /plain words/.test(plainMade.content) && !/font-family/.test(plainMade.content), JSON.stringify({ font: plainMade?.font, page: plainMade?.page, content: plainMade?.content }));
+    check('with Serif chosen again and the page put back, a new note is written in Serif — a font like any other since 1.0.4 — at no size and on no page of its own', !!plainMade && /^"Charter"/.test(plainMade.font?.family ?? '') && plainMade.font?.size === undefined && plainMade.page === undefined && /plain words/.test(plainMade.content), JSON.stringify({ font: plainMade?.font, page: plainMade?.page, content: plainMade?.content }));
 
     // ---- Hide the AI panel -----------------------------------------------------
     await openSettings();
@@ -409,16 +420,16 @@ export async function runSettingsChecks(check) {
     await openSettings('look');
     await win.waitForFunction(() => !document.getElementById('theme-editor').hidden, null, { polling: 50 });
     const chips = () => win.evaluate(() => [...document.querySelectorAll('#theme-editor .te-profiles > *')].map((c) => `${c.querySelector('.te-chip__name')?.textContent ?? c.textContent}${c.querySelector('.te-chip__x') ? '×' : ''}${c.classList.contains('on') ? '*' : ''}`).join('|'));
-    check('Your own theme comes with two ready profiles, Matcha and Contrast — each with a × like any other', (await chips()) === 'Matcha×|Contrast×', await chips());
+    check('Your own theme comes with two ready profiles, Matcha and Contrast — each with a × like any other, and a + after them', (await chips()) === 'Matcha×|Contrast×|+', await chips());
     await win.click('#theme-editor .te-chip__name:text-is("Contrast")');
     const worn = await win.evaluate(() => { const css = getComputedStyle(document.documentElement); return ['--paper', '--paper-sunken', '--rule', '--clay', '--ink'].map((v) => css.getPropertyValue(v).trim().toUpperCase()).join(','); });
-    check('Contrast is near-black on near-white, the lines and the lit buttons as dark as the words', worn === '#F7F7F7,#F7F7F7,#2B2B2B,#2B2B2B,#2B2B2B' && (await chips()) === 'Matcha×|Contrast×*', `${worn} ${await chips()}`);
+    check('Contrast is near-black on near-white, the lines and the lit buttons as dark as the words', worn === '#F7F7F7,#F7F7F7,#2B2B2B,#2B2B2B,#2B2B2B' && (await chips()) === 'Matcha×|Contrast×*|+', `${worn} ${await chips()}`);
     await win.click('#theme-editor .te-chip:has(.te-chip__name:text-is("Contrast")) .te-chip__x');
     await win.click('#theme-editor .te-chip--danger');
     const afterDelete = await chips();
-    check('a ready profile can be deleted: it leaves the list, its colours stay worn as "Last edited", and one press brings the ready ones back', afterDelete === 'Matcha×|Last edited*|Bring back the ready profiles', afterDelete);
+    check('a ready profile can be deleted: it leaves the list, its colours stay worn as "Last edited", and one press brings the ready ones back', afterDelete === 'Matcha×|Last edited*|+|Bring back the ready profiles', afterDelete);
     await win.click('#theme-editor .te-chip--back');
-    check('brought back, Contrast is there again', (await chips()) === 'Matcha×|Contrast×*', await chips());
+    check('brought back, Contrast is there again', (await chips()) === 'Matcha×|Contrast×*|+', await chips());
     await win.click('#theme-pick [data-theme="main"]');
     await closeSettings();
 
@@ -454,7 +465,7 @@ export async function runSettingsChecks(check) {
     const nameAsked = () => win.evaluate(() => (document.getElementById('ov-dialog').hidden ? null : { title: document.getElementById('dlg-title').textContent, value: document.getElementById('dlg-input').value }));
     const answerName = async (name) => { await win.fill('#dlg-input', name); await win.click('#dlg-ok'); await win.waitForTimeout(200); };
     const own = await logoNow();
-    check('under Appearance stands the logo — large, and as small as a taskbar and a title bar draw it — and at its right its colours, laid out as Your own theme is', own.left && own.below && own.sizes === '112,32,16' && own.drawn && own.swatches === 28 && own.slots.split('|').map((x) => x.split(':')[0]).join('|') === 'Background|Border|Moon|Moon’s shade|Star', JSON.stringify(own));
+    check('under Appearance stands the logo — large, and as small as a taskbar and a title bar draw it — and at its right its colours, laid out as Your own theme is', own.left && own.below && own.sizes === '123,35,18' && own.drawn && own.swatches === 28 && own.slots.split('|').map((x) => x.split(':')[0]).join('|') === 'Background|Border|Moon|Moon’s shade|Star', JSON.stringify(own));
     check('it starts as the logo Nebula comes with — the Main theme’s, lit — with no "Nebula’s own" in an app that is not the test build, and a + after the last theme', own.colors === '#17122A,#2A2145,#C9B6FF,#7C3AED,#996AF4' && own.chips === 'Main*|Dark|Light|White|Matcha|Contrast|+' && !fs.existsSync(logoDir) && own.kept === '', `${own.colors} ${own.chips}`);
     await win.click(chip('Contrast'));
     await until(() => logoKept()?.colors?.bg === '#F7F7F7');
@@ -523,7 +534,7 @@ export async function runSettingsChecks(check) {
 
     // For a desktop with the program file itself on it: a shortcut is made, wearing the logo.
     const linksBefore = fs.readdirSync(shortcuts).filter((f) => f.endsWith('.lnk'));
-    await win.click('#logo-editor + .set-hint + .logo-shortcut');
+    await win.click('#logo-editor .logo-shortcut');
     await until(() => fs.readdirSync(shortcuts).filter((f) => f.endsWith('.lnk')).length === linksBefore.length + 1);
     const made = fs.readdirSync(shortcuts).filter((f) => f.endsWith('.lnk') && !linksBefore.includes(f))[0];
     const madeLink = made ? await linkOf(path.join(shortcuts, made)) : null;
@@ -790,7 +801,7 @@ export async function runSettingsChecks(check) {
     const turkish = await win.evaluate(() => [...document.querySelectorAll('#app-menu .am-title')].at(-2).textContent);
     await openSettings();
     const sheetTr = await win.evaluate(() => ({ tabs: [...document.querySelectorAll('#ov-settings .set-tab')].map((t) => t.textContent).join('|'), heads: [...document.querySelectorAll('#settings-body .set-head')].map((h) => h.textContent).join('|'), state: document.querySelector('#set-lock .set-state').textContent, own: document.getElementById('set-size').selectedOptions[0].textContent, font: document.getElementById('set-font').selectedOptions[0].textContent, page: document.getElementById('set-page').options[0].textContent, set: document.querySelector('#set-lock [data-lock="set"]').textContent }));
-    check('in Türkçe the title is Ayarlar and the sheet reads in Turkish, the pages keeping their names', turkish === 'Ayarlar' && sheetTr.heads === 'Yeni notlar|Göster ve gizle|Yazım denetimi|Tema düzenleyici|Logo|Sesler|Açılışta kilit|Bu bilgisayarda' && sheetTr.tabs === 'Genel|Görünüm|Sesler|Uygulama kilidi|Depolama' && sheetTr.state === 'Nebula sormadan açılır.' && sheetTr.own === '14' && sheetTr.font === 'Serif' && sheetTr.page === 'Nebula Wide (NW)' && sheetTr.set === 'Kilit kur', JSON.stringify({ turkish, ...sheetTr }));
+    check('in Türkçe the title is Ayarlar and the sheet reads in Turkish, the pages keeping their names', turkish === 'Ayarlar' && sheetTr.heads === 'Yeni notlar|Göster ve gizle|Yazım denetimi|Tasarım|Tema düzenleyici|Logo|Sesler|Açılışta kilit|Bu bilgisayarda' && sheetTr.tabs === 'Genel|Görünüm|Sesler|Uygulama kilidi|Depolama' && sheetTr.state === 'Nebula sormadan açılır.' && sheetTr.own === '14' && sheetTr.font === 'Serif (Nebula)' && sheetTr.page === 'Nebula Wide (NW)' && sheetTr.set === 'Kilit kur', JSON.stringify({ turkish, ...sheetTr }));
     await closeSettings();
     await win.click('#lang-row [data-lang="en"]');
     await stop();

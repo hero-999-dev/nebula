@@ -30,6 +30,7 @@ import { plainVideosOf, sealedVideosOf } from './file-video.js';
 import { icon } from './icons.js';
 import { on } from './bus.js';
 import { readSettings } from './settings.js';
+import { withKeyring } from './keyring-hint.js';
 
 const IDLE_KEY = 'nebula:holes-idle-minutes';
 const IDLE_MINUTES = 10;
@@ -108,7 +109,7 @@ export function refusalWords(res, lock = 'pin') {
     case 'other-computer': return t('This black hole was locked on another computer. Open it with its recovery key.');
     case 'hello-refused': return t('Not confirmed.');
     case 'hello-unavailable': return t('No passkey is set up on this computer.');
-    case 'storage-unavailable': return t('Secure storage is unavailable on this computer. Try again when it is available.');
+    case 'storage-unavailable': return withKeyring(t('Secure storage is unavailable on this computer. Try again when it is available.'));
     case 'in-use': return t('This black hole has a file open. Close it and try again.');
     case 'locked': return t('The black hole is locked.');
     case 'name': return t('Give it a name.');
@@ -653,6 +654,11 @@ export function initBlackHoles({ listEl, store, noteItem, onChanged, onLocked, o
       const res = await api.exportVideo(holeId, noteId, file).catch(() => null);
       if (!res?.ok) { say('The video could not be taken out'); return false; }
       content = content.split(address).join(res.url);
+    }
+    // Its pictures are held for as long as the black hole is open, and only named in the note
+    // (electron/black-holes.js): a plain note has them written into it, and they become files of its own.
+    if (/nebula-media:\/\/hole\/[\w-]+\/[\w-]+\/pic-/.test(content) && window.nebula?.media?.inline) {
+      content = await window.nebula.media.inline(content).catch(() => content);
     }
     if (content !== note.content) note.content = content;
     store.setHole(noteId, null);

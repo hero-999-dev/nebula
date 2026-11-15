@@ -24,10 +24,10 @@ That is the release. It:
    plugged in.
 
 Pushing the tag starts [`.github/workflows/release.yml`](../.github/workflows/release.yml),
-which builds Windows and macOS and publishes one GitHub Release
+which builds Windows, macOS and Linux and publishes one GitHub Release
 (~10 minutes). Installed copies of Nebula offer the update on their next check.
 
-**Both platforms build on every tag, and nobody is asked.** `hero-999-dev/nebula`
+**All three platforms build on every tag, and nobody is asked.** `hero-999-dev/nebula`
 is public, and GitHub Actions is free and unlimited on public repositories —
 the macOS runner included. The 10x macOS multiplier applies only to private
 repos, so there is nothing to save by skipping it.
@@ -55,7 +55,8 @@ repair cost a version: 0.9.7 and 0.9.8 were never published.
 So the release commit is built on GitHub before it is tagged
 ([`scripts/precheck-ci.js`](../scripts/precheck-ci.js)). It goes to
 `precheck/vX.Y.Z`, which runs `.github/workflows/release.yml` with every job —
-Windows tests, build, smoke and package; macOS tests and package — except
+Windows tests, build, smoke and package; macOS tests and package; Linux tests,
+first run and package — except
 publish (`if: startsWith(github.ref, 'refs/tags/v')`). `gh run watch` follows
 it (~10–15 minutes). The branch is deleted afterwards either way.
 
@@ -108,7 +109,11 @@ token, no secret to leak.
 | `Nebula-portable-X.Y.Z.exe` | Windows portable | no |
 | `Nebula-X.Y.Z-mac.dmg` | macOS universal | no |
 | `Nebula-X.Y.Z-mac.zip` | macOS universal | no |
+| `Nebula-X.Y.Z.AppImage` | Linux x64, any distribution | **yes** |
+| `nebula_X.Y.Z_amd64.deb` | Ubuntu, Linux Mint, Kali (x64) | no |
+| `nebula-X.Y.Z.pacman` | Arch, Manjaro, EndeavourOS (x64) | no |
 | `latest.yml` | — | the manifest the Windows app reads |
+| `latest-linux.yml` | — | the manifest the AppImage reads |
 
 The release **must not be a draft**: `electron-updater` reads
 `releases/latest/download/latest.yml`, and a draft is not "latest".
@@ -166,6 +171,31 @@ an older app, confirm About and existing notes, and record that evidence.
 There is no installer to hand a new build to. `electron/updater.js` detects it
 (`PORTABLE_EXECUTABLE_DIR`) and shows the download prompt instead of an
 Update button, rather than offering a path that would fail.
+
+### Linux: three packages, one of them updates itself
+
+`electron/updater.js` (`selfUpdates`) lets a packaged Linux copy replace itself
+only when the AppImage runtime has set `APPIMAGE`: that one file is what an
+update replaces. A deb and a pacman package are packaged and on Linux too, but
+their files belong to the system's package manager, so they are told of a newer
+release and shown its page.
+
+`electron/safe-store.js` is the rule for secrets. On Linux `safeStorage` counts
+only when its backend is a named keyring (GNOME Keyring through libsecret, or
+KWallet). With `basic_text` — no keyring running — black holes and the sync
+pairing refuse and say why; nothing is ever stored weakly.
+
+The Linux job runs the unit tests, a first run of the real app under `xvfb`
+(`tests/e2e/first-run.mjs`: open, write a note, close, open again), builds the
+three packages, and asserts that each exists, that `latest-linux.yml` names the
+AppImage, that `electron-updater` is in the asar, and what the deb says of
+itself (name, category, document types, `libsecret`). The full smoke suite
+runs on Windows only, and the packages are built on GitHub only: the machine
+the releases are made on has no Linux. None of this replaces a hands-on
+check. Before calling a Linux release verified, install each package on its
+system (Ubuntu 24.04, Mint 22, Kali, an Arch-based one), open, write a note,
+close, open again, try Sync and a black hole with and without a keyring, update
+an older AppImage — and record that evidence.
 
 ---
 

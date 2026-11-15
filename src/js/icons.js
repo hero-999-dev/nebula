@@ -116,6 +116,18 @@ export const ICONS = {
   pomodoro: S('<circle cx="12" cy="13.5" r="7.5"/><path d="M10 2.5h4"/><path d="M12 2.5v3.5"/><path d="M12 13.5l3-3"/><path d="M18.5 6.5l1.5-1.5"/>'),
   clock: S('<circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2"/><path d="M4.5 5.5l2.5-2"/><path d="M19.5 5.5l-2.5-2"/><path d="M7 19.5l-1.5 1.5"/><path d="M17 19.5l1.5 1.5"/>'),
   bell: S('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>'),
+  // The World clock (1.0.4): a globe with a clock's hands. The Weather: a sun behind a cloud.
+  worldClock: S('<circle cx="12" cy="12" r="9"/><path d="M3.6 9h4.9"/><path d="M15.5 9h4.9"/><path d="M3.6 15h16.8"/><path d="M12 7v5l3 1.5"/>'),
+  weather: S('<circle cx="8" cy="8.5" r="3"/><path d="M8 2.5v1"/><path d="M2 8.5h1"/><path d="M3.8 4.3l.7.7"/><path d="M12.2 4.3l-.7.7"/><path d="M8.5 19.5h9a3.5 3.5 0 0 0 .4-7 5 5 0 0 0-9.6 1.2 3 3 0 0 0 .2 5.8z"/>'),
+  // The sky of a Weather widget, one drawing for each kind of it.
+  wxSun: S('<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2"/><path d="M12 19.3v2.2"/><path d="M2.5 12h2.2"/><path d="M19.3 12h2.2"/><path d="M5.3 5.3l1.5 1.5"/><path d="M17.2 17.2l1.5 1.5"/><path d="M5.3 18.7l1.5-1.5"/><path d="M17.2 6.8l1.5-1.5"/>'),
+  wxMoon: S('<path d="M19.5 14.2A8 8 0 0 1 9.8 4.5a8 8 0 1 0 9.7 9.7z"/>'),
+  wxPartly: S('<circle cx="8" cy="8.5" r="3"/><path d="M8 2.5v1"/><path d="M2 8.5h1"/><path d="M3.8 4.3l.7.7"/><path d="M12.2 4.3l-.7.7"/><path d="M8.5 19.5h9a3.5 3.5 0 0 0 .4-7 5 5 0 0 0-9.6 1.2 3 3 0 0 0 .2 5.8z"/>'),
+  wxCloud: S('<path d="M7 18.5h10a4 4 0 0 0 .5-8 5.5 5.5 0 0 0-10.6 1.3A3.4 3.4 0 0 0 7 18.5z"/>'),
+  wxFog: S('<path d="M7 13.5h10a4 4 0 0 0 .5-8A5.5 5.5 0 0 0 6.9 6.8 3.4 3.4 0 0 0 7 13.5z"/><path d="M5 17h14"/><path d="M7.5 20.5h9"/>'),
+  wxRain: S('<path d="M7 14.5h10a4 4 0 0 0 .5-8A5.5 5.5 0 0 0 6.9 7.8 3.4 3.4 0 0 0 7 14.5z"/><path d="M8.5 17.5l-1 3"/><path d="M12.5 17.5l-1 3"/><path d="M16.5 17.5l-1 3"/>'),
+  wxSnow: S('<path d="M7 14.5h10a4 4 0 0 0 .5-8A5.5 5.5 0 0 0 6.9 7.8 3.4 3.4 0 0 0 7 14.5z"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/><path d="M10 21h.01"/><path d="M14 21h.01"/>'),
+  wxStorm: S('<path d="M7 14.5h10a4 4 0 0 0 .5-8A5.5 5.5 0 0 0 6.9 7.8 3.4 3.4 0 0 0 7 14.5z"/><path d="M12.5 14.5l-2.5 4h3.5l-2 3.5"/>'),
   widget: S('<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><path d="M17 13.5v7"/><path d="M13.5 17h7"/>'),
   search: S('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>'),
   spell: S('<path d="M3 16 7 6l4 10"/><path d="M4.4 13h5.2"/><path d="m13.5 15 2.5 2.5 5-5.5"/>'),

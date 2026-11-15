@@ -104,7 +104,10 @@ body {
 .am-sep { height: 1px; margin: 4px 6px; background: var(--rule); }
 
 /* The strip takes 38px off the top, so the app is what is left. */
-#app { display: flex; height: calc(100vh - 38px); }
+/* Clipped, never scrolled: the AI panel waits and slides beyond the right edge (dock.js),
+   and its chat taking the focus there scrolled the whole app 82px to the left for the
+   length of the slide — the panel was seen jumping in instead of coming in (1.0.4). */
+#app { display: flex; height: calc(100vh - 38px); overflow: clip; }
 
 .side {
   width: 264px;
@@ -704,8 +707,8 @@ body {
 .lp-filter.on { border-color: var(--clay); color: var(--clay); }
 .lp-list { flex: 1; display: flex; flex-direction: column; gap: 3px; min-height: 0; overflow: hidden; }
 .lp-sec { margin: 6px 0 2px 4px; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); }
-.lp-row { padding: 6px 9px; border-radius: 8px; }
-.lp-row.on { background: var(--paper-raised); box-shadow: inset 3px 0 0 var(--clay); }
+.lp-row { padding: 5px 8px; border: 1px solid transparent; border-radius: 8px; }
+.lp-row.on { background: var(--paper-raised); border-color: var(--rule); }
 .lp-row__top { display: flex; align-items: center; gap: 5px; }
 .lp-row__top .lp-ic { width: 13px; height: 13px; color: var(--clay); }
 .lp-row__title { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -735,21 +738,26 @@ body {
 .lp-langs .on { color: var(--clay); font-weight: 600; }
 .lp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .lp-head { display: flex; align-items: center; gap: 10px; padding: 14px 22px 10px; flex: none; }
-.lp-title { flex: 1; min-width: 0; font-size: 24px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-title { flex: 1; min-width: 0; font-size: 24px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lp-label { padding: 2px 9px; border-radius: 999px; font-size: 11.5px; background: color-mix(in srgb, var(--clay) 18%, transparent); color: var(--clay); }
 .lp-saved { font-size: 11.5px; color: var(--ink-faint); }
 .lp-pad { display: flex; gap: 3px; padding: 3px 4px; border: 1px solid var(--rule); border-radius: 8px; }
 .lp-pad .lp-ic { width: 14px; height: 14px; }
+/* The frames are the window's own (1.0.4): the bar's line, the page's two lines, the open note's
+   edge, and the ground the bar and the page stand on. A design names each of them beside the
+   window's (designs.css), so what it draws on the app it draws here (the owner: "önizlemeyi
+   düzeltelim"). */
+.lp-shell { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 0 22px 20px; }
 .lp-toolbar {
-  display: flex; flex-direction: column; gap: 5px; margin: 0 22px; padding: 6px 9px; flex: none;
-  border: 1px solid var(--rule); border-radius: 10px; background: var(--paper-raised);
+  display: flex; flex-direction: column; gap: 5px; padding: 6px 9px; flex: none;
+  border: 1.4px solid var(--ink); border-radius: 10px; background: var(--paper-raised);
 }
 .lp-tbrow { display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; }
 .lp-sep { flex: none; width: 1px; height: 16px; background: var(--rule); }
 .lp-select { flex: none; padding: 1px 8px; border: 1px solid var(--rule); border-radius: 6px; font-size: 11.5px; color: var(--ink-soft); }
 .lp-page {
-  flex: 1; min-height: 0; margin: 12px 22px 0; padding: 20px 28px; overflow: hidden;
-  border: 1px solid var(--rule); border-bottom: 0; border-radius: 10px 10px 0 0; background: var(--paper);
+  flex: 1; min-height: 0; margin: 5px; padding: 20px 28px; overflow: hidden;
+  border: 1.6px solid var(--ink); outline: 1.6px solid var(--ink); outline-offset: 5px; background: var(--paper-raised);
 }
 .lp-note { font-size: var(--lp-size, 16px); line-height: 1.55; }
 .lp-note p { margin: 0 0 10px; }
@@ -759,7 +767,9 @@ body {
 .lp-todo.done .lp-box { background: var(--clay); border-color: var(--clay); }
 .lp-todo.done span:last-child { text-decoration: line-through; color: var(--ink-faint); }
 .lp-quote { margin: 12px 0 0; padding-left: 12px; border-left: 3px solid var(--clay); color: var(--ink-soft); }
-.look-preview.has-backdrop .lp-bar, .look-preview.has-backdrop .lp-side { background: var(--backdrop-veil-side); }
+.look-preview.has-backdrop .lp-bar { background: var(--backdrop-veil-side); }
+/* As heavy as `#app.has-backdrop .side`: over a picture the list is its veil alone, whatever a design paints on it. */
+#ov-settings .look-preview.has-backdrop .lp-side { background: var(--backdrop-veil-side); }
 .look-preview.has-backdrop .lp-main { background: var(--backdrop-veil); }
 .look-preview.has-backdrop .lp-page { background: transparent; }
 .lp-amount {
@@ -794,8 +804,10 @@ body {
 .set-mix-styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; margin: 0 0 10px; }
 .set-mix-style {
   display: grid; justify-items: center; gap: 4px; padding: 5px 4px 4px; border: 1px solid var(--rule); border-radius: 8px;
-  background: var(--paper-raised); color: var(--ink-soft); font-size: 11.5px; cursor: pointer;
+  background: var(--paper-raised); color: var(--ink-soft); font: inherit; font-size: 11.5px; cursor: pointer;
 }
+/* The first of them wears no style: a plain sheet. */
+.set-mix-style[data-mix-style="none"] canvas { border: 1px dashed var(--ink-faint); background: var(--paper); }
 .set-mix-style canvas { width: 64px; height: 36px; border-radius: 5px; display: block; }
 .set-mix-style:hover { color: var(--ink); border-color: var(--ink-faint); }
 .set-mix-style.on { border-color: var(--clay); box-shadow: 0 0 0 1px var(--clay); color: var(--ink); }
@@ -816,6 +828,71 @@ body {
   padding: 20px 28px 8px;
   border-bottom: 1px solid var(--rule);
 }
+
+/* Tabs over the note (1.0.4, note-tabs.js): they stand on the line under the
+   title ("tam not basliginin altindaki cizgi ile birlesik sekmeler", the
+   owner), so with tabs the line is theirs, drawn inside the strip — a border
+   would lie outside what a scrolling strip lets its tabs cover. The tab of the
+   note written in is open to the page under it. */
+.page-head:has(+ .note-tabs:not([hidden])) { border-bottom-color: transparent; padding-bottom: 6px; }
+.note-tabs {
+  position: relative; flex-shrink: 0; display: flex; align-items: flex-end; gap: 3px;
+  min-height: 31px; padding: 0 28px; box-shadow: inset 0 -1px 0 var(--rule);
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none; user-select: none;
+}
+.note-tabs[hidden] { display: none; }
+.note-tabs::-webkit-scrollbar { display: none; }
+.note-tab {
+  flex: 0 1 190px; min-width: 84px; height: 29px; box-sizing: border-box;
+  display: flex; align-items: center; gap: 4px; padding: 0 5px 0 11px;
+  border: 1px solid var(--rule); border-radius: 8px 8px 0 0;
+  background: transparent; color: var(--ink-soft); font-size: 13px; cursor: pointer; outline: none;
+}
+.note-tab:hover { background: var(--paper-raised); color: var(--ink); }
+.note-tab:focus-visible { border-color: var(--clay); }
+.note-tab.active {
+  background: var(--paper); color: var(--ink); font-weight: 600; cursor: default;
+  border-color: var(--ink-faint); border-bottom-color: var(--paper); box-shadow: inset 0 2px 0 var(--clay);
+}
+/* Shown beside the one written in: its line, fainter. */
+.note-tab.beside { box-shadow: inset 0 2px 0 var(--ink-faint); color: var(--ink); }
+/* It came and the page did not go to it (a mention clicked, a note let go here). */
+.note-tab.lit { animation: note-tab-lit 1.4s ease-out; }
+@keyframes note-tab-lit {
+  0%, 55% { background: color-mix(in srgb, var(--clay) 26%, transparent); border-color: var(--clay); color: var(--ink); }
+  100% { background: transparent; }
+}
+.nt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-close {
+  flex-shrink: 0; width: 18px; height: 18px; display: grid; place-items: center; padding: 0;
+  border: none; border-radius: 5px; background: none; color: var(--ink-faint); font-size: 10px; cursor: pointer; opacity: 0;
+}
+.note-tab:hover .nt-close, .note-tab.active .nt-close, .note-tab:focus-visible .nt-close { opacity: 1; }
+.nt-close:hover { background: color-mix(in srgb, var(--clay) 18%, transparent); color: var(--clay); }
+/* A note is being dragged and there are no tabs yet: where one would come. */
+.note-tabs--offer { align-items: center; }
+.note-tabs--offer::before {
+  content: attr(data-hint); flex: 1; height: 23px; margin-bottom: 4px; display: grid; place-items: center;
+  border: 1.5px dashed var(--clay); border-radius: 7px; color: var(--ink-soft); font-size: 12px;
+  background: color-mix(in srgb, var(--clay) 10%, transparent);
+}
+/* Over the line, a note in the air is shown as the tab it would be, in its place
+   ("sadece cizgi degilde sekme önizlemesi seklinde olsun", the owner): sized as
+   a tab is, so the others stand aside as they will. The bare line's words give way to it. */
+.note-tab-ghost {
+  flex: 0 1 190px; min-width: 84px; height: 29px; box-sizing: border-box;
+  display: flex; align-items: center; padding: 0 11px;
+  border: 1.5px dashed var(--clay); border-bottom: none; border-radius: 8px 8px 0 0;
+  background: color-mix(in srgb, var(--clay) 16%, transparent); color: var(--ink); font-size: 13px;
+  opacity: .85; pointer-events: none;
+}
+.note-tabs--offer:has(.note-tab-ghost) { align-items: flex-end; }
+.note-tabs--offer:has(.note-tab-ghost)::before { display: none; }
+/* A tab in the air is faint where it stands; over the line it gives its room to
+   its preview (no width, and the gap after it taken back — still drawn, it is what is dragged). */
+.note-tab.moving { opacity: .45; }
+.note-tab.away { flex: 0 0 0; min-width: 0; padding: 0; border-width: 0; margin-right: -3px; overflow: hidden; opacity: 0; }
+@media print { .note-tabs { display: none !important; } }
 
 .title-input {
   flex: 1;
@@ -916,6 +993,11 @@ body {
 /* Over Settings too, for the window can be moved with it open; under a toast. */
 .screen-tip { width: min(380px, calc(100vw - 36px)); z-index: 110; }
 .screen-tip .uc-actions { flex-wrap: wrap; }
+/* The fonts put back (design-fonts.js): asked from Settings, so over it; under a toast. */
+.fonts-back { z-index: 110; }
+/* Copy for Discord (1.0.4, discord-copy.js): over Settings too; what the text could not carry, smaller under the card’s words. */
+.discord-copy { z-index: 110; }
+.discord-copy .discord-left { font-size: 12px; opacity: .8; }
 
 /* About panel — paths are long, so the modal is wider and they wrap.
    `.modal.modal-wide`, not `.modal-wide`: editor.css sets .modal to 420px and
@@ -1586,9 +1668,20 @@ button.te-chip { padding: 3px 10px; cursor: pointer; }
    The sheet from the title beside Help: what a new note starts with, what is
    put away, and the lock on opening. Ids, because editor.css sets .overlay and
    .modal after this file. */
-#ov-settings { padding-top: 7vh; }
-#ov-settings .modal { display: flex; flex-direction: column; max-height: 86vh; }
-#settings-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 4px; }
+#ov-settings { padding-top: 4vh; }
+#ov-settings .modal { display: flex; flex-direction: column; max-height: calc(92vh / var(--set-zoom)); }
+/* The whole sheet a tenth larger, in proportion (1.0.4, the owner: "herşeyi %10 büyütelim orantılı,
+   settings kutusu da dahil"): the box, its words and every control in it alike, so one zoom and no size
+   of its own changed. What is measured against the window is divided by it, so the sheet still fits the
+   window; and where the window was what held the box (Appearance), the box takes more of it, 92 of the
+   hundred for 86, since a box as tall as before would not have grown. settings-panel.js reads the same
+   zoom where it measures (holdHintRoom). */
+#ov-settings .modal { --set-zoom: 1.1; zoom: var(--set-zoom); }
+#ov-settings .modal.modal-wide { width: min(580px, calc(94vw / var(--set-zoom))); }
+#ov-settings .modal.modal-wide.settings-modal.is-wide { width: min(1000px, calc(96vw / var(--set-zoom))); }
+/* No scroll anchoring: when a design changed how a hint wrapped, the browser held on to a thing of the
+   left column and moved the whole sheet by that line (the owner: "scroll mesela kayıyor soldaki"). */
+#settings-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-anchor: none; padding-right: 4px; }
 .set-group + .set-group { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
 /* The themes in Settings (1.0.3): the row as wide as the group, the editor opening under it. */
 .set-group .theme-pick button { font-size: 12px; padding: 6px 2px; }
@@ -1624,6 +1717,14 @@ button.te-chip { padding: 3px 10px; cursor: pointer; }
 .studio-tools .te-pick .te-dot-add { flex: 0 0 26px; width: 26px; }
 @media (max-width: 560px) {
   .studio-tools .te-pick { grid-template-columns: minmax(0, 1fr); }
+}
+/* Side by side, the two end on one line: the colours to choose from are as
+   tall as the room the slots leave them, so their foot is the last slot's
+   (1.0.4, the owner's Bugs note: the swatches ended short of the Text row). */
+@media (min-width: 561px) {
+  .studio-tools .te-pick__sets, .studio-tools .te-pick__colors { align-self: stretch; }
+  .studio-tools .te-pick__colors .te-swatches { flex: 1 1 auto; grid-auto-rows: minmax(14px, 1fr); }
+  .studio-tools .te-pick__colors .te-swatch { aspect-ratio: auto; }
 }
 .te-dot-wrap { position: relative; display: inline-flex; }
 .te-dot {
@@ -1739,6 +1840,9 @@ button.te-chip { padding: 3px 10px; cursor: pointer; }
 .tool-steps { margin: 8px 0 8px; padding-left: 20px; font-size: 12.5px; line-height: 1.55; color: var(--ink-soft); }
 .tool-steps li + li { margin-top: 4px; }
 .tool-guide > .set-hint { margin-bottom: 2px; }
+/* Online in Tailscale and silent in Nebula (1.0.4): the firewall and the way through it, under the list. Its command can be copied. */
+.tool-firewall { border-color: var(--c-red, #c0392b); }
+.tool-firewall .tool-steps { margin-bottom: 2px; padding-left: 16px; user-select: text; }
 
 /* A sync running (tailnet-sync.js): a thin line under the title bar, and on opening a card that can be skipped. */
 /* The sync card (tailnet-sync.js): bottom right like the update card, over Settings and Tools, under a toast. */
@@ -1784,22 +1888,36 @@ button.te-chip { padding: 3px 10px; cursor: pointer; }
 
 /* The logo's editor, at the foot of the Settings sheet (0.9.4, logo-editor.js):
    the logo at the left, and at its right the theme editor's own pieces (.te-*). */
-.logo-editor { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 18px; align-items: start; margin-bottom: 8px; }
-.logo-side { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 2px; }
+.logo-editor { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 18px; align-items: center; margin-bottom: 8px; }
+.logo-side { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .logo-big { width: 112px; height: 112px; display: block; }
 .logo-smalls { display: flex; align-items: flex-end; gap: 12px; }
 .logo-mid { width: 32px; height: 32px; }
 .logo-tiny { width: 16px; height: 16px; }
 .logo-tools { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .logo-tools .te-label { margin-top: 0; }
-.logo-tools .te-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
-.logo-tools .te-swatches { grid-template-columns: repeat(14, 1fr); }
+/* Under the themes: its five parts one under the other at the left, and the colours for the chosen one
+   filling all the room at their right, as high as the five are (1.0.4). */
+.logo-colours { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 10px; align-items: stretch; }
+/* One under the other here, whatever the Settings sheet does with the theme's own (two side by side). */
+.logo-colours .te-slots { display: flex; flex-direction: column; gap: 4px; }
+/* As high together as what stands at their right: the last part ends where the colours end. */
+.logo-colours .te-slot { flex: 1; }
+.logo-pick { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+/* On top the picture of one's own and the shortcut, with a line on the picture; the bar of the chosen
+   colour and the colours, squares fourteen to a row as in the theme's editor, at the foot. */
+.logo-pick .te-swatches { flex: none; grid-template-columns: repeat(14, 1fr); }
 /* The logo's own themes: a + after the last of them, and under the editor a button for a shortcut. */
 /* The user's own picture, kept among the themes (1.0.3). */
 .logo-themes .logo-mine { display: inline-flex; align-items: center; gap: 6px; }
 .logo-mine__img { width: 16px; height: 16px; border-radius: 4px; object-fit: cover; }
-.logo-themes .logo-add {min-width: 26px; padding: 3px 9px; font-weight: 600; color: var(--clay); }
-.logo-shortcut { font-size: 12.5px; padding: 6px 11px; margin-top: 2px; }
+.logo-themes .logo-add, .te-profiles .te-add {min-width: 26px; padding: 3px 9px; font-weight: 600; color: var(--clay); }
+.logo-pick .set-hint { margin: 0; }
+/* The picture's buttons fill their row, and the row under it when they do not fit in one: both
+   ends on the bar's ends in every face and language (1.0.4, the owner: "burada kayma var"). */
+.logo-pick .set-buttons .btn { flex: 1 1 auto; }
+.logo-pick .te-bar-row { margin-top: auto; }
+.logo-shortcut { font-size: 12.5px; padding: 6px 11px; }
 .logo-shortcut:disabled { opacity: .5; cursor: default; }
 .set-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
 .set-buttons .btn { font-size: 12.5px; padding: 6px 11px; }
@@ -1865,6 +1983,15 @@ button.te-chip { padding: 3px 10px; cursor: pointer; }
 .galaxy-full svg, .galaxy-mini-fit svg { width: 13px; height: 13px; }
 .galaxy-full:hover, .galaxy-full.on, .galaxy-mini-fit:hover { border-color: var(--clay); color: var(--clay); }
 .galaxy-mini .galaxy-canvas { display: block; width: 100%; height: 120px; cursor: default; outline: none; }
+/* Folded by the caret in its head: the head is all that is left of it. */
+.galaxy-fold {
+  flex: none; width: 16px; height: 22px; display: grid; place-items: center; padding: 0; border: 0;
+  background: none; cursor: pointer; border-radius: 4px;
+}
+.galaxy-fold:hover .fr-caret { color: var(--clay); }
+.galaxy-fold[aria-expanded="true"] .fr-caret::before { transform: rotate(90deg); }
+.galaxy-mini.folded .galaxy-canvas { display: none; }
+.galaxy-mini-fit[hidden] { display: none; }
 .galaxy-canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--clay); }
 #app.side-collapsed .galaxy-slot { display: none; }
 
@@ -1995,6 +2122,22 @@ body.map-full .page-head, body.map-full #toolbar { display: none; }
 .corner-card__text { font-size: 14px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .corner-card__note { font-size: 12px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .corner-card__key { flex: none; }
+/* Made smaller, then down to its icon (1.0.4, widgets.js): the − at its end steps it down. */
+.corner-card__size {
+  flex: none; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 5px;
+  background: transparent; color: var(--ink-faint); font-size: 15px; line-height: 1; cursor: pointer;
+}
+.corner-card__size:hover { background: var(--paper-sunken); color: var(--ink); }
+.corner-stack > .corner-card--small, .corner-stack > .corner-card--icon { align-self: flex-end; }
+.corner-card--small { gap: 7px; padding: 5px 7px; }
+.corner-card--small .corner-card__ic { width: 22px; height: 22px; border-radius: 7px; }
+.corner-card--small .corner-card__ic .ic { width: 14px; height: 14px; }
+.corner-card--small .corner-card__head, .corner-card--small .corner-card__key { display: none; }
+.corner-card--small .corner-card__time { font-size: 14px; }
+.corner-card--icon { padding: 5px; }
+.corner-card--icon .corner-card__ic { width: 26px; height: 26px; border-radius: 8px; }
+.corner-card--icon .corner-card__ic .ic { width: 16px; height: 16px; }
+.corner-card--icon .corner-card__body, .corner-card--icon .corner-card__key, .corner-card--icon .corner-card__size { display: none; }
 .alarm-card { border-color: var(--clay); }
 .alarm-card .corner-card__ic { animation: corner-ring .5s ease-in-out 6; }
 @keyframes corner-ring { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-14deg); } 75% { transform: rotate(14deg); } }

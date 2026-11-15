@@ -382,7 +382,7 @@ export async function runIdeas103Checks(check) {
     const offersShown = () => win.evaluate(() => { const b = document.querySelector('#theme-editor .te-pick__offers'); return !!b && !b.hidden && b.querySelectorAll('.te-offers > *').length > 0; });
     check('and the photo’s colours go with it while the style is worn', !await offersShown());
     await win.click('#set-backdrop-photos .set-photo__wear');
-    await win.waitForFunction(() => document.querySelector('#set-backdrop-photos .set-photo.on') && !document.querySelector('[data-mix-style].on'), null, { polling: 50 });
+    await win.waitForFunction(() => document.querySelector('#set-backdrop-photos .set-photo.on') && !document.querySelector('[data-mix-style].on:not([data-mix-style="none"])'), null, { polling: 50 });
     check('worn again, its colours are offered again', await offersShown());
     check('and its little picture puts it back on', await win.evaluate(() => /^url\("data:image\/jpeg/.test(document.getElementById('app').style.getPropertyValue('--backdrop-image'))));
     check('Settings is not dimmed over the picture', await win.evaluate(() => getComputedStyle(document.getElementById('ov-settings')).backgroundColor === 'rgba(0, 0, 0, 0)'));
@@ -533,8 +533,8 @@ export async function runIdeas103Checks(check) {
         label: document.querySelector('#theme-editor .te-extra-label')?.textContent ?? '',
         smooth: !!document.getElementById('set-smooth-screen')?.closest('#set-picture') && document.getElementById('set-smooth-screen').value };
     });
-    check('Appearance: the preview at the left, the themes, one editor of their and the styles’ colours, and fifteen styles at its right',
-      organizer.heads === 'Theme organizer,Logo' && organizer.together && organizer.beside && organizer.fits && organizer.order && organizer.styles === 15 && organizer.dots === 3, JSON.stringify(organizer));
+    check('Appearance: the designs first (1.0.4), the preview at the left, the themes, one editor of their and the styles’ colours, and No style with fourteen styles at its right',
+      organizer.heads === 'Design,Theme organizer,Logo' && organizer.together && organizer.beside && organizer.fits && organizer.order && organizer.styles === 15 && organizer.dots === 3, JSON.stringify(organizer));
     check('the picture stands at the left under the preview, with Soften for the screen on Never',
       organizer.picture && organizer.smooth === 'off', JSON.stringify(organizer));
     // 1.0.3 (the owner: "aşağı indirince picture kısmı önizlemenin altına düşüyor, hepsi sabit olsun aşağı doğru insin").

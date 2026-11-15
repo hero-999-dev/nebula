@@ -304,7 +304,7 @@ Regular text with **bold**, *italic* and \`inline code\`.
  * uses it to add the guide to a vault that predates it, exactly once, without
  * touching anything already there.
  */
-export const GUIDE_VERSION = '1.0.3';
+export const GUIDE_VERSION = '1.0.4';
 
 /**
  * The guide's words, without its markup, shapes, code or equations — so a
@@ -669,6 +669,186 @@ export const GUIDE_SIGNATURES = {
   '1.0.3 de': '54c04070',
   '1.0.3 pl': 'b2acf411',
   '1.0.3 tr': '6765518a',
+  // New in 1.0.4: the corner card's sizes, the size in About, a box in one column; the badge without its lock.
+  '1.0.4 before the Clock’s timer': '9d28570e',
+  '1.0.4 before the Clock’s timer de': '7a9a9e6d',
+  '1.0.4 before the Clock’s timer pl': '964329b0',
+  '1.0.4 before the Clock’s timer tr': '5b0c42ff',
+  // The Clock's timer.
+  '1.0.4 before files taken out': '37af6c38',
+  '1.0.4 before files taken out de': '09115771',
+  '1.0.4 before files taken out pl': 'a50c67b4',
+  '1.0.4 before files taken out tr': '01c83c43',
+  // Files taken out of a note.
+  '1.0.4 before pictures taken out': 'a43d1069',
+  '1.0.4 before pictures taken out de': '9cf61583',
+  '1.0.4 before pictures taken out pl': '984f1eee',
+  '1.0.4 before pictures taken out tr': '8df8b927',
+  // Pictures taken out too, a stepper’s number typed.
+  '1.0.4 before a file sent to a note': '002f094a',
+  '1.0.4 before a file sent to a note de': '654b9359',
+  '1.0.4 before a file sent to a note pl': 'c236ce30',
+  '1.0.4 before a file sent to a note tr': 'b52f3ab2',
+  // A file sent to another note, a card taken anywhere, what is pulled shown.
+  '1.0.4 before the table corner': '4795b0bf',
+  '1.0.4 before the table corner de': '85c24d05',
+  '1.0.4 before the table corner pl': '0906df0d',
+  '1.0.4 before the table corner tr': 'ce05cf99',
+  // A table pulled larger or smaller by its corner.
+  '1.0.4 before Send to… for anything': '71b2bd36',
+  '1.0.4 before Send to… for anything de': '3195e920',
+  '1.0.4 before Send to… for anything pl': '838f2643',
+  '1.0.4 before Send to… for anything tr': 'e570c7e4',
+  // Send to… for a picture, a block, the words selected; the corner pulled straight.
+  '1.0.4 before the two marks of a table': '33f78600',
+  '1.0.4 before the two marks of a table de': '62285e4e',
+  '1.0.4 before the two marks of a table pl': 'b96a0de5',
+  '1.0.4 before the two marks of a table tr': 'dbb96898',
+  // A table's two marks: only wider, only higher.
+  '1.0.4 before Save new name': '6f0066b2',
+  '1.0.4 before Save new name de': 'f8bcc3d5',
+  '1.0.4 before Save new name pl': '4108b107',
+  '1.0.4 before Save new name tr': '196ab8bc',
+  '1.0.4 before the random theme': '58373499',
+  '1.0.4 before the World clock and the Weather': 'ccbe5bdd',
+  '1.0.4 before the Weather’s many cities': '4243b0be',
+  '1.0.4 before feet made level': 'eef8d5bf',
+  '1.0.4 before folded sections': 'add4ccec',
+  '1.0.4 before the shapes’ own place': 'db30345a',
+  '1.0.4 before the sections of the removed lists': 'eb20b811',
+  '1.0.4 before New in left the page': '49aee8c5',
+  '1.0.4 before the widget button': 'd1f87c73',
+  '1.0.4 before the shape tiles': 'c6be56c2',
+  '1.0.4 before the arrow tiles': 'd4014a92',
+  '1.0.4 before the shape sides': '09c2cff8',
+  '1.0.4 before the text box': '96ae26e9',
+  '1.0.4 before the empty dot': '7e33a204',
+  '1.0.4 before the faint preview': '0d3946a2',
+  '1.0.4 before the held pictures': 'e152f178',
+  '1.0.4 before the bent arrows': '499e1c5e',
+  '1.0.4 before the tabs': 'd6409bcc',
+  '1.0.4 before the designs': '56c0597f',
+  '1.0.4 before the nine designs': 'b03db3d5',
+  '1.0.4 before the eight designs': '3a3368c6',
+  '1.0.4 before a design put on Main': 'deb9f6fa',
+  '1.0.4 before Ink wrote by hand': '36991157',
+  '1.0.4 before the designs’ faces on top': '7290b8e5',
+  '1.0.4 before the faces over the pins': 'f60cd8d3',
+  '1.0.4 before the design’s font': 'bb28cd73',
+  '1.0.4 before the font on every note': 'f387d3e2',
+  '1.0.4 before the Serif a font': 'fa92c9eb',
+  '1.0.4 before the firewall and a note kept off sync': '20ff4cb1',
+  '1.0.4 before the firewall button left': '13e578c7',
+  '1.0.4 before live sync': 'b08f1e47',
+  '1.0.4 before files and pictures said to be coming': '86a2de7d',
+  '1.0.4 before Nebula on Linux': '0608f4cf',
+  '1.0.4 before Copy for Discord': '2bbcf1e8',
+  '1.0.4': '0ab656dc',
+  '1.0.4 before the random theme de': '413b11df',
+  '1.0.4 before the World clock and the Weather de': '26d933e4',
+  '1.0.4 before the Weather’s many cities de': '477fb505',
+  '1.0.4 before feet made level de': '231a003d',
+  '1.0.4 before folded sections de': 'd549ad6c',
+  '1.0.4 before the shapes’ own place de': 'f93bf26a',
+  '1.0.4 before the sections of the removed lists de': 'cbe4a1fc',
+  '1.0.4 before New in left the page de': '77806345',
+  '1.0.4 before the widget button de': 'fbc39e50',
+  '1.0.4 before the shape tiles de': '570e1444',
+  '1.0.4 before the arrow tiles de': 'b8dd6228',
+  '1.0.4 before the shape sides de': '07282074',
+  '1.0.4 before the text box de': 'd4322b80',
+  '1.0.4 before the empty dot de': '2759fc5e',
+  '1.0.4 before the faint preview de': '81be2e0e',
+  '1.0.4 before the held pictures de': '803b968a',
+  '1.0.4 before the bent arrows de': 'eedcd139',
+  '1.0.4 before the tabs de': '37594997',
+  '1.0.4 before the designs de': 'e87db0ae',
+  '1.0.4 before the nine designs de': '6b571969',
+  '1.0.4 before the eight designs de': '8cfd8406',
+  '1.0.4 before a design put on Main de': 'ab362f12',
+  '1.0.4 before Ink wrote by hand de': '8f98b7d0',
+  '1.0.4 before the designs’ faces on top de': '72c8d002',
+  '1.0.4 before the faces over the pins de': 'fcc3ab90',
+  '1.0.4 before the design’s font de': 'd88b36c4',
+  '1.0.4 before the font on every note de': '78e33393',
+  '1.0.4 before the Serif a font de': 'ef38bd7c',
+  '1.0.4 before the firewall and a note kept off sync de': '97c5a9f7',
+  '1.0.4 before the firewall button left de': 'e5082f88',
+  '1.0.4 before live sync de': 'c896a5b7',
+  '1.0.4 before files and pictures said to be coming de': '75e9cc1c',
+  '1.0.4 before Nebula on Linux de': 'f26f1123',
+  '1.0.4 before Copy for Discord de': 'baa159ef',
+  '1.0.4 de': 'e212f220',
+  '1.0.4 before the random theme pl': 'e0cd0e49',
+  '1.0.4 before the World clock and the Weather pl': 'fb223d07',
+  '1.0.4 before the Weather’s many cities pl': 'eeedc6a7',
+  '1.0.4 before feet made level pl': '1a2546cf',
+  '1.0.4 before folded sections pl': 'a62dfce3',
+  '1.0.4 before the shapes’ own place pl': '1dfc6910',
+  '1.0.4 before the sections of the removed lists pl': '63d19917',
+  '1.0.4 before New in left the page pl': '0e81e7f3',
+  '1.0.4 before the widget button pl': 'c1ddf248',
+  '1.0.4 before the shape tiles pl': 'a789a25d',
+  '1.0.4 before the arrow tiles pl': '4e8fcea6',
+  '1.0.4 before the shape sides pl': '92f908b1',
+  '1.0.4 before the text box pl': '44e49d15',
+  '1.0.4 before the empty dot pl': '1b4e8b53',
+  '1.0.4 before the faint preview pl': '177f8cac',
+  '1.0.4 before the held pictures pl': 'd7b55466',
+  '1.0.4 before the bent arrows pl': 'c5b1ae26',
+  '1.0.4 before the tabs pl': '1d07e688',
+  '1.0.4 before the designs pl': '59b4b5fe',
+  '1.0.4 before the nine designs pl': '56982c25',
+  '1.0.4 before the eight designs pl': 'c83d8f42',
+  '1.0.4 before a design put on Main pl': 'f53ba1b9',
+  '1.0.4 before Ink wrote by hand pl': '3238b211',
+  '1.0.4 before the designs’ faces on top pl': '9dd3fff9',
+  '1.0.4 before the faces over the pins pl': '65aff72c',
+  '1.0.4 before the design’s font pl': 'd0a82b52',
+  '1.0.4 before the font on every note pl': '71979bc1',
+  '1.0.4 before the Serif a font pl': '20ec13c1',
+  '1.0.4 before the firewall and a note kept off sync pl': '8f49a0ff',
+  '1.0.4 before the firewall button left pl': 'e6162af7',
+  '1.0.4 before live sync pl': '18cb03e3',
+  '1.0.4 before files and pictures said to be coming pl': '2df534d8',
+  '1.0.4 before Nebula on Linux pl': '63b2577d',
+  '1.0.4 before Copy for Discord pl': '6a8c5a96',
+  '1.0.4 pl': '475dace0',
+  '1.0.4 before the random theme tr': 'd4512fc4',
+  '1.0.4 before the World clock and the Weather tr': '87f10631',
+  '1.0.4 before the Weather’s many cities tr': '55333d22',
+  '1.0.4 before feet made level tr': 'e76d7e77',
+  '1.0.4 before folded sections tr': '1f4db674',
+  '1.0.4 before the shapes’ own place tr': 'dc15424a',
+  '1.0.4 before the sections of the removed lists tr': 'b910ab7e',
+  '1.0.4 before New in left the page tr': 'bb69ec78',
+  '1.0.4 before the widget button tr': 'da90790e',
+  '1.0.4 before the shape tiles tr': '6af19ee4',
+  '1.0.4 before the arrow tiles tr': '32b441db',
+  '1.0.4 before the shape sides tr': 'f93756c8',
+  '1.0.4 before the text box tr': '5434565d',
+  '1.0.4 before the empty dot tr': 'bc668196',
+  '1.0.4 before the faint preview tr': '58f8b6f1',
+  '1.0.4 before the held pictures tr': '15020c83',
+  '1.0.4 before the bent arrows tr': '9d39260c',
+  '1.0.4 before the tabs tr': 'dd2cdb02',
+  '1.0.4 before the designs tr': 'abf8487d',
+  '1.0.4 before the nine designs tr': 'd1403cdf',
+  '1.0.4 before the eight designs tr': '5a05dd46',
+  '1.0.4 before a design put on Main tr': 'fa6aeef3',
+  '1.0.4 before Ink wrote by hand tr': 'b4a626ad',
+  '1.0.4 before the designs’ faces on top tr': 'd60688d8',
+  '1.0.4 before the faces over the pins tr': '246fb961',
+  '1.0.4 before the design’s font tr': 'ef96a8dc',
+  '1.0.4 before the font on every note tr': 'eca8d808',
+  '1.0.4 before the Serif a font tr': '2bb2bb3e',
+  '1.0.4 before the firewall and a note kept off sync tr': '2df79808',
+  '1.0.4 before the firewall button left tr': '8d06292d',
+  '1.0.4 before live sync tr': 'bc6544a3',
+  '1.0.4 before files and pictures said to be coming tr': '67779851',
+  '1.0.4 before Nebula on Linux tr': 'b4578ac9',
+  '1.0.4 before Copy for Discord tr': '9327fdcb',
+  '1.0.4 tr': '88454fdc',
 };
 
 /** Whether a vault's guide is one we shipped and nobody has typed in. */
@@ -679,105 +859,27 @@ export const GUIDE_NOTE = {
   // Opens in Only view so a stray key cannot change it (0.8.9); ⋯ -> Edit mode unlocks it.
   readOnly: true,
   content:
-    // Shapes live on layers at the top of the note; the behind-layer is a real
-    // second layer, not a class, so it can be painted under the text.
-    //
-    // They sit in a row on a stage of their own — an empty band at the very top
-    // that no text flows through. Placed over the opening paragraphs (up to
-    // 0.8.5) they landed on the words at any window width but one, which looked
-    // like a mistake rather than a demonstration.
-    '<div class="shape-layer shape-layer--behind" contenteditable="false" data-block-type="shape-layer">' +
-    '<div class="shape diamond behind" data-kind="diamond" style="left:392px;top:8px;width:150px;height:116px;background:#F0D2CE"><div class="shape-text" contenteditable="true">behind the text</div><span class="shape-h"></span></div>' +
-    '</div>' +
-    '<div class="shape-layer" contenteditable="false" data-block-type="shape-layer">' +
-    '<div class="shape rect" data-kind="rect" data-rot="-6" style="left:14px;top:22px;width:150px;height:86px;background:#D6E4D0;transform:rotate(-6deg)"><div class="shape-text" contenteditable="true">drag me anywhere</div><span class="shape-h"></span></div>' +
-    '<div class="shape ellipse" data-kind="ellipse" style="left:196px;top:16px;width:164px;height:98px;background:#D3E0EA"><div class="shape-text" contenteditable="true">double-click to write</div><span class="shape-h"></span></div>' +
-    '</div>' +
-    '<div class="guide-stage" contenteditable="false" aria-hidden="true"></div>' +
-
     '<h1>Welcome to Nebula</h1>' +
     '<p>A calm place for notes. Everything auto-saves — there is no save button to forget, though <span class="inline-code">Ctrl+S</span> works if you want one.</p>' +
     '<p>This is the whole guide in one page. Every section has something you can try on the spot; the text you are reading is an ordinary note, so edit it, break it, or delete it once you are done. Your own notes are never touched by an update — and this page updates itself only while you have not written in it.</p>' +
-    '<p>This page opens in <strong>Only view</strong> (the 🔒 badge by its title), so nothing here changes by accident. To try things on it, click the badge or choose ⋯ → Edit mode in the note list — or try them in a new note.</p>' +
+    '<p>This page opens in <strong>Only view</strong> (the <em>Only view</em> badge by its title), so nothing here changes by accident. To try things on it, click the badge or choose ⋯ → Edit mode in the note list — or try them in a new note.</p>' +
+    '<p><strong>Every section below is folded.</strong> Click the arrow before a heading to open it; <span class="inline-code">Ctrl+F</span> finds a word inside a folded section too, and opens it.</p>' +
 
     // Each release adds its features here (features, not fixes) and in the
     // section they belong to. See GUIDE_SIGNATURES before changing any text.
     // A divider closes each section before the next heading (owner, 0.8.9).
+    //
+    // 1.0.4, the owner: "only the latest update should show under what is new,
+    // and the guide's pages should be friendlier: toggles for the categories".
+    // What the newest release added and each numbered section are folded toggle
+    // headings — the page opens as a list of headings; the earlier releases are
+    // not in it (Help → What's new has them all). A translation counts a section's heading
+    // and what is under it block by block (guide-i18n.js wordBlocks).
     '<hr class="blk-hr">' +
-    '<h2>New in 1.0.3</h2>' +
-    '<p><strong>Several blocks at once.</strong> Pick a block by its grip, then Shift+click another grip, press Shift+↑ or Shift+↓, or drag a box from the empty side of the page. Copy, cut, delete and move what you picked together — section 15. Empty lines at the ends of a pick are left out. A drag begun in a line’s words selects words while it stays in that line; once it reaches another line it picks whole blocks, and back in its line it is words again.</p>' +
-    '<p><strong>Pictures of your own.</strong> A picture behind your notes, and a picture as the logo, cropped inside the app — section 16. Settings → Appearance opens on a small Nebula that shows how your words look over it.</p>' +
-    '<p><strong>A note with its files, as one zip.</strong> Export → Nebula note saves a note with videos, PDFs or other files as one zip, the note and its files in it. Import the zip on another computer and the files come along into your notes, linked again.</p>' +
-    '<p><strong>Taller columns.</strong> The upright line between two columns has a small grip at its foot. Pull it down and the columns grow, taking in the lines under them; pull it up and they shrink again.</p>' +
-    '<p><strong>A Pomodoro and a Clock.</strong> Type <span class="inline-code">/widget</span> and choose Pomodoro: focus, a break, and a long break after a number of sessions, each with its own minutes, and a stopwatch on its other tab. The Clock shows the time and the date and has an alarm: set its hour and minutes and turn the bell on. Both ring with Settings → Alarm sound: wind chimes, a sound of your computer, an mp3 of your own, or Off.</p>' +
-    '<p><strong>Pomodoro, your way.</strong> Say after how many sessions the long break comes. Auto-continue starts the next break or focus by itself. A focus and a break end with different sounds — wind chimes and a singing bowl, two real recordings credited in About Nebula — and the ♪ buttons in the Pomodoro and the Clock choose them right there: Nebula’s, any sound your computer has, or sounds of your own, as many as twenty. Settings → Sounds has the same three.</p>' +
-    '<p><strong>Days with events, a Pomodoro that follows you.</strong> Click a day in a Calendar widget to choose it: under the month are its events, Mark marks the day, and + Event writes one with a time and, if you like, an alarm. The alarm rings at its time whichever note is open, and a card in the bottom-right corner says what it is; click it and Nebula opens that calendar on that day. A Pomodoro running out of sight, further down the note or in another note, shows live in the same corner with Pause and Continue; click it to go back to it.</p>' +
-    '<p><strong>A map that stays put.</strong> The lock in the corner of a Universe widget pins its map where it is: it no longer drags or zooms, the wheel scrolls the note past it, and the note keeps the view. The left of its four buttons hides the names, as Hide names does on the big map, and the widget keeps that choice; a picked body still names its own system. The next one fits the whole map in view; on a pinned map it pins that view. The third one follows a body: click a planet or a star on the map, press it, and the camera keeps that body in the middle as it goes round; a drag, Fit or another body lets go. Locked while it follows, the map keeps following, and the round marks of the pick are gone.</p>' +
-    '<p><strong>Themes in Settings.</strong> The themes moved from the foot of the sidebar to the top of Settings, with a fifth in the middle: <strong>Matcha</strong>, dark green with white words. Your own theme stands open beside them, with no button to open it.</p>' +
-    '<p><strong>Your notes on all your devices.</strong> The new Tools menu beside Settings holds Nebula’s connections with other apps. The first, Tailscale sync, keeps the notes of your computers alike over your own tailnet — two of them or more, and a phone once Nebula comes to phones — straight from one to the other with no cloud between. Turn it on on each, make a pairing code on one and type it into each of the others: all your devices share that one code. Then list the other devices on each one by their Tailscale name or address; beside each, Tools says whether it is connected, and at the top whether Tailscale is. A device added later takes the same code: on a paired one press Show the code, and Hide the code puts it away again. Each fetches what changed on the others when it opens, when another closes, and at Sync now; a device that is off is simply skipped until next time. Sync now, in the sheet that Tools → Tailscale opens, goes both ways: the devices it reaches fetch from this one too, and a card at the bottom right shows how far it has come and ends with Synced on all your devices. Unpair, or taking a connected device off the list, asks first. A note changed on two of them is kept twice, side by side; a note deleted for good on one goes on all the others too, even those that hear of it only through another. Black holes and this guide stay on each device, and big videos come over afterwards, in the background. Devices sync only on the same version of Nebula: if one is behind, it says which, and to update it first. How to set it up — for two devices, a third or a phone, and what to do with one lost — is in the Tools sheet itself, step by step.</p>' +
-    /* new */ '<p><strong>Settings in tabs.</strong> Settings opens in tabs now — General, Appearance, Sounds, App lock and Storage — on the one used last; the themes are under Appearance. Storage shows how much room Nebula takes on this computer: the notes, their words and their pictures apart, the five biggest, the black holes, the backups, the Trash and the program itself. The Trash can be emptied there, as with its own Delete.</p>' +
-    '<p><strong>A background of colours.</strong> No picture at hand? The Theme organizer makes one of colours: pick a few, then a style — waves, clouds, rings and more — section 16. The picture now fills the whole window, behind the list too, and takes on the theme’s colour.</p>' +
-    '<p><strong>Appearance, seen first.</strong> Settings → Appearance is laid out like the logo’s editor. At the left a whole small Nebula — the title strip, the note list with its foot, the note’s head, the editing bar and a note — in the theme, the background, the font and the size you chose; point at a style and it shows there before you wear it. Under it the picture, with How much it shows and Soften for the screen. At the right one editor keeps the themes; in it the colours of Your own theme and the style colours — up to five — stand at the left, the bar and the colours to choose from beside them, then the styles. Seven styles are new: Aurora, Rings, Mesh, Facets, Horizon, Dunes and Bubbles; the colours of your picture are offered to them too. Your own picture, kept first among the themes as My picture, takes a name of yours with a double click on it; and once a style is chosen, the colours of your picture are no longer offered.</p>' +
-    '<p><strong>Smaller things.</strong> Beside New folder there is a New project button. The Universe search takes as many labels as you like. Planets turn at the same pace on every computer and no longer speed up under the mouse. A window snapshot says where it was saved, and a click on the message opens the folder. One press clears the Universe search. An open black hole shows its whole name on the map, a locked one only its initials.</p>' +
-    '<hr class="blk-hr">' +
-    '<h2>New in 1.0.2</h2>' +
-    '<p><strong>Names layer by layer.</strong> In the Universe, names come in as you zoom in: projects first, then folders and black holes, then notes, then labels, and zooming out hides them in the same order. A click on a body names everything in its orbit. Labels are small planets now, and the map’s stars twinkle like the lock screen’s, which now fill the whole lock screen — section 11.</p>' +
-    '<hr class="blk-hr">' +
-    '<h2>New in 1.0.1</h2>' +
-    '<p><strong>Dividers cut smaller parts.</strong> In an open toggle, a divider pulled sideways puts the toggle’s lines and pictures side by side. In a column, a divider pulled sideways and down or up over a part of the column cuts only that part.</p>' +
-    '<p><strong>A livelier Universe.</strong> The small Universe has a Fit button beside ⤢: after zooming in or out, it glides back to the view around the open note. Its stars twinkle the way the ones behind the lock screen do, and the lock screen’s planet turns smoothly.</p>' +
-    '<p><strong>The German dash.</strong> With the app in Deutsch, two hyphens typed between words become a dash (–) when you type the space after them.</p>' +
-    '<hr class="blk-hr">' +
-    '<h2>New in 1.0.0</h2>' +
-    '<p><strong>Every block moves with the mouse.</strong> Point at a line, a heading, a list item, a toggle or a table and a grip of three dots appears at its left. Drag it and a mark shows where the block will land: between two lines, inside an open toggle or inside a column. Moving a block never adds a divider of its own: columns are made by pulling a divider sideways. A click on the grip picks the block, and Ctrl+C, Ctrl+X, Ctrl+D or Delete then work on all of it. A copied toggle pastes with everything inside it, and a file dragged over a note shows where it will land — section 4. A video or any other file copied in Explorer or Finder pastes into a note with Ctrl+V (section 7), and a table printed or exported to PDF on narrower paper is fitted to it (section 4).</p>' +
-    '<p><strong>Try it:</strong> choose Edit mode, then drag the grip of “Click the arrow to fold this away” in section 4 to another place, and press Ctrl+Z to bring it back.</p>' +
-    '<p><strong>Widgets.</strong> Type <span class="inline-code">/widget</span> and choose a calculator, a scientific calculator or a calendar. A widget is like a picture: drag it, pull its corner to make it bigger or smaller, and from its bar put it in the text, in front of the words or behind them. Click its keys or, with it picked, type on the keyboard; Enter gives the answer. A click on a day of the calendar marks it. Print and Export as PDF ask whether the widgets go on the paper too.</p>' +
-    '<p><strong>Black holes keep their names to themselves.</strong> A locked black hole shows only its initials in the list. Pin to top in its ⋯ menu keeps one above the others.</p>' +
-    '<p><strong>Notes side by side.</strong> Drag a note from the list onto the page and it opens beside the one you are writing in — up to four, the page shared out equally among them. Each has its own title and a ✕ to close it; the editing bar and the AI panel stay one, for the note you click in. ⋯ → Open side by side does the same. Beside a Nebula Wide page a note is shown in Nebula Wide; its own page comes back when it leaves.</p>' +
-    '<p><strong>Projects.</strong> Drag a folder onto the middle of another folder and the two become a project, one step above folders in the list. A project has + Add a note and + Add a folder, and holds notes of its own beside its folders — section 11.</p>' +
-    '<p><strong>The Universe.</strong> Above Archive and Trash your notes are a small galaxy: projects are stars, folders planets, a folder’s notes its moons, and labels the moons of their notes. Every project, folder, label and black hole has a colour of its own, and a label search lights up the notes that share a label, joined in thin lines. Click to fly to one, right-click to open it, and ⤢ puts the Universe over the whole page — section 11.</p>' +
-    '<p><strong>A Universe of your own.</strong> Type <span class="inline-code">/widget</span> and choose Universe: a live Universe inside the note, the same sky. Drag it to look around and double-click a note to open it; the saved note keeps a picture of the sky — section 12.</p>' +
-    '<p><strong>Panes you can size.</strong> In the split view, drag the line between two panes and the two share out the page; double-click it for equal halves again, and with it focused the arrow keys move it — section 13.</p>' +
-    '<p><strong>Black holes scroll on their own.</strong> Under your notes, the Black holes section has its own scroll, so new notes never push it down — section 14.</p>' +
-    '<p><strong>Also:</strong> a click on the core frames its first ring of loose notes; #labels written in a note show on the Universe and in its label search; the small Universe glides from note to note and steps aside while the big one is open; the Universe search finds @mentions too and shows which note links to which; a rocket sets off now and then — click it to ride along; and a locked Nebula waits with a slow sky behind it.</p>' +
-    '<hr class="blk-hr">' +
-    '<h2>New in 0.9.9</h2>' +
-    '<p><strong>Black holes ask before they destroy.</strong> Every note in the Trash needs a second press to delete for good; a black hole also asks for its PIN or passkey. An open black hole can make a new recovery key from its ⋯ menu, showing it once and ending the old key. A PIN change asks for the current PIN or passkey first.</p>' +
-    '<p><strong>Try it:</strong> With a throwaway note, press Delete once in the Trash and read the changed button before you press it again. In an open black hole, look under ⋯ for New recovery key.</p>' +
-    '<hr class="blk-hr">' +
-    '<h2>New in 0.9.6</h2>' +
-    '<ul><li><strong>Files in a note.</strong> Drag any file — a PDF, a spreadsheet, an archive — onto a note, or choose it with /file: a copy stays in the note as a card with the logo of its kind, its name and its size. A click saves a copy wherever you like — section 7.</li><li><strong>A page in a note asks first.</strong> An embedded page that wants your microphone, your camera or notifications asks you, and the answer is forgotten when the page closes — section 10.</li></ul>' +
-
-    '<hr class="blk-hr">' +
-    '<h2>New in 0.9.4</h2>' +
-    '<ul>' +
-    '<li><strong>This guide in your language.</strong> Choose Deutsch, Polski or Türkçe and this page follows, as long as you have not written in it — section 1.</li>' +
-    '<li><strong>Two ways to paste.</strong> A right-click offers <em>Paste as Nebula format</em> and <em>Paste original format</em>; it is one menu everywhere in a note, with the formatting buttons, Cut and Copy too — sections 2 and 7.</li>' +
-    '<li><strong>Bigger and smaller words.</strong> Ctrl + and Ctrl − size the selected words, or the line the caret is in — section 3.</li>' +
-    '<li><strong>Arrows as you type.</strong> <span class="inline-code">--&gt;</span> becomes → and <span class="inline-code">&lt;--</span> becomes ← — section 2.</li>' +
-    '<li><strong>Toggle headings, and toggles in a list.</strong> <span class="inline-code">/toggle-h1</span> to <span class="inline-code">/toggle-h3</span> make a heading that folds; a list item becomes a toggle where it stands — section 4.</li>' +
-    '<li><strong>Spelling: Ignore, and British English.</strong> <em>Ignore</em> leaves a word alone until you close the app; English accepts the American and the British spelling — section 2.</li>' +
-    '<li><strong>A new note straight into a folder.</strong> <em>+ Add a note</em> at the top of every open folder; a right-click on a note or a folder opens its menu — section 1.</li>' +
-    '<li><strong>Clear an AI tab’s session.</strong> Right-click a tab → <em>Clear session data</em> signs you out there and removes its cookies; deleting a tab asks first — sections 1 and 9.</li>' +
-    '<li><strong>Your privacy, written down.</strong> What Nebula keeps on your computer, and what it never reads — section 9.</li>' +
-    '<li><strong>A theme of your own.</strong> The palette button at the right of the themes opens a colour editor: the app changes as you pick, and a profile can be named and saved. Matcha and Contrast are there as ready ones — section 1.</li>' +
-    '<li><strong>Fonts: search, add and keep.</strong> The Font menu has a search and <em>+ Add a font</em> for any font on your computer; words copied inside Nebula keep the font chosen for them, and words from outside take the note’s writing font — sections 3 and 7.</li>' +
-    '<li><strong>Labels you can pick and follow.</strong> Typing <em>#</em> lists the labels in use; with a label chosen in <em>Filter by label</em>, a bar steps through its places in the open note — section 1.</li>' +
-    '<li><strong>Pictures where you want them.</strong> A picture in the text stands at the left, in the middle or at the right of its line, two can share a line, and one can stand inside a line of words like a letter — from its bar, or by dragging it — section 7.</li>' +
-    '<li><strong>A divider that splits the page.</strong> Pull a divider sideways and it stands up: the part of the note above it becomes two columns, and pulled over a column it cuts that one again — as many columns as the line has room for. A Word, OpenDocument or Rich Text file keeps them as columns — sections 4 and 8.</li>' +
-    '<li><strong>Tables.</strong> <span class="inline-code">/table</span>, or the table button on the bar, makes a table: its columns numbered x1, x2… and its rows y1, y2…, with cells you can colour, merge and fill by pulling a corner, and a + to make it longer or wider — section 4.</li>' +
-    '<li><strong>AI tabs that sleep.</strong> Tabs stay awake unless you say otherwise: a tab told it may sleep gives its memory back after twenty minutes unseen and loads again when you open it; a temporary chat, or words not sent yet, keep it awake all the same — section 1.</li>' +
-    '<li><strong>A folder for each note.</strong> A note is a folder of its own now — its file, its pictures and its videos in it — and a picture is no longer text inside the note. A video file dropped on a note, or chosen with /video, is copied there and played, and goes along when the note is exported as a Nebula note, whatever its size — sections 7, 8 and 12.</li>' +
-    '<li><strong>Black holes.</strong> Notes kept encrypted, in a section of their own under your notes: opened with a 6-digit PIN, and with a passkey — your fingerprint, your face or the computer’s own PIN — if you add one; deleting one, or taking a note out of it, asks for it again — sections 1 and 12.</li>' +
-    '<li><strong>Open with Nebula.</strong> Right-click a Word, OpenDocument or Rich Text file and choose Open with → Nebula: it opens as a new note, in the Nebula that is already running. Make Nebula the default for such files and they wear a violet document icon — section 8.</li>' +
-    '<li><strong>Settings.</strong> <em>Settings</em>, beside Help at the top, sets what a new note starts with — its font, its text size and its page — puts the AI panel or the black holes away, and gives Nebula’s logo colours of your own — section 1.</li>' +
-    '<li><strong>A lock on opening.</strong> In Settings, a 6-digit PIN locks Nebula each time it opens, and a passkey can be added beside it; <em>File → Lock Nebula</em> shuts it at once — section 1.</li>' +
-    '<li><strong>Pin your fonts.</strong> A pin beside each font in the Font menu puts it at the top of the list — section 3.</li>' +
-    '<li>Recently: <strong>paper sizes and page zoom</strong>, <strong>Word and OpenDocument</strong>, <strong>folders</strong>, <strong>four languages</strong>, <strong>toggle lists</strong>, <strong>@ and #</strong> and <strong>a font for each note</strong> (0.9.3); <strong>Google sign-in in the app</strong> and <strong>Theme color</strong> (0.9.2); <strong>older notes repaired too</strong> and <strong>deleted is deleted</strong> (0.9.1).</li>' +
-    '</ul>' +
-
-    '<hr class="blk-hr">' +
-    '<h2>1 · The window and your notes</h2>' +
+    // The owner, later the same day: "what is new already says what it is; adding what
+    // was added to the guide is our part". The page holds no list of a release: each
+    // feature is written into the section it belongs to, and Help → What’s new lists them.
+    '<div class="blk-toggle"><h2>1 · The window and your notes</h2><div class="toggle-body">' +
     '<p>The six buttons on the header line move the <strong>editing bar</strong>, not the note:</p>' +
     '<ul>' +
     '<li><strong>↑</strong> bar on top (default) — press the active side again to come back to it</li>' +
@@ -786,8 +888,11 @@ export const GUIDE_NOTE = {
     '<li><strong>−</strong> hides the bar for a clean page</li>' +
     '</ul>' +
     '<p><strong>Languages.</strong> Right beside the version number at the bottom of the sidebar stand the four languages — <strong>English</strong>, <strong>Deutsch</strong>, <strong>Polski</strong>, <strong>Türkçe</strong> — each in its own language, the one in use lit. Pick one and every menu, button and hint follows at once; with the note list folded they stand one under another as EN, DE, PL, TR. Your notes are never translated; this guide is the one page that follows the language, and only while you have not written in it. The spelling check does not follow it: it checks every language ticked under <em>Settings → Spelling</em>.</p>' +
-    '<p>Five themes at the top of Settings: <strong>Main</strong>, <strong>Dark</strong>, <strong>Matcha</strong>, <strong>Light</strong> and <strong>White</strong> — and under them <strong>your own</strong> stands open: pick the background, the sidebar’s tone, the lines, the accent and the text, and the app changes as you do; give it a name and <em>Save this profile</em> to keep it. Matcha, dark green with white words, and Contrast, near-black on near-white, are there as ready profiles; a ready profile can be deleted like any other, and brought back. The layout and the theme both survive a restart. <span class="inline-code">F11</span> is full screen, and the View menu zooms the whole window and hides the note list.</p>' +
+    '<p>Five themes at the top of Settings: <strong>Main</strong>, <strong>Dark</strong>, <strong>Matcha</strong>, <strong>Light</strong> and <strong>White</strong> — and under them <strong>your own</strong> stands open: pick the background, the sidebar’s tone, the lines, the accent and the text, and the app changes as you do; give it a name and <em>Save this profile</em> to keep it. On a saved profile left as it is the button reads <em>Save new name</em>: the name typed becomes its name, and no second profile is made. The <strong>+</strong> after the profiles adds a random theme, saved and worn at once. Matcha, dark green with white words, and Contrast, near-black on near-white, are there as ready profiles; a ready profile can be deleted like any other, and brought back. The layout and the theme both survive a restart. <span class="inline-code">F11</span> is full screen, and the View menu zooms the whole window and hides the note list.</p>' +
+    '<p><strong>Designs.</strong> Over the Theme organizer, under <em>Settings → Appearance</em>, <strong>Design</strong> changes the whole of Nebula and not its colours alone: its letters, its lines, the cards of attached files and the worlds of the Universe. <strong>Nebula</strong> is the look you know. <strong>Medieval</strong> writes in the letters of old manuscripts, frames everything in double lines and makes every star, planet and moon of the Universe a flat disk on a turning drum. <strong>Pixel</strong> squares every corner, writes in pixel letters and makes them turning cubes. <strong>Neon</strong> lights the edges and makes them glow. <strong>Blueprint</strong> is a drawing board, white lines on blue, with wire globes for worlds. <strong>Ink</strong> is brush and paper: all of it is written in a brush’s hand, and each world is one stroke of a ring. <strong>Art Deco</strong> is black and gold, its worlds cut gems. <strong>Clockwork</strong> is brass on dark wood, written in the letters of old print and old posters, its worlds fine gears. No design takes room or gives any: every part of Nebula is as high and as wide as in the look you know. Choosing a design puts on Main, which is the colours of the design itself; your themes go on working under each one, and Light too is the design’s own in Medieval, which is parchment, and in Ink, which is paper. A note with a font of its own keeps it, and the letters of every design are in the Font menu, for any note. Under the designs, <strong>Put the design’s font on every note</strong> takes the fonts off your notes and their titles, so that all of them are written in the design’s face; a card at the bottom right then puts them back, if you like. The letters are in the app; nothing is fetched.</p>' +
     '<p><strong>Settings</strong>, beside Help at the top, opens a sheet with five parts. <em>New notes</em>: the font, the text size and the page a new note starts with — the notes you have keep their own. <em>Show and hide</em>: put the AI panel away, with its button, or the black holes, with their section and their button; nothing is deleted, and both are back when the box is cleared. <em>Spelling</em>: the languages the spelling check knows — all four ticked at first; untick one and its words are no longer marked. <em>Lock on opening</em>: set a 6-digit PIN and Nebula asks for it each time it opens; a passkey can be added beside it, and then either one opens the app — the passkey at a press of <em>Log in with passkey</em>. <em>File → Lock Nebula</em> shuts it at once; while it waits for the PIN, a faint sky of stars and a ringed planet drifts behind it. <em>Turn the lock off</em> stops the asking and keeps the lock; <em>Remove lock</em> deletes it. A recovery key, shown once, opens Nebula when the PIN is forgotten. The lock keeps the app shut on this computer — it does not encrypt the notes’ files; a black hole does that. <em>Logo</em>: Nebula’s logo in colours of your own — its background, its border, the moon and its shade, the star — or with a theme put on it: a fixed one, a ready profile like Contrast, or one you saved; <strong>+</strong> keeps the colours on it as a theme of the logo’s own, under a name, and a change made to a ready one is kept as a new theme. This window, the taskbar and the shortcuts that start Nebula — on the desktop, in the Start menu, pinned to the taskbar — wear it; the mark at the top left of the app stays in the app’s theme.</p>' +
+    '<p><strong>Settings in tabs.</strong> Settings opens in tabs now — General, Appearance, Sounds, App lock and Storage — on the one used last; the themes are under Appearance. Storage shows how much room Nebula takes on this computer: the notes, their words and their pictures apart, the five biggest, the black holes, the backups, the Trash and the program itself. The Trash can be emptied there, as with its own Delete.</p>' +
+    '<p><strong>How much room Nebula takes.</strong> About Nebula — click the version number at the foot of the sidebar — has a new row, <em>Size on this computer</em>. Settings → Storage shows every part of it.</p>' +
     '<p><strong>F12</strong> takes a picture of the window: it is saved as a PNG in <em>Pictures\\Nebula</em> and copied, ready to paste anywhere. A note at the bottom says where it went.</p>' +
     '<p><strong>Try it:</strong> send the bar to the left rail, restart the app, and it is still there.</p>' +
     '<hr class="blk-hr">' +
@@ -796,19 +901,19 @@ export const GUIDE_NOTE = {
     '<p><strong>Try it:</strong> add <em>work</em>, then type <em>#work</em> in the sidebar filter to find matching notes.</p>' +
     '<p><strong>#word in a note</strong> writes a label into the text: type <em>#</em>, a word and a space (or Enter), and the word becomes a label chip in the line. As soon as you type <em>#</em>, the labels already in use are listed: ↓ or Tab picks one, and typing on narrows the list. A chip is ordinary text — change its word and the label changes with it. It is a label of the text, not one of the note’s own labels by its title; taking a label off the title leaves the text as it is. “C#” and “#1” stay ordinary words.</p>' +
     '<p><strong>Filter by label.</strong> The button right under the filter box opens a search box and every label in use, of the titles and of the texts, in one set. Click a label and the list shows the notes that have it either way; the button then names it, and its × shows every note again. Open one of those notes and the label’s places in it are lit, the way Ctrl+F lights a word; a small bar says how many there are, and its ↑ and ↓ step from one to the next. The ⋯ beside a label offers <em>Delete label</em>: it says how many notes have it, and then takes it off every note — from the title and from the text.</p>' +
-    '<p><strong>@ mentions a note.</strong> Type <em>@</em> and the start of another note’s name: a list of matching notes opens; Enter (or a click) puts a mention in the line, and a click on the mention opens that note. It keeps up with the note’s name if you rename it.</p>' +
-    '<p><strong>Try it:</strong> in a note of your own, type <em>see @Wel</em> and press Enter, then click the mention.</p>' +
+    '<p><strong>@ mentions a note.</strong> Type <em>@</em> and the start of a note’s name — the one you are writing in too: a list of matching notes opens; Enter (or a click) puts a mention in the line. A click on the mention keeps that note as a tab over the page, without leaving the one you are in; Ctrl+click goes straight to it. It keeps up with the note’s name if you rename it.</p>' +
+    '<p><strong>Try it:</strong> in a note of your own, type <em>see @Wel</em> and press Enter, then click the mention: this guide comes as a tab over the page.</p>' +
     '<hr class="blk-hr">' +
     '<h3>Your notes</h3>' +
     '<ul>' +
     '<li><strong>New note</strong> under the list, or <span class="inline-code">Ctrl+N</span>. The box at the top of the list filters by title and text.</li>' +
     '<li>Everything saves itself as you go; the word by the title says <em>Saving…</em> and then <em>Saved</em>. <span class="inline-code">Ctrl+S</span> saves at once.</li>' +
     '<li>Each note’s <strong>⋯</strong> menu: <em>Pin to top</em>, <em>Archive</em> (out of the list, kept), <strong>Only view</strong>, and <em>Move to trash</em>. <strong>Archive</strong> and <strong>Trash</strong> under the list open their notes, with <em>Unarchive</em> or <em>Restore</em> to bring one back.</li>' +
-    '<li><strong>Only view</strong> locks a note: you can read it, scroll it, select and copy, open its links with Ctrl+click and play its videos, but no key, paste, drag or toolbar button changes it. The ⋯ menu switches it: <em>Only view mode</em> locks the note, <em>Edit mode</em> unlocks it; the 🔒 badge by the title shows it, and clicking the badge unlocks it too.</li>' +
+    '<li><strong>Only view</strong> locks a note: you can read it, scroll it, select and copy, open its links with Ctrl+click and play its videos, but no key, paste, drag or toolbar button changes it. The ⋯ menu switches it: <em>Only view mode</em> locks the note, <em>Edit mode</em> unlocks it; the <em>Only view</em> badge by the title shows it, and clicking the badge unlocks it too.</li>' +
     '<li><span class="inline-code">Ctrl+F</span> finds words in the open note and steps through every match. <span class="inline-code">Ctrl+K</span> opens the command palette: type part of any command’s name and press Enter. <span class="inline-code">Ctrl+Z</span> and <span class="inline-code">Ctrl+Y</span> undo and redo, one step at a time — a move, a paste or a run of typing each count as one.</li>' +
     '<li>Help → <em>Keyboard shortcuts</em> lists every key, and <em>What’s new</em> shows what the current version changed.</li>' +
     '</ul>' +
-    '<p><strong>Try it:</strong> lock a note of your own with ⋯ → Only view, try to type in it, then click the 🔒 badge to unlock it.</p>' +
+    '<p><strong>Try it:</strong> lock a note of your own with ⋯ → Only view, try to type in it, then click the <em>Only view</em> badge to unlock it.</p>' +
     '<hr class="blk-hr">' +
     '<h3>Page width</h3>' +
     '<p>The eight boxes beside <em>Saved</em> set the open note\u2019s page; press one and it says what it is. <strong>NW</strong>, Nebula Wide, is the page as it always was: as wide as the window, no paper drawn; its PDF is A4, landscape or portrait, chosen in the export’s preview. <strong>NN</strong>, Nebula Narrow, is A4 written close to its edges (6.35 mm margins). <strong>A3</strong>, <strong>A4</strong>, <strong>A5</strong>, <strong>B3</strong>, <strong>B4</strong> and <strong>B5</strong> are the paper sizes. In every mode but NW the line is as long as it is on that paper when printed, so the caret goes to the next line where the paper will; the paper\u2019s edges are drawn faintly on either side, and a very thin line across the page shows where the export starts a new page. Printing and PDF export use that paper. Each note keeps its own page; choosing one is not an edit.</p>' +
@@ -823,8 +928,8 @@ export const GUIDE_NOTE = {
     '<p><strong>Drag a note</strong> onto the middle of a folder to put it in, or between two notes or folders to put it there — a line shows where it will land. Dragging never pins or unpins a note: pinned notes stay at the top and can be put in any order among themselves, and a note in a folder can be pinned too (⋯ → Pin to top), staying at the top of that folder. <strong>Folders are dragged the same way</strong>: a new folder comes in at the top, and a note you change afterwards rises above it, as notes do, until you put the folder where you want it. <strong>⋯ → Move to folder</strong> moves a note without dragging. A note you never dragged still moves to the top when you change it; one you placed stays where you put it. A black hole — the round button beside New folder — is for notes that must be safe: everything in it is kept encrypted on the disk (AES-256), title and pictures included, in a folder of its own. It is opened with the 6-digit PIN chosen when it was made — typed twice then, to be sure of it. A passkey — your fingerprint, your face or the computer’s own PIN, which the system asks for in front of Nebula — can be added beside the PIN, when the black hole is made or later from its ⋯ menu, and then either opens it; after five wrong PINs each try has to wait. A hint can be kept with the PIN and is shown when it is asked for — anyone can read it, so it is a reminder and never the PIN itself. Open, it shows its notes like a folder: + Add a note writes one in it, a note dragged onto it or sent there from its ⋯ menu is moved in — and its plain file leaves the vault and every backup. The lock at its left closes it, ten minutes untouched close it too, and every black hole is locked when the app starts. The arrow beside Black holes folds the whole section away. From its ⋯ menu a black hole goes to the Trash whole, locked; there it is restored, or deleted with every note in it — which asks for its PIN or its passkey first. Taking a note out again — from the note’s ⋯ menu, or by dragging it up among the notes — asks for it too. The recovery key shown once when it is made opens it on another computer, or when the PIN is forgotten — without the PIN and without that key, nobody can open it, Nebula included. From the ⋯ menu of an open black hole a new recovery key can be made: the old one stops working at once, and the new one is shown once — write it down.</p>' +
     '<p><strong>Try it:</strong> make a folder called <em>Work</em>, drag a note onto it, then drag another note above the first one in the list.</p>' +
 
-    '<hr class="blk-hr">' +
-    '<h2>2 · Writing</h2>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>2 · Writing</h2><div class="toggle-body">' +
     '<p><strong>Bold</strong> · <em>italic</em> · <span class="u-single">underline</span> · <s>strikethrough</s> · <span class="inline-code">inline code</span> · <span class="inline-eq" data-tex="E = mc^2" contenteditable="false"></span></p>' +
     '<p>Underlines come in five styles from the <em>▾</em> beside the button, and they <em>replace</em> each other rather than stacking: ' +
     '<span class="u-single">single</span> — <span class="u-double">double</span> — <span class="u-bold">bold</span> — <span class="u-wavy">wavy</span> — <span class="u-dash">dashed</span>.</p>' +
@@ -841,12 +946,13 @@ export const GUIDE_NOTE = {
     '<p><strong>Try it:</strong> select a few words in a note of your own, right-click them and press <strong>B</strong> in the menu’s first row.</p>' +
     '<h3>Arrows as you type</h3>' +
     '<p>Type <span class="inline-code">--&gt;</span> and it becomes →; type <span class="inline-code">&lt;--</span> and it becomes ←. One Ctrl+Z gives the typed characters back; in code they are left as they are.</p>' +
+    '<p><strong>The German dash.</strong> With the app in Deutsch, two hyphens typed between words become a dash (–) when you type the space after them.</p>' +
     '<h3>The / menu</h3>' +
     '<p>Type <span class="inline-code">/</span> at the start of a line (or after a space) and a menu of blocks opens; keep typing to narrow it, ↑ ↓ to choose, Enter to use. It turns the line you are on into <strong>Text</strong>, <strong>Heading 1–3</strong>, a <strong>bulleted</strong> or <strong>numbered</strong> list, a <strong>toggle list</strong>, a <strong>toggle heading</strong> or a <strong>quote</strong>, and it inserts a <strong>to-do</strong>, a <strong>code block</strong>, a <strong>divider</strong>, a <strong>shape</strong>, or a link as an <strong>embed</strong>, a <strong>bookmark</strong> or a <strong>URL</strong>.</p>' +
     '<p><strong>Try it:</strong> in a new note type <span class="inline-code">/h2</span> and Enter, then a title — only that line becomes a heading.</p>' +
 
-    '<hr class="blk-hr">' +
-    '<h2>3 · Fonts, size and colour</h2>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>3 · Fonts, size and colour</h2><div class="toggle-body">' +
     '<p><span style="font-family:Arial, Helvetica, sans-serif">Arial</span> · ' +
     '<span style="font-family:Calibri, &quot;Segoe UI&quot;, sans-serif">Calibri</span> · ' +
     '<span style="font-family:&quot;Times New Roman&quot;, Times, serif">Times New Roman</span> · ' +
@@ -860,14 +966,14 @@ export const GUIDE_NOTE = {
     '<p><span style="font-size:22px">22px</span> · <span style="font-size:11px">11px</span> · ' +
     '<span class="c-red">red text</span> · <span class="c-blue">blue text</span> · <span class="c-green">green text</span> · ' +
     '<span class="h-yellow">yellow background</span> · <span class="h-green">green background</span> · <span class="h-purple">purple background</span></p>' +
-    '<p><strong>Try it:</strong> the <strong>Font</strong> menu shows every face in its own typeface. With text selected it restyles the selection. The button always names the font under the caret. <strong>Size</strong> accepts any number you type, not just the listed ones — try 37. <span class="inline-code">Ctrl +</span> and <span class="inline-code">Ctrl −</span> take the selected words one size up or down; with nothing selected, the line the caret is in. The field at the top of the Font menu searches the list, and <em>+ Add a font</em> shows every font on this computer: pick one and it joins your list (its × takes it off again). A pin beside each font puts it at the top of the list; press it again and the font goes back to its place. The font used last stands above <em>+ Add a font</em>, with a pin.</p>' +
-    '<p><strong>A font for each note.</strong> The font and the size you picked last in a note become that note’s writing font: a new line is written in them, and the bar shows them there. What you already wrote keeps the font it was written in; <em>Serif</em> and 14 go back to the app’s own. The note’s title is written in that font too.</p>' +
+    '<p><strong>Try it:</strong> the <strong>Font</strong> menu shows every face in its own typeface. With text selected it restyles the selection. The button always names the font under the caret. <strong>Size</strong> accepts any number you type, not just the listed ones — try 37. <span class="inline-code">Ctrl +</span> and <span class="inline-code">Ctrl −</span> take the selected words one size up or down; with nothing selected, the line the caret is in. The field at the top of the Font menu searches the list, and <em>+ Add a font</em> shows every font on this computer: pick one and it joins your list (its × takes it off again). The list begins with the faces of the designs, each with its design’s name in brackets — <em>Courgette (Ink)</em> — and a design’s name typed in the field finds its face; <em>Settings → General</em> lists them first as well, for the font of new notes. A pin beside each font puts it right under them; press it again and the font goes back to its place. Every other font stands by its name, from A to Z. The font used last stands above <em>+ Add a font</em>, with a pin.</p>' +
+    '<p><strong>A font for each note.</strong> The font and the size you picked last in a note become that note’s writing font: a new line is written in them, and the bar shows them there. What you already wrote keeps the font it was written in; 14 goes back to the app’s own size. The note’s title is written in that font too. <em>Serif</em> is a font like the others: a note given it stays in it under every design. To have every note, and the new ones, follow the design again, press <em>Put the design’s font on every note</em> in Settings, under the designs.</p>' +
     '<p><strong>Try it:</strong> in a note of your own, pick Consolas with nothing selected, press Enter and type — the new line is in Consolas; the lines above did not change.</p>' +
     '<p><strong>Try it:</strong> <em>A</em> applies the last text colour and <em>H</em> the last highlight; each <em>▾</em> opens the full list. <em>Theme color</em>, at the top, gives selected words back the theme’s own ink — also words pasted in a fixed colour that vanished in the Dark theme. Every row lines up and the list fits without scrolling.</p>' +
     '<p><strong>Try it:</strong> switch between the themes with that paragraph in view. Every colour repaints for the theme and stays readable — a colour is stored as a name, not as a fixed value picked against one background.</p>' +
 
-    '<hr class="blk-hr">' +
-    '<h2>4 · Lists, to-dos, quotes, dividers and tables</h2>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>4 · Lists, to-dos, quotes, dividers and tables</h2><div class="toggle-body">' +
     '<h3>Bulleted</h3><ul><li>first</li><li>second</li><li>third</li></ul>' +
     '<h3>Numbered</h3><ol><li>one</li><li>two</li><li>three</li></ol>' +
     '<h3>To-dos</h3>' +
@@ -894,13 +1000,14 @@ export const GUIDE_NOTE = {
     '<h3>Quotes and dividers</h3>' +
     '<blockquote>A quote stands apart from the text around it.</blockquote>' +
     '<p>A quote comes from the outline dropdown or <span class="inline-code">/quote</span>. Enter on an empty line of a quote leaves it, the way a list does. A <strong>divider</strong> — the ― button, <span class="inline-code">/divider</span>, or four dashes typed on a line of their own — is a line of its own; Backspace next to it first marks it, and a second Backspace removes it, so one stray key cannot. A click on a divider picks it: Backspace or Delete then removes it, and any other key carries on in the line under it. A divider can be dragged too. Pulled up or down, a mark shows the place between two lines where it will lie. Pulled sideways it stands up: an upright mark and a tint show the part of the note it will split — everything up to the divider above, or from the line the pointer is over — and letting go makes that part two columns, what was there on the wider side and an empty line on the other; Esc gives the drag up. Drag the upright divider sideways to make one column wider; click it and press Backspace or Delete, and the two columns are one flow again. Another divider pulled sideways over a column cuts that column in two the same way — as many columns as the line has room for; each upright divider then moves by itself, and one taken away joins the two columns at its sides. A column always ends with a line to write on, under a picture too. A divider in a column pulled sideways and down or up over a part of it cuts only that part; in an open toggle, a divider pulled sideways puts the toggle’s lines — pictures too — side by side. <span class="inline-code">/paragraph</span> turns a heading or a quote back into a plain line.</p>' +
+    '<p><strong>Taller columns.</strong> The upright line between two columns has a small grip at its foot. Pull it down and the columns grow, taking in the lines under them; pull it up and they shrink again.</p>' +
     // Tables (0.9.4, table.js).
     '<h3>Tables</h3>' +
-    '<p><span class="inline-code">/table</span> or the table button on the bar asks how large the table is to be — point at a square, or type the two numbers; Enter alone makes five rows of five columns — and puts it on the line. Over its columns stand x1, x2, x3… and beside its rows y1, y2, y3…, as in a spreadsheet: a press on one selects that column or row, and the line at the right of an x is pulled to make its column wider or narrower, the line under a y to make its row higher or lower — the size shown in millimetres while you pull. Each cell is written in like a line of the note — <strong>Tab</strong> and <strong>Shift+Tab</strong> step from cell to cell (Tab in the last one makes a new row), the arrows cross from one cell into the next and out of the table, and Enter is a new line in the cell. <strong>Ctrl+A</strong> selects what the cell holds and, pressed again, every cell of the table; the bar’s left, centre and right buttons line up the words of the cell the caret is in, or of the selected cells. Pull the mouse from one cell to another — or hold Shift and click — to select cells: a background colour from the H button then colours their backs (with only the caret in a cell, that cell’s), Delete empties them, and Ctrl+C copies them as rows any spreadsheet reads; rows copied from one are pasted one cell each. At the selection’s lower right stands what can be done with it: <em>Merge</em> makes one cell of several and <em>Unmerge</em> takes it apart again; for whole rows, columns or the whole table, <em>Delete</em>. The small square at its lower left is pulled to carry the cells on over their neighbours: one cell is copied, 1, 2 goes on with 3, 4, and Day 1 with Day 2. The <strong>+</strong> along the bottom adds a row and the one at the right a column. A right-click in a cell puts a row in above or below it, or a column at its left or right, and deletes its row or its column. The corner where the numbers meet moves the table like a picture, and a right-click on it deletes the table. A table never reaches over the edge of its page or its column: where there is no room for its columns, they are drawn narrower. Printed or exported to PDF on paper narrower than the page it was made on, the table is fitted to the paper too, each column keeping its share of the width.</p>' +
+    '<p><span class="inline-code">/table</span> or the table button on the bar asks how large the table is to be — point at a square, or type the two numbers; Enter alone makes five rows of five columns — and puts it on the line. Over its columns stand x1, x2, x3… and beside its rows y1, y2, y3…, as in a spreadsheet: a press on one selects that column or row, and the line at the right of an x is pulled to make its column wider or narrower, the line under a y to make its row higher or lower — the size shown in millimetres while you pull. Each cell is written in like a line of the note — <strong>Tab</strong> and <strong>Shift+Tab</strong> step from cell to cell (Tab in the last one makes a new row), the arrows cross from one cell into the next and out of the table, and Enter is a new line in the cell. <strong>Ctrl+A</strong> selects what the cell holds and, pressed again, every cell of the table; the bar’s left, centre and right buttons line up the words of the cell the caret is in, or of the selected cells. Pull the mouse from one cell to another — or hold Shift and click — to select cells: a background colour from the H button then colours their backs (with only the caret in a cell, that cell’s), Delete empties them, and Ctrl+C copies them as rows any spreadsheet reads; rows copied from one are pasted one cell each. At the selection’s lower right stands what can be done with it: <em>Merge</em> makes one cell of several and <em>Unmerge</em> takes it apart again; for whole rows, columns or the whole table, <em>Delete</em>. The small square at its lower left is pulled to carry the cells on over their neighbours: one cell is copied, 1, 2 goes on with 3, 4, and Day 1 with Day 2. The <strong>+</strong> along the bottom adds a row and the one at the right a column. The small corner between the two is pulled to make the whole table larger or smaller, every column and every row by the same share. The mark over the + at the right is pulled to make the table only wider or narrower, the one under the last y only higher or lower. A right-click in a cell puts a row in above or below it, or a column at its left or right, and deletes its row or its column. The corner where the numbers meet moves the table like a picture; a click on it picks the whole table up, and Delete then takes it away — so does a right-click on it. A table never reaches over the edge of its page or its column: where there is no room for its columns, they are drawn narrower. Printed or exported to PDF on paper narrower than the page it was made on, the table is fitted to the paper too, each column keeping its share of the width.</p>' +
     '<p><strong>Try it:</strong> in a note of your own type <span class="inline-code">/table</span>, write 1 and 2 in the first two cells of a column, select both and pull the small square down — the column counts on. Then select two cells, press <em>Merge</em>, and give them a colour.</p>' +
 
-    '<hr class="blk-hr">' +
-    '<h2>5 · Equations</h2>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>5 · Equations</h2><div class="toggle-body">' +
     '<p><span class="inline-code">Ctrl+Q</span> or the √x button opens a LaTeX box with a live preview. The <em>source</em> is what gets stored, and the formula is typeset again every time the note opens — nothing depends on the saved markup, so an upgrade re-renders old notes instead of freezing them.</p>' +
     '<p>Inline: <span class="inline-eq" data-tex="e^{i\\pi} + 1 = 0" contenteditable="false"></span> and ' +
     '<span class="inline-eq" data-tex="\\sqrt{x^2 + y^2}" contenteditable="false"></span> and ' +
@@ -908,22 +1015,37 @@ export const GUIDE_NOTE = {
     '<span class="inline-eq" data-tex="\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}" contenteditable="false"></span>.</p>' +
     '<p><strong>Try it:</strong> each one sits in its own frame, like <span class="inline-code">inline code</span>, so you can see where it starts and ends. Click one — the editor reopens with its LaTeX. Close the note and come back: all four are still typeset. It works with no network.</p>' +
 
-    '<hr class="blk-hr">' +
-    '<h2>6 · Shapes and arrows</h2>' +
-    '<p>Five kinds from the ◇ button’s <em>▾</em>: rectangle, square, ellipse, diamond and triangle (plus circle). A selected shape shows its outline in colour, the resize grip at its bottom-right corner and the turning handle at its bottom-left.</p>' +
-    '<p>Shapes float over the whole note — the three at the top of this page are real ones. Drag them down here, resize from the corner handle, double-click to write inside, and turn them with the round handle: the angle shows while you turn (the green one is tilted by −6°). Text wrap is <strong>through</strong>: the words never reflow, the shape floats above or below them.</p>' +
-    '<p>Selecting a shape opens its little bar: six colours, <em>▾</em> to send it behind the text, <em>▴</em> to bring it above, <em>✕</em> to delete it.</p>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>6 · Shapes and arrows</h2><div class="toggle-body">' +
+    // The demo shapes stand here, on a stage of their own: a band no text
+    // flows through, with its two layers inside it (the behind-layer is a real
+    // second layer, not a class, so it can be painted under the text). Up to
+    // 1.0.3 the band was the top of the page; the owner, 1.0.4: "the shapes at
+    // the very top should go, they should have a place of their own in the
+    // guide". Folded with their section, they are out of the way.
+    '<div class="guide-stage" contenteditable="false">' +
+    '<div class="shape-layer shape-layer--behind" contenteditable="false" data-block-type="shape-layer">' +
+    '<div class="shape diamond behind" data-kind="diamond" style="left:392px;top:8px;width:150px;height:116px;background:#F0D2CE"><div class="shape-text" contenteditable="true">behind the text</div><span class="shape-h"></span></div>' +
+    '</div>' +
+    '<div class="shape-layer" contenteditable="false" data-block-type="shape-layer">' +
+    '<div class="shape rect" data-kind="rect" data-rot="-6" style="left:14px;top:22px;width:150px;height:86px;background:#D6E4D0;transform:rotate(-6deg)"><div class="shape-text" contenteditable="true">drag me anywhere</div><span class="shape-h"></span></div>' +
+    '<div class="shape ellipse" data-kind="ellipse" style="left:196px;top:16px;width:164px;height:98px;background:#D3E0EA"><div class="shape-text" contenteditable="true">double-click to write</div><span class="shape-h"></span></div>' +
+    '</div>' +
+    '</div>' +
+    '<p>Five kinds from the ◇ button: rectangle, square, ellipse, diamond and triangle (plus circle). A selected shape shows its outline in colour, the resize grip at its bottom-right corner and the turning handle at its bottom-left.</p>' +
+    '<p>Shapes float over the whole note — the three above this line are real ones. Drag them about, resize from the corner handle, double-click to write inside, and turn them with the round handle: the angle shows while you turn (the green one is tilted by −6°). Text wrap is <strong>through</strong>: the words never reflow, the shape floats above or below them.</p>' +
+    '<p>Selecting a shape opens its little bar: an empty dot that takes the fill away, six colours, <em>▾</em> to send it behind the text, <em>▴</em> to bring it above, <em>✕</em> to delete it.</p>' +
     '<p>Shapes and floating pictures share one canvas: they stack in a single order, so either can lie over the other. <em>▴</em> on a shape’s or a picture’s bar puts it on top of everything there.</p>' +
-    '<p><strong>Try it:</strong> paste a picture, press <em>▴</em> on its bar to set it free, drag it half over the green shape at the top, then select the shape and press <em>▴</em> — now the shape is on top.</p>' +
+    '<p><strong>Try it:</strong> in a note of your own add a shape and paste a picture, press <em>▴</em> on the picture’s bar to set it free, drag it half over the shape, then select the shape and press <em>▴</em> — now the shape is on top.</p>' +
     '<p><strong>Try it:</strong> send the green rectangle behind the text and drag it over this paragraph — the words run <em>on top of</em> it, at full strength, not through a faded copy.</p>' +
     '<p><strong>Try it:</strong> press <em>✕</em>. The shape goes and the bar goes with it — same for Esc, for clicking anywhere off a shape, and for switching notes. The bar is never left floating with nothing selected.</p>' +
-    '<p>Add more from the toolbar ◇ button (<em>▾</em> for every kind) or type <span class="inline-code">/shape</span>.</p>' +
+    '<p>Add more from the toolbar ◇ button (it opens every kind to choose from) or type <span class="inline-code">/shape</span>. A shape or an arrow you choose follows the pointer, faint, until you click where it should stand; Esc lets it go. The first two are not shapes to fill: a <strong>text box</strong> is words with nothing round them — thin lines show it under the pointer and when it is picked — and a <strong>work area</strong> is a wide frame: put the pieces of a chart in it, drag the area, and they move with it as one. Its size is changed from any of its four corners. Double-click it to give it a name, and a button in the bar over it makes it hold the pictures in it too: moved, it lifts them out of the text and takes them along.</p>' +
     '<h3>Arrows</h3>' +
-    '<p>The ↗ button beside the shapes adds a <strong>straight</strong> arrow; its <em>▾</em> has <strong>elbow</strong> and <strong>curved</strong> ones too. Drag an arrow’s end towards a shape, a picture or a link card: once it comes close — inside it, or within a finger’s width of its edge — the target is outlined and the end snaps onto its side. Let go and the two are joined; move either and the arrow follows. A line of text holds an end only when you drop it right on the words.</p>' +
+    '<p>The ↗ button beside the shapes opens the arrows to choose from: <strong>straight</strong>, <strong>elbow</strong> and <strong>curved</strong>. Drag an arrow’s end towards a shape, a picture or a link card: once it comes close — inside it, or within a finger’s width of its edge — the target is outlined and the end snaps onto its side. Let go and the two are joined; move either and the arrow follows. A line of text holds an end only when you drop it right on the words. Near the middle of a side the end takes that side and stays on it — the four are shown as dots while you drag. A shape under the pointer shows the same four dots: drag one to draw an arrow from that side — let go over another shape to join the two, or on empty ground to put a shape like the first there — or click one, and the next shape stands beside it, already joined. That is a flowchart’s next step, or a mind map’s next branch. An end let go at the edge of a shape, away from the middles, holds the outline right there. Click an arrow and its bar opens: make it straight, elbow or curved, turn its heads (one press: both ways; the next: the other way; then none; then as it was), dash its line, put a label on it, or delete it. A text box let go beside an arrow’s line rides the arrow, above it or below it as you left it. Pick an arrow and a dot shows in its middle: drag it and the line bends — a straight or curved arrow bows the way you pull, an elbow’s middle leg moves across, or up and down. Double-click the dot and the arrow is its own line again. An elbow arrow joined to a shape finds its own way round a shape or a picture standing between its ends; one you have bent stays as you bent it.</p>' +
     '<p><strong>Try it:</strong> in a note of your own, add two shapes and an arrow, pull each end near a shape until it snaps, then drag the shapes apart — the arrow stretches with them. Click an arrow so it lights up and press Delete to remove it.</p>' +
 
-    '<hr class="blk-hr">' +
-    '<h2>7 · Links, pictures, videos and files</h2>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>7 · Links, pictures, videos and files</h2><div class="toggle-body">' +
     '<p><strong>Pasted words take this note’s font.</strong> Text copied from a web page or a document arrives in the note’s writing font and colours; its paragraphs, headings, lists, links, bold and italic stay. Words copied from another Nebula note keep a font that was chosen for them — a line in Consolas stays in Consolas. A right-click pastes it the other two ways: with its original format, or as text only (section 2); Ctrl+Shift+V pastes text only too. Lines pasted into a quote run on as one quote. <strong>Try it:</strong> copy a paragraph from any web page and paste it into a note — it looks like the rest of the note.</p>' +
     '<p><strong>Paste a web address</strong> on its own (or type <span class="inline-code">/embed</span>, <span class="inline-code">/bookmark</span> or <span class="inline-code">/url</span>) and Nebula asks how to show it, in a menu beside where you pasted:</p>' +
     '<ul>' +
@@ -937,71 +1059,100 @@ export const GUIDE_NOTE = {
     '<p><strong>Try it:</strong> copy any web address, paste it on an empty line, then ↓ → → Enter.</p>' +
     '<p><strong>Link any words:</strong> select them and paste a URL over them, or use the link button in the toolbar. <strong>Ctrl+click</strong> a link to open it; choosing the link button again with an empty address takes the link off.</p>' +
     '<p><strong>Videos:</strong> embed a YouTube or Vimeo link and you get the player itself, as wide as the text (up to a comfortable size) so the picture is sharp, black while it loads like on any site — a start time in the link is kept. A video file of your own — MP4, WebM, MOV, MKV, and AVI, WMV and the other kinds too — dropped on a note, or chosen from the computer with /video, is copied into the note’s folder and played from there, with its name under it and a bar of its own: back and on by ten seconds, the speed, the whole screen. A kind the app’s player cannot play is kept all the same, and its card offers to open it in another program. A file for another program shows a line with the video’s name in its place; a note exported as a Nebula note takes its videos along. In a black hole the video is sealed beside its note, like the note itself, and plays while the black hole is open.</p>' +
-    '<p><strong>Pictures:</strong> paste an image and it goes on the line you are on, part of the text, so it moves with the words at any window size. Click it for its bar, where three buttons say where it lives and the current one is lit: <em>▾</em> behind the text, <em>▴</em> above the text (floating, on top), <em>≡</em> in the text. <em>Aa</em> writes a caption under it — so does a <strong>double-click</strong> on the picture — <em>✂</em> crops it (drag the frame’s edges or corners, Enter crops, Esc leaves it whole, one Ctrl+Z brings the whole picture back), <em>✕</em> deletes it, and any of its four corner handles resizes it proportionally. <strong>Ctrl+C</strong> with a picture selected (or <em>Copy image</em> on a right-click) copies the picture itself, ready for any program. In the text, Backspace at the start of the line under a picture, or Delete at the end of the line above, first selects the picture and only a second press deletes it; an empty line beside a picture simply goes. With a picture in the text selected, Enter opens a line under it and Alt+↑ / Alt+↓ move it up or down a line. On floating pictures, the opposite corner stays in place. An image dropped from a folder floats where you drop it. A picture in the text has five more buttons on its bar: left, middle and right say where it stands on its line, and the fourth puts it beside the picture before it — two pictures on one line, which get smaller in a narrow window rather than cut off. Dragging does the same: pulled sideways it snaps left, middle or right; held over another picture a mark stands at that picture’s side; held between two lines a mark lies there — let go, and it moves. The last button, a▫a, stands the picture inside a line of words, as a letter of that line: drag it and a mark shows the caret it will go to; press Enter and you type on right after it. Such a picture has no caption; the same button, or left, middle or right, takes it out of the line again. Two pictures side by side, resized to nearly the same height, take the same height, and a dashed line along their feet shows they are even.</p>' +
+    '<p><strong>Pictures:</strong> paste an image and it goes on the line you are on, part of the text, so it moves with the words at any window size. Click it for its bar, where three buttons say where it lives and the current one is lit: <em>▾</em> behind the text, <em>▴</em> above the text (floating, on top), <em>≡</em> in the text. <em>Aa</em> writes a caption under it — so does a <strong>double-click</strong> on the picture — <em>✂</em> crops it (drag the frame’s edges or corners, Enter crops, Esc leaves it whole, one Ctrl+Z brings the whole picture back), <em>✕</em> deletes it, and any of its four corner handles resizes it proportionally. <strong>Ctrl+C</strong> with a picture selected (or <em>Copy image</em> on a right-click) copies the picture itself, ready for any program. In the text, Backspace at the start of the line under a picture, or Delete at the end of the line above, first selects the picture and only a second press deletes it; an empty line beside a picture simply goes. With a picture in the text selected, Enter opens a line under it and Alt+↑ / Alt+↓ move it up or down a line. On floating pictures, the opposite corner stays in place. An image dropped from a folder floats where you drop it. A picture in the text has five more buttons on its bar: left, middle and right say where it stands on its line, and the fourth puts it beside the picture before it — two pictures on one line, which get smaller in a narrow window rather than cut off. Dragging does the same: pulled sideways it snaps left, middle or right; held over another picture a mark stands at that picture’s side; held between two lines a mark lies there — let go, and it moves. The last button, a▫a, stands the picture inside a line of words, as a letter of that line: drag it and a mark shows the caret it will go to; press Enter and you type on right after it. Such a picture has no caption; the same button, or left, middle or right, takes it out of the line again. Two pictures side by side, resized to nearly the same height, take the same height, and a dashed line along their feet shows they are even. Widgets do the same, and so does anything that stands beside something else: a table pulled by the line of a row or by its corner, an embedded page or video made larger or smaller — its foot stops at the foot of what is next to it, in a row or in the column next door, and the same line shows it. A table, a card or an embedded page dragged over the left or right third of another one, or of a picture, stands beside it, in two columns with a divider between; a picture or a widget dragged over the side of a table or a card does the same.</p>' +
     '<p><strong>Try it:</strong> copy any picture, click at the end of this line and paste. Give it a caption, then make the window narrow and wide — the picture stays between the same two lines.</p>' +
     '<p><strong>Files:</strong> drag any file from Explorer or Finder onto a note, or type <span class="inline-code">/file</span> and choose one. Nebula keeps its own copy inside the note — the original stays where it was — and shows it as a card: the logo of its kind (PDF red, Word blue, Excel green…), its name and its size. A click on the card saves a copy wherever you choose; <em>Open</em> opens it in its own program — changes made there do not go back into the note; × takes it out of the note. Pictures and videos dropped on their own still go in as pictures and videos. A file copied in Explorer or Finder is pasted the same way: Ctrl+V puts it under the line the caret is in — a video as a video, any other file as its card.</p>' +
     '<p><strong>Try it:</strong> in a note of your own, drag a PDF from your Downloads folder onto an empty line, then click the card and save the copy to your desktop.</p>' +
+    '<p><strong>Files and pictures taken out of a note.</strong> Pull a file’s card or a picture out of the window with the mouse and let it go on the desktop or in a folder: a copy lies there. Pulled onto the AI panel, it is handed to the page open there. The note keeps its own. A file’s card is taken anywhere on it, and what you pull is shown at the pointer. Right-click a file’s card — or a picture, a block, the words you have selected — and choose <em>Send to…</em> to put a copy of it at the end of another note; the notes of a black hole are listed only while it is open.</p>' +
 
-    '<hr class="blk-hr">' +
-    '<h2>8 · Import, export, print and moving a note</h2>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>8 · Import, export, print and moving a note</h2><div class="toggle-body">' +
     '<p>The export button (and the File menu) writes the open note as <strong>Markdown</strong>, <strong>HTML</strong>, <strong>Word</strong> (.docx, and .doc for older Word), <strong>OpenDocument</strong> (.odt, for LibreOffice), <strong>Rich Text</strong> (.rtf: TextEdit, Pages and Apple Notes open it), <strong>Evernote</strong> (.enex: Apple Notes, Evernote, Bear, Joplin and UpNote import it), <strong>PDF</strong> (on the note’s paper — A4 for NW and NN — laid out the way it looks; a preview shows the pages first, and a Nebula Wide note picks landscape or portrait in it) or a <strong>Nebula note (.json)</strong>, which takes the note’s pictures and its video files along: small videos inside the file, large ones in a folder beside it, named after it, that belongs with the file — there is no size limit. <span class="inline-code">Ctrl+P</span> prints. <strong>Import</strong> opens a Markdown, HTML, text, Word (.docx, .doc), OpenDocument (.odt) or Nebula note file as a new note; a Word, OpenDocument, Rich Text or Evernote file keeps its headings, lists, bold and italic, links and pictures (an .enex with several notes brings each in), and is set on the note\u2019s paper when it goes out (pictures keep their side and their line, columns stay columns; shapes stay behind — a word processor has no canvas); anything that could run is stripped out first. The same files open from outside the app: in Explorer or the Finder, right-click a .docx, .doc, .odt or .rtf file → Open with → Nebula (the installed app offers itself there; it never makes itself the default). The file opens as a new note in the Nebula that is already running — there is only ever one copy of the app on a vault — and the file itself is not changed. Choose Nebula and “Always” for a kind of file, and those files wear Nebula’s violet document icon. A file dropped onto the app’s icon opens the same way.</p>' +
     '<p><strong>Videos in an export.</strong> A video in the note goes out the way it shows: its picture with the play button, as wide as in the note, linked to the video — in Word it even plays, and an HTML file keeps the player. At the top of the export menu, and in the preview, <em>Videos: With / Without</em> chooses; without, it goes as a bookmark card — its title over its address, linked — like a bookmark in the note. Bookmarks, and embedded pages that no paper can show, go out as those cards too. PDF, Word, OpenDocument and Rich Text show their pages first, on the note\u2019s paper; Export writes the file.</p>' +
     '<p><strong>Try it:</strong> export a note of your own as Word (.docx), then import that file: it comes back as a new note with its headings, lists and pictures.</p>' +
     '<p><strong>Try it:</strong> in a note of your own on NW, choose export → PDF; turn the preview between Landscape and Portrait and watch the pages change, then Cancel — nothing is saved until Export.</p>' +
-    '<p>To move a note to another Nebula intact, export it as a <strong>Nebula note</strong> — text, labels, shapes, arrows, pictures and embeds in one file — and import that file there. A note file copied straight out of a vault folder imports too. Markdown and HTML are for other apps; they cannot carry shapes.</p>' +
+    '<p>To move a note to another Nebula intact, export it as a <strong>Nebula note</strong> — text, labels, shapes, arrows, pictures and embeds in one file — and import that file there. A note file copied straight out of a vault folder imports too. Markdown and HTML are for other apps; they cannot carry shapes. To put a note into a Discord chat, right-click it in the list and choose <strong>Copy for Discord</strong>: the note goes onto the clipboard as text Discord reads — headings, lists, quotes and code as they are, a table as lined-up text — and you paste it there. A note longer than one Discord message (2,000 characters) is copied part by part: paste, then press <em>Next part</em> on the card at the bottom right; its pictures are copied one at a time after the text. Shapes, arrows and widgets stay behind, and the card counts them. Nebula sends nothing; the text is on the clipboard, and in the clipboard history if you keep one. A black hole’s note and this guide have no such entry.</p>' +
+    '<p><strong>A note with its files, as one zip.</strong> Export → Nebula note saves a note with videos, PDFs or other files as one zip, the note and its files in it. Import the zip on another computer and the files come along into your notes, linked again.</p>' +
 
-    '<hr class="blk-hr">' +
-    '<h2>9 · Your privacy</h2>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>9 · Your privacy</h2><div class="toggle-body">' +
     '<p><strong>Your notes stay on your computer.</strong> Nebula has no account, no cloud and no statistics: nothing you write is sent anywhere. The app itself goes online for three things only — to ask GitHub whether there is a newer version, to fetch the title of a page you saved as a bookmark, and to fetch the picture of a video for an export.</p>' +
     '<p><strong>AI chats are not saved by Nebula.</strong> The AI panel is a browser tab inside the app: what you write there goes straight to the service you opened — Claude, ChatGPT, Gemini and the others — and is kept in your account there, under that service’s own privacy rules. Nebula does not read a chat, does not store it, and puts nothing from it into your notes unless you copy it there yourself.</p>' +
     '<p><strong>What is kept on this computer</strong> is what any browser keeps: each tab’s sign-in (its cookies and site data), so you are still signed in tomorrow. Every tab has a session of its own, so signing in to one is not signing in to another. Right-click a tab → <em>Clear session data</em> removes that tab’s sign-in, cookies and cache.</p>' +
     '<p><strong>Try it:</strong> right-click an AI tab you are signed in to and choose <em>Clear session data</em> — the page loads again, signed out.</p>' +
 
-    '<hr class="blk-hr">' +
-    '<h2>10 · A page in a note that asks</h2>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>10 · A page in a note that asks</h2><div class="toggle-body">' +
     '<p>An embedded page — a meeting, a voice recorder, a news site — may ask for your <strong>microphone</strong>, your <strong>camera</strong> or to <strong>show notifications</strong>. Nebula asks you first, naming the site and what it wants, and <em>Don\'t allow</em> is the answer already chosen: a page you do not allow gets nothing. Your answer is never saved. It lasts while that page is open; a reload, another page in the embed or the note opened again asks again. A page that asks on its own, with nothing pressed in it, is not asked about at all, and some sites then never ask — open those in your browser. Everything else — what you copied, your location, your devices — an embedded page never gets.</p>' +
     '<p><strong>Try it:</strong> in a note of your own, embed a page that records your voice, press its record button and choose <em>Don\'t allow</em> — the page hears nothing. Open the note again and press it once more: Nebula asks again.</p>' +
 
-    '<hr class="blk-hr">' +
-    '<h2>11 · Projects and the Universe</h2>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>11 · Projects and the Universe</h2><div class="toggle-body">' +
     '<p><strong>Projects.</strong> Drag a folder by its row and let go on the middle of another folder: the two go into a new project, a row like a folder’s one step up. A folder let go on a project joins it. An open project shows <em>+ Add a note</em> and <em>+ Add a folder</em>; a note made there, or dragged onto the project, sits in the project itself, beside its folders. Double-click a project to rename it; its ⋯ menu holds the rest. Projects are kept beside your folders, and there are none inside black holes.</p>' +
     '<p><strong>The Universe.</strong> The small window above Archive and Trash is your notes as a galaxy. Each project is a star, each folder a planet — round its project’s star, or on its own — and a folder’s notes are its moons. Notes in no folder are planets round the bright core in the middle, and once a ring is full the next ones go round farther out. Each of a note’s labels is a small moon of it. Every project and folder has a colour of its own, its notes wear it, and a label is the same colour on every note; notes in no folder stay in the theme’s own ink, a shade under the white core, and a project’s own loose notes wear its colour. Bodies sharing a ring are spread evenly round it. Everything turns slowly round the middle. The Universe follows the note you open. A shooting star crosses it about once a minute, and every five minutes a small rocket leaves a planet: click it and the camera rides along, and once it is gone the Universe fits itself again. Drag to look around; the wheel or the touchpad zooms. A click flies to a body and rings it, and a second, wider circle takes in everything that goes round it. Right-click → <em>Open</em> opens the note.</p>' +
-    '<p><strong>⤢</strong> at the top of the Universe puts it over the whole page; there, at the top right, are the search for labels and mentions, <em>Fit Universe</em>, <em>Hide names</em> — every name off the Universe until it is pressed again, then <em>Show names</em> — and the whole-screen button. The small Universe under the list only watches: it glides to the note you open and takes no clicks. Type a label and pick it: its notes are ringed in its colour and joined in thin lines, a constellation, while the rest fades; pick more and each is drawn in its own colour, × takes one away. Type @ or a note’s title to pick a mention: that note and every note it mentions or is mentioned by light up, joined by arrows from the note that mentions to the note mentioned. Open a note from the Universe and the note comes beside it; another one makes three. Drag the Universe by its name onto a note and the page is shared between them, as with notes side by side; its ✕ closes it. Right-click a black hole: a locked one offers <em>Open</em>, which asks for its PIN or passkey and then pulls you in — a double-click does the same; an open one offers <em>Enter the black hole</em> and <em>Lock</em>. Inside, a space of its own holds only its notes, with main space faint around it. An open black hole shows its whole name, and a locked one only its initials. <em>Back to main space</em> brings you out. Names come in as you zoom in, a layer at a time: projects first, then folders and black holes, then notes, then labels; zooming out hides them again in the same order. Click a body and everything in its orbit shows its name — with the names hidden too. The ring of the picked body follows the note you open beside the Universe. The Universe reads titles, folders, labels and @mentions — nothing else of what is written in a note.</p>' +
+    '<p><strong>⤢</strong> at the top of the Universe puts it over the whole page; there, at the top right, are the search for labels and mentions, <em>Follow the body picked</em>, <em>Fit Universe</em>, <em>Hide names</em> — every name off the Universe until it is pressed again, then <em>Show names</em> — and the whole-screen button. Follow is the Universe widget’s: click a planet or a star, press it, and the camera keeps that body in the middle as it goes round; a drag, Fit or another body lets go. The small Universe under the list only watches: it glides to the note you open and takes no clicks. The arrow before its name folds it away and brings it back. Type a label and pick it: its notes are ringed in its colour and joined in thin lines, a constellation, while the rest fades; pick more and each is drawn in its own colour, × takes one away. Type @ or a note’s title to pick a mention: that note and every note it mentions or is mentioned by light up, joined by arrows from the note that mentions to the note mentioned. Open a note from the Universe and the note comes beside it; another one makes three. Drag the Universe by its name onto a note and the page is shared between them, as with notes side by side; its ✕ closes it. Right-click a black hole: a locked one offers <em>Open</em>, which asks for its PIN or passkey and then pulls you in — a double-click does the same; an open one offers <em>Enter the black hole</em> and <em>Lock</em>. Inside, a space of its own holds only its notes, with main space faint around it. An open black hole shows its whole name, and a locked one only its initials. <em>Back to main space</em> brings you out. Names come in as you zoom in, a layer at a time: projects first, then folders and black holes, then notes, then labels; zooming out hides them again in the same order. Click a body and everything in its orbit shows its name — with the names hidden too. The ring of the picked body follows the note you open beside the Universe. The Universe reads titles, folders, labels and @mentions — nothing else of what is written in a note.</p>' +
+    '<p>Beside New folder there is a <strong>New project</strong> button, and one press clears the Universe search.</p>' +
     '<p><strong>Try it:</strong> drag one folder onto the middle of another to make a project. Then press ⤢ on the Universe, type a label into the search at the top right and pick it, then right-click a planet and choose <em>Open</em>.</p>' +
-    '<hr class="blk-hr">' +
-    '<h2>12 · A Universe of your own</h2>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>12 · A Universe of your own</h2><div class="toggle-body">' +
     '<p>Type <span class="inline-code">/widget</span> and choose Universe: the same sky as the small one beside your folders, alive inside the note. Drag to look around; the wheel or the touchpad zooms; double-click a note and it opens. When the note saves, it keeps a picture of the sky, so the Universe is there even in a note that is only read — the live one comes back when the note is edited again.</p>' +
+    '<p><strong>A map that stays put.</strong> The lock in the corner of a Universe widget pins its map where it is: it no longer drags or zooms, the wheel scrolls the note past it, and the note keeps the view. The left of its four buttons hides the names, as Hide names does on the big map, and the widget keeps that choice; a picked body still names its own system. The next one fits the whole map in view; on a pinned map it pins that view. The third one follows a body: click a planet or a star on the map, press it, and the camera keeps that body in the middle as it goes round; a drag, Fit or another body lets go. Locked while it follows, the map keeps following, and the round marks of the pick are gone.</p>' +
     '<p><strong>Try it:</strong> in a note of your own type <span class="inline-code">/widget</span>, choose Universe, drag the sky around, then double-click a note in it.</p>' +
-    '<hr class="blk-hr">' +
-    '<h2>13 · Panes you can size</h2>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>13 · Panes you can size</h2><div class="toggle-body">' +
+    '<p><strong>Notes side by side.</strong> Drag a note from the list onto the page and it opens beside the one you are writing in — up to four, the page shared out equally among them. Each has its own title and a ✕ to close it; the editing bar and the AI panel stay one, for the note you click in. ⋯ → Open side by side does the same. Beside a Nebula Wide page a note is shown in Nebula Wide; its own page comes back when it leaves.</p>' +
     '<p>When notes are side by side, a thin line stands between every two panes. Drag the line and the two neighbours share out the page between them — the other panes keep theirs; double-click it and the two are equal again. A click on the line focuses it, and then the ← and → keys move it.</p>' +
     '<p><strong>Try it:</strong> with two notes side by side, drag the line between them and watch the two shares follow; double-click the line for equal halves again.</p>' +
-    '<hr class="blk-hr">' +
-    '<h2>14 · Black holes scroll on their own</h2>' +
+    '<p><strong>Tabs over the note.</strong> Drag a note from the list onto the line under the title and it stays there as a tab, beside one for the note you are writing in. A click on a tab opens its note; ✕ or a press of the mouse wheel lets the tab go — the note itself is not touched. Ctrl+Tab and Ctrl+Shift+Tab step through them, and a tab can be dragged along the line to another place. Drag a tab onto the page and its note opens beside the one you are in; the tab stays. A note you open from the list takes the tab you are in; ⋯ → Open in a tab and a click on a mention add one without leaving it. With one tab left the line is bare again.</p>' +
+    '<p><strong>Try it:</strong> drag two notes from the list onto the line under the title, click through the tabs, then drag one of them onto the page.</p>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>14 · Black holes scroll on their own</h2><div class="toggle-body">' +
     '<p>The Black holes section, under your notes, has its own scroll: it stays in sight however many notes you have, and new notes never push it down. The notes above it scroll on their own; the Universe and Archive and Trash stay where they are.</p>' +
     '<p><strong>Try it:</strong> scroll the note list and the Black holes section apart — each keeps its own place.</p>' +
-    '<hr class="blk-hr">' +
-    '<h2>15 · Several blocks at once</h2>' +
+    '<p><strong>Black holes keep their names to themselves.</strong> A locked black hole shows only its initials in the list. Pin to top in its ⋯ menu keeps one above the others.</p>' +
+    '<p><strong>Black holes ask before they destroy.</strong> Every note in the Trash needs a second press to delete for good; a black hole also asks for its PIN or passkey. An open black hole can make a new recovery key from its ⋯ menu, showing it once and ending the old key. A PIN change asks for the current PIN or passkey first.</p>' +
+    '<p><strong>Try it:</strong> With a throwaway note, press Delete once in the Trash and read the changed button before you press it again. In an open black hole, look under ⋯ for New recovery key.</p>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>15 · Several blocks at once</h2><div class="toggle-body">' +
     '<p>A click on a block’s grip picks it. To pick more, Shift+click the grip of another block and everything between the two is picked; Shift+↑ and Shift+↓ grow or shrink the pick; or press the mouse on the empty side of the page and drag a box over the lines.</p>' +
     '<p>What you picked stays together: Ctrl+C copies the blocks in their order, Ctrl+X cuts them, Ctrl+D puts a copy under them, Delete removes them, and Ctrl+Shift+↑ and Ctrl+Shift+↓ move them. Esc lets them go. Hold and drag the grip of any picked block, and they all go along.</p>' +
+    '<p><strong>Words or blocks.</strong> A drag begun in a line’s words selects words while it stays in that line; once it reaches another line it picks whole blocks, and back in its line it is words again. Empty lines at the ends of a pick are left out.</p>' +
+    '<p><strong>A box inside one column.</strong> Drag a box that stays over one column of a row and only that column’s blocks are picked, not the whole row. The empty line under a column’s last picture now goes with Backspace or Delete, and widgets side by side shrink together when the page narrows.</p>' +
     '<p><strong>Try it:</strong> choose Edit mode, click the grip of this line, press Shift+↑ twice, then Ctrl+Shift+↑ — and Ctrl+Z to bring it all back.</p>' +
-    '<hr class="blk-hr">' +
-    '<h2>16 · A picture of your own</h2>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>16 · A picture of your own</h2><div class="toggle-body">' +
     '<p><strong>Behind your notes.</strong> Settings → Appearance → Theme organizer → Choose a picture puts a picture behind every note, and How much it shows sets how strongly it shows through; Reset to default beside it puts it back to 30%. First it opens in a frame of the window’s shape: pull it and zoom to choose the part that lies behind your notes, and if that part is small, it says so. Every picture you choose is kept as a little picture beside Choose a picture: press one to put it back on, or its × to delete it. Remove the picture takes off what is behind your notes, a picture or a style, and keeps it. The pictures stay on this computer in files of their own, inside no note.</p>' +
     '<p><strong>As the logo.</strong> Settings → Logo → Use a picture of mine opens the picture in a square: pull it into place, zoom with the slider or the mouse wheel, and Use this picture makes it the logo. Remove the picture brings the coloured logo back.</p>' +
-    '<p><strong>Of colours.</strong> In Style colours, pick up to five colours and press a style: Diagonal, Across, Glow, Swirl, Stripes, Blocks, Clouds, Waves, Aurora, Rings, Mesh, Facets, Horizon, Dunes or Bubbles. Press a colour to choose it with the theme’s bar and colours beside it, or from Colours inspired by your picture, and point at a style to see it in the preview first. Wearing a style keeps your picture. The picture is made from them and goes behind your notes like any other. If it shows green specks or steps on a screen, Soften for the screen draws it smaller and a little blurred: choose Always, or On an external screen. It is Never until you choose. Moved onto an external screen, Nebula says where it is in a card at the bottom right; Don’t show again for this screen keeps it away from that screen.</p>' +
+    '<p><strong>Of colours.</strong> In Style colours, pick up to five colours and press a style: Diagonal, Across, Glow, Swirl, Stripes, Blocks, Clouds, Waves, Aurora, Rings, Mesh, Facets, Dunes or Bubbles. Press a colour to choose it with the theme’s bar and colours beside it, or from Colours inspired by your picture, and point at a style to see it in the preview first. Wearing a style keeps your picture, and No style, the first of them, takes the style off again. The picture is made from them and goes behind your notes like any other. If it shows green specks or steps on a screen, Soften for the screen draws it smaller and a little blurred: choose Always, or On an external screen. It is Never until you choose. Moved onto an external screen, Nebula says where it is in a card at the bottom right; Don’t show again for this screen keeps it away from that screen.</p>' +
+    '<p><strong>Appearance, seen first.</strong> Settings → Appearance is laid out like the logo’s editor. At the left a whole small Nebula — the title strip, the note list with its foot, the note’s head, the editing bar and a note — in the theme, the background, the font and the size you chose; point at a style and it shows there before you wear it. Under it the picture, with How much it shows and Soften for the screen. At the right one editor keeps the themes; in it the colours of Your own theme and the style colours — up to five — stand at the left, the bar and the colours to choose from beside them, then the styles. Six styles are new: Aurora, Rings, Mesh, Facets, Dunes and Bubbles; the colours of your picture are offered to them too. Your own picture, kept first among the themes as My picture, takes a name of yours with a double click on it; and once a style is chosen, the colours of your picture are no longer offered.</p>' +
     '<p><strong>Try it:</strong> choose a picture for the background, then move How much it shows from one end to the other.</p>' +
-    '<hr class="blk-hr">' +
-    '<h2>17 · Where your notes live</h2>' +
+    '</div></div>' +
+    // Widgets and syncing were told only in the lists of the releases that brought them;
+    // those lists left the page with 1.0.4, so each has a section of its own (owner, 1.0.4).
+    '<div class="blk-toggle"><h2>17 · Widgets</h2><div class="toggle-body">' +
+    '<p><strong>Widgets.</strong> Type <span class="inline-code">/widget</span> and choose a calculator, a scientific calculator or a calendar. A widget is like a picture: drag it, pull its corner to make it bigger or smaller, and from its bar put it in the text, in front of the words or behind them. Click its keys or, with it picked, type on the keyboard; Enter gives the answer. Print and Export as PDF ask whether the widgets go on the paper too.</p>' +
+    '<p><strong>Widgets from the editing bar.</strong> The button with three small squares and a plus in the editing bar’s first row, left of the shapes button, opens the same choice without typing: pick a widget and it lands where the caret is.</p>' +
+    '<p><strong>A Pomodoro and a Clock.</strong> Type <span class="inline-code">/widget</span> and choose Pomodoro: focus, a break, and a long break after a number of sessions, each with its own minutes, and a stopwatch on its other tab. The Clock shows the time and the date and has an alarm: set its hour and minutes and turn the bell on.</p>' +
+    '<p><strong>Pomodoro, your way.</strong> Say after how many sessions the long break comes. Auto-continue starts the next break or focus by itself. A focus and a break end with different sounds — wind chimes and a singing bowl, two real recordings credited in About Nebula — and the ♪ buttons in the Pomodoro and the Clock choose them right there: Nebula’s, any sound your computer has, or sounds of your own, as many as twenty. Settings → Sounds has the same three.</p>' +
+    '<p><strong>Days with events, a Pomodoro that follows you.</strong> Click a day in a Calendar widget to choose it: under the month are its events, Mark marks the day, and + Event writes one with a time and, if you like, an alarm. The alarm rings at its time whichever note is open, and a card in the bottom-right corner says what it is; click it and Nebula opens that calendar on that day. A Pomodoro running out of sight, further down the note or in another note, shows live in the same corner with Pause and Continue; click it to go back to it.</p>' +
+    '<p><strong>A smaller corner card.</strong> The card that follows a running Pomodoro into the corner has a − button: one press leaves the time alone, another only the icon; click the icon and the card is whole again. It counts in whole seconds and keeps its size for the next start.</p>' +
+    '<p><strong>A timer in the Clock.</strong> The Clock widget has two tabs now, <em>Clock</em> and <em>Timer</em>. On Timer, set the minutes with − and + or click the number and type it — as long as you like — press Start, and it counts down and rings with the alarm’s sound when the time is up — also while another note is open. Pause, Reset and Stop are beside it. The Pomodoro’s numbers are typed the same way, up to six hours, and Auto-continue stops after the long break.</p>' +
+    '<p><strong>A World clock and the Weather.</strong> Two new widgets under <span class="inline-code">/widget</span>. The World clock shows your own time and, under it, the cities you add with <em>Add a city</em> — up to eight — each with how far ahead or behind it is; point at a city and its × takes it away. It asks nobody anything: the cities and their time zones are in Nebula. The Weather shows a city’s sky now and for the three days after, and holds up to six cities: <em>Add a city</em> adds one, a click on another shows it in full, its × takes it away; °C reads °F, ↻ asks again. A city is found by its name or its country’s — more than thirty thousand of them, all in Nebula. Its forecast comes from Open-Meteo, asked as quietly as it can be: no account, no key, no cookies, only the rough place of the cities you chose — never where you are — and only while a Weather widget is in a note you have open.</p>' +
+    '<p><strong>Try it:</strong> in a note of your own type <span class="inline-code">/widget</span>, choose Clock, open its Timer tab, set one minute and press Start — then open another note and wait for it to ring.</p>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>18 · Your notes on all your devices</h2><div class="toggle-body">' +
+    '<p><strong>Your notes on all your devices.</strong> The Tools menu beside Settings holds Nebula’s connections with other apps. The first, Tailscale sync, keeps the notes of your computers alike over your own tailnet — two of them or more, and a phone once Nebula comes to phones — straight from one to the other with no cloud between. Turn it on on each, make a pairing code on one and type it into each of the others: all your devices share that one code. Then list the other devices on each one by their Tailscale name or address; beside each, Tools says whether it is connected, and at the top whether Tailscale is. When a device is online in Tailscale but Nebula on it does not answer, a firewall there is most likely in the way: Tools says so under the list, with the steps that let Nebula through on Windows, Mac and Linux. A device added later takes the same code: on a paired one press Show the code, and Hide the code puts it away again. Each fetches what changed on the others when it opens, when another closes, and at Sync now; a device that is off is simply skipped until next time. While two of them are open at once they keep alike by themselves: what you write on one reaches the other a moment after you stop typing, and a note open there takes the change in where you are reading: the page, the caret and a playing video stay. Sync now, in the sheet that Tools → Tailscale opens, goes both ways: the devices it reaches fetch from this one too, and a card at the bottom right shows how far it has come and ends with Synced on all your devices. Unpair, or taking a connected device off the list, asks first. A note changed on two of them is kept twice, side by side; a note deleted for good on one goes on all the others too, even those that hear of it only through another. Black holes and this guide stay on each device, and big videos, files and pictures come over afterwards, in the background: until one is here, its player, its card or its place in the note says Video syncing, File syncing or Picture syncing and how much of it has come, and Nebula asks before it closes while a big file is still crossing. A note you want on one computer only stays there as well: once sync is on, right-click it in the list and choose Do not sync this note. A Not synced badge then stands by its title, and a click on it — or Sync this note again in the same menu — puts the note back. A copy your other devices already had stays with them as it was. Devices sync only on the same version of Nebula: if one is behind, it says which, and to update it first. How to set it up — for two devices, a third or a phone, and what to do with one lost — is in the Tools sheet itself, step by step.</p>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>19 · Where your notes live</h2><div class="toggle-body">' +
     '<p>Click the version number at the bottom of the sidebar to see every folder this copy uses. Each note is a folder of its own: in it the note’s JSON file, written atomically, and its pictures and videos as files — a picture is written once, so typing saves only the words. A dated snapshot of the whole vault is kept alongside, one a day, and only the newest is kept: it copies the notes’ own files and shares their pictures and videos with the vault instead of copying them, so a video is on the disk once. On a disk that cannot share a file — a flash drive, a network folder — the copy holds them itself, so they are there twice. Of the copies made before an update and before a repair, the newest of each kind is kept. A note deleted from the Trash takes its folder with it, in every snapshot too. Black holes are beside the notes, in blackholes: one folder each, every note in it one sealed file.</p>' +
-    '<p>An update replaces the application folder only. The vault is copied into Backups before anything installs, and <strong>nothing in it is ever deleted</strong>. The installed app, the portable copy, the test build and the dev build each keep their own separate notes.</p>' +
+    '<p>An update replaces the application folder only. The vault is copied into Backups before anything installs, and <strong>nothing in it is ever deleted</strong>. The installed app, the portable copy, the test build and the dev build each keep their own separate notes. On Linux the AppImage updates itself; the deb package (Ubuntu, Mint, Kali) and the pacman package (Arch) show a card that opens the download page, and the new package is installed over the old one. Notes are in <em>~/.config/nebula</em> there. Black holes and the sync pairing need the system keyring on Linux, GNOME Keyring or KWallet: without one Nebula refuses them and says why, and never keeps their keys where another program could read them.</p>' +
     '<p><strong>File → Open notes folder</strong> shows that folder in Explorer. Pictures taken with F12 go to <em>Pictures\\Nebula</em>, outside the vault.</p>' +
     '<p><strong>Deleted is deleted.</strong> A note in the Trash can still be restored. Deleting from it asks first — one press only arms the “Delete for good?” that does it — and then it leaves the vault and every backup with it — the daily copies, the ones taken before updates and before repairs — so it cannot be brought back from anywhere. A picture or a video taken out of a note goes the same way at the next start: out of the note’s folder and out of every backup. What you take out is gone for good, however much it is. Only where a note has lost pictures that were not taken out in Nebula — a fault, or its file changed outside the app — Nebula asks first and deletes nothing until you answer. They can then be deleted, or put back at the end of the note, from where you move them to their old place. Notes deleted before 0.9.1 are taken out of the backups the first time 0.9.1 starts.</p>' +
     '<p><strong>Older notes are brought up to date.</strong> When a version changes how notes are written, the first start after the update repairs every note you have, a few at a time while the app is idle, after copying the whole vault to <em>Backups\\pre-heal-</em> and the version number. Only how a note is built is repaired: its words, pictures, links, shapes, code and equations stay exactly as they were, and a note that could not be repaired without changing one of them is left as it is. Its date and its place in the list do not change, and opening a note is never counted as editing it.</p>' +
     '<p><strong>Try it:</strong> after the next update, open the Backups folder from the version number: beside the dated copy there is one called <em>pre-heal-</em> with the version it was taken for.</p>' +
 
-    '<hr class="blk-hr">' +
-    '<h2>18 · Code blocks</h2>' +
+    '</div></div>' +
+    '<div class="blk-toggle"><h2>20 · Code blocks</h2><div class="toggle-body">' +
     '<p>Markdown-style: pick a language and the colours follow, the way GitHub, Discord or Notion do it. Click into the code to edit it; changing the language repaints the same text; <em>Copy</em> takes the raw source. Every language Nebula knows has a sample below.</p>' +
     '<h3>Markdown</h3>' + code(MD_SRC, 'markdown') +
     '<h3>JavaScript</h3>' + code(JS_SRC, 'javascript') +
@@ -1019,8 +1170,12 @@ export const GUIDE_NOTE = {
     '<h3>JSON</h3>' + code(JSON_SRC, 'json') +
     '<h3>SQL</h3>' + code(SQL_SRC, 'sql') +
     '<h3>Bash</h3>' + code(BASH_SRC, 'bash') +
-    '<p><strong>Try it:</strong> switch the JavaScript block to Python — the same text recolours. In every sample the comment, the strings, the numbers and the keywords are coloured differently; flat grey text would mean that language’s rules failed to load.</p>',
+    '<p><strong>Try it:</strong> switch the JavaScript block to Python — the same text recolours. In every sample the comment, the strings, the numbers and the keywords are coloured differently; flat grey text would mean that language’s rules failed to load.</p>' +
+    '</div></div>',
 };
+
+/** A guide's text with every toggle folded, as it ships. */
+const asFolded = (html) => String(html ?? '').replaceAll(' data-open="true"', '');
 
 /**
  * Put the guide back, whatever the vault remembers.
@@ -1045,13 +1200,16 @@ export function addGuide(store, lang = 'en') {
   // A guide the user has written in is theirs: it is never overwritten. The
   // current one arrives beside it under a versioned title instead, so nothing
   // is lost either way.
-  if (existing && existing.content === guide.content) {
+  //
+  // A section opened in Edit mode is not writing in it (1.0.4: the sections
+  // are folded toggles, and an open one is saved open).
+  if (existing && asFolded(existing.content) === asFolded(guide.content)) {
     if (existing.archivedAt) store.unarchive(existing.id);
     return existing.id;
   }
 
   const title = existing ? `${guide.title} (${GUIDE_VERSION})` : guide.title;
-  const already = live.find((n) => n.title === title && n.content === guide.content);
+  const already = live.find((n) => n.title === title && asFolded(n.content) === asFolded(guide.content));
   if (already) {
     if (already.archivedAt) store.unarchive(already.id);
     return already.id;

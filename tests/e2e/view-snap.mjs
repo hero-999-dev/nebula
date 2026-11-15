@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { putFromBar } from './put.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -106,7 +107,7 @@ export async function runViewSnapChecks(check) {
     await win.evaluate(() => { const ed = document.getElementById('editor'); ed.focus(); for (let i = 0; i < 14; i++) ed.insertAdjacentHTML('beforeend', '<p><br></p>'); ed.dispatchEvent(new Event('input', { bubbles: true })); });
     const kinds = {};
     for (const kind of ['rect', 'diamond', 'triangle']) {
-      await win.evaluate((k) => document.querySelector(`[data-shape-add="${k}"]`).click(), kind);
+      await putFromBar(win, 'shape', kind);
       await win.waitForTimeout(150);
       kinds[kind] = await win.evaluate(() => {
         const s = document.querySelector('#editor .shape.sel'); const r = s.getBoundingClientRect();
@@ -128,15 +129,13 @@ export async function runViewSnapChecks(check) {
       kinds.diamond.rotAtBottomLeft && kinds.diamond.sizeAtBottomRight && kinds.rect.rotAtBottomLeft && kinds.rect.sizeAtBottomRight, JSON.stringify(kinds));
 
     /* ---------------- arrows snap on (XMind-style) */
-    await win.evaluate(() => {
-      const shapes = [...document.querySelectorAll('#editor .shape')];
-      shapes.forEach((s) => s.remove());
-      document.querySelector('[data-shape-add="rect"]').click();
-      const a = document.querySelector('#editor .shape.sel'); a.style.left = '60px'; a.style.top = '220px'; a.id = 'sa';
-      document.querySelector('[data-shape-add="rect"]').click();
-      const b = document.querySelector('#editor .shape.sel'); b.style.left = '520px'; b.style.top = '220px'; b.id = 'sb';
-      document.querySelector('[data-arrow-add="straight"]').click();
-    });
+    await win.evaluate(() => { document.querySelectorAll('#editor .shape').forEach((s) => s.remove()); });
+    for (const [id, left] of [['sa', '60px'], ['sb', '520px']]) {
+      await putFromBar(win, 'shape', 'rect');
+      await win.evaluate(([i, l]) => { const s = document.querySelector('#editor .shape.sel'); s.style.left = l; s.style.top = '220px'; s.id = i; }, [id, left]);
+    }
+    // The arrow on open ground, clear of both.
+    await putFromBar(win, 'arrow', 'straight', await win.evaluate(() => { const r = document.getElementById('editor').getBoundingClientRect(); return { x: Math.round(r.left + 300), y: Math.round(r.top + 60) }; }));
     await win.keyboard.press('Escape');
     await win.waitForTimeout(150);
     const endAt = (end) => win.evaluate((e) => { const r = document.querySelector(`#editor .note-arrow .arrow-end[data-end="${e}"]`).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, end);

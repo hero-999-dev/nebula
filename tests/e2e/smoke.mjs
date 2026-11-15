@@ -21,6 +21,7 @@ import { runTableKeyChecks } from './table-keys.mjs';
 import { runLinkPasteChecks } from './link-paste.mjs';
 import { runWidgetChecks } from './widgets.mjs';
 import { runSplitChecks } from './split-view.mjs';
+import { runNoteTabChecks } from './note-tabs.mjs';
 import { runGalaxyChecks } from './galaxy.mjs';
 import { runUniverseWidgetChecks } from './universe-widget.mjs';
 import { runSideScrollChecks } from './side-scroll.mjs';
@@ -60,6 +61,7 @@ import { runPdfScratchChecks } from './pdf-scratch.mjs';
 import { runOpenGuardChecks } from './open-guard.mjs';
 import { runVaultDisconnectChecks } from './vault-disconnect.mjs';
 import { runEmbedAskChecks } from './embed-ask.mjs';
+import { putFromBar, unfoldAll } from './put.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const mainJs = path.join(root, 'dist-electron', 'main.js');
@@ -175,6 +177,8 @@ try {
   // a person would, with the badge by the title.
   await win.waitForFunction(() => !document.getElementById('readonly-chip')?.hidden, undefined, { timeout: 10_000 }).catch(() => {});
   await win.evaluate(() => { const chip = document.getElementById('readonly-chip'); if (chip && !chip.hidden) chip.click(); });
+  // Its sections come folded (1.0.4); this suite reads and writes all over the page.
+  await unfoldAll(win);
 
   check('window opens with the app shell', true);
   check('window title', (await win.title()) === 'Nebula', await win.title());
@@ -241,14 +245,14 @@ try {
   await press(win, '#app-version');
   await win.waitForSelector('#ov-about:not([hidden])', { timeout: 5_000 });
   const aboutRows = await win.evaluate(() => document.querySelectorAll('#about-body > .about-table tr').length);
-  check('About opens and lists every folder', aboutRows === 7, `${aboutRows} rows`);
+  check('About opens and lists every folder, and the size of it all (1.0.4)', aboutRows === 8, `${aboutRows} rows`);
   await press(win, '#about-close');
 
   // Editor surfaces that only exist once the real page has booted.
   const surfaces = await win.evaluate(() => ({
     toolbar: !!document.querySelector('#toolbar .tb[data-act="bold"]'),
     slash: !!document.getElementById('slash-menu'),
-    shapes: !!document.querySelector('[data-shape-add="rect"]'),
+    shapes: !!document.querySelector('#toolbar [data-act="shape"]'),
     ai: !!document.getElementById('ai-panel'),
   }));
   check('toolbar, slash menu, shapes and AI panel are wired',
@@ -797,7 +801,7 @@ try {
   // the diamond and the triangle had no outline at all.
   {
     await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>x</p>'; });
-    await press(win, '[data-shape-add="triangle"]');
+    await putFromBar(win, 'shape', 'triangle');
     await win.waitForTimeout(300);
     const shape = await win.evaluate(() => {
       const s = document.querySelector('#editor .shape.triangle');
@@ -1266,10 +1270,8 @@ try {
     // SVG stroke scales (a hairline apart): compared with the page unzoomed.
     await win.evaluate(() => { document.getElementById('editor').style.zoom = ''; });
     for (const kind of ['square', 'diamond', 'triangle']) {
-      await win.evaluate((k) => {
-        document.getElementById('editor').innerHTML = '<p>x</p>';
-        document.querySelector(`[data-shape-add="${k}"]`).click();
-      }, kind);
+      await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>x</p>'; });
+      await putFromBar(win, 'shape', kind);
       await win.waitForTimeout(300);
       weights[kind] = await win.evaluate((k) => {
         const s = document.querySelector(`#editor .shape.${k}`);
@@ -1481,13 +1483,15 @@ try {
    * rendered is why it survived several rounds.
    */
   {
-    await press(win, '[data-menu="menu-shapes"]');
+    // Tiles since 1.0.4: the shape button opens them, as the widget button does.
+    await press(win, '#toolbar [data-act="shape"]');
+    await win.waitForSelector('#shape-menu [data-shape-add]', { state: 'attached', timeout: 3000 });
     await win.waitForTimeout(250);
     const rows = await win.evaluate(() => {
-      const m = document.getElementById('menu-shapes');
+      const m = document.getElementById('shape-menu');
       const box = m.getBoundingClientRect();
       return [...m.querySelectorAll('[data-shape-add]')].map((b) => {
-        const lab = b.querySelector('.label');
+        const lab = b.lastElementChild;
         const r = lab?.getBoundingClientRect();
         return { kind: b.dataset.shapeAdd, text: lab?.textContent ?? '',
                  w: r ? Math.round(r.width) : 0,
@@ -1495,16 +1499,17 @@ try {
       });
     });
     check('every shape row shows its name, wide enough to read',
-      rows.length === 6 && rows.every((r) => r.text && r.w > 30 && r.inside),
+      rows.length === 8 && rows.every((r) => r.text && r.w > 30 && r.inside),
       JSON.stringify(rows.map((r) => `${r.text}:${r.w}`)));
-    await press(win, '[data-menu="menu-shapes"]');
-    await win.waitForTimeout(150);
+    await win.keyboard.press('Escape');
+    // The button does not open again for a moment after its tiles were let go.
+    await win.waitForTimeout(450);
   }
 
   // A shape's text: a caret to see, and room to grow into.
   {
     await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>x</p>'; });
-    await press(win, '[data-shape-add="rect"]');
+    await putFromBar(win, 'shape', 'rect');
     await win.waitForTimeout(300);
     const pt = await win.evaluate(() => {
       const r = document.querySelector('#editor .shape').getBoundingClientRect();
@@ -1878,7 +1883,7 @@ try {
     await win.evaluate(() => !!document.querySelector('#editor .inline-eq .katex')));
 
   // The shape bar must not survive a note switch.
-  await press(win, '[data-act="shape-rect"]');
+  await putFromBar(win, 'shape', 'rect');
   await win.waitForSelector('#shape-bar:not([hidden])', { timeout: 5_000 });
   check('selecting a shape opens its bar', true);
   await win.evaluate(() => {
@@ -1893,7 +1898,7 @@ try {
   // single overlay could never be behind anything, whatever class it carried.
   await focusEditor(win);
   await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>words the shape goes behind</p>'; });
-  await press(win, '[data-act="shape-rect"]');
+  await putFromBar(win, 'shape', 'rect');
   await win.waitForSelector('#shape-bar:not([hidden])', { timeout: 5_000 });
   await clickAt(win, '#shape-bar [data-shape="back"]');
   {
@@ -1940,7 +1945,7 @@ try {
   // text used to cover the whole body and swallow the press.
   {
     await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>shape drag test</p>'; });
-    await press(win, '[data-act="shape-rect"]');
+    await putFromBar(win, 'shape', 'rect');
     await win.waitForSelector('#editor .shape', { timeout: 5_000 });
     const box = await win.evaluate(() => {
       const r = document.querySelector('#editor .shape').getBoundingClientRect();
@@ -1974,7 +1979,7 @@ try {
     await win.evaluate(() => {
       document.getElementById('editor').innerHTML = `<p>${'a paragraph long enough to wrap over several lines so that the shape underneath is completely covered by text. '.repeat(4)}</p>`;
     });
-    await press(win, '[data-act="shape-rect"]');
+    await putFromBar(win, 'shape', 'rect');
     await win.waitForSelector('#shape-bar:not([hidden])', { timeout: 5_000 });
     await clickAt(win, '#shape-bar [data-shape="back"]');
     // Centre the shape on the paragraph, then deselect by clicking the sidebar.
@@ -2086,7 +2091,7 @@ try {
       document.getElementById('editor').innerHTML =
         `<p>${'a paragraph long enough to wrap over several lines so the shape underneath is completely covered. '.repeat(4)}</p>`;
     });
-    await press(win, '[data-act="shape-rect"]');
+    await putFromBar(win, 'shape', 'rect');
     await win.waitForSelector('#shape-bar:not([hidden])', { timeout: 5_000 });
     await clickAt(win, '#shape-bar [data-shape="back"]');
     const pt = await win.evaluate(() => {
@@ -2127,7 +2132,7 @@ try {
   // Undo has to cover what the app does by script, which Chromium never saw.
   {
     await win.evaluate(() => { document.getElementById('editor').innerHTML = '<p>keep me</p>'; });
-    await press(win, '[data-act="shape-rect"]');
+    await putFromBar(win, 'shape', 'rect');
     await win.waitForSelector('#editor .shape', { timeout: 5_000 });
     const shape = await win.evaluate(() => {
       const s = document.querySelector('#editor .shape');
@@ -2449,6 +2454,8 @@ try {
     ['link-paste', runLinkPasteChecks],
     ['widgets', runWidgetChecks],
     ['split-view', runSplitChecks],
+    // 1.0.4: tabs on the line under the title.
+    ['note-tabs', runNoteTabChecks],
     ['galaxy', runGalaxyChecks],
     ['universe-widget', runUniverseWidgetChecks],
     ['side-scroll', runSideScrollChecks],

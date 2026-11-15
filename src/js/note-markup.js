@@ -27,6 +27,11 @@ const CLASS_STATE = [
   ['.note-mention.is-missing', 'is-missing'],
   // A video the player could not play, found out on this screen (file-video.js).
   ['.link-file.cannot-play', 'cannot-play'],
+  // A video still on its way from another computer (1.0.4, file-video.js).
+  ['.link-file.is-coming', 'is-coming'],
+  // An attached file, a picture still on its way (1.0.4, file-video.js).
+  ['.link-attach.is-coming', 'is-coming'],
+  ['.note-image.is-coming', 'is-coming'],
   // Cells selected, stood in, or about to be filled (table.js).
   ['.blk-table td.sel', 'sel'],
   ['.blk-table td.act', 'act'],
@@ -44,9 +49,10 @@ const CLASS_STATE = [
  * whenever a note is shown, with the player's clock in it — and what is drawn
  * round a table (table.js): its numbering, grips, the two +, the fill square
  * and the choices for the selected cells; and an attached file's Open and
- * Save a copy (0.9.6, file-attach.js), in the app's language.
+ * Save a copy (0.9.6, file-attach.js), in the app's language; and the word on
+ * a picture still on its way from another computer (1.0.4, file-video.js).
  */
-export const TRANSIENT_NODES = '.shape-angle, .video-bar, .tbl-ui, .attach-bar, .wg-live';
+export const TRANSIENT_NODES = '.shape-angle, .video-bar, .tbl-ui, .attach-bar, .wg-live, .picture-coming';
 // (The crop frame and an embed's grip: the frame is on the page, not in the
 // note; the grip is in the note, rebuilt on load like a shape's handles.)
 

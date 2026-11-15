@@ -10,7 +10,7 @@ import { WORDS, words } from '../electron/dialog-words.js';
 
 const NAMES = /\{([a-z]+)\}/g;
 const namesOf = (text) => [...String(text).matchAll(NAMES)].map((m) => m[1]).sort();
-const FULL = { error: 'boom', file: 'a.bat', site: 'meet.example' };
+const FULL = { error: 'boom', file: 'a.bat', site: 'meet.example', name: 'film.mp4', got: '1.0', size: '9.0' };
 
 describe('the words table', () => {
   it('has all three languages for every key, each a string with something to say', () => {

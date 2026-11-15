@@ -32,6 +32,8 @@
  */
 
 import { t } from './i18n.js';
+import { hideGhost } from './drag-ghost.js';
+import { paintComingAttach } from './file-video.js';
 
 /** The kinds a card is drawn for, by the file's ending: its colour and its word. */
 const KINDS = [
@@ -189,7 +191,8 @@ const BAR_VERSION = '1';
 
 /**
  * Every card made a control again, its address only ever a note's own file,
- * and its buttons drawn — on the screen, never into the note.
+ * and its buttons drawn — on the screen, never into the note. A file still on
+ * its way from another computer says so in their place (1.0.4, file-video.js).
  */
 export function refreshAttachBlocks(root) {
   for (const card of root.querySelectorAll('.link-block.link-attach')) {
@@ -197,7 +200,7 @@ export function refreshAttachBlocks(root) {
     if (!isAttachUrl(card.dataset.src)) card.dataset.src = '';
     redrawFace(card);
     let bar = card.querySelector(':scope > .attach-bar');
-    if (bar?.dataset.v === BAR_VERSION) continue;
+    if (bar?.dataset.v === BAR_VERSION) { paintComingAttach(card); continue; }
     bar?.remove();
     bar = card.ownerDocument.createElement('div');
     bar.className = 'attach-bar';
@@ -217,6 +220,7 @@ export function refreshAttachBlocks(root) {
     );
     const del = card.querySelector(':scope > .link-del');
     if (del) del.before(bar); else card.append(bar);
+    paintComingAttach(card);
   }
 }
 
@@ -235,6 +239,8 @@ export function initAttachCards(editor, { say = () => {}, owner = null } = {}) {
     let url = card.dataset.src;
     const name = card.dataset.name || card.querySelector('.link-card__title')?.textContent || '';
     if (!media?.saveFile || !isAttachUrl(url)) { say('The file is not in this note'); return; }
+    // Still on its way from another computer (1.0.4): there is no file to open or copy yet.
+    if (card.classList.contains('is-coming')) { say('This file is still syncing'); return; }
     if (busy.has(card)) return;
     busy.add(card);
     try {
@@ -267,6 +273,184 @@ export function initAttachCards(editor, { say = () => {}, owner = null } = {}) {
   }, true);
   // A press on the bar is the bar's: it neither picks the card up nor moves the caret.
   editor.addEventListener('mousedown', (e) => { if (e.target.closest?.('.attach-bar') && cardOf(e.target)) { e.preventDefault(); e.stopPropagation(); } }, true);
+}
+
+/** How far a press must move before a card is carried (block-drag.js TAKE). */
+const CARRY = 8;
+
+/**
+ * Whether a card carried to that point has left the note for a place a file
+ * can be let go: out of the window, or over the AI panel.
+ * @param {number} x
+ * @param {number} y in the window
+ * @param {Document} [doc]
+ */
+export function carriedOut(x, y, doc = document) {
+  const win = doc.defaultView;
+  if (x <= 0 || y <= 0 || x >= win.innerWidth - 1 || y >= win.innerHeight - 1) return true;
+  return !!doc.elementFromPoint?.(x, y)?.closest?.('#ai-panel');
+}
+
+/**
+ * What the system's drag is carrying, when it began in this note.
+ *
+ * The owner: "I pulled it to the right, did not let it go there, pulled it
+ * back and let it go in the note: a copy was made." Come back, the system's
+ * drag is a file dropped on the note like any other. The note knows its own
+ * (`takeCarried`): a card goes to where it is let go, a picture stays.
+ *
+ * While the system drags, the page sees no mouse; the first move without the
+ * button, or a press, says that drag is over and the next drop is another's.
+ * @type {null | {el: HTMLElement, ext: string}}
+ */
+let carriedNow = null;
+let carriedWatched = false;
+/** The system's drag that was asked for and has not answered yet. */
+let asked = null;
+const extOf = (name) => (/\.([a-z0-9]{1,8})$/i.exec(String(name ?? ''))?.[1] ?? '').toLowerCase();
+/**
+ * @param {HTMLElement} el the card or the picture
+ * @param {string} name
+ * @param {Promise<unknown>|null} [started] the system's drag, asked for: answered once it began — on Windows, once it is over
+ */
+function carryOut(el, name, started = null) {
+  carriedNow = { el, ext: extOf(name) };
+  asked = started;
+  Promise.resolve(started).catch(() => {}).then(() => { if (asked === started) asked = null; });
+  // The system's drag has a picture of its own.
+  hideGhost();
+  // Whatever was moving it within the note gives up: it is not let go there (block-drag.js).
+  window.dispatchEvent(new CustomEvent('nebula-carried-out'));
+  if (carriedWatched) return;
+  carriedWatched = true;
+  // The button let go before the system's drag began (a picture's copy is made first): that drag must not begin
+  // with no button held — it would be let go at once, wherever the pointer is. Until it has answered, what it
+  // lets go in the note is still the note's own.
+  const letGo = () => {
+    if (!asked) { carriedNow = null; return; }
+    window.nebula?.media?.carryEnd?.();
+  };
+  window.addEventListener('mousemove', (e) => { if (!(e.buttons & 1)) letGo(); }, true);
+  window.addEventListener('mouseup', () => { if (asked) window.nebula?.media?.carryEnd?.(); }, true);
+  window.addEventListener('mousedown', () => { carriedNow = null; }, true);
+}
+
+/**
+ * The card or picture of this note that the files of a drop are a copy of, once.
+ * @param {File[]} files what was dropped
+ * @returns {HTMLElement|null}
+ */
+export function takeCarried(files) {
+  const was = carriedNow;
+  carriedNow = null;
+  if (!was?.el.isConnected || files?.length !== 1) return null;
+  return was.ext && extOf(files[0].name) !== was.ext ? null : was.el;
+}
+
+/**
+ * A file's card pulled out of the note (1.0.4).
+ *
+ * The owner: "I should be able to take the files in a note — a docx, any kind
+ * — out with the mouse, onto the desktop or into the AI panel." Within the
+ * note the card is moved as every card is (block-drag.js). Once the pointer
+ * is out of the window, or over the AI panel, the pull is the system's own
+ * drag of a file: a copy, the one Open makes (electron/opened-files.js),
+ * which Explorer, Finder or the page in the panel takes as any file dropped
+ * on it. The note keeps its file, in an Only view note too.
+ *
+ * The copy is made as soon as the card is carried, so it is there when the
+ * pointer leaves; while it is carried the panel's pages let the pointer
+ * through (body.attach-carried), or the window would lose it at their edge.
+ * @param {HTMLElement} editor
+ * @param {{owner?: () => ({id?: string|null, hole?: string|null}|null)}} [opts]
+ */
+export function initAttachCarry(editor, { owner = null } = {}) {
+  if (!editor) return;
+  /** @type {null | {url: string, name: string, card: HTMLElement, x: number, y: number, carried: boolean}} */
+  let held = null;
+  const drop = () => {
+    if (!held) return;
+    if (held.carried) window.nebula?.media?.carryEnd?.();
+    held = null;
+    document.body.classList.remove('attach-carried');
+  };
+  editor.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    const card = e.target.closest?.('.link-block.link-attach');
+    // Anywhere on the card but its buttons (the owner: "not only by the middle of it").
+    if (!card || !editor.contains(card) || e.target.closest('button, select, input')) return;
+    const url = card.dataset.src;
+    const mine = owner?.();
+    // Only the open note's own file: one pasted from another note is adopted at a click first.
+    if (!window.nebula?.media?.dragFile || !isAttachUrl(url) || (mine && !ownsAttachUrl(url, mine))) return;
+    held = { url, name: card.dataset.name || '', card, x: e.clientX, y: e.clientY, carried: false };
+  }, true);
+  window.addEventListener('mousemove', (e) => {
+    if (!held) return;
+    if (!(e.buttons & 1) || !held.card.isConnected) { drop(); return; }
+    const media = window.nebula.media;
+    if (!held.carried) {
+      if (Math.abs(e.clientX - held.x) < CARRY && Math.abs(e.clientY - held.y) < CARRY) return;
+      held.carried = true;
+      document.body.classList.add('attach-carried');
+      void media.carryFile?.(held.url, held.name)?.catch?.(() => {});
+    }
+    if (!carriedOut(e.clientX, e.clientY)) return;
+    const { url, name, card } = held;
+    held = null;
+    document.body.classList.remove('attach-carried');
+    carryOut(card, name, media.dragFile(url, name));
+  });
+  window.addEventListener('mouseup', drop);
+  window.addEventListener('blur', drop);
+}
+
+/** A picture's address a copy can be made of: a file of a note, or the picture itself written into the text. */
+const isPictureSrc = (src) => /^nebula-media:\/\/note\/[\w-]{1,120}\/[\w-]{1,80}\.[a-z0-9]{2,5}$|^nebula-media:\/\/hole\/[\w-]{1,120}\/[\w-]{1,120}\/pic-[0-9a-f]{32}\.[a-z]{3,4}$|^data:image\/[a-z+]+;base64,/.test(String(src ?? ''));
+
+/**
+ * A picture pulled out of the note (1.0.4, the owner: "resimin de sürüklenmesi
+ * lazim"). Within the note a picture is moved as it always was (rich-paste.js);
+ * once the pointer is out of the window, or over the AI panel, that move is
+ * given up (`onOut`) and the pull is the system's own drag of a copy of the
+ * picture. In an Only view note too: the note is not changed by it.
+ * @param {HTMLElement} editor
+ * @param {{owner?: () => ({id?: string|null, hole?: string|null}|null), onOut?: () => void}} [opts]
+ */
+export function initPictureCarry(editor, { owner = null, onOut = null } = {}) {
+  if (!editor) return;
+  /** @type {null | {src: string, figure: HTMLElement, x: number, y: number, carried: boolean}} */
+  let held = null;
+  const drop = () => {
+    if (!held) return;
+    held = null;
+    document.body.classList.remove('attach-carried');
+  };
+  editor.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || e.target.closest?.('.image-h, .image-caption')) return;
+    const figure = e.target.closest?.('.note-image');
+    if (!figure || !editor.contains(figure) || figure.matches('.note-widget, .note-video')) return;
+    const src = figure.querySelector('img')?.getAttribute('src');
+    if (!window.nebula?.media?.dragPicture || !isPictureSrc(src)) return;
+    held = { src, figure, x: e.clientX, y: e.clientY, carried: false };
+  }, true);
+  window.addEventListener('mousemove', (e) => {
+    if (!held) return;
+    if (!(e.buttons & 1) || !held.figure.isConnected) { drop(); return; }
+    if (!held.carried) {
+      if (Math.abs(e.clientX - held.x) < CARRY && Math.abs(e.clientY - held.y) < CARRY) return;
+      held.carried = true;
+      document.body.classList.add('attach-carried');
+    }
+    if (!carriedOut(e.clientX, e.clientY)) return;
+    const { src, figure } = held;
+    drop();
+    onOut?.();
+    // A picture written into the text is copied under a name of its own: any one picture is it.
+    carryOut(figure, src.startsWith('data:') ? '' : src, window.nebula.media.dragPicture(src, owner?.() ?? null));
+  });
+  window.addEventListener('mouseup', drop);
+  window.addEventListener('blur', drop);
 }
 
 /**

@@ -128,7 +128,9 @@
   user-select: none;
   flex-shrink: 0;
 }
-.tb-row { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; padding: 3px 0; }
+/* A pixel less between the buttons and beside the separators (1.0.4): the widget button closed the
+   first row, and at the window’s first width the row has to hold it in all four languages. */
+.tb-row { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding: 3px 0; }
 .tb-row + .tb-row { border-top: 1px solid var(--rule); }
 
 /* vertical rails: rows become columns and scroll */
@@ -190,7 +192,7 @@
 }
 .tb:hover { background: var(--paper-sunken); border-color: var(--rule); }
 .tb:active, .tb.active { background: var(--clay-soft); border-color: var(--clay-soft); }
-.tb-sep { width: 1px; height: 18px; background: var(--rule); margin: 0 4px; }
+.tb-sep { width: 1px; height: 18px; background: var(--rule); margin: 0 3px; }
 /* Page zoom (0.9.3): − ratio +, one group. */
 .tb-zoom { display: inline-flex; align-items: center; gap: 2px; }
 /* Auto order page (0.9.3): pressed while the note does it by itself; on
@@ -200,7 +202,16 @@
 /* Narrow (0.9.4): "page zoom is too wide" — with the window at the side of the screen it was what the
    second row could not hold. The signs are slim, the ratio as wide as its words. */
 .tb-zoom .tb { font-size: 16px; line-height: 1; min-width: 20px; width: 20px; padding: 0; }
-.tb-zoom .tb-zoom-select { width: auto; min-width: 50px; max-width: 86px; padding-left: 3px; padding-right: 3px; font-size: 11.5px; text-align: center; }
+/* The triangle has its own room at the right edge (1.0.4, the owner: "alt ücgen biraz daha sagda
+   olmali"): with 3px on both sides it sat on the % sign. */
+.tb-zoom .tb-zoom-select {
+  width: 58px; padding-left: 4px; padding-right: 15px; font-size: 11.5px; text-align: center;
+  background-position: calc(100% - 8px) calc(50% + 1px), calc(100% - 4px) calc(50% + 1px);
+}
+/* As wide as its words only while "Fit (87%)" is what it shows. Left to itself the box took the
+   width of its longest line, the Fit one, but not until something made it measure again: 58 at
+   first and 72 after the first change of a design, in whatever design came after. */
+.tb-zoom .tb-zoom-select.is-fit { width: auto; min-width: 58px; max-width: 94px; }
 .edit-shell.bar-left .tb-zoom, .edit-shell.bar-right .tb-zoom { flex-direction: column; }
 /* Every dropdown mark in the bar is the same triangle at the same size: the
    ▾ glyph ones (underline, colours, shapes, font) and the CSS-drawn ones on
@@ -376,9 +387,13 @@
 .tb-menu__search:focus { border-color: var(--clay); }
 .tb-menu__rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .tb-menu--font .tb-menu__rows button { grid-template-columns: 1fr auto auto; gap: 4px; }
+/* A design's face names its design after itself (1.0.4): "Courgette (Ink)".
+   The name is as wide as it is and the design takes the rest, so the two stand together. */
+.tb-menu--font .tb-menu__rows button.of-design { grid-template-columns: auto 1fr auto; }
+.tb-menu__of { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-faint); font-family: var(--sans); font-size: 12px; }
 .tb-menu__x { color: var(--ink-faint); font-size: 15px; line-height: 1; padding: 0 3px; border-radius: 4px; font-family: var(--sans); }
 .tb-menu__x:hover { color: var(--madder); background: var(--paper-raised); }
-/* A pin beside each font (0.9.4): pinned ones stand first in the list. It
+/* A pin beside each font (0.9.4): pinned ones stand first under the designs’ faces. It
    comes up when the pointer is on the font ("when I take the mouse to a font,
    the pin at its side" — the owner); a pinned one is always drawn. */
 .tb-menu__pin { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 4px; color: var(--ink-faint); opacity: 0; }
@@ -566,6 +581,11 @@ body.divider-dragging .link-frame { pointer-events: none; }
   color: var(--ink-soft);
   pointer-events: none;
 }
+/* A bullet is the same mark in every design: a design's face drew its own dot — a square in Pixel, a
+   blot in Ink — or had none and borrowed one, so the same list changed its marks with the design (the
+   owner, 1.0.4). It is Nebula's own, with no stroke of a one-weight face on it. A number is written, and
+   stays in the design's face with the words beside it. */
+.editor ul > li:not(.blk-todo)::before { font-family: var(--marks); -webkit-text-stroke: 0; }
 /* A to-do draws its own box in ::before, so it is left out of the rules above
    rather than having its marker cancelled afterwards. */
 
@@ -887,10 +907,12 @@ body.divider-dragging .link-frame { pointer-events: none; }
 .note-image.note-image--inline.note-image--row {
   display: inline-block;
   vertical-align: top;
-  /* Its share of the line — or, where the others are narrow, the room they
-     leave (`--beside`: their widths and gaps, image-place.js). Together never
-     more than the line: one that takes the room leaves the others their width. */
-  max-width: max(calc((100% - 1px) / var(--row, 2) - 12px), calc(100% - 13px - var(--beside, 100%)));
+  /* Its part of the line: what its width is of the widths the row was given
+     (`--share`, image-place.js; an even part where a row has none yet). A line
+     wide enough holds nobody back; a narrower one shrinks them all alike, a
+     widget beside a widget too (1.0.4 — before, the one beside a narrow one
+     gave way alone). `--beside` is still written, for a build before this. */
+  max-width: calc((100% - 1px - 12px * var(--row, 2)) * var(--share, calc(1 / var(--row, 2))));
   margin: 10px 12px 14px 0;
 }
 /* Pictures in a row pulled to the same height: a line along their foot (1.0.3, rich-paste.js). */
@@ -1089,6 +1111,47 @@ body.divider-dragging .link-frame { pointer-events: none; }
 body.block-dragging { user-select: none; }
 body.block-dragging, body.block-dragging * { cursor: grabbing !important; }
 body.block-dragging .link-frame { pointer-events: none; }
+/* What is pulled, at the pointer (1.0.4, drag-ghost.js): a veil over the block
+   where it still lies, and a chip with its name that goes with the mouse.
+   Neither is in the note, neither takes the mouse. */
+.carry-veil {
+  position: fixed;
+  z-index: 89;
+  border-radius: 10px;
+  background: var(--paper);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.carry-ghost {
+  position: fixed;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 260px;
+  padding: 6px 11px 6px 7px;
+  border: 1px solid var(--clay);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+  font-family: var(--sans, inherit);
+  font-size: 13px;
+  pointer-events: none;
+}
+.carry-ghost .attach-icon { flex: none; transform: scale(0.8); margin: -4px -2px; }
+.carry-ghost--pic { padding: 4px; }
+.carry-ghost__pic { display: block; max-width: 120px; max-height: 90px; border-radius: 6px; object-fit: contain; }
+.carry-ghost__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A file's card is taken anywhere on it (1.0.4). */
+.link-block.link-attach { cursor: grab; }
+/* A file sent to another note (1.0.4, send-file.js): a field and the notes under it. */
+.send-menu__list { max-height: 260px; margin-top: 6px; overflow-y: auto; }
+.send-menu__list button { width: 100%; }
+.send-menu__list button.send-menu__hole::after { content: '●'; margin-left: auto; color: var(--ink-faint); font-size: 9px; }
+.send-menu__none { padding: 8px; color: var(--ink-faint); font-size: 12px; }
+/* A file's card on its way out of the note (file-attach.js): the panel's pages let the pointer through until the system's drag takes it. */
+body.attach-carried #ai-panel webview { pointer-events: none; }
 
 /* Every block's grip, as in Notion (1.0.0, block-handle.js): it comes up at
    the left of the block the pointer is on. Pulled, the block goes with the
@@ -1202,6 +1265,9 @@ body.tbl-resizing-row, body.tbl-resizing-row * { cursor: row-resize !important; 
 .editor:not([data-readonly="true"]) .blk-table .tbl-corner { cursor: grab; }
 .blk-table .tbl-corner::before { content: "⠿"; font-size: 11px; opacity: .55; }
 .blk-table .tbl-corner:hover::before { opacity: 1; }
+/* Picked up by its corner (table.js): a line round the whole table, and Delete takes it away. */
+.blk-table .tbl-corner.picked::before { opacity: 1; color: var(--clay); }
+.blk-table:has(.tbl-corner.picked) > table { outline: 2px solid var(--clay); outline-offset: 1px; }
 
 /* Cells selected as cells: tinted over whatever colour they have; the one the caret waits in is framed. */
 .blk-table td.sel { background-image: linear-gradient(color-mix(in srgb, var(--clay) 20%, transparent), color-mix(in srgb, var(--clay) 20%, transparent)); }
@@ -1235,6 +1301,57 @@ body.tbl-filling, body.tbl-filling * { cursor: crosshair !important; user-select
 /* In a column with another at its right there is no margin to hang into: there the + has room of its own. */
 .blk-col:not(:last-child) .blk-table { grid-template-columns: max-content 18px; }
 .blk-col:not(:last-child) .blk-table .tbl-add-col { position: static; grid-area: 1 / 2; width: auto; margin: 19px 0 0 3px; }
+/* The corner between the two +: pulled, the whole table grows or shrinks, every column and row by the same share. */
+.blk-table .tbl-scale {
+  position: absolute; left: calc(100% + 3px); bottom: 0;
+  width: 15px; height: 15px;
+  box-sizing: border-box;
+  border: 1px dashed var(--rule); border-radius: 4px;
+  color: var(--ink-faint);
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity .12s;
+}
+.blk-table .tbl-scale::before {
+  content: ""; position: absolute; right: 3px; bottom: 3px;
+  width: 6px; height: 6px;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+}
+.blk-table:hover .tbl-scale, .blk-table:focus-within .tbl-scale, body.tbl-scaling .blk-table .tbl-scale { opacity: 1; }
+.blk-table .tbl-scale:hover, body.tbl-scaling .blk-table .tbl-scale { border-color: var(--clay); color: var(--clay); background: var(--paper-raised); }
+.blk-col:not(:last-child) .blk-table .tbl-scale { position: static; grid-area: 2 / 2; margin: 3px 0 0 3px; }
+body.tbl-scaling, body.tbl-scaling * { cursor: nwse-resize !important; user-select: none; }
+/* Two marks of one way each (1.0.4): over the + at the right the table is pulled only wider or narrower,
+   under the rows' numbers — as wide as they are — only higher or lower. The corner keeps both. */
+.blk-table .tbl-pull {
+  display: flex; align-items: center; justify-content: center;
+  box-sizing: border-box;
+  border: 1px dashed var(--rule); border-radius: 4px;
+  color: var(--ink-faint);
+  /* The arrow is drawn, not a letter of some font: a shaft through the middle and a head at each end,
+     the same for both marks, so it sits in the very middle and is as sharp as the lines around it. */
+  background: linear-gradient(currentColor, currentColor) center / 9px 1px no-repeat;
+  opacity: 0;
+  transition: opacity .12s;
+  user-select: none;
+}
+.blk-table .tbl-pull::before, .blk-table .tbl-pull::after {
+  content: ""; position: absolute; left: calc(50% - 2.5px); top: calc(50% - 2.5px);
+  box-sizing: border-box; width: 5px; height: 5px;
+  border: solid currentColor; border-width: 0 0 1px 1px;
+}
+.blk-table .tbl-pull-x { position: absolute; left: calc(100% + 3px); top: 2px; width: 15px; height: 15px; cursor: ew-resize; }
+.blk-table .tbl-pull-x::before { transform: translateX(-2px) rotate(45deg); }
+.blk-table .tbl-pull-x::after { transform: translateX(2px) rotate(225deg); }
+.blk-table .tbl-pull-y { position: relative; grid-area: 2 / 1; justify-self: start; width: 29px; height: 15px; margin: 3px 0 0 0; background-size: 1px 9px; cursor: ns-resize; }
+.blk-table .tbl-pull-y::before { transform: translateY(-2px) rotate(135deg); }
+.blk-table .tbl-pull-y::after { transform: translateY(2px) rotate(315deg); }
+.blk-table:hover .tbl-pull, .blk-table:focus-within .tbl-pull, body.tbl-scaling .blk-table .tbl-pull { opacity: 1; }
+.blk-table .tbl-pull:hover, body.tbl-scaling-x .blk-table .tbl-pull-x, body.tbl-scaling-y .blk-table .tbl-pull-y { border-color: var(--clay); color: var(--clay); background-color: var(--paper-raised); }
+body.tbl-scaling-x .blk-table .tbl-scale, body.tbl-scaling-y .blk-table .tbl-scale { border-color: var(--rule); color: var(--ink-faint); background: none; }
+.blk-col:not(:last-child) .blk-table .tbl-pull-x { position: static; grid-area: 1 / 2; align-self: start; width: auto; margin: 1px 0 0 3px; }
+body.tbl-scaling-x, body.tbl-scaling-x * { cursor: ew-resize !important; }
+body.tbl-scaling-y, body.tbl-scaling-y * { cursor: ns-resize !important; }
 
 /* The square at the selection's lower left: pulled, it carries the cells on. */
 .blk-table .tbl-fill {
@@ -1271,6 +1388,8 @@ body.tbl-filling, body.tbl-filling * { cursor: crosshair !important; user-select
 .blk-table .tbl-chip button:hover { background: var(--clay-soft); }
 .blk-table .tbl-chip button[data-tbl^="del-"] { color: var(--c-red); }
 .editor[data-readonly="true"] .blk-table .tbl-add,
+.editor[data-readonly="true"] .blk-table .tbl-scale,
+.editor[data-readonly="true"] .blk-table .tbl-pull,
 .editor[data-readonly="true"] .blk-table .tbl-colgrip,
 .editor[data-readonly="true"] .blk-table .tbl-rowgrip { display: none; }
 /* The width of the column being pulled, over the line that is pulled — a row's height, beside its line. */
@@ -1531,20 +1650,41 @@ body.tbl-filling, body.tbl-filling * { cursor: crosshair !important; user-select
 .shape.sel .shape-rot { display: block; }
 .shape-rot {
   position: absolute;
-  left: -1px; bottom: -1px;
-  width: 12px; height: 12px;
+  left: -3px; bottom: -3px;
+  width: 18px; height: 18px;
   background: var(--clay);
-  border-radius: 0 3px 0 0;
+  border-radius: 50%;
   cursor: crosshair;
 }
+/* A turning arrow: a ring with a head on it. The ring with a gap alone read as a letter C (the owner). */
 .shape-rot::before {
   content: '';
   position: absolute;
   inset: 3px;
-  border: 1.5px solid var(--paper-sunken);
-  border-right-color: transparent;
-  border-radius: 50%;
+  background: var(--paper-sunken);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 12a8 8 0 1 1-3-6.2'/%3E%3Cpath d='M18 1v6h-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 12a8 8 0 1 1-3-6.2'/%3E%3Cpath d='M18 1v6h-6'/%3E%3C/svg%3E") center / contain no-repeat;
 }
+/* A work area's other three corners. */
+.shape-h[data-corner="nw"] { left: -1px; top: -1px; right: auto; bottom: auto; border-radius: 0 0 3px 0; cursor: nwse-resize; }
+.shape-h[data-corner="ne"] { right: -1px; top: -1px; bottom: auto; border-radius: 0 0 0 3px; cursor: nesw-resize; }
+.shape-h[data-corner="sw"] { left: -1px; bottom: -1px; right: auto; border-radius: 0 3px 0 0; cursor: nesw-resize; }
+/* A work area's name is written as a caption is; an empty one says what goes there while the area is picked. */
+.shape.area .shape-text { font-style: italic; }
+.shape.area.sel.is-unnamed:not(.editing) .shape-text::before { content: var(--t-area-name, 'Name of the area'); opacity: .6; }
+/* Its button stood in its top right corner; it is in the bar now. One left in a note not yet healed is not shown. */
+.area-catch { display: none; }
+/* What was chosen from the bar and is not yet put: a faint picture under the pointer (place.js). */
+.place-ghost {
+  position: fixed; z-index: 9000; pointer-events: none; opacity: 0.45;
+  transform: translate(-50%, -50%) scale(var(--z, 1));
+  color: var(--ink);
+}
+/* The shape in it would take the press that places it: a shape answers the pointer by itself. */
+.place-ghost .shape { left: 0; top: 0; pointer-events: none; }
+.place-ghost .shape.textbox { outline: 1px dashed var(--ink-soft); }
+.place-ghost svg { display: block; overflow: visible; }
+body.is-placing, body.is-placing * { cursor: crosshair !important; }
 
 .shape-angle {
   position: absolute;
@@ -1559,6 +1699,37 @@ body.tbl-filling, body.tbl-filling * { cursor: crosshair !important; user-select
   pointer-events: none;
   white-space: nowrap;
 }
+/* A text box (1.0.4): words on the page with nothing round them. Thin lines say where it is
+   under the pointer and when it is picked; its words are the note's colour, not a shape's. */
+/* Over the rule that darkens words on a filled ground: these two have no fill of their own. */
+.shape.textbox { border-color: transparent; min-height: 28px; }
+.editor .shape[style*="background: transparent"] { color: var(--ink); }
+/* A shape emptied of its fill keeps a line that shows on any page. */
+.editor .shape[style*="background: transparent"]:not(.textbox):not(.no-outline) { border-color: var(--ink-soft); }
+.shape[style*="background: transparent"]:not(.no-outline):not(.sel) .shape-svg polygon { stroke: var(--ink-soft); }
+.shape[style*="background: transparent"].editing .shape-text { caret-color: var(--ink); }
+.shape.textbox:hover { outline: 1px dashed var(--rule); }
+.shape.textbox.sel { box-shadow: none; outline: 1px dashed var(--clay); }
+.shape.textbox.editing .shape-text, .shape.area.editing .shape-text { caret-color: var(--ink); }
+/* A work area: a frame for the pieces of a chart, which it carries when it is moved. Its words are its name, top left. */
+.shape.area {
+  border: 1px dashed var(--ink-soft); border-radius: 10px;
+  align-items: flex-start; justify-content: flex-start; font-size: 12px;
+}
+/* Outlined from its bar, the line is whole. */
+.shape.area.lined { border-style: solid; }
+.editor .shape.area[style*="rgba(140, 130, 170, 0.08)"] { color: var(--ink-soft); }
+.shape.area .shape-text { text-align: left; max-width: 100%; padding: 6px 10px; }
+.shape.area.sel { box-shadow: 0 0 0 1.5px var(--clay); }
+/* Its ground lets the pointer through to the words and the pictures under it; shapes.js reads the
+   press and takes the area where nothing written lies. Its grips and its button stay its own. */
+.shape-layer:not(.shape-layer--behind) > .shape.area { pointer-events: none; }
+.shape.area > .shape-h { pointer-events: auto; }
+#editor[data-area-grab], #editor[data-area-grab] * { cursor: grab; }
+/* The arrow a carried text box would ride. */
+.note-arrow.is-catching .arrow-line { stroke: var(--clay); }
+.shape-bar button.on { border-color: var(--clay); color: var(--clay); }
+.shape-bar button svg { display: block; margin: auto; }
 .note-arrow {
   position: absolute;
   left: 0;
@@ -1568,11 +1739,34 @@ body.tbl-filling, body.tbl-filling * { cursor: crosshair !important; user-select
   overflow: visible;
   color: var(--ink);
   pointer-events: none;
+  /* Over the shapes of its layer: one put after it lay on the line and hid it (the owner). */
+  z-index: 1;
 }
 .note-arrow .arrow-line { pointer-events: stroke; }
+/* The wide unseen line that takes a press anywhere along the arrow, and says so under the pointer. */
+.note-arrow .arrow-hit { pointer-events: stroke; cursor: pointer; }
+.note-arrow:not(.is-selected):hover .arrow-line { stroke-width: 2.4; }
 .note-arrow.is-selected .arrow-line { stroke: var(--clay); stroke-width: 2.4; }
 /* What a dragged arrow end will hold on to when released (0.8.9). */
 .arrow-target { outline: 2px dashed var(--clay); outline-offset: 4px; }
+/* The four sides of a shape (1.0.4): a dot outside each, to draw an arrow from or to put the
+   next shape beside. While an arrow's end is over an object they sit on its sides, the held one lit. */
+.shape-ports { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
+.shape-ports[hidden], .shape-port[hidden] { display: none; }
+.shape-port {
+  position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; padding: 0;
+  border: 1.5px solid var(--clay); border-radius: 50%; background: var(--paper-raised, var(--paper));
+  pointer-events: auto; cursor: crosshair; opacity: 0.85;
+  transition: transform 0.12s ease, background-color 0.12s ease;
+}
+.shape-port:hover, .shape-port.on { background: var(--clay); opacity: 1; transform: scale(1.3); }
+.shape-ports--target .shape-port { pointer-events: none; width: 8px; height: 8px; margin: -4px 0 0 -4px; }
+/* The grip in the middle of a picked arrow: pulled, the line bends; double-clicked, it is straight again. */
+.note-arrow .arrow-bend { display: none; }
+.note-arrow.is-selected .arrow-bend {
+  display: block; pointer-events: all; cursor: move;
+  fill: var(--clay); stroke: var(--paper-raised); stroke-width: 1.4;
+}
 .note-arrow .arrow-end {
   pointer-events: all;
   fill: var(--paper-raised);
@@ -1598,6 +1792,10 @@ body.tbl-filling, body.tbl-filling * { cursor: crosshair !important; user-select
   cursor: pointer;
 }
 .shape-bar .dot:hover { border-color: var(--ink); }
+/* No fill: an empty dot struck through. */
+.shape-bar .dot--none {
+  background: linear-gradient(to top right, transparent calc(50% - 1px), var(--clay) calc(50% - 1px), var(--clay) calc(50% + 1px), transparent calc(50% + 1px));
+}
 .shape-bar button {
   min-width: 24px; height: 22px;
   border: 1px solid var(--rule);
@@ -2018,7 +2216,7 @@ body.resizing webview { pointer-events: none; }
   .image-layer { position: relative !important; inset: auto !important; }
   .note-image--inline, .image-layer .note-image { position: relative !important; left: auto !important; top: auto !important; break-inside: avoid; margin: 8px 0; }
   .note-image .image-caption { position: static; margin-top: 4px; }
-  .image-h, .link-del, .tbl-ui, .attach-bar { display: none !important; }
+  .image-h, .link-del, .tbl-ui, .attach-bar, .picture-coming { display: none !important; }
   .blk-table { display: block; break-inside: avoid; }
   .blk-table td { border-color: #bbb !important; }
 }
@@ -2184,34 +2382,8 @@ body.resizing webview { pointer-events: none; }
 .tb-menu--size button { grid-template-columns: 1fr; }
 /* .tb-combo .tb-caret is positioned inside the field — see above. */
 
-/* The shape menu: the mark in a column of its own, the name beside it, and no
-   empty half down the right — it was as wide as the font list. */
-/* Wide enough for the longest name.
-   `min-width: 0` was put here when the menu was asked to be less wide, and it
-   crushed the name column to zero: every label was still in the markup, at
-   13px, measuring 0 x 18. "Write the shapes' names next to the arrow, I have
-   asked dozens of times" — they were there and invisible, and checking that the
-   text existed rather than that it RENDERED is why it survived. */
-.tb-menu--shapes { min-width: 146px; }
-.tb-menu--arrows { min-width: 168px; }
 /* A toolbar button drawn inline (the arrow button has no icon-set entry). */
 .tb .tb-svg { display: grid; place-items: center; pointer-events: none; }
-.tb-menu--shapes button {
-  display: grid;
-  grid-template-columns: 18px minmax(0, auto);
-  align-items: center;
-  gap: 8px;
-  text-align: left;
-}
-/* Each row shows the shape it makes, drawn the way the shape is drawn — a
-   1.6px outline, the same weight the real one carries. Unicode glyphs were
-   never the right silhouette and were hairlines at this size. */
-.tb-menu--shapes .sh-mark {
-  display: grid;
-  place-items: center;
-  color: var(--ink);
-}
-.tb-menu--shapes .sh-mark svg { display: block; }
 
 /* What the size box is about to change, kept visible while it has focus. */
 ::highlight(nebula-size-target) {
@@ -2241,9 +2413,13 @@ body.resizing { cursor: col-resize; user-select: none; }
 .editor .block-picked hr.blk-hr {
   border-top-color: var(--clay) !important;
   border-radius: 2px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--clay) 35%, transparent);
+  /* Stronger in 1.0.4: at 35% a picked divider could not be told from one that
+     was not ("secilip secilmedigi belli olmuyor", the owner's Nebula note). */
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--clay) 65%, transparent);
   background: none;
 }
+/* The upright dividers of a picked row of columns go with it, and show it. */
+.editor .block-picked hr.blk-vr { border-color: var(--clay) !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--clay) 65%, transparent); }
 .editor :is(.note-image, .link-block):is(.in-sel, .block-picked),
 .editor .block-picked :is(.note-image, .link-block) {
   outline: 3px solid var(--clay);
@@ -2253,9 +2429,13 @@ body.resizing { cursor: col-resize; user-select: none; }
 .editor :is(.note-image, .link-block):is(.in-sel, .block-picked) :is(img, video),
 .editor .block-picked :is(.note-image, .link-block) :is(img, video) { filter: brightness(.82) saturate(.9); }
 
-/* The guide's shape stage: an empty band at the top of the guide where its demo
-   shapes stand, so no line of text ever runs under them at any window width. */
-.editor .guide-stage { height: 136px; user-select: none; }
+/* The guide's shape stage: an empty band where its demo shapes stand, so no
+   line of text ever runs under them at any window width. Since 1.0.4 it is in
+   the section about shapes and holds their two layers itself: they are placed
+   from the band, and fold away with the section. Under the words there means
+   under the section's own words — the section is one stacking context. */
+.editor .guide-stage { height: 136px; position: relative; user-select: none; }
+.editor .guide-stage > .shape-layer--behind { z-index: -1; }
 
 /* The option chosen from the keyboard in the link menu (0.8.7). */
 .link-menu__options button.sel,
@@ -2342,6 +2522,13 @@ body.resizing { cursor: col-resize; user-select: none; }
 /* A video the player cannot play has no picture to size the card by. */
 .link-file.cannot-play .link-frame { min-height: 96px; }
 .link-file.cannot-play .video-bar [data-video]:not([data-video="outside"]), .link-file.cannot-play .video-now { display: none; }
+/* A video still on its way from another computer (Tailscale sync, 1.0.4): how
+   much of it is here, in place of the buttons that have nothing to act on yet. */
+.link-file.is-coming .link-frame { min-height: 96px; }
+.link-file.is-coming .video-bar [data-video], .link-file.is-coming .video-now { display: none; }
+.link-file .video-coming { flex: 1 1 100%; display: flex; align-items: center; gap: 10px; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.link-file .video-coming__meter { flex: 1 1 auto; height: 4px; border-radius: 2px; background: var(--rule); overflow: hidden; }
+.link-file .video-coming__meter i { display: block; width: 0; height: 100%; border-radius: 2px; background: var(--clay); transition: width .3s ease; }
 /* A file attached to the note (0.9.6, file-attach.js), as OneNote shows one:
    a page with a folded corner in the colour of its kind and its ending on it,
    then its name and size, then Open and Save a copy. A click saves a copy. */
@@ -2414,7 +2601,18 @@ body.resizing { cursor: col-resize; user-select: none; }
   cursor: pointer;
 }
 .link-attach .attach-bar button:hover { border-color: var(--clay); color: var(--clay); }
-@media (max-width: 520px) { .link-attach .attach-bar { display: none; } }
+@media (max-width: 520px) { .link-attach:not(.is-coming) .attach-bar { display: none; } }
+/* An attached file or a picture still on its way from another computer
+   (Tailscale sync, 1.0.4): how much of it is here — in the card's bar in place
+   of its buttons, and where the picture will be. */
+.link-attach.is-coming .attach-bar button { display: none; }
+.link-attach .file-coming { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.link-attach .file-coming__meter { flex: 0 0 56px; height: 4px; border-radius: 2px; background: var(--rule); overflow: hidden; }
+.note-image.is-coming { min-height: 64px; }
+.note-image.is-coming img { visibility: hidden; }
+.note-image .picture-coming { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); font-variant-numeric: tabular-nums; text-align: center; pointer-events: none; }
+.note-image .picture-coming__meter { width: min(160px, 70%); height: 4px; border-radius: 2px; background: var(--rule); overflow: hidden; }
+.link-attach .file-coming__meter i, .note-image .picture-coming__meter i { display: block; width: 0; height: 100%; border-radius: 2px; background: var(--clay); transition: width .3s ease; }
 
 /* Labels share the title row, ahead of the save indicator. */
 .note-labels {
@@ -2501,8 +2699,9 @@ body.resizing { cursor: col-resize; user-select: none; }
   padding: 4cqw;
   gap: 3cqw;
   color: var(--ink);
-  /* The note's own writing font, else the theme's (1.0.3: "herseyin fontu temaya ayarlara uygun olsun"). */
-  font-family: var(--note-font, var(--serif));
+  /* The design's face, whatever font the note is written in (1.0.4, the owner: "widgetler design
+     fontunu kullansın"); under Nebula that is its Serif. It was the note's own writing font in 1.0.3. */
+  font-family: var(--serif);
   line-height: 1.2;
   text-align: left;
   white-space: normal;
@@ -2510,7 +2709,8 @@ body.resizing { cursor: col-resize; user-select: none; }
 }
 .note-widget > .wg--calc { aspect-ratio: .72; }
 .note-widget > .wg--sci { aspect-ratio: .95; padding: 3cqw; gap: 2.2cqw; }
-.note-widget > .wg--calendar { aspect-ratio: .8; gap: 2.4cqw; }
+/* As high as what it holds (1.0.4: it was one height, and the ground under its day lay empty). */
+.note-widget > .wg--calendar { aspect-ratio: auto; gap: 2.4cqw; }
 /* The Universe (1.0.0): a title bar and the sky; in the editor the live map
    (.wg-live, never saved) covers the drawn rings. */
 .note-widget > .wg--universe { aspect-ratio: 1.6; padding: 2.4cqw; gap: 1.8cqw; }
@@ -2587,14 +2787,18 @@ body.resizing { cursor: col-resize; user-select: none; }
 .wg-day--sel { outline: .6cqw solid var(--ink-soft); outline-offset: -.6cqw; }
 .wg-day--event::after { content: ''; position: absolute; top: .8cqw; right: .9cqw; width: 1.3cqw; height: 1.3cqw; border-radius: 50%; background: var(--clay); }
 .wg-day--today.wg-day--mark.wg-day--event::after { background: var(--paper); }
-.wg-agenda { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 1.4cqw; border-top: 1px solid var(--rule); padding-top: 2cqw; }
+.wg-agenda { flex: none; display: flex; flex-direction: column; gap: 1.4cqw; border-top: 1px solid var(--rule); padding-top: 2cqw; }
 .wg-agenda-head { display: flex; align-items: center; justify-content: center; gap: 1.6cqw; }
 .wg-agenda-day { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 4cqw; font-weight: 600; text-transform: capitalize; }
 .wg-agenda-btn { flex: none; display: inline-flex; align-items: center; justify-content: center; padding: .8cqw 2.4cqw; line-height: 1.2; white-space: nowrap; border: 1px solid var(--rule); border-radius: 999px; background: none; color: var(--ink-soft); font: inherit; font-size: 3.4cqw; cursor: pointer; }
 .wg-agenda-btn:hover { background: var(--paper-sunken); }
 .wg-agenda-btn.on { background: var(--clay-soft); border-color: var(--clay-soft); color: var(--ink); }
 .wg-agenda-add { border-color: var(--clay); color: var(--clay); }
-.wg-events { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 1cqw; }
+/* One line high, or as many as the fullest day holds up to three (widgets.js, calendarRows); more scroll. */
+.wg-events { flex: none; height: 6.8cqw; overflow-y: auto; display: flex; flex-direction: column; gap: 1cqw; }
+.wg-events[data-rows="2"] { height: 14.6cqw; }
+.wg-events[data-rows="3"] { height: 22.4cqw; }
+.wg-event { flex: none; }
 .wg-event { display: flex; align-items: center; gap: 2cqw; width: 100%; padding: 1.2cqw 2cqw; border: 0; border-radius: 2cqw; background: var(--paper-sunken); color: var(--ink); font: inherit; font-size: 3.6cqw; text-align: left; cursor: pointer; }
 .wg-event:hover { filter: brightness(.97); }
 .wg-ev-time { flex: none; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
@@ -2632,7 +2836,8 @@ body.resizing { cursor: col-resize; user-select: none; }
 
 /* Pomodoro and Clock (1.0.3): a big time, the keys that run it, the settings under it. */
 .note-widget > .wg--pomodoro { aspect-ratio: .74; padding: 3.6cqw; gap: 2.4cqw; }
-.note-widget > .wg--clock { aspect-ratio: 1.02; }
+/* A little taller since its two tabs, Clock and Timer (1.0.4). */
+.note-widget > .wg--clock { aspect-ratio: .94; }
 .wg-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4cqw; padding: 1cqw; border-radius: 3cqw; background: var(--paper-sunken); }
 .wg-tab { margin: 0; padding: 1.6cqw 0; border: 0; border-radius: 2.2cqw; background: none; color: var(--ink-soft); font: inherit; font-size: 4.2cqw; cursor: pointer; }
 .wg-tab.on { background: var(--paper); color: var(--ink); box-shadow: 0 0 0 1px var(--rule); }
@@ -2649,9 +2854,14 @@ body.resizing { cursor: col-resize; user-select: none; }
    auto-continue as a switch and the two sounds, each a row of its own. */
 .wg-panel { display: flex; flex-direction: column; padding: 1.4cqw 3cqw; border-radius: 3cqw; background: var(--paper-sunken); }
 .wg-sets { display: flex; flex-direction: column; }
-.wg-set { display: grid; grid-template-columns: 1fr auto 2.4em auto 4.6em; align-items: center; gap: 1.2cqw; padding: 1cqw 0; font-size: 3.8cqw; }
+.wg-set { display: grid; grid-template-columns: 1fr auto minmax(2.4em, auto) auto 4.6em; align-items: center; gap: 1.2cqw; padding: 1cqw 0; font-size: 3.8cqw; }
 .wg-set-name { color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wg-set-v { text-align: center; font-variant-numeric: tabular-nums; }
+/* The number is a key too: a click on it and it is typed (1.0.4). */
+.wg-set-v { margin: 0; padding: .1em .2em; border: 0; border-radius: 1.4cqw; background: none; color: inherit; font: inherit; text-align: center; font-variant-numeric: tabular-nums; cursor: text; }
+.wg-set-v:hover { background: var(--paper); box-shadow: 0 0 0 1px var(--rule); }
+.wg-spin .wg-set-v:hover { background: var(--paper-sunken); }
+.float-menu.number-menu { width: auto; min-width: 0; padding: 3px; overflow: visible; }
+.link-menu input.number-menu__v { width: 76px; padding: 4px 0; text-align: center; font-size: 15px; font-variant-numeric: tabular-nums; }
 .wg-step {
   width: 6.4cqw; height: 6.4cqw; margin: 0; padding: 0; border: 1px solid var(--rule); border-radius: 50%;
   background: var(--paper); color: var(--ink-soft); font: inherit; font-size: 4cqw; line-height: 1; cursor: pointer;
@@ -2691,6 +2901,70 @@ body.resizing { cursor: col-resize; user-select: none; }
 .wg-sound-ic { color: var(--clay); }
 .wg-sound-for { color: var(--ink-faint); }
 .wg-sound-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+
+/* The World clock (1.0.4): a line for here and one for each city, as high as
+   its lines — every height in cqw, so widgets.js knows its ratio (worldRatio). */
+.note-widget > .wg--world { aspect-ratio: auto; }
+.wg--world .wg-head { height: 6.25cqw; flex: none; }
+.wg-wrows { display: flex; flex-direction: column; flex: none; }
+.wg-wrow { display: flex; align-items: center; gap: 2cqw; height: 13cqw; box-sizing: border-box; min-width: 0; }
+.wg-wrow + .wg-wrow { border-top: 1px solid var(--rule); }
+.wg-wname { display: flex; flex-direction: column; flex: 1; min-width: 0; gap: .6cqw; }
+.wg-wcity { font-size: 5cqw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wg-wsub { color: var(--ink-faint); font-size: 3.4cqw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wg-wrow--here .wg-wcity { color: var(--clay); }
+.wg-wrow--here .wg-wsub { text-transform: capitalize; }
+.wg-wtime { flex: none; font-size: 8.4cqw; font-weight: 300; font-variant-numeric: tabular-nums; line-height: 1; }
+.wg-wdel { flex: none; width: 0; height: 6cqw; margin: 0 0 0 -2cqw; padding: 0; overflow: hidden; border: 0; border-radius: 50%; background: none; color: var(--ink-faint); font: inherit; font-size: 5cqw; line-height: 1; cursor: pointer; opacity: 0; transition: width .12s, opacity .12s; }
+.wg-wrow:hover .wg-wdel, .wg-wxcity:hover .wg-wdel, .wg-wxrow:hover .wg-wdel { width: 6cqw; margin-left: 0; opacity: 1; }
+.wg-wdel:hover { background: var(--paper-sunken); color: var(--clay); }
+.wg-wadd { flex: none; height: 9cqw; margin: 0; padding: 0; border: 1px dashed var(--rule); border-radius: 2.4cqw; background: none; color: var(--ink-soft); font: inherit; font-size: 4cqw; cursor: pointer; }
+.wg-wadd:hover { background: var(--paper-sunken); color: var(--ink); }
+
+/* The Weather (1.0.4): the city, the sky now, three days after, and who was asked. */
+.note-widget > .wg--weather { aspect-ratio: auto; gap: 2.4cqw; }
+.wg-wxcity { display: flex; align-items: baseline; gap: 2cqw; min-width: 0; padding: 1.4cqw 2.4cqw; border-radius: 2.4cqw; background: var(--paper-sunken); color: var(--ink); font-size: 5.2cqw; }
+.wg-wxname { flex: none; max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wg-wxcity .wg-wdel { align-self: center; }
+.wg-wxcc { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-faint); font-size: .7em; }
+/* The Weather's other cities: a line each, shown in full at a press. */
+.wg-wxrows { display: flex; flex-direction: column; }
+.wg-wxrow { display: flex; align-items: center; gap: 2cqw; height: 9cqw; min-width: 0; }
+.wg-wxrow + .wg-wxrow { border-top: 1px solid var(--rule); }
+.wg-wxgo { display: flex; align-items: center; gap: 2cqw; flex: 1; min-width: 0; height: 100%; margin: 0; padding: 0 2.4cqw; border: 0; border-radius: 2cqw; background: none; color: var(--ink); font: inherit; font-size: 4.4cqw; text-align: left; cursor: pointer; }
+.wg-wxgo:hover { background: var(--paper-sunken); }
+.wg-wxrow-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wg-wxrow-ic { flex: none; width: 6cqw; height: 6cqw; color: var(--ink-soft); }
+.wg-wxrow-t { flex: none; min-width: 9cqw; text-align: right; font-variant-numeric: tabular-nums; }
+.wg-wxnow { display: flex; align-items: center; justify-content: center; gap: 4cqw; padding-top: 1cqw; }
+.wg-wxic { width: 19cqw; height: 19cqw; color: var(--clay); stroke-width: 1.3; }
+.wg-wxtemp { font-size: 22cqw; font-weight: 300; font-variant-numeric: tabular-nums; line-height: 1; }
+.wg-wxword { text-align: center; color: var(--ink-soft); font-size: 4.8cqw; }
+.wg-wxbits, .wg-wxdays { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.4cqw; }
+.wg-wxbits { padding: 2cqw 1cqw; border-radius: 3cqw; background: var(--paper-sunken); }
+.wg-wxbit, .wg-wxday { display: flex; flex-direction: column; align-items: center; gap: .8cqw; min-width: 0; }
+.wg-wxbit-v { font-size: 4.2cqw; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wg-wxbit-n, .wg-wxday-n { max-width: 100%; color: var(--ink-faint); font-size: 3.2cqw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wg-wxday-n { text-transform: capitalize; }
+.wg-wxday-ic { width: 8cqw; height: 8cqw; color: var(--ink-soft); }
+.wg-wxday-t { font-size: 4cqw; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wg-wxday-min { color: var(--ink-faint); }
+.wg-wxfoot { display: flex; align-items: center; gap: 1.6cqw; color: var(--ink-faint); font-size: 3.2cqw; }
+.wg-wxkeys { display: flex; gap: 1.2cqw; margin-left: auto; }
+.wg-wxkey { min-width: 8cqw; height: 6.4cqw; margin: 0; padding: 0 1.4cqw; border: 1px solid var(--rule); border-radius: 3.2cqw; background: var(--paper); color: var(--ink-soft); font: inherit; font-size: 3.6cqw; line-height: 1; cursor: pointer; }
+.wg-wxkey:hover { background: var(--paper-sunken); color: var(--ink); }
+.wg-wxempty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3cqw; padding: 6cqw 2cqw; }
+.wg-wxpick { padding: 2.6cqw 6cqw; font-size: 4.8cqw; }
+.wg-wxnote { color: var(--ink-faint); font-size: 3.6cqw; text-align: center; line-height: 1.35; }
+/* On paper: what it reads, not the keys that change it. */
+@media print { .wg-wadd, .wg-wdel, .wg-wxkeys { display: none !important; } }
+
+/* A city chosen: the sounds' list with a field over it. */
+.link-menu input.city-menu__q { width: 100%; box-sizing: border-box; }
+.city-menu__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.city-menu__cc { flex: none; max-width: 48%; margin-left: auto; padding-left: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-faint); font-size: 11px; }
+.city-menu .sound-menu__pick.on { color: var(--clay); font-weight: 600; }
+.city-menu__none { padding: 8px 10px; color: var(--ink-faint); font-size: 12px; }
 
 /* A widget's sounds: the link menu's look, a list that scrolls, the user's own with a ×. */
 .float-menu.sound-menu { width: 280px; min-width: 0; max-width: calc(100vw - 16px); max-height: none; overflow: visible; }

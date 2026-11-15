@@ -249,8 +249,8 @@ export async function runBlackHoleChecks(check) {
     await openNote('Launch plan');
     check('a note of it reads as it was written', await win.evaluate(() => document.getElementById('editor').textContent.includes('the door code is 9911-ZEBRA')));
     await openNote('Tax papers');
-    const pic = await win.evaluate(async () => { const img = document.querySelector('#editor .note-image img'); if (!img.complete) await img.decode().catch(() => {}); return { w: img.naturalWidth, data: img.getAttribute('src').startsWith('data:image/png') }; });
-    check('and the moved note has its picture, from inside the seal', pic.w === 40 && pic.data, JSON.stringify(pic));
+    const pic = await win.evaluate(async () => { const img = document.querySelector('#editor .note-image img'); if (!img.complete) await img.decode().catch(() => {}); return { w: img.naturalWidth, held: /^nebula-media:\/\/hole\/[^/]+\/n-plain\/pic-[0-9a-f]{32}\.png$/.test(img.getAttribute('src')), src: img.getAttribute('src').slice(0, 48) }; });
+    check('and the moved note has its picture, from inside the seal — drawn from the memory that holds it, by a short address (1.0.4)', pic.w === 40 && pic.held, JSON.stringify(pic));
 
     // ---- A video file in a black hole (the owner: "why can a video not go in?") -------
     const clipBytes = fs.readFileSync(path.join(root, 'tests', 'fixtures', 'clip.webm'));

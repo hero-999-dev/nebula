@@ -25,6 +25,11 @@
  *     picture is (block-drag.js); a right-click on it deletes the table;
  *   – a + along the bottom for one more row, and one at the right for one more
  *     column;
+ *   – between the two +, at the table's lower right, the corner the whole
+ *     table is pulled by (1.0.4). The owner: "there should be something round
+ *     a table by which I make it wider and narrower as a picture — say I pull
+ *     from the lower right: let all of it grow or shrink in proportion".
+ *     Every column and every row takes the same share;
  *   – around the selected cells: at the lower left the small square that is
  *     pulled to carry them on over their neighbours, and at the lower right
  *     what can be done with them — Merge, Unmerge, and for whole rows, columns
@@ -57,6 +62,8 @@ import {
   mergeCells, unmergeCells, addRow, addColumn, insertRow, insertColumn, deleteRows, deleteColumns,
   fillTarget, fillCells, toTsv, fromTsv, putRows, setCellText, cellText, isBlank, plainTable, alignOf, setAlign,
 } from './table-grid.js';
+
+import { LEVEL_SNAP, footGap, showLevel, hideLevel } from './level.js';
 
 export const TABLE = '.blk-table';
 const tableOf = (wrap) => wrap?.querySelector(':scope > table') ?? null;
@@ -99,7 +106,7 @@ export function dressTable(wrap) {
   const head = make('thead', UI);
   const top = doc.createElement('tr');
   const corner = make('th', 'tbl-corner');
-  corner.title = t('Drag to move the table');
+  corner.title = t('Drag to move the table. A click picks it up: Delete takes it away');
   top.appendChild(corner);
   for (let c = 0; c < grid.cols; c += 1) {
     const th = make('th', 'tbl-x', { n: `x${c + 1}`, c });
@@ -121,6 +128,15 @@ export function dressTable(wrap) {
     button.title = t(title);
     wrap.appendChild(button);
   }
+  const scale = make('div', `${UI} tbl-scale`);
+  scale.title = t('Drag to resize the whole table');
+  wrap.appendChild(scale);
+  // Over the + at the right, the table made only wider; under the last y, only higher (the owner, 1.0.4).
+  for (const [way, title] of [['x', 'Drag to make the table wider or narrower'], ['y', 'Drag to make the table higher or lower']]) {
+    const pull = make('div', `${UI} tbl-pull tbl-pull-${way}`, { way });
+    pull.title = t(title);
+    wrap.appendChild(pull);
+  }
   fitTable(wrap);
   return true;
 }
@@ -132,7 +148,7 @@ export function refreshTables(root) {
 
 /**
  * Whether a table stands as dressTable left it: its numbering over every
- * column and beside every row, and its two +. One that was pasted with the
+ * column and beside every row, its two + and its corner. One that was pasted with the
  * lines around it, or changed behind the app's back, does not.
  */
 function isDressed(wrap) {
@@ -140,6 +156,7 @@ function isDressed(wrap) {
   if (!table) return true;                      // nothing to dress
   if (wrap.children.length < 3 || wrap.querySelectorAll(':scope > .tbl-add').length !== 2) return false;
   if (wrap.hasAttribute('style') || !table.querySelector(':scope > colgroup > col.tbl-ycol')) return false;
+  if (!wrap.querySelector(':scope > .tbl-scale') || wrap.querySelectorAll(':scope > .tbl-pull').length !== 2) return false;
   const rows = rowsOf(table);
   if (!rows.length || rows.some((tr) => !tr.firstElementChild?.classList.contains('tbl-y'))) return false;
   return table.querySelectorAll(':scope > thead.tbl-ui th.tbl-x').length === colsOf(table).length;
@@ -342,7 +359,7 @@ export function initTables(editor, { history, isLocked = () => false, onGeometry
   let sel = null;
   /** A press on a cell that may become a pull over cells. */
   let press = null;
-  /** A column's line being pulled — or, with `row`, the line under a row. */
+  /** A column's line being pulled — or, with `row`, the line under a row; with `scale`, the whole table by its corner. */
   let resize = null;
   /** The corner square being pulled. */
   let fill = null;
@@ -624,6 +641,21 @@ export function initTables(editor, { history, isLocked = () => false, onGeometry
       e.stopPropagation();
       return;
     }
+    const pulled = e.target.closest('.tbl-scale, .tbl-pull');
+    if (pulled) {
+      e.preventDefault();
+      e.stopPropagation();
+      const table = tableOf(wrap);
+      if (!table || locked()) return;
+      const zoom = table.getBoundingClientRect().width / Math.max(1, table.offsetWidth) || 1;
+      // The corner: both by the same share. A mark of one way: that way alone.
+      const along = pulled.dataset.way === 'x' ? 'x' : pulled.dataset.way === 'y' ? 'y' : '';
+      resize = { wrap, scale: true, along, by: 1, x: e.clientX, y: e.clientY, zoom, moved: false };
+      doc.body.classList.add('tbl-scaling');
+      if (along) doc.body.classList.add(`tbl-scaling-${along}`);
+      showWidth();
+      return;
+    }
     if (e.target.closest('.tbl-colgrip')) {
       e.preventDefault();
       e.stopPropagation();
@@ -695,6 +727,14 @@ export function initTables(editor, { history, isLocked = () => false, onGeometry
       tip.className = `${UI} tbl-tip${resize.row ? ' tbl-tip-row' : ''}`;
       resize.wrap.appendChild(tip);
     }
+    if (resize.scale) {
+      // How much of what it was the table is now, over the corner that is pulled.
+      const table = tableOf(resize.wrap);
+      tip.dataset.label = `${resize.along === 'x' ? '↔ ' : resize.along === 'y' ? '↕ ' : ''}${Math.round(resize.by * 100)}%`;
+      tip.style.left = `${table.offsetLeft + table.offsetWidth}px`;
+      tip.style.top = `${table.offsetTop + table.offsetHeight}px`;
+      return;
+    }
     if (resize.row) {
       // What is drawn: a row is as high as its words where they need more than it was given.
       const box = resize.wrap.getBoundingClientRect();
@@ -713,11 +753,12 @@ export function initTables(editor, { history, isLocked = () => false, onGeometry
   }
 
   function endPulls({ apply = true } = {}) {
+    hideLevel();
     if (resize) {
       const moved = resize.moved;
       resize.wrap.querySelector(':scope > .tbl-tip')?.remove();
       resize = null;
-      doc.body.classList.remove('tbl-resizing', 'tbl-resizing-row');
+      doc.body.classList.remove('tbl-resizing', 'tbl-resizing-row', 'tbl-scaling', 'tbl-scaling-x', 'tbl-scaling-y');
       if (moved) { onGeometry?.(); dirty(); }
     }
     if (fill) {
@@ -746,6 +787,66 @@ export function initTables(editor, { history, isLocked = () => false, onGeometry
     if (!(e.buttons & 1)) { endPulls({ apply: false }); return; }
     if (resize) {
       if (!resize.wrap.isConnected) { endPulls({ apply: false }); return; }
+      if (resize.scale) {
+        if (!resize.moved) {
+          if (e.clientX === resize.x && e.clientY === resize.y) return;
+          history?.push();
+          resize.moved = true;
+          // What is drawn is what is pulled, as with a column's line.
+          settle(resize.wrap);
+          const table = tableOf(resize.wrap);
+          resize.cols = colsOf(table).map((col) => ({ col, from: widthOf(col) }));
+          // A row as high as its words is taken at the height it is drawn; where nothing is drawn it is left alone.
+          resize.rows = rowsOf(table).map((row) => ({ row, own: heightOf(row), from: row.offsetHeight || heightOf(row) }));
+          resize.w = resize.cols.reduce((sum, { from }) => sum + from, 0);
+          resize.h = resize.rows.reduce((sum, { from }) => sum + from, 0);
+          // No wider than the room that is left, and no smaller than its widest column at the narrowest a column may be.
+          const room = roomFor(resize.wrap);
+          resize.most = room ? Math.max(1, room / resize.w) : Infinity;
+          resize.least = Math.min(1, MIN_COL / Math.max(...resize.cols.map(({ from }) => from)));
+          resize.low = Math.min(1, MIN_ROW / Math.max(1, ...resize.rows.map(({ from }) => from)));
+          resize.wide = 1;
+          resize.high = 1;
+        }
+        const dx = (e.clientX - resize.x) / resize.zoom;
+        const dy = (e.clientY - resize.y) / resize.zoom;
+        // The mark at the right, the columns alone; the mark under the numbers, the
+        // rows alone; the corner, both by the same share — the pull laid on the line
+        // from the table's upper left to its lower right.
+        const { along } = resize;
+        const both = 1 + (dx * resize.w + dy * resize.h) / (resize.w * resize.w + resize.h * resize.h);
+        const wide = along === 'y' ? 1 : Math.max(resize.least, Math.min(resize.most, along ? 1 + dx / resize.w : both));
+        const high = along === 'x' ? 1 : along ? Math.max(resize.low, 1 + dy / resize.h) : wide;
+        if (wide !== resize.wide || high !== resize.high) {
+          resize.wide = wide;
+          resize.high = high;
+          resize.by = along === 'y' ? high : wide;
+          // Rounded down where it grows: the columns never add up to more than the room.
+          const whole = wide > 1 ? Math.floor : Math.round;
+          for (const { col, from } of resize.cols) setWidth(col, Math.max(MIN_COL, whole(from * wide)));
+          for (const { row, own, from } of resize.rows) {
+            if (!from) continue;
+            setHeight(row, high === 1 ? own : Math.max(MIN_ROW, Math.min(MAX_ROW, Math.round(from * high))));
+            tellHeight(row);
+          }
+          fitTable(resize.wrap);
+          // Its foot within a few pixels of the foot of what stands beside it — a table, a picture, a
+          // card in the next column: level with it, by its last row, and the line says so (1.0.4, level.js).
+          hideLevel();
+          const gap = along === 'x' ? null : footGap(editor, resize.wrap, LEVEL_SNAP * resize.zoom);
+          if (gap !== null) {
+            const last = resize.rows.findLast(({ from }) => from);
+            if (last && Math.abs(gap) >= 0.5) {
+              setHeight(last.row, Math.max(MIN_ROW, Math.min(MAX_ROW, Math.round(last.row.offsetHeight + gap / resize.zoom))));
+              tellHeight(last.row);
+            }
+            showLevel(editor, resize.wrap);
+          }
+          paint();
+        }
+        showWidth();
+        return;
+      }
       if (resize.row) {
         if (!resize.moved) {
           if (e.clientY === resize.y) return;
@@ -766,12 +867,22 @@ export function initTables(editor, { history, isLocked = () => false, onGeometry
           tellHeight(resize.row);
         }
         const want = Math.round(resize.from + (e.clientY - resize.y) / resize.zoom);
-        const h = Math.max(resize.least, Math.min(MAX_ROW, want));
-        if (h !== heightOf(resize.row)) {
+        const fit = (px) => Math.max(resize.least, Math.min(MAX_ROW, Math.round(px)));
+        const was = heightOf(resize.row);
+        const give = (h) => {
+          if (h === heightOf(resize.row)) return;
           setHeight(resize.row, h);
           tellHeight(resize.row);
-          paint();
+        };
+        give(fit(want));
+        // The table's foot within a few pixels of the foot of what stands beside it: level with it (level.js).
+        hideLevel();
+        const gap = footGap(editor, resize.wrap, LEVEL_SNAP * resize.zoom);
+        if (gap !== null) {
+          if (Math.abs(gap) >= 0.5) give(fit(fit(want) + gap / resize.zoom));
+          showLevel(editor, resize.wrap);
         }
+        if (heightOf(resize.row) !== was) paint();
         showWidth();
         return;
       }
@@ -838,8 +949,38 @@ export function initTables(editor, { history, isLocked = () => false, onGeometry
       e.stopPropagation();
       run(act, wrap);
     }
-    // A click on the corner does nothing: it selected the whole table and offered Merge and Delete, which
-    // nobody had asked for by picking the table up (the owner, 0.9.4). Ctrl+A twice selects every cell.
+    // A click on the corner picks the table up as one thing: a line round it, and Delete takes it away
+    // (the owner, 1.0.4: "noktaya tıklayınca tablo seçilsin, silinebilsin"). It selects no cells and
+    // offers nothing — that was what nobody had asked for (0.9.4). Ctrl+A twice selects every cell.
+    else if (e.target.closest('.tbl-corner')) pick(wrap);
+  }, true);
+
+  /** The table picked up by its corner. The mark is on the corner, which no note keeps. */
+  let picked = null;
+  function pick(wrap) {
+    const corner = wrap && !locked() ? wrap.querySelector('.tbl-corner') : null;
+    for (const other of editor.querySelectorAll('.tbl-corner.picked')) if (other !== corner) other.classList.remove('picked');
+    picked = corner ? wrap : null;
+    if (!corner) return;
+    clear();
+    corner.classList.add('picked');
+    win.getSelection()?.removeAllRanges();
+  }
+  // A press anywhere else lets go of it.
+  doc.addEventListener('mousedown', (e) => {
+    if (picked && !e.target.closest?.('.tbl-corner')) pick(null);
+  }, true);
+  doc.addEventListener('keydown', (e) => {
+    if (!picked) return;
+    if (!picked.isConnected) { picked = null; return; }
+    if (e.key === 'Escape') { pick(null); return; }
+    if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+    if (e.target.closest?.('input, textarea, select')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const wrap = picked;
+    pick(null);
+    run('del-table', wrap);
   }, true);
 
   // Words are not pulled out of a cell or dropped into one: a cell holds what is typed and pasted.
@@ -1316,7 +1457,7 @@ export function initTables(editor, { history, isLocked = () => false, onGeometry
       press = null;
       resize = null;
       fill = null;
-      doc.body.classList.remove('tbl-ranging', 'tbl-resizing', 'tbl-resizing-row', 'tbl-filling');
+      doc.body.classList.remove('tbl-ranging', 'tbl-resizing', 'tbl-resizing-row', 'tbl-scaling', 'tbl-filling');
       if (sel && !sel.wrap.isConnected) sel = null;
       refreshTables(editor);
       watch();

@@ -189,7 +189,10 @@ export function initZoomControl({ group, editorEl, frameEl = null, current, choo
     if (v === FIT && !fits) v = DEFAULT_ZOOM;     // Nebula Wide: no sheet to fit
     measureFit();                // the label shows it even when another zoom is chosen
     applyZoom(editorEl, v);
-    if (select) select.value = String(v);
+    if (select) {
+      select.value = String(v);
+      select.classList.toggle('is-fit', v === FIT);   // as wide as "Fit (87%)" only while it shows it
+    }
     after();                     // what is measured in the page's pixels, measured again
     // Fitted, the scroll bar measured at the new zoom may leave the sheet a hair too wide.
     if (v === FIT && frameEl && frameEl.scrollWidth > frameEl.clientWidth + 1) {

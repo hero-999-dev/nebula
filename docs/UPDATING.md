@@ -62,6 +62,27 @@ versions is not guaranteed; retain the pre-upgrade backup.
 Same as macOS: it tells you there is a new version and sends you to the
 download page. A portable exe has no installer to hand an update to.
 
+### Linux (AppImage, deb, pacman)
+
+- **AppImage** (`Nebula-*.AppImage`, any distribution): like the installed
+  Windows app. **Update**, then **Restart and install**; the new file takes the
+  place of the old one and Nebula reopens. Keep the file in a folder you can
+  write to. It needs FUSE 2 (`libfuse2`), and on Ubuntu 24.04 and later the
+  system may stop an AppImage from starting; take the deb there.
+- **deb** (Ubuntu, Linux Mint, Kali): Nebula tells you there is a new version
+  and opens the download page. `sudo apt install ./nebula_X.Y.Z_amd64.deb`
+  installs it over the old one.
+- **pacman** (Arch, Manjaro, EndeavourOS): the same, with
+  `sudo pacman -U nebula-X.Y.Z.pacman`.
+
+No package touches your notes: they are in `~/.config/nebula`.
+
+**Black holes and the sync pairing need a keyring.** Their keys are kept by the
+system: GNOME Keyring or KWallet, installed and unlocked. Where none is running
+Nebula does not fall back to storing them weakly — it refuses to make or open a
+black hole, or to pair, and says why. Install a keyring, log in again, and they
+work. Notes and everything else work without one.
+
 ---
 
 ## Where your notes actually live
@@ -73,6 +94,7 @@ whole point of a portable build.
 |---|---|
 | **Installed** (Windows) | `%APPDATA%\nebula` |
 | **Installed** (macOS) | `~/Library/Application Support/nebula` |
+| **Installed** (Linux: AppImage, deb, pacman) | `~/.config/nebula` |
 | **Portable** (`Nebula-portable-*.exe`) | `Nebula-data`, beside the exe — put the exe on a USB stick and your notes go with it |
 
 These are separate vaults on purpose: the portable build cannot see or change

@@ -17,6 +17,26 @@
  * tombstone (an id and a time, nothing of the note) so the peer lets it go,
  * and what was half downloaded for it goes with it — a deleted note stays
  * deleted (the owner, 2026-09-27). Black holes are never served.
+ *
+ * A note marked "Do not sync this note" (1.0.4, the owner, 2026-11-15) is
+ * neither served nor taken while it is so: it is not in the manifest, its text
+ * and its files are refused, and nothing a peer says of its id — a version, a
+ * tombstone — reaches it. A copy a peer took before stays there as it was
+ * (a big file of it still on its way does not come any more);
+ * put back, the note goes in as the newest version. Deleted for good here while
+ * it is so, it goes from this computer alone (the owner, 2026-11-15: "sync
+ * dışına alındığı için silinmesi diğer bilgisayara etki etmesin"): no tombstone
+ * is handed out, so the copy a peer took before stays there; its id is
+ * remembered apart, told to no one and for good, so that copy is never taken
+ * back here — a deleted note stays deleted.
+ *
+ * Live (1.0.4, the owner, 2026-11-15: "iki bilgisayar da açıkken canlı
+ * eşitleme"): a change written here asks the other devices to pull once it has
+ * been quiet for a moment, and this copy then pulls from them, so two
+ * computers open at once stay alike without a close or a press. What a pull
+ * itself put here is not told back. A big file still on its way is named to
+ * the window with how much of it is here (its player says so in its place),
+ * and one crossing right now is what closing asks about first.
  */
 import http from 'node:http';
 import os from 'node:os';
@@ -73,7 +93,9 @@ function sendJson(res, status, body) {
  * @param {() => boolean} o.canProtect
  * @param {(text: string) => Buffer} o.protect   the pairing key, wrapped for this user (safeStorage)
  * @param {(box: Buffer) => string} o.unprotect
- * @param {string} [o.host]      where to listen instead of the tailnet (tests: loopback)
+ * @param {(address: string) => Promise<boolean|null>} [o.tailnetOnline]  whether Tailscale sees that address online (tailscale-status.js)
+ * @param {{quiet?: number, gap?: number, most?: number}} [o.live]  live sync's waits in ms (tests: short ones)
+ * @param {string} [o.host]     where to listen instead of the tailnet (tests: loopback)
  * @param {number} [o.port]
  * @param {number} [o.peerPort]
  */
@@ -121,6 +143,8 @@ export function createSync(o) {
       peers,
       openSync: s.openSync !== false,
       tombs: obj(s.tombs),
+      // Notes deleted here while kept to this computer: never handed out, never pruned (see the head of this file).
+      keptTombs: obj(s.keptTombs),
       last: s.last && typeof s.last === 'object' ? s.last : null,
       pending: Array.isArray(s.pending) ? s.pending.filter((f) => NOTE_ID.test(f?.from) && NOTE_ID.test(f?.to) && FILE_NAME.test(f?.name) && SHA.test(f?.sha)) : [],
     };
@@ -146,17 +170,21 @@ export function createSync(o) {
   let key;
   function getKey() {
     if (key !== undefined) return key;
-    try { key = Buffer.from(o.unprotect(fsSync.readFileSync(pairFile())), 'base64'); if (key.length !== 32) key = null; } catch { key = null; }
+    // Never a key the system does not keep secret (Linux with no keyring, safe-store.js): this
+    // copy is then not paired, and Tools says why.
+    try { key = o.canProtect() ? Buffer.from(o.unprotect(fsSync.readFileSync(pairFile())), 'base64') : null; if (key && key.length !== 32) key = null; } catch { key = null; }
     return key;
   }
   const writeWrapped = (file, text) => {
+    // The one place the pairing is written: never where the wrapping is not secret, whoever asks.
+    if (!o.canProtect()) throw new Error('protect');
     fsSync.mkdirSync(dir(), { recursive: true });
     const tmp = `${file}.tmp-${process.pid}`;
     fsSync.writeFileSync(tmp, o.protect(text));
     fsSync.renameSync(tmp, file);
   };
   function keptCode() {
-    try { return cleanPairingCode(o.unprotect(fsSync.readFileSync(codeFile()))); } catch { return null; }
+    try { return o.canProtect() ? cleanPairingCode(o.unprotect(fsSync.readFileSync(codeFile()))) : null; } catch { return null; }
   }
   function setCode(code) {
     const next = keyOfCode(code);
@@ -167,8 +195,13 @@ export function createSync(o) {
     persist();
   }
 
-  /** The window's own guide: never served, never taken (it is made by each copy in its language). */
+  /**
+   * What this copy keeps to itself, as the window says: its guide (made by each copy in its
+   * language) and the notes marked "Do not sync this note" (1.0.4). Never served, never taken.
+   */
   let keepOut = null;
+  /** Such a note says so in its own file too: not handed out, whatever the window's list holds yet. */
+  const keptHere = (note) => note?.noSync === true;
 
   // ── this vault, as the peer sees it ───────────────────────────────────────
   const shaCache = new Map();
@@ -185,7 +218,7 @@ export function createSync(o) {
     return entry;
   }
   const noteCache = new Map();
-  /** A note as the manifest gives it, or null for a black hole's mark or a file that is not a note. */
+  /** A note as the manifest gives it, or null for a black hole's mark, a note kept to this computer or a file that is not a note. */
   async function noteEntry(id) {
     const file = noteFile(o.notesRoot(), id);
     const st = await fs.stat(file);
@@ -193,7 +226,7 @@ export function createSync(o) {
     if (known && known.size === st.size && known.mtimeMs === st.mtimeMs) return known.entry;
     const text = await fs.readFile(file, 'utf8');
     const h = hashNote(text);
-    const entry = !h || h.note.hole || h.note.id !== id ? null
+    const entry = !h || h.note.hole || keptHere(h.note) || h.note.id !== id ? null
       : { hash: h.hash, updatedAt: Number(h.note.updatedAt) || 0, names: [...referencesOf(text, id).own] };
     noteCache.set(id, { size: st.size, mtimeMs: st.mtimeMs, entry });
     return entry;
@@ -234,6 +267,8 @@ export function createSync(o) {
   // ── the server ────────────────────────────────────────────────────────────
   let server = null;
   let listeningOn = null;
+  /** How many big files other devices are taking from this copy right now. */
+  let going = 0;
   const ready = () => state.enabled && !!getKey();
   const listenHost = () => host ?? tailnetAddress();
 
@@ -260,7 +295,7 @@ export function createSync(o) {
     // Nothing but hello is handed to a copy of another version: one of the two is to be updated first.
     const asking = req.headers['x-nebula-version'];
     if (asking && asking !== o.version) return sendJson(res, 409, { error: 'version', theirs: o.version });
-    // Until the window has said which note is its guide, nothing is handed out.
+    // Until the window has said which notes it keeps to itself (its guide, the ones marked so), nothing is handed out.
     if (keepOut === null) return sendJson(res, 503, { error: 'starting' });
     if (req.method === 'GET' && p === `${API}/manifest`) {
       const notes = await vaultNotes({ withFiles: true });
@@ -279,14 +314,14 @@ export function createSync(o) {
       let text;
       try { text = await fs.readFile(noteFile(o.notesRoot(), id), 'utf8'); } catch { return sendJson(res, 404, { error: 'missing' }); }
       const h = hashNote(text);
-      if (!h || h.note.hole || h.note.id !== id) return sendJson(res, 404, { error: 'missing' });
+      if (!h || h.note.hole || keptHere(h.note) || h.note.id !== id) return sendJson(res, 404, { error: 'missing' });
       res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'content-length': Buffer.byteLength(text), 'cache-control': 'no-store' });
       return res.end(text);
     }
     m = /^\/sync\/v1\/file\/([\w-]{1,120})\/([\w-]{1,80}\.[a-z0-9]{2,5})$/.exec(p);
     if (req.method === 'GET' && m) {
       const [, id, name] = m;
-      // Only a file a plain note names: never a black hole's, never one waiting to be deleted.
+      // Only a file a plain note names: never a black hole's, never one waiting to be deleted, never a kept note's.
       let entry = null;
       try { entry = keepOut.has(id) ? null : await noteEntry(id); } catch { /* no note */ }
       const file = entry?.names.includes(name) ? mediaPath(o.notesRoot(), id, name) : null;
@@ -308,12 +343,17 @@ export function createSync(o) {
         ...(range ? { 'content-range': `bytes ${start}-${end}/${st.size}` } : {}),
       });
       if (st.size === 0) return res.end();
+      // A big file on its way to another device: closing asks first (moving(), 1.0.4).
+      if (end - start + 1 > BIG_FILE) { going++; res.once('close', () => { going--; }); }
       fsSync.createReadStream(file, { start, end }).on('error', () => res.destroy()).pipe(res);
       return undefined;
     }
-    if (req.method === 'POST' && p === `${API}/nudge`) {
+    if (req.method === 'POST' && (p === `${API}/nudge` || p === `${API}/live`)) {
       // The peer is closing, or just changed something: this copy pulls now. Answered when done, or after half a minute.
-      await Promise.race([pull('nudge'), delay(30_000)]);
+      // Live (1.0.4): a pull already under way looked before that change was there, so one more follows it.
+      const live = p === `${API}/live`;
+      const run = live && pulling ? pulling.then(() => pull('live')) : pull(live ? 'live' : 'nudge');
+      await Promise.race([run, delay(30_000)]);
       return sendJson(res, 200, { ok: true });
     }
     return sendJson(res, 404, { error: 'unknown' });
@@ -373,7 +413,8 @@ export function createSync(o) {
         reject(fail('unpaired'));
       });
       req.on('timeout', () => req.destroy(fail('unreachable')));
-      req.on('error', (err) => reject(err.code === 'unreachable' ? err : fail('unreachable')));
+      // Refused is an answer of a kind: the device is there and nothing listens on the port (Nebula shut). Silence is not.
+      req.on('error', (err) => reject(err.code === 'unreachable' ? err : fail('unreachable', err.code === 'ECONNREFUSED' ? { refused: true } : {})));
       req.end();
     });
   }
@@ -518,7 +559,7 @@ export function createSync(o) {
       for (const device of [...state.peers]) {
         const seen = { name: device.name, at: Date.now(), error: null };
         try {
-          const got = await pullFrom(device);
+          const got = await pullFrom(device, reason);
           for (const k of ['took', 'dropped', 'copies', 'skipped']) summary[k] += got[k];
           seen.version = o.version;
         } catch (err) {
@@ -547,10 +588,12 @@ export function createSync(o) {
     return summary;
   }
 
-  async function pullFrom(device) {
+  async function pullFrom(device, reason) {
     const got = { took: 0, dropped: 0, copies: 0, skipped: 0 };
     const addr = await peerAddress(device.name);
-    progress({ phase: 'looking', device: device.name });
+    // Why it runs goes with every step: the window shows no card for a live one.
+    const say = (p) => progress({ ...p, reason });
+    say({ phase: 'looking', device: device.name });
     const remote = await getJson(addr, `${API}/manifest`);
     if (remote?.app !== 'nebula' || remote.protocol !== PROTOCOL) throw fail('protocol');
     if (remote.version !== o.version) throw fail('version', { theirs: String(remote.version ?? ''), mine: o.version });
@@ -559,7 +602,7 @@ export function createSync(o) {
     if (state.peers.some((d) => d !== device && d.instance === remote.instance)) throw fail('twice');
     if (remote.instance !== device.instance) { forgetDevice(device); device.instance = remote.instance; }
 
-    // The window writes what it holds, and says which note is its guide.
+    // The window writes what it holds, and says which notes it keeps to itself.
     const prep = await ask('prepare', null);
     if (Array.isArray(prep?.keepOut)) keepOut = new Set(prep.keepOut.filter((id) => NOTE_ID.test(String(id))));
     const local = await vaultNotes({ withFiles: false });
@@ -569,9 +612,12 @@ export function createSync(o) {
     }
     state.tombs = Object.fromEntries(pruneTombs(new Map(Object.entries(state.tombs))));
     const remoteTombs = new Map(Object.entries(remote.tombs ?? {}).filter(([id]) => NOTE_ID.test(id)).map(([id, at]) => [id, Number(at) || 0]));
+    // A note deleted here while it was kept to this computer: the copy a peer still has is not taken back.
+    const apart = new Set(keepOut);
+    for (const id of Object.keys(state.keptTombs)) if (!local.has(id)) apart.add(id);
     const plan = planSync({
       local, remote: remoteNotes, base: new Map(Object.entries(device.base)),
-      localTombs: new Map(Object.entries(state.tombs)), remoteTombs, keepOut,
+      localTombs: new Map(Object.entries(state.tombs)), remoteTombs, keepOut: apart,
     });
 
     const notes = [];
@@ -583,7 +629,7 @@ export function createSync(o) {
     let bytes = 0;
     const onBytes = (n) => { bytes += n; };
     for (const t of plan.take) {
-      progress({ phase: 'notes', device: device.name, done: done++, total, bytes });
+      say({ phase: 'notes', device: device.name, done: done++, total, bytes });
       let text = null;
       try { text = await getText(addr, `${API}/note/${t.id}`); } catch (err) { if (err.code !== 'missing') throw err; }
       const h = text && hashNote(text);
@@ -592,7 +638,7 @@ export function createSync(o) {
       notes.push({ id: t.id, text, expect: t.expect, hash: t.hash });
     }
     for (const c of plan.copies) {
-      progress({ phase: 'notes', device: device.name, done: done++, total, bytes });
+      say({ phase: 'notes', device: device.name, done: done++, total, bytes });
       let text = null;
       if (c.side === 'local') {
         text = await fs.readFile(noteFile(o.notesRoot(), c.id), 'utf8').catch(() => null);
@@ -608,16 +654,24 @@ export function createSync(o) {
     const folders = mergeList(device.folderBase, await readList('folders.json', 'folders'), remote.folders);
     const projects = mergeList(device.projectBase, await readList('projects.json', 'projects'), remote.projects);
 
-    progress({ phase: 'apply', device: device.name, done: total, total, bytes });
-    const result = (notes.length || copies.length || plan.drop.length || folders.changed || projects.changed)
-      ? await ask('apply', {
-        notes: notes.map(({ id, text, expect }) => ({ id, text, expect })),
-        copies,
-        drops: plan.drop,
-        folders: folders.changed ? folders.merged : null,
-        projects: projects.changed ? projects.merged : null,
-      })
-      : { applied: [], dropped: [], skipped: [], lists: true };
+    say({ phase: 'apply', device: device.name, done: total, total, bytes });
+    let result = { applied: [], dropped: [], skipped: [], lists: true };
+    if (notes.length || copies.length || plan.drop.length || folders.changed || projects.changed) {
+      // What the window writes for this is not this computer's own change: no word of it goes back (own(), 1.0.4).
+      taking = new Set([
+        ...notes.map((n) => n.id), ...copies.map((c) => c.id), ...plan.drop.map((d) => d.id),
+        ...(folders.changed ? ['folders.json'] : []), ...(projects.changed ? ['projects.json'] : []),
+      ]);
+      try {
+        result = await ask('apply', {
+          notes: notes.map(({ id, text, expect }) => ({ id, text, expect })),
+          copies,
+          drops: plan.drop,
+          folders: folders.changed ? folders.merged : null,
+          projects: projects.changed ? projects.merged : null,
+        });
+      } finally { taking = null; }
+    }
     const applied = new Set(Array.isArray(result?.applied) ? result.applied : []);
     const dropped = new Set(Array.isArray(result?.dropped) ? result.dropped : []);
 
@@ -647,6 +701,15 @@ export function createSync(o) {
 
   // ── big files, in the background ──────────────────────────────────────────
   let draining = false;
+  /** The big file coming right now: { id, name, got, size }, or null. */
+  let coming = null;
+  /** How much of a waiting file is here already: download() carries on from there. */
+  async function partSize(f) {
+    try {
+      const have = (await fs.stat(path.join(partialDir(), f.to, `${f.name}.part`))).size;
+      return have > f.size ? 0 : have;
+    } catch { return 0; }
+  }
   async function drainPending() {
     if (draining || !state.pending.length || !ready() || o.shut()) return;
     draining = true;
@@ -673,14 +736,16 @@ export function createSync(o) {
         const dest = mediaPath(o.notesRoot(), f.to, f.name);
         // The note went meanwhile, or the file is here already.
         if (dest && fsSync.existsSync(noteFile(o.notesRoot(), f.to)) && !fsSync.existsSync(dest)) {
-          let got = 0;
+          // Counted from what an earlier run left here, and told with its note: the player waiting for it says its share (1.0.4).
+          let got = await partSize(f);
+          coming = { id: f.to, name: f.name, got, size: f.size };
           try {
-            await download(addr, f, (n) => { got += n; progress({ phase: 'files', name: f.name, got, size: f.size, left: state.pending.length }); });
+            await download(addr, f, (n) => { got += n; coming.got = got; progress({ phase: 'files', id: f.to, name: f.name, got, size: f.size, left: state.pending.length }); });
             tell('sync:media-ready', { id: f.to, name: f.name });
           } catch (err) {
             // Gone there, or not what it said it was: dropped. Anything else: carried on later, from where it stopped.
             if (err.code !== 'missing' && err.code !== 'sha') { away.add(via); i++; continue; }
-          }
+          } finally { coming = null; }
         }
         state.pending.splice(i, 1);
         persist();
@@ -694,6 +759,10 @@ export function createSync(o) {
   // ── is each device there ──────────────────────────────────────────────────
   /** What each device answered when last asked (not kept: asked again when Tools opens). */
   const reach = new Map();
+  /** Tailscale's own word on a device that did not answer: true, false, or null when there is none. */
+  const seenOnline = async (address) => {
+    try { const said = await o.tailnetOnline?.(address); return said === true ? true : said === false ? false : null; } catch { return null; }
+  };
   async function checkDevice(device) {
     const seen = { at: Date.now(), ok: false, error: null, version: null };
     try {
@@ -706,7 +775,12 @@ export function createSync(o) {
       if (state.peers.some((d) => d !== device && d.instance && d.instance === h.instance)) throw fail('twice');
       if (seen.version !== o.version) throw fail('version', { theirs: seen.version, mine: o.version });
       seen.ok = true;
-    } catch (err) { Object.assign(seen, errorOf(err)); }
+    } catch (err) {
+      Object.assign(seen, errorOf(err));
+      // Silent at its address: does Tailscale see it online all the same? Then something on the
+      // way keeps Nebula out, a firewall most often, and Tools says so (1.0.4).
+      if (seen.error === 'unreachable' && seen.address && !err.refused) seen.online = await seenOnline(seen.address);
+    }
     if (state.peers.includes(device)) reach.set(device.name, seen);
     return seen;
   }
@@ -735,34 +809,107 @@ export function createSync(o) {
     };
   }
 
-  /** A note deleted here: remembered as gone (its id, nothing else), and nothing half-downloaded for it is left. */
-  async function forgetNote(id) {
+  /** Whether a note is kept to this computer, by its own file's word: asked before the file is deleted. */
+  async function isKept(id) {
+    if (!NOTE_ID.test(String(id ?? ''))) return false;
+    try { return keptHere(JSON.parse(await fs.readFile(noteFile(o.notesRoot(), id), 'utf8'))); } catch { return false; }
+  }
+
+  /**
+   * A note deleted here: remembered as gone (its id, nothing else), and nothing half-downloaded for it is left.
+   * One that was kept to this computer (`kept`, 1.0.4) is remembered apart: the other devices are not told, and keep their copy.
+   */
+  async function forgetNote(id, { kept = false } = {}) {
     if (!NOTE_ID.test(String(id ?? ''))) return;
     noteCache.delete(id);
     const hadPending = state.pending.some((f) => f.to === id);
     state.pending = state.pending.filter((f) => f.to !== id);
     await fs.rm(path.join(partialDir(), id), { recursive: true, force: true }).catch(() => {});
-    if (!getKey() && !hadPending) return;
-    state.tombs[id] = Date.now();
+    // Remembered apart whether paired or not: a device paired again later may still hold its copy.
+    if (kept) state.keptTombs[id] = Date.now();
+    else if (getKey() || hadPending) state.tombs[id] = Date.now();
+    else return;
     for (const d of state.peers) delete d.base[id];
     persist();
   }
 
   /**
-   * Closing, or Sync now: every device is asked to pull now, while this copy still answers.
+   * Closing, Sync now, or a change just made (`live`): every device is asked to pull now, while this copy still answers.
    * How many did, done; 0 is falsy, so closing reads it as before.
    */
-  async function nudgePeer(ms = 8000) {
+  async function nudgePeer(ms = 8000, { live = false } = {}) {
     if (!ready() || o.shut() || !state.peers.length) return 0;
     const one = async (device) => {
       try {
         const addr = await Promise.race([peerAddress(device.name), delay(1500).then(() => { throw fail('unreachable'); })]);
-        const res = await request(addr, 'POST', `${API}/nudge`, { timeout: ms });
+        const res = await request(addr, 'POST', `${API}/${live ? 'live' : 'nudge'}`, { timeout: ms });
         res.resume();
         return res.statusCode === 200;
       } catch { return false; }
     };
     return (await Promise.all(state.peers.map(one))).filter(Boolean).length;
+  }
+
+  // ── live, while both are open (1.0.4) ─────────────────────────────────────
+  /** Quiet for `quiet` after the last change, yet no later than `most` after the first, and no round sooner than `gap` after the one before. */
+  const LIVE = { quiet: 3000, gap: 10_000, most: 20_000, ...obj(o.live) };
+  /** What a pull is handing the window right now: note ids, 'folders.json', 'projects.json'. */
+  let taking = null;
+  let liveTimer = null;
+  let liveSince = null;   // when the first change not yet told was made
+  let liveLast = 0;
+  let liveRound = null;
+  /**
+   * Whether a write of this — a note's id, 'folders.json', 'projects.json' — is this computer's own doing:
+   * not what a pull is putting here at this moment, and not a note kept to this computer. Asked before
+   * anything is awaited, while the pull that hands it over still waits for the window's answer.
+   */
+  const own = (what) => !taking?.has(what) && !keepOut?.has(what);
+  /**
+   * Something of the vault was written or deleted here by this computer's own doing (own()): once it has
+   * been quiet for a moment the other devices are asked to pull, and this copy then pulls from them — so
+   * both know what the two now hold alike, and the next change on either side is no conflict.
+   * @returns {boolean} whether a round is on its way
+   */
+  function changed() {
+    if (!ready() || o.shut() || !state.peers.length) return false;
+    const now = Date.now();
+    liveSince ??= now;
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(liveNow, Math.max(0, Math.min(LIVE.quiet, liveSince + LIVE.most - now), liveLast + LIVE.gap - now));
+    liveTimer.unref?.();
+    return true;
+  }
+  function liveNow() {
+    liveTimer = null;
+    // The round under way looked before this change was there: one more after it.
+    if (liveRound) { liveTimer = setTimeout(liveNow, 300); liveTimer.unref?.(); return; }
+    liveSince = null;
+    liveLast = Date.now();
+    liveRound = (async () => {
+      if (await nudgePeer(35_000, { live: true })) await pull('live');
+    })().catch(() => {}).finally(() => { liveRound = null; });
+  }
+
+  /**
+   * The big files still to come, for the players that wait for them (1.0.4): the note, the file, how much of it is here.
+   * One that arrived while this looked is left out: its player was told it is here, and is not told otherwise after.
+   */
+  const comingFiles = async () => {
+    const list = await Promise.all(state.pending.map(async (f) => ({
+      id: f.to, name: f.name, size: f.size, got: coming?.id === f.to && coming.name === f.name ? coming.got : await partSize(f),
+    })));
+    return list.filter((f) => state.pending.some((p) => p.to === f.id && p.name === f.name));
+  };
+  /**
+   * A big file crossing right now — coming here (which, and how far), or being taken from here by
+   * another device (how many) — else null. Closing asks about it first (the owner, 2026-11-15); files
+   * that only wait for a device that is away are nothing to ask about: they come when it is back.
+   * @returns {{coming: {name: string, got: number, size: number, left: number}|null, going: number}|null}
+   */
+  function moving() {
+    if (!coming && !going) return null;
+    return { coming: coming ? { name: coming.name, got: coming.got, size: coming.size, left: state.pending.length } : null, going };
   }
 
   let timer = null;
@@ -774,6 +921,8 @@ export function createSync(o) {
   function shutdown() {
     if (timer) clearInterval(timer);
     timer = null;
+    clearTimeout(liveTimer);
+    liveTimer = null;
     stop();
   }
 
@@ -853,6 +1002,7 @@ export function createSync(o) {
       return { ...summary, told };
     });
     handle('check', () => checkAll());
+    handle('coming', () => comingFiles());
     handle('keep-out', (ids) => {
       keepOut = new Set((Array.isArray(ids) ? ids : []).filter((id) => NOTE_ID.test(String(id))));
       if (state.pending.length) void drainPending();
@@ -864,8 +1014,10 @@ export function createSync(o) {
   }
 
   return {
-    start, shutdown, register, pull, nudgePeer, forgetNote, publicState, answer, checkAll,
+    start, shutdown, register, pull, nudgePeer, isKept, forgetNote, publicState, answer, checkAll,
+    own, changed, moving, comingFiles,
     // Tests drive these without a window.
+    liveDone: async () => { while (liveTimer || liveRound) await delay(20); },
     setKeepOut: (ids) => { keepOut = new Set(ids); },
     configure: ({ peer, peers, ...patch }) => {
       Object.assign(state, patch);

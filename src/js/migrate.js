@@ -15,7 +15,7 @@
  */
 
 import { ensureHeadControls, paintCode } from './codeblock.js';
-import { outlineSvg, ensureLayer, releaseEmptyLayers } from './shapes.js';
+import { outlineSvg, shapeGrips, ensureLayer, releaseEmptyLayers } from './shapes.js';
 import { normalizeUnderlineInk } from './inline-family.js';
 import { liftNestedDividers } from './blocks.js';
 import { stripTransient } from './note-markup.js';
@@ -383,11 +383,13 @@ export function rebuildShapeChrome(shape) {
     shape.insertBefore(fresh, shape.firstChild);
   }
 
-  for (const [cls, title] of [['shape-rot', 'Rotate'], ['shape-h', 'Resize']]) {
-    shape.querySelectorAll(`:scope > .${cls}`).forEach((grip) => grip.remove());
+  // A work area has four grips to size it by and none to turn it (shapes.js shapeGrips).
+  shape.querySelectorAll(':scope > .shape-rot, :scope > .shape-h, :scope > .area-catch').forEach((grip) => grip.remove());
+  for (const [cls, title, corner] of shapeGrips(shape.dataset.kind)) {
     const grip = doc.createElement('span');
     grip.className = cls;
     grip.setAttribute('title', title);
+    if (corner) grip.dataset.corner = corner;
     shape.appendChild(grip);
   }
   return shape.innerHTML !== before;

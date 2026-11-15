@@ -287,12 +287,16 @@ export async function runLayoutChecks(check) {
     row = await tops();
     const fit = { a: await box('#ta'), c: await box('#tc') };
     check('three stay on one line in a narrow window, inside the page', row[0] === row[1] && row[1] === row[2] && fit.a.left >= pg.left - 1 && fit.c.right <= pg.right + 1, JSON.stringify({ row, fit, pg }));
-    // Held back by the row: pulled far out it does not store a width it cannot have …
+    // A row its line cannot hold: pulled wider it is drawn wider and the others give way (1.0.4 — written
+    // as it was pulled, it got a smaller part of the line and shrank), the row on its one line still …
     g = await grab('#ta');
     await pull(g, 220);
     const capped = await win.evaluate(() => { const f = document.getElementById('ta'); return { given: parseFloat(f.style.width), drawn: parseFloat(getComputedStyle(f).width) }; });
-    check('a picture pulled wider than its share of the line keeps the width it is drawn at', capped.given <= capped.drawn + 1, JSON.stringify(capped));
-    // … so the next pull inward makes it smaller at once.
+    row = await tops();
+    const last = await box('#tc');
+    check('a picture of a full row pulled wider is drawn wider, the row still on its line inside the page', capped.drawn > g.box.width + 60 && row[0] === row[1] && row[1] === row[2] && last.right <= pg.right + 1,
+      JSON.stringify({ before: g.box.width, capped, row, last, pg }));
+    // … and the next pull inward makes it smaller at once.
     g = await grab('#ta');
     await pull(g, -30);
     ta = await box('#ta');

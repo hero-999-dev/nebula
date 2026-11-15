@@ -127,6 +127,24 @@ export const WORDS = {
   ],
   "Don't allow": ['Nicht erlauben', 'Nie zezwalaj', 'İzin verme'],
   'Allow': ['Erlauben', 'Zezwalaj', 'İzin ver'],
+  // Closing while a big file crosses (Tailscale sync, 1.0.4; sync-close.js)
+  'A big file is still being synced.': [
+    'Eine große Datei wird noch synchronisiert.',
+    'Duży plik jest jeszcze synchronizowany.',
+    'Büyük bir dosya hâlâ eşitleniyor.',
+  ],
+  '{name}: {got} of {size} MB are here. If you close Nebula now, the rest comes the next time Nebula is open on both computers.': [
+    '{name}: {got} von {size} MB sind da. Wenn Sie Nebula jetzt schließen, kommt der Rest, sobald Nebula wieder auf beiden Computern geöffnet ist.',
+    '{name}: jest już {got} z {size} MB. Po zamknięciu teraz programu Nebula reszta dotrze, gdy Nebula będzie znów otwarta na obu komputerach.',
+    '{name}: {got} / {size} MB geldi. Nebula şimdi kapatılırsa kalanı, Nebula iki bilgisayarda da yeniden açık olduğunda gelir.',
+  ],
+  'Another of your devices is still taking a big file from this computer. If you close Nebula now, it carries on the next time Nebula is open on both.': [
+    'Ein anderes Ihrer Geräte holt noch eine große Datei von diesem Computer. Wenn Sie Nebula jetzt schließen, geht es weiter, sobald Nebula wieder auf beiden geöffnet ist.',
+    'Inne z Twoich urządzeń wciąż pobiera duży plik z tego komputera. Po zamknięciu teraz programu Nebula pobieranie ruszy dalej, gdy Nebula będzie znów otwarta na obu.',
+    'Cihazlarınızdan biri bu bilgisayardan hâlâ büyük bir dosya alıyor. Nebula şimdi kapatılırsa aktarım, Nebula ikisinde de yeniden açık olduğunda kaldığı yerden sürer.',
+  ],
+  'Keep Nebula open': ['Nebula offen lassen', 'Nie zamykaj', 'Nebula açık kalsın'],
+  'Close anyway': ['Trotzdem schließen', 'Zamknij mimo to', 'Yine de kapat'],
 };
 
 /** As i18n.js keeps its columns: de, pl, tr. */

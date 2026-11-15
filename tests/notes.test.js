@@ -280,6 +280,32 @@ describe('NoteStore.filter searches the whole note', () => {
   });
 });
 
+// 1.0.4, the owner, 2026-11-15: a note kept to this computer, out of Tailscale sync.
+describe('a note kept off sync (1.0.4)', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('is kept out as a flag, and put back as the newest version', () => {
+    const store = new NoteStore({ allowSeed: false });
+    store.notes = [{ id: 'a', title: 'A', content: 'x', createdAt: 1, updatedAt: 5 }];
+    store.save();
+    store.toggleNoSync('a');
+    expect(store.get('a').noSync).toBe(true);
+    expect(store.get('a').updatedAt).toBe(5);
+    // Said twice, it is said once: the date does not move.
+    store.setNoSync('a', true);
+    expect(store.get('a').updatedAt).toBe(5);
+    const before = Date.now();
+    store.toggleNoSync('a');
+    // Nothing of the mark is left in the note as it is written, so the other devices never see it.
+    expect('noSync' in JSON.parse(JSON.stringify(store.get('a')))).toBe(false);
+    expect(store.get('a').updatedAt).toBeGreaterThanOrEqual(before);
+    const at = store.get('a').updatedAt;
+    store.setNoSync('a', false);
+    expect(store.get('a').updatedAt).toBe(at);
+    expect(store.toggleNoSync('nobody')).toBeNull();
+  });
+});
+
 describe('Only view (0.8.9)', () => {
   beforeEach(() => localStorage.clear());
 

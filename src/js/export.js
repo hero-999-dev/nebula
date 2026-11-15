@@ -259,7 +259,7 @@ export function toHtml(html, title = 'Note') {
   .note-image--inline { margin: .8em 0; }
   .note-image--center { margin-left: auto; margin-right: auto; }
   .note-image--right { margin-left: auto; margin-right: 0; }
-  .note-image--row { display: inline-block; vertical-align: top; max-width: max(calc((100% - 1px) / var(--row, 2) - 12px), calc(100% - 13px - var(--beside, 100%))); margin-right: 12px; }
+  .note-image--row { display: inline-block; vertical-align: top; max-width: calc((100% - 1px - 12px * var(--row, 2)) * var(--share, calc(1 / var(--row, 2)))); margin-right: 12px; }
   /* A picture standing in a line of words: a character of the line. */
   .note-image--inword { display: inline-block; vertical-align: bottom; margin: 0 3px; }
   /* A divider that splits the page: two columns, the divider upright between them. */
@@ -393,7 +393,7 @@ export function toPrintDocument({ title = 'Untitled', body = '', css = '', margi
   doc.body.querySelectorAll('.blk-table > table').forEach(fitToPaper);
   // The shape layer is positioned against the editor, and the resize grips and
   // code-block buttons are controls, not content.
-  doc.body.querySelectorAll('.shape-h, .code-copy, .code-del, .code-hint, .image-h, .link-del').forEach((el) => el.remove());
+  doc.body.querySelectorAll('.shape-h, .area-catch, .code-copy, .code-del, .code-hint, .image-h, .link-del').forEach((el) => el.remove());
 
   const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 

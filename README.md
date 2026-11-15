@@ -1,11 +1,12 @@
 # Nebula
 
-Calm notes with a real editor. An Electron desktop app for **Windows and macOS**
+Calm notes with a real editor. An Electron desktop app for **Windows, macOS and Linux**
 that keeps every note in your own profile, as a folder of its own: a plain JSON
 file with the note's pictures and videos beside it. Installed Windows builds
-offer in-app updates; macOS and portable builds offer a download link.
+and the Linux AppImage offer in-app updates; macOS, portable, deb and pacman
+builds offer a download link.
 
-**Version v1.0.3** ·
+**Version v1.0.4** ·
 **[Download](https://github.com/hero-999-dev/nebula/releases/latest)** ·
 [Documentation site](https://hero-999-dev.github.io/nebula-web/)
 
@@ -136,8 +137,16 @@ and the thing on your screen are obviously the same product.
 | **Windows** | `Nebula-Setup-X.Y.Z.exe`. Per-user install, no admin. **Updates itself.** |
 | **Windows, no install** | `Nebula-portable-X.Y.Z.exe`. Runs from a folder or USB stick; does not auto-update. |
 | **macOS, Apple Silicon or Intel** | `Nebula-X.Y.Z-mac.dmg` (universal). Drag to Applications. See the [Mac install/update guide](docs/UPDATING.md#macos-install-or-update-step-by-step), including security warnings. |
+| **Linux, any distribution** (x64) | `Nebula-X.Y.Z.AppImage`. `chmod +x` it, then open it; nothing is installed. **Updates itself.** |
+| **Ubuntu, Linux Mint, Kali** (x64) | `nebula_X.Y.Z_amd64.deb`. `sudo apt install ./nebula_X.Y.Z_amd64.deb`. Shows when a newer release is out; its package is installed the same way. |
+| **Arch, Manjaro, EndeavourOS** (x64) | `nebula-X.Y.Z.pacman`. `sudo pacman -U nebula-X.Y.Z.pacman`. Updated the same way. |
 
 All from the [Releases page](https://github.com/hero-999-dev/nebula/releases/latest).
+
+**On Linux, black holes and the sync pairing need a keyring** (GNOME Keyring or
+KWallet, installed and unlocked): their keys are kept by the system. Where none
+is running Nebula refuses to make or open them and says why; it never stores
+those keys weakly. More in the [Linux notes](docs/UPDATING.md#linux-appimage-deb-pacman).
 
 **Can't find it after installing?** It is at `%LOCALAPPDATA%\Programs\Nebula`,
 with shortcuts on the Desktop and in the Start Menu. The app answers this
@@ -156,7 +165,13 @@ installs on its own.
 macOS and portable builds use manual updates: they detect a newer version and
 open its download page. On Mac, save, quit, back up your profile, and replace
 only `/Applications/Nebula.app`. Signing credentials alone do not enable Mac
-auto-updates; the current updater deliberately limits installation to Windows.
+auto-updates; the current updater deliberately limits installation to the
+Windows installer and the Linux AppImage.
+
+On Linux the AppImage updates as the installed Windows app does: the new file
+takes the place of the old one. The deb and the pacman package are told of a
+newer version and open its download page, since their files belong to the
+system's package manager.
 
 The app and vault are separate. These safeguards reduce the risk of losing notes;
 they are not a substitute for a backup or a guarantee against hardware failure:
@@ -195,7 +210,8 @@ an abrupt power loss.
 electron/
   main.js             window, IPC, vault, snapshots, path guard, AppUserModelId
   preload.js          the only bridge — storage, updates, paths, window and lifecycle save requests
-  updater.js          auto (Windows installer) / manual (macOS, portable, dev)
+  updater.js          auto (Windows installer, Linux AppImage) / manual (macOS, portable, deb, pacman, dev)
+  safe-store.js       may a secret be kept on this computer: on Linux only with a keyring
   version-compare.js  pure semver comparison
 src/js/
   main.js             boot: vault status -> store -> editor -> panels
@@ -242,6 +258,7 @@ npm run old-notes                # the long-note trials on COPIES of Nebula Test
 npm run check:versions           # every surface agrees with package.json
 npm run check:browsers           # the browser the sign-in windows claim is one Google still accepts
 npm run pack:win    # release/Nebula-Setup-*.exe + Nebula-portable-*.exe
+npm run pack:linux  # AppImage + deb + pacman, on a Linux machine (GitHub builds them for a release)
 npm run site        # rebuild site/index.html (docs + mind maps)
 npm run icons       # rebuild build/icon.png + icon.ico from vector (Windows)
 ```
@@ -268,6 +285,9 @@ use `npm run dev`.
 | **Test** — `Nebula Test.exe` in the project root | `<repo>\Nebula-data` |
 | **Portable** — `Nebula-portable-*.exe` from a release | `<folder of the exe>\Nebula-data` |
 | **Dev** — `npm run dev` | `<repo>\.dev-profile` |
+
+On macOS the installed app keeps its notes in `~/Library/Application Support/nebula`,
+on Linux in `~/.config/nebula` — AppImage, deb and pacman alike.
 
 Electron derives its profile from the package name, so all four would be the
 same directory if nothing intervened — and a portable build sitting in this
@@ -312,7 +332,7 @@ npm run precheck:ci # GitHub's build of the current HEAD, nothing released
 
 Tests → smoke → build → doc freshness → version bump → `Log.md` → commit →
 GitHub builds that commit on `precheck/vX.Y.Z` → tag → push (a red precheck
-undoes the commit; no tag, the version stays free). GitHub Actions builds Windows and macOS and publishes one Release; the
+undoes the commit; no tag, the version stays free). GitHub Actions builds Windows, macOS and Linux and publishes one Release; the
 docs site is rebuilt and mirrored to `nebula-web`; the USB drive is synced if it
 is plugged in.
 

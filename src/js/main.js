@@ -8,12 +8,14 @@ import { initWhatsNew } from './whats-new.js';
 import { bindEditor } from './editor.js';
 import { initTheme, wearStoredTheme } from './theme.js';
 import { initThemeEditor } from './theme-editor.js';
-import { on } from './bus.js';
-import { initDock } from './dock.js';
+import { on, emit } from './bus.js';
+import { wearStoredDesign } from './design.js';
+import { initDock, ARRIVING } from './dock.js';
 import { initToolbar } from './toolbar.js';
 import { initSlashMenu } from './slash-menu.js';
 import { initShapes } from './shapes.js';
 import { initArrows } from './arrows.js';
+import { initShapePorts } from './shape-ports.js';
 import { initCodeBlocks, paintAllCode } from './codeblock.js';
 import { paintAllEquations } from './equation.js';
 import { initAiPanel } from './ai-panel.js';
@@ -24,6 +26,7 @@ import { initAbout } from './about.js';
 import { initSideToggle } from './side-toggle.js';
 import { initFind } from './find.js';
 import { initHistory } from './history.js';
+import { holdPlace } from './note-in-place.js';
 import { initRichPaste } from './rich-paste.js';
 import { initMarkHeal } from './mark-heal.js';
 import { initLabels } from './labels.js';
@@ -42,6 +45,7 @@ import { initReminders } from './reminders.js';
 import { askAboutHeldMedia } from './held-media.js';
 import { initI18n, initLanguagePicker, t, getLang } from './i18n.js';
 import { initContextMenu } from './context-menu.js';
+import { initSendFile } from './send-file.js';
 import { initToggles } from './toggles.js';
 import { initAutoArrows } from './auto-arrows.js';
 import { initMentions, refreshMentions, removeTagChips } from './mentions.js';
@@ -50,19 +54,22 @@ import { FolderStore } from './folders.js';
 import { ProjectStore } from './projects.js';
 import { initPageModes, applyPageMode, opensFitted, sheetPx, isFluid, usesRealSize } from './page-mode.js';
 import { initSplitView } from './split-view.js';
+import { initNoteTabs } from './note-tabs.js';
 import { restoreWideOrientation } from './pdf-preview.js';
 import { orderPage } from './page-order.js';
 import { initZoomControl, setRealScale, normalizeZoom, FIT, DEFAULT_ZOOM } from './page-zoom.js';
 import { initNoteList } from './note-list.js';
 import { initAppMenu } from './app-menu.js';
 import { initPalette, initShortcuts, initBlocks } from './palette.js';
-import { newNoteDefaults, readSettings, initSpelling } from './settings.js';
+import { newNoteDefaults, readSettings, writeSettings, initSpelling } from './settings.js';
 import { initSettingsPanel } from './settings-panel.js';
 import { initBackdrop } from './backdrop.js';
 import { initScreenTip } from './screen-tip.js';
+import { initDesignFonts } from './design-fonts.js';
+import { initDiscordCopy } from './discord-copy.js';
 import { appLockGate, appLockIsOn } from './app-lock.js';
 import { initToolsPanel } from './tools-panel.js';
-import { initTailnetSync } from './tailnet-sync.js';
+import { initTailnetSync, canKeepOff } from './tailnet-sync.js';
 
 const $ = (id) => document.getElementById(id);
 const AUTOSAVE_MS = 400;
@@ -98,6 +105,7 @@ async function boot() {
   // and nothing is started until it has been answered — in the theme and the
   // language of the app, which is why those two come first.
   wearStoredTheme();
+  wearStoredDesign();
   const gate = await appLockGate();
   const disk = await initDiskStorage();
   if (!disk.bridge) $('demo-banner').hidden = false;
@@ -232,6 +240,11 @@ async function boot() {
     if (ro) { shapes?.reset(); richPaste?.reset(); }
   }
   readonlyChip?.addEventListener('click', () => { if (store.activeId) store.setReadOnly(store.activeId, false); });
+  // Kept to this computer (1.0.4, tailnet-sync.js): like Only view, a word by the title while it is so, and a click puts the note back into sync.
+  const nosyncChip = $('nosync-chip');
+  function paintNoSync() { if (nosyncChip) nosyncChip.hidden = !store.active()?.noSync; }
+  // Put back, it is the newest note (notes.js): the list is drawn again.
+  nosyncChip?.addEventListener('click', () => { if (store.activeId && store.setNoSync(store.activeId, false)) renderList(); });
   // A long title gets smaller until it fits, down to two thirds of its size;
   // past that it ends in "…" (the owner's Bug Find note, 1.0.3: "font küçülsün
   // sığsın"). Measured in its own font, so a wider face shrinks sooner.
@@ -273,7 +286,7 @@ async function boot() {
     if (family) editorEl.style.setProperty('--note-font', family);
     else editorEl.style.removeProperty('--note-font');
   }
-  on('note-changed', ({ id } = {}) => { if (id === store.activeId) { applyReadOnly(); paintTitleFont(); } });
+  on('note-changed', ({ id } = {}) => { if (id === store.activeId) { applyReadOnly(); paintNoSync(); paintTitleFont(); } });
   const READING_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown', 'Escape', 'Shift', 'Control', 'Alt', 'Meta', 'F12']);
   const stop = (e) => { e.preventDefault(); e.stopImmediatePropagation(); };
   editorEl.addEventListener('beforeinput', (e) => { if (isReadOnly()) stop(e); }, true);
@@ -320,6 +333,8 @@ async function boot() {
       paintAllCode(editorEl);
       paintAllEquations(editorEl);
       shapes?.reset();
+      arrows?.reset();
+      shapePorts?.reset();
       richPaste?.reset();
       toggles?.heal();
       richPaste?.refresh();
@@ -332,14 +347,25 @@ async function boot() {
   });
   // Shapes first: the toolbar's shape buttons go through this controller so a
   // new shape arrives selected, with its colour bar already open.
-  const shapes = initShapes(editorEl, { history, onGeometry: () => arrows?.reflow() });
-  const arrows = initArrows(editorEl, { history });
+  const shapes = initShapes(editorEl, {
+    history,
+    onGeometry: () => arrows?.reflow(),
+    // A text box carried by an arrow's line lights the arrow, and rides it once let go (1.0.4).
+    onDrag: (shape) => arrows?.hint(shape),
+    onDrop: (shape) => arrows?.catchLabel(shape),
+    // A work area whose button is on lifts the pictures in it out of the text to carry them.
+    liftPicture: (figure) => richPaste?.float?.(figure),
+  });
+  const arrows = initArrows(editorEl, { history, shapes });
+  // The four sides of a shape: an arrow drawn from one, the next shape put beside one (1.0.4).
+  const shapePorts = initShapePorts(editorEl, { history, shapes, arrows, label: t('Drag to join · click to add a shape') });
   // Nebula Wide's sheet for export and print, as it was last turned (pdf-preview.js).
   restoreWideOrientation();
   const toolbar = initToolbar(editorEl, {
     translate: t,
     onWideOrientation: () => pageModes?.paint(),
     onLink: () => richPaste?.open('url'),
+    onWidget: (kind) => richPaste?.insertWidget(kind),
     shapes,
     arrows,
     history,
@@ -401,12 +427,21 @@ async function boot() {
     store,
     history,
     openNote: (id) => openNote(id),
+    // A mention clicked opens its note as a tab over this one (1.0.4).
+    openTab: (id) => noteTabs?.add(id),
     showLabel: (label) => labelFilter?.set({ kind: 'text', label }),
     isLocked: isReadOnly,
+  });
+  const sendFile = initSendFile({
+    store,
+    say: (text) => window.dispatchEvent(new CustomEvent('nebula-toast', { detail: text })),
+    saveCurrent,
   });
   initContextMenu(editorEl, {
     history,
     images: richPaste,
+    // A file's card: a copy of the file sent to another note (1.0.4).
+    files: { sendTo: (card, x, y) => sendFile.open(card, x, y) },
     // In a table: rows and columns put in beside the clicked cell (0.9.4).
     tables,
     miniBarAt: (x, y) => toolbar?.miniBarAt?.(x, y),
@@ -490,6 +525,9 @@ async function boot() {
   let pageModes = null;
   let zoomControl = null;
   let splitView = null;
+  let noteTabs = null;
+  // Tailscale sync, the window's half (set up further down): the note's menu asks it whether sync is on.
+  let tailnet = null;
   // The page the note being written in is shown in: its own, or Nebula Wide beside a Nebula Wide one (split-view.js).
   const activePage = () => splitView?.pageOf(store.activeId) ?? store.active()?.page ?? 'nw';
   const defaultZoom = () => (opensFitted(activePage()) ? FIT : DEFAULT_ZOOM);
@@ -521,6 +559,7 @@ async function boot() {
     if (filtering || !noteList) for (const note of notes) listEl.appendChild(noteItem(note));
     noteActions?.renderDrawers();
     splitView?.sync();
+    noteTabs?.sync();
     refreshGalaxy();
   }
 
@@ -540,9 +579,19 @@ async function boot() {
       : t('You have not created any notes yet. Add one with New note on the left.');
   }
 
-  function openNote(id) {
+  /**
+   * @param {string} id
+   * @param {object} [o]
+   * @param {boolean} [o.inPlace] the note that is open, come in newer from another
+   *   computer (tailnet-sync.js, 1.0.4): its markup is taken in where the reader is —
+   *   the page, the caret and a playing video stay (note-in-place.js), Find stays
+   *   open, and the map does not travel. Its undo steps go all the same: a step back
+   *   would write the older version over what the other computer did.
+   */
+  function openNote(id, { inPlace = false } = {}) {
     flushTitle();     // before the active note changes, or it lands on the wrong one
     editor.flush();
+    const place = inPlace && id && id === store.activeId && store.active() ? holdPlace(editorEl) : null;
     store.setActive(id);
     const note = store.active();
     titleNoteId = note?.id ?? null;
@@ -553,6 +602,7 @@ async function boot() {
     paintTitleFont();
     zoomControl?.paint();        // how close the page is, and with it the page width measured at that zoom
     editor.load(note);
+    place?.players();
     // Before anything reads the markup: bring what the note SAVED up to what
     // this version writes. A fix that lives in a note's HTML never reaches the
     // notes written before it otherwise — see migrate.js.
@@ -560,11 +610,14 @@ async function boot() {
     // A mentioned note that was renamed is shown under its name now.
     refreshMentions(editorEl, store);
     applyReadOnly();
+    paintNoSync();
     // Both are regenerated from their stored source, never trusted from the
     // saved HTML — and the shape bar belongs to a note that is now gone.
     paintAllCode(editorEl);
     paintAllEquations(editorEl);
     shapes?.reset();
+    arrows?.reset();
+    shapePorts?.reset();
     richPaste?.reset();
     toggles?.heal();
     richPaste?.refresh();
@@ -577,14 +630,18 @@ async function boot() {
     const healed = editor.adopt();
     if (healed && note) store.heal(note.id, healed, MARKUP_VERSION);
     history?.reset(); // this note's history is not the next note's
-    find?.close();    // its ranges point into the note that just closed
+    if (place) find?.refresh(); // the same note, newer: what is looked for is looked for in it
+    else find?.close();         // its ranges point into the note that just closed
     setSaveState('');
     renderList();
     paintOrder();
     autoOrder(400);              // pictures have their size by then
-    showLabelHits({ scroll: true });
+    showLabelHits({ scroll: !place });
     splitView?.sync();           // side by side: the editor goes to this note's pane
-    galaxy?.follow(store.activeId); // the map's camera goes to it
+    noteTabs?.sync();            // the tabs: this note's is the lit one
+    toolbar.syncNoteFont();      // the bar's font and size: this note's, not the last caret's
+    if (place) place.restore();  // the page, the caret and the focus, where the reader was
+    else galaxy?.follow(store.activeId); // the map's camera goes to it
   }
 
   /**
@@ -702,6 +759,13 @@ async function boot() {
   // Which OS, so the title strip can leave room for macOS's traffic lights.
   document.documentElement.dataset.platform = window.nebula?.platform ?? 'web';
 
+  // Copy for Discord (1.0.4): a note’s menu puts it on the clipboard as the text
+  // Discord reads; nothing is sent (discord-copy.js).
+  const discordCopy = initDiscordCopy({
+    store,
+    saveNow: () => saveCurrent(),
+    say: (words) => window.dispatchEvent(new CustomEvent('nebula-toast', { detail: words })),
+  });
   const labels = initLabels(store);
   const noteActions = initNoteActions({
     onLabels: (id, button) => labels?.open(id, button),
@@ -713,6 +777,11 @@ async function boot() {
     onHoleDelete: (id) => blackHoles?.destroy(id),
     canBeside: (id) => splitView?.canAdd(id) ?? false,
     onBeside: (id) => splitView?.add(id),
+    canTab: (id) => noteTabs?.canAdd(id) ?? false,
+    onTab: (id) => noteTabs?.add(id),
+    canKeepOff: (note) => canKeepOff(note, tailnet?.isOn()),
+    canDiscord: (note) => discordCopy.can(note),
+    onDiscord: (id) => { void discordCopy.copy(id); },
     store,
     onChanged: () => { renderList(); openNote(store.activeId); },
     openNote: (id) => openNote(id),
@@ -796,6 +865,17 @@ async function boot() {
     },
     // The editor is wider or narrower now: its page, zoom and arrows measured again.
     onLayout: () => requestAnimationFrame(() => { pageModes?.paint(); zoomControl?.paint(); arrows?.reflow(); columns?.refresh?.(); }),
+    onPanes: () => noteTabs?.paint(),
+  });
+  // Tabs over the note (1.0.4): on the line under the title — a note dragged there, a mention clicked.
+  noteTabs = initNoteTabs({
+    strip: $('note-tabs'),
+    store,
+    titleEl,
+    openNote: (id) => openNote(id),
+    panes: () => splitView?.panes() ?? [],
+    closePane: (id) => splitView?.close(id),
+    translate: t,
   });
   $('btn-new-folder')?.addEventListener('click', () => { void noteList.create(); });
   $('btn-new-project')?.addEventListener('click', () => { void noteList.createProject(); });
@@ -819,6 +899,14 @@ async function boot() {
   // are the only list the command palette reads.
   const shortcuts = initShortcuts();
   const blocks = initBlocks();
+  // The design's font on every note (1.0.4): the button under the designs, and the card that puts the fonts back.
+  const designFonts = initDesignFonts({
+    store,
+    saveNow: () => saveCurrent(),
+    reopen: () => { if (store.activeId) openNote(store.activeId); else renderList(); },
+    say: (words) => window.dispatchEvent(new CustomEvent('nebula-toast', { detail: words })),
+    newFont: { get: () => readSettings().font, set: (font) => { writeSettings({ font }); } },
+  });
   // Settings, beside Help (0.9.4): a new note's font, size and page; what is put away; the lock on opening.
   const settings = initSettingsPanel({
     overlay: $('ov-settings'),
@@ -833,6 +921,7 @@ async function boot() {
       noteActions?.renderDrawers();
     },
     noteTitle: (id) => store.get(id)?.title || null,
+    fontsOnAll: () => designFonts.apply(),
   });
   // Onto another screen with the picture unsoftened: where to soften it (1.0.3).
   initScreenTip({ openSettings: (tab) => settings.open(tab) });
@@ -842,7 +931,10 @@ async function boot() {
   // Tools, beside Settings (1.0.3): other apps — Tailscale sync first.
   const tools = initToolsPanel({ overlay: $('ov-tools'), body: $('tools-body'), closeButton: $('tools-close') });
   // An unreadable vault is neither served nor written to: without the window's answer, sync.js does neither.
-  const tailnet = disk.ok ? initTailnetSync({ store, folders, projects, saveCurrent, renderList, openNote }) : null;
+  tailnet = disk.ok ? initTailnetSync({
+    store, folders, projects, saveCurrent, renderList, openNote,
+    flushTyped: () => { flushTitle(); editor.flush(); },
+  }) : null;
   let menu = null;
   /** About Nebula, set up further down; Help → About opens it with the sounds' credits. */
   let aboutPanel = null;
@@ -890,6 +982,13 @@ async function boot() {
   }
   paintTitleBar();
   on('theme-changed', paintTitleBar);
+  // A design brings its own colours for Main (1.0.4), and a design chosen is
+  // seen in them (the owner: "her design'ın main'i olsun, şu an göremiyorum" —
+  // under Dark, Light or a theme of their own a design had only its letters and
+  // frames to show): choosing one puts Main on. Whoever reads the colours — the
+  // strip above, the colour bars, the theme organizer — hears it as a change of
+  // theme; the other themes are a press away, under the design as before.
+  on('design-changed', () => theme.set('main'));
 
   // The two accelerators the menus advertise but nothing else owns. The rest
   // live with the feature they belong to (Ctrl+F in find.js, Ctrl+K in
@@ -1096,8 +1195,10 @@ async function boot() {
       // Attach the guest when the panel is actually visible, never while it is
       // display:none — that detaches it and forces a reload.
       const aiPanel = $('ai-panel');
-      new MutationObserver(() => { if (!aiPanel.hidden) ai.open(); })
-        .observe(aiPanel, { attributes: true, attributeFilter: ['hidden'] });
+      // ...and not while it slides in: waking the chat then held the window still and the
+      // panel was seen arriving in jumps (1.0.4, dock.js).
+      new MutationObserver(() => { if (!aiPanel.hidden && !aiPanel.classList.contains(ARRIVING)) ai.open(); })
+        .observe(aiPanel, { attributes: true, attributeFilter: ['hidden', 'class'] });
       if (!aiPanel.hidden) ai.open();
     }
   } catch (err) {

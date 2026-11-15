@@ -1,4 +1,829 @@
 
+## [2026-11-15 20:41] v1.0.4 - by release-script
+
+
+
+
+* (no commits since the last release)
+
+---
+
+## [2026-11-15 19:31] v1.0.3 - by Claude (the debts before 1.0.4: the older e2e files brought up to what 1.0.4 is, one picture rule put back; then the release)
+
+Asked (in chat): "buda kalsin paket 1 ciksin simdilik , sonrasinda degerlendirilecek, borclar kapansin yeni versiyon pushlansin"
+
+- Copy for Discord (package 1) stays as it is and goes out with 1.0.4. The webhook and the bot (packages 2 and 3) are not started: the owner weighs them later.
+- The debt: the e2e files written before rounds 35–62 still asked for what 1.0.3 was. The whole smoke stopped at its first shape, and behind it stood more. Brought up to 1.0.4, each change a stale expectation and not a loosened one: shapes and arrows are put from their tiles (tests/e2e/put.mjs, new, used by smoke.mjs and the suites that draw); the guide is read with its sections unfolded (guide.mjs); every right-click menu has “Send to…” before “Select all”, a picture’s menu too (v093.mjs, v094.mjs); a plain click on a mention opens a tab, Ctrl + click goes there (v093.mjs); the font list has the eight design faces first, then the pins, then A–Z, 58 fonts (v094.mjs, settings.mjs); a picture of an open black hole is drawn by its short address, not as data (black-holes.mjs); “No style” is a button of the row, the Appearance tab begins with Design (ideas-103.mjs, settings.mjs, in Turkish too); Settings has no “no font” row, Serif is chosen as any font is (settings.mjs); the theme’s profiles end in a +, and the logo’s three sizes are a tenth larger with the sheet (settings.mjs); seven packed design faces are asked for, and a face of one weight is bold by a line round the letter, never fattened (design.mjs).
+- One real fault found by the smoke, src/js/rich-paste.js: after a picture with no line over it was deleted, the picture right beside it was no longer selected — the divider pick of 1.0.4 came first and took the caret. The picture under it, else the one over it, is selected again as since 0.9.3; the divider is picked only where no picture stands beside.
+- Ran, green: every suite of the smoke list alone, one by one (among them v093, v094, black-holes 90, ideas-103 106, ideas-103b 55, dense 39, canvas 22, view-snap 22, rich-paste 20, guide 9, deleted 6); settings.mjs 129 of 129, design.mjs, sync.mjs, table.mjs, table-edges.mjs, first-run.mjs 9 of 9; units tests/rich-paste.test.js and tests/v104.test.js, 58, after the fix.
+- The release’s first run then passed the units (2132 in 120 files), the build, the whole smoke (1401 of 1401) and the rebuild page (100%), and was stopped by its old-notes gate before anything was committed — on a real fault, as old as 1.0.3 (its lines had not changed since): Enter inside a highlight, then Backspace, and the second half of the line came back without its highlight. Chromium brings the lower half up bare, and the tidying after a delete knew spans with a style only, not the marks with a class.
+- src/js/blocks.js: before a delete, the mark the upper line ends with and the words the lower line begins with in the same mark are noted (splitMarks, for the caret’s line with the one over it and the one under it); after a join those words go back into that mark, and the no-break space Enter left is a space again. Words that stood after the mark, another highlight, and words never highlighted stay as they were. Units: tests/blocks.test.js 28 (4 new). In the built app: the same trial on a note written for it, red before and green after. Seven more trials of that note failed in the gate’s first pass and passed in its run alone.
+- The second run passed the same gates and the highlight trial, and old-notes was red again in the same note — this time the test’s fault, not the app’s. That note holds a world clock and a weather: their faces draw the time of day and what the weather service last said, the minute turned in the middle of the trials, and every trial after it found the note “changed” (it is what had made seven trials fail in the first run too). tests/e2e/dense.mjs: of a world clock, a weather and a clock the state kept on the figure is compared, not the drawing made from it; the same faces are left out of the count of the note’s letters. Nothing else of a widget is left out. old-notes alone after it: every trial green on ten notes, that note’s nineteen among them.
+- The release was then run a third time from its beginning. One check of v093 (a PDF’s preview closed in landscape) failed once inside the whole smoke and passes alone; it tells more now when it fails.
+- Never built or run until the release’s precheck: the Linux packages. Not tried by hand: two real computers on live sync, a real system drag, Linux on four distributions.
+
+## [2026-11-15 18:23] v1.0.3 - by Claude (Copy for Discord after the owner’s first paste: no empty rows or columns of a table, no “Untitled” heading; test build, not released)
+
+Asked (in chat): "deneme discord notuna bak"
+
+- The owner pasted a trial note into Discord and kept a picture of what came out. Seen there, as written by the 17:56 build: a table of twelve columns and eight rows with two words in its second row went as a rule of dashes over nothing, the two words, and six empty lines; the note, not named yet, went under a heading “Untitled”. The divider, the heading, the list and a highlighted, underlined, struck line came out as meant.
+- src/js/discord-share.js, the table: a row or a column with no word in it is not written; the rule stands under the table’s own first row only where that row has words and rows follow it; a table with no word at all is not written.
+- The title: a note never named (“Untitled”, or the same in German, Polish, Turkish) carries no heading. This one was not asked for in words; it is one line to take back.
+- Units: tests/discord-share.test.js 29 (2 new: the owner’s table, cell for cell, with the other empty-row and empty-column cases; the unnamed note) and tests/discord-copy.test.js 17, green. Not run again: the other files of round 61, the whole unit suite, e2e, smoke.
+- Still not tried: a picture onto the real clipboard in the built app by my own hand (the owner’s paste shows text arrives as meant).
+- Not committed, not pushed.
+
+## [2026-11-15 17:56] v1.0.3 - by Claude (Copy for Discord: a note onto the clipboard as the text Discord reads, a long one part by part; nothing is sent; test build, not released)
+
+Asked (in chat): "paket 2 ve 3 beklesin , paket 1 i yapalim"
+
+- Package 1 of the Discord share plan. The webhook (package 2) and the bot (package 3) wait on the owner’s word; nothing of them is in the app, and Tools has no Discord group.
+- New file src/js/discord-share.js, pure (no clipboard, no window, no network): its own walk over the note as export.js cleans it, not a rewriting of the Markdown export. The title and headings 1–3 as `#`, `##`, `###`, a deeper heading a bold line; bold, italic, strike as they are, underline `__x__`, a highlight bold; a web link `[words](address)`, a link into the vault or a mention its words alone, a mail address or phone number written out beside its words; lists two spaces a level; a checklist with ☐ and ☑; a quote `>` on every line; code fenced with its language; an equation its source; a table a code block lined up in columns, a merged cell in its first place; a divider `───`; a picture’s caption an italic line.
+- Plain words are escaped so Discord shows them as written (`\` `` ` `` `*` `_` `[` `]`, `~~`, `||`; a line that begins like a heading, small print, a quote or a list); an address is left whole. `@everyone`, `@here` and a written-out mention get a zero-width space, so a pasted note calls nobody.
+- One message is 2000 characters (`MESSAGE_LIMIT`, one named constant). Whole blocks are packed into a part; a block longer than a part is cut at a line’s end, else at a space, never one character in two; a code block longer than a part is fenced again in each piece.
+- What the text cannot carry is counted, never dropped silently: shapes and arrows, widgets, attached files, and pictures where no picture can be put on the clipboard.
+- `canShare(note)`, one function for the menu and the copy, a test for each line: never a black hole’s note, never anything while Nebula is locked, never a note in the Trash, never the guide.
+- New file src/js/discord-copy.js: the note menu’s entry Copy for Discord (index.html, note-actions.js, main.js) writes what is being typed, then puts the first part on the clipboard; a card at the bottom right says “Part 1 of 3 copied” and its button copies the next part, then the note’s own pictures one at a time through the picture bridge that was already there. A part the clipboard refuses is tried again by the same button; a picture it cannot take is passed over and named. The card keeps the note’s text only while it is up: Close, the note deleted, or the note moved into the Trash or a black hole lets go of it.
+- Two questions of the plan the owner has not answered were taken at a default, each one line to change: a note marked “Do not sync this note” may be copied (it is the owner’s own act, one note at a time), and only the whole note is copied, never a selection.
+- Unlike the plan as it stood: a widget is left out and counted, not written as its words (a calculator’s keys are not words). The plan’s row is corrected.
+- The words in German, Polish and Turkish (5 rows, 9 numbered lines). The guide’s export paragraph says it in four languages, with what stays on the clipboard; a What’s new item (“Copy for Discord”) before Fixes; new guide signatures, the former kept as “before Copy for Discord”.
+- Units: 572 green in 24 files (every file that reads what was touched). New files: tests/discord-share.test.js (27), tests/discord-copy.test.js (17).
+- Not tried: a paste into Discord itself (the forms follow Discord’s written markdown rules; how it draws them was not seen), a picture onto the real clipboard in the built app, the card by hand in the window. Not run: the whole unit suite, e2e, smoke.
+- Not committed, not pushed.
+
+## [2026-11-15 16:56] v1.0.3 - by Claude (Linux builds written: AppImage, deb, pacman; no black hole and no pairing where no keyring runs; never built or run yet; test build, not released)
+
+Asked (in chat): "linux derlemelerini yapalim"
+
+- Section 2 of the 1.0.4 plan. Three packages for x64: `Nebula-X.Y.Z.AppImage` (any distribution), `nebula_X.Y.Z_amd64.deb` (Ubuntu, Linux Mint, Kali), `nebula-X.Y.Z.pacman` (Arch, Manjaro, EndeavourOS). package.json has the `linux`, `appImage`, `deb` and `pacman` blocks (category Office, the app’s icon, executable `nebula`, as maintainer the repository owner’s public name with no e-mail, docx, doc, odt and rtf as document types, `desktopName`, `homepage`) and `npm run pack:linux`.
+- The keyring rule, the one security rule of the plan. New file electron/safe-store.js: on Linux a secret may be kept only when Electron’s safeStorage answers with a named keyring (GNOME Keyring through libsecret, or KWallet); `basic_text`, `unknown` and any name not known count as no. Both places that asked safeStorage, black holes and sync, ask through it. Black holes: none is made, and one whose key the system wrapped is not opened, by PIN or by the system’s sign-in; the refusal is “secure storage is unavailable”, not “another computer”, and no guess is counted against the PIN. Sync: the pairing is not written (the one function that writes it refuses) and a pairing on disk is not read, so nothing is served or fetched with it. On Linux both refusals add what to do, in four languages: install and unlock GNOME Keyring or KWallet (src/js/keyring-hint.js).
+- Updates: the AppImage updates itself as the installed Windows app does (electron/updater.js `selfUpdates`: on Linux only when the AppImage runtime names its file). The deb and the pacman package are told of a newer release and open its page.
+- The Serif stack has the Palatino faces a Linux system has (“TeX Gyre Pagella”, “URW Palladio L”, “P052”) after Palatino Linotype, alike in tokens.css, designs.css, design.js and toolbar.js. Windows and a Mac never reach them.
+- GitHub: a `build-linux` job (unit tests, a first run of the real app under xvfb, the three packages, their names, `latest-linux.yml`, electron-updater in the asar, what the deb says of itself); publish waits for it. New: tests/e2e/first-run.mjs (open, write a note, close, open again), in place of the whole smoke suite, which has never run off Windows and needs a keyring.
+- Found already there, nothing to do: Tailscale’s places and adapter name on Linux, the system sound folder, the firewall steps for Linux in Tools, a document opened from the command line. Corrected in the plan: the notes are in `~/.config/nebula`, lower case.
+- The release body, README, docs/UPDATING.md and docs/RELEASE.md say which package is for which system, how each is updated, and the keyring. Guide section 19 and a What’s new item (“Nebula on Linux”) in four languages; new guide signatures, the former kept as “before Nebula on Linux”.
+- Units: 1054 green in 46 files (every file that reads what was touched). New files: tests/safe-store.test.js, tests/keyring-hint.test.js; new tests in sync-server, black-holes, updater and release-body. The first run passed here on Windows, 9 of 9. The build block is valid against electron-builder’s own schema, and a wrong key in it is caught.
+- Not tried, none of it: no Linux package has been built, since this computer has no Linux; the `build-linux` job has never run; no package installed or opened on any distribution; the title bar, the icon in the dock, the document types, the fonts, sound and notifications on Linux unseen; what the pacman package asks the system for untested on Arch; an AppImage updating itself; a real keyring, there or missing. The first build is the precheck on GitHub at the next push. The hand tests on Ubuntu 24.04, Mint 22, Kali and an Arch-based system stay open.
+- Not committed, not pushed.
+
+## [2026-11-15 15:55] v1.0.3 - by Claude (a big attached file or picture still on its way says “File syncing · %” or “Picture syncing · %”; the open note takes a newer version in where the reader is; test build, not released)
+
+Asked (in chat): "tailscale yapalim kücükleri"
+
+- The two small things left of Tailscale sync, as listed to the owner: a card for a big attachment or picture still on its way, and the open note updated where it stands in place of being opened again.
+- An attached file over 5 MB comes after its note, in the background, as a video does. Until now its card stood there as if the file were here, and Open or Save a copy failed. Now the card’s bar says “File syncing · 62 %” over a thin meter, in place of the two buttons, and a click on the card says “This file is still syncing”. When the file lands the buttons are back.
+- A picture over 5 MB: where it will be, its frame says “Picture syncing · 62 %” over the same meter, and the broken picture is not shown meanwhile. When the file lands the picture loads.
+- Both are drawn on the screen only and never saved into the note; both run 0 to 99, never 100. A file sealed in a black hole never has the card: black holes do not travel. A widget and a video’s still are not pictures of the note’s folder and never have it.
+- The open note, in place. When a round (live, on opening, Sync now) brings a newer version of the note that is open, the note is no longer opened again. Its markup is changed under the reader: the block at the top of what is seen stands there again though lines came or went above it, the caret is back in its block at its place (at the block’s start when the block is not built as it was, left alone when the block is gone), the note keeps the focus, a video of the same file stays the player it was, Find stays open and looks again, and the map does not travel. The note’s undo steps are dropped all the same: a step back would write the older version over what the other computer did. New file: src/js/note-in-place.js.
+- Found on the way and fixed: a key pressed after the pull had looked at the open note, and not yet written when the notes came, could be saved over the note that had just come, and the other computer’s change was lost. Now what is typed is written first, and from that moment to the note shown anew nothing is waited for; a note typed in meanwhile is left alone, as the rule always said.
+- Guide section 18 and the What’s new item in four languages say both. New guide signatures; the former are kept as “before files and pictures said to be coming”.
+- Units: 828 green in 36 files (every file that reads what was touched). New files: tests/coming-files.test.js, tests/note-in-place.test.js.
+- Not tried: two real computers; a real attachment or picture over 5 MB over the tailnet; the cards and the in-place take seen by eye in the app (where the page stands is tested with made-up block heights, since the test page has no layout); the whole unit suite, e2e, smoke.
+- Not committed, not pushed.
+
+## [2026-11-15 14:27] v1.0.3 - by Claude (two open computers stay alike by themselves; a video still on its way says “Video syncing · %” in its player; Nebula asks before it closes while a big file crosses; black holes across computers studied and planned, not built; test build, not released)
+
+Asked (in chat): "Yapılmamış Tailscale aşamaları / - Oynatıcıda "video eşitleniyor · %" kartı. / - Büyük aktarım sürerken kapatmadan önce soru. / - İki bilgisayar da açıkken canlı eşitleme (bugün: açılışta, kapanışta, "Şimdi eşitle"). / bu ücünü yap , karadelikleri de incele plan olusturalim onun icin"
+
+- Live sync. While Nebula is open on two paired computers, a change on one now reaches the other by itself. Three seconds after the last save (twenty at the most while the typing goes on, and not more often than every ten seconds) the computer tells the others; each of them pulls, and the computer that changed pulls once back, so both hold the same last-synced state and the next change is no conflict. What a computer has just taken from another starts no round of its own. A note kept to one computer and a black hole’s notes start none. These rounds show no card: the list changes, nothing else.
+- Its limits, as they are: when a newer version of the note that is open arrives, that note is opened again, as after every sync; two people typing in the same note at the same moment still get a copy side by side; a note just marked “Do not sync this note” can start one round that carries nothing.
+- The video card. A video over 5 MB comes after the notes, in the background. Until now its player stood empty, or said the video cannot be played, until the file landed. Now the player says “Video syncing · 62 %” over a thin meter that follows the file (0 to 99, never 100: at the end the card goes and the video loads). It is never saved into the note. Videos only: a big attachment or picture still on its way has no card yet.
+- The question before closing. While a big file is crossing at that moment (coming here, or another device taking one from this computer), closing Nebula asks first: “A big file is still being synced.”, with the file’s name and how much of it is here. “Keep Nebula open” is the first button and what Enter, Esc and the dialog’s × mean; “Close anyway” closes, and the rest comes the next time Nebula is open on both. Files that only wait are no reason to ask. On the sending computer the question covers the time until the last byte has left it, not until the other has written it.
+- Found by the new tests and fixed: a player that asked which files are on their way, just before one of them landed, could be marked as waiting again after it had landed. The answer is now checked against the queue once more before it is given.
+- The guide’s Tailscale part (section 18) tells of the three, in four languages; What’s new for 1.0.4 has “Two computers open at once stay alike”, in four languages. New signatures; the guide as it stood in the test builds until now is kept among the known ones (“before live sync”), so it is brought up to date by itself.
+- In the code: a `/live` route beside `/nudge` and the part “live, while both are open” in electron/sync.js; the question in the new electron/sync-close.js, asked by the window’s closing after the save; the card in src/js/file-video.js and src/js/tailnet-sync.js.
+- Black holes across computers: studied, not built. The plan is a file of its own beside the other plans (Nebula-Black-Hole-Sync-Plan.md). In short: only sealed files travel and sync never holds a key; the other computer opens the black hole the first time with its recovery key and a new PIN (the way that exists for a black hole brought from another computer); the PIN’s wrapper, the passkey, the hint and the wrong-PIN counts never leave their computer; each black hole is chosen for it by hand; a sealed note is taken only while its black hole is locked there; deleted stays deleted on both. It says plainly what gets worse (what the other side can count and measure) and ends in six questions for the owner. Put off by the owner the same day (“simdilik karadelikler sync olmasin … ideas and discuss olarak kalsin … kara delikler tasinmasin”): black holes do not travel, the file stays as an idea to discuss, and nothing of it is due.
+- Tried: units green, 723 tests in 31 files (every file that reads what was touched). New: tests/sync-close.test.js (7), four tests of two real servers on this computer in tests/sync-server.test.js (a change crossing by itself and back without a copy, a deletion crossing, what starts a round and what does not, `/nudge` and `/live`, a file of 16 MB through the queue with the numbers the card and the question read), tests/file-video.test.js (+3), tests/tailnet-sync.test.js (the card in the window, the words in three languages). The contracts written in the code (which notes start a round, when one is started, what counts as crossing, the list of files on their way, the question’s default, the card’s numbers) were read clause by clause against the code. `node --check` on the five files of the main process that were touched.
+- Not tried: two real computers; a real file over 5 MB over Tailscale; the closing question pressed in the app; nothing seen by eye. Not run: the whole unit suite, e2e, smoke.
+- Not committed, not pushed.
+
+## [2026-11-15 13:57] v1.0.3 - by Claude (the box and the button “Allow Nebula through” on a blocked computer are taken out; the firewall hint on the other devices stays; test build, not released)
+
+Asked (in chat): "önerdigin seyin gerekliligini inceler misin ?" … "cikarilsin ne cikarilmasi gerekiyorsa , birde baska tailscale asamasi var mi ?"
+
+- Taken out, on the owner’s word after the need for it was looked at again: on Windows, the box in Tools that said this computer’s own firewall blocks Nebula, and its button “Allow Nebula through” (the 11:22 build of the same day). Nebula no longer reads the firewall’s rules and no longer asks Windows for an administrator’s approval.
+- Why, as read on this computer (read only): Windows asks about a program once, when it first listens, and keeps the answer through updates; a Block rule comes only from a question that was cancelled. Every rule naming Nebula here is Allow. Against that small gain: the box needed a hidden PowerShell each time Tools opened, and the button an elevated one, from an unsigned app, which is what a behaviour guard suspects (one stopped the test build on 2026-11-02). The approved press itself was never tried, no blocked computer being at hand.
+- What stays: the hint under the list on the other devices (the 09:22 build): a device online in Tailscale and silent in Nebula is named, with the steps for Windows, Mac and Linux. The owner’s case of 2026-11-05 is met by it.
+- The guide’s Tailscale part loses the sentence about the button, in four languages; it still names the firewall and the steps in Tools. New signatures, and the guide as it stood in the test builds until now is kept among the known ones, so it is brought up to date by itself. What’s new tells of the hint alone.
+- Gone from the code: electron/firewall-here.js and its test file, what joined it to the sync, the window and Tools, six strings in three languages, the box’s styles. Checking the devices is as it was before the 11:22 build.
+- Tried: units green, 562 tests in 23 files (every file that reads what was touched) and the hint’s own 4 in tests/tailscale-status.test.js; electron/sync.js, main.js and preload.js pass a syntax check. Not seen by eye.
+- Not committed, not pushed.
+
+## [2026-11-15 12:12] v1.0.3 - by Claude (a note kept to one computer, deleted for good, is deleted on that computer alone; test build, not released)
+
+Asked (in chat): "4. notta sync disina alindigi icin silinmesi diger bilgisayara etki etmesin" (the fourth step of the case explained before: a note both computers had, kept to one of them, then deleted there for good)
+
+- A note marked “Do not sync this note” and then deleted for good is now deleted on that computer alone. Until this build its deletion was told to the other devices like any other, and their older copy went too. Now nothing is told: the copy another device took before the note was kept stays there.
+- The deleted note does not come back either. Its id (nothing else of it) is remembered on the computer that deleted it, apart from the deletions that are handed out: it is told to no one, it is not let go after 180 days as those are, and a pull passes over that id. So the copy the other device still has is never taken back here: a deleted note stays deleted.
+- How it is known: the main process reads the mark in the note’s own file just before the file is deleted (the Trash’s Delete), not from what the window says. It is remembered whether the computer is paired at that moment or not, since a device paired again later may still hold its copy.
+- A note put back into sync before it is deleted is deleted everywhere, as before.
+- Tried: units green, 126 tests in 5 files. New in tests/sync-server.test.js (+1): two real servers on this computer, each with a made-up window. One keeps a note to itself and deletes it and a plain note for good; its list then tells the plain note’s deletion and not a word of the kept one; pulling from the other, which still has both and a third, it takes the third only; the other, pulling back, lets the plain note go and keeps its copy of the kept one. The contract at the head of electron/sync.js read clause by clause against the code. Not tried: two real computers; not seen by eye. Not run: the whole unit suite, e2e, smoke.
+- Not committed, not pushed.
+
+## [2026-11-15 11:53] v1.0.3 - by Claude (a note can be kept to one computer: “Do not sync this note” in its menu once Tailscale sync is on, with a “Not synced” badge; the guide’s Tailscale part names the firewall; test build, not released)
+
+Asked (in chat): "Rehberin Tailscale bölümüne güvenlik duvarı henüz yazılmadı; sürümden önce yazılacak. yaz istersen birde notlara sag tiklayip bu notu sync olmasin diger bilgisayarla özelligi olsun ( view mode gibi etiket gözüksün yukarda ) birde sey kullanici tailscale aktiflestirirse bu sekme notlara sagtikla ciksin"
+
+- A note can be kept to one computer. A right-click on a note (or its ⋯) has “Do not sync this note”, after the view modes. Chosen, the note stays on this computer and a “Not synced” badge stands by its title, in the Only view badge’s shape. A click on the badge, or “Sync this note again” in the same menu, puts it back.
+- The entry is there only once Tailscale sync is switched on in Tools (the owner: “kullanıcı tailscale aktifleştirirse”). Pairing is not waited for, so a note can be kept out before the first sync. A note already kept has the entry always, so it can be put back with sync off. The guide and a black hole’s notes do not have it: they stay on each computer anyway. The window learns the switch when it starts and from Tools at every change (the `sync-state` word on the bus).
+- What it does, both ways. Kept out is a mark in the note (`noSync`), like pinning: its date does not move. Such a note is not in the list handed to the other devices, its text and its files are refused, and nothing another device says of it (a newer version, a deletion) reaches it. The main process reads the mark in the note’s own file as well, so it holds from the first moment, before the window has named the note. Put back is an edit: the note goes in as the newest version, so a deletion made elsewhere meanwhile does not take it, and a copy changed elsewhere meanwhile is kept beside it as a conflict copy.
+- Limits, as they are: a copy the other devices already took stays with them as it was (a big file of it still on its way does not come any more); it is not deleted there. Deleting the kept note for good still deletes it everywhere, as every deletion does.
+- The guide’s Tailscale part (section 18) now names the firewall, in four languages: a device online in Tailscale with Nebula silent, the steps in Tools for Windows, Mac and Linux, and on Windows the button “Allow Nebula through” on the blocked computer (one administrator’s approval, Private networks only). The same part tells of the note kept to one computer. The guide as it stood in the test builds until now is kept among the known ones, so it is brought up to date by itself.
+- What’s new for 1.0.4 has “A note kept to one computer”, in four languages.
+- Tried: units green, 556 tests in 23 files (every file that reads what was touched). New: tests/tailnet-sync.test.js (+4: the kept note named to the main process, nothing taken over it and nothing dropped; when the entry is offered; the entry in the page’s own menu, its two labels and the way back with sync off; the switch followed from Tools; the words in three languages), tests/notes.test.js (+1: kept out without moving the date, put back as the newest, nothing of the mark left in the file), tests/sync-server.test.js (+1: a real server hands out neither the list entry, the text nor a file of a note marked in its own file or named by the window, and hands it out again once put back). Not tried: two real computers; not seen by eye. Not run: the whole unit suite, e2e, smoke.
+- Not committed, not pushed.
+
+## [2026-11-15 11:22] v1.0.3 - by Claude (on Windows, Tools on a blocked computer says its own firewall is blocking Nebula and has a button that lets it through; the folder merge offer is dropped; test build, not released)
+
+Asked (in chat): "tamam c yi yap, 2 düşsün, klasör önerin de düssün" (C was the third of the ways explained before: on the blocked computer itself Nebula sees the rule and offers a button)
+
+- On Windows, Tools now says so when this computer’s own firewall keeps Nebula out. A box under “Sync with your other devices” reads “The firewall of this computer is blocking Nebula, so your other devices cannot reach it.”, with a button “Allow Nebula through” and a line saying that Windows asks for an administrator’s approval once and that Nebula is then allowed on Private networks only. Pressed, Windows shows its own approval question. Approved, the rule that blocked Nebula is turned to Allow on Private networks and the box says “Nebula is allowed through now. Press Sync now on your other devices.” Declined, or not done: “Nothing was changed. You can still allow Nebula by hand:” with the Windows step under it.
+- How it is known (electron/firewall-here.js, new): Windows keeps its firewall rules as text in the registry. Nebula reads them, which needs no approval and changes nothing, and counts a rule only when it is on, inbound, Block, for this very program file, over TCP or any protocol, on Private networks or all, on the sync port or all, and says nothing else. A rule someone narrowed on purpose (to some addresses, a service, a user, a package) is not counted and never touched. It is looked at when Tools opens and on “Check again”, only while sync is on and paired, and never while pairing, when Windows’ own question may still be on the screen with its rule already written.
+- How it is allowed: only the rules the look found are changed, each by its own name, to Allow and Private. The names travel as base64, so no path, however written, can break the command. Windows’ own PowerShell is used at its fixed place, never one found along PATH, and never from a file; the approved step is one more PowerShell that Windows starts after its question. The window sends nothing with the press: which rules, and to what, is decided in the main process alone. Afterwards the rules are read again, and what they say is what Tools shows, not what the step said of itself.
+- Nothing is asked while Nebula installs (the owner, the same day): this question lives inside sync’s own setup, which is by choice, and only on a computer that is in fact blocked.
+- Limits: Windows only. Not seen: a rule set by an organisation’s policy, another firewall program, and no rule at all (Windows then asks by itself). The Tailscale network is taken to be Private, as Tailscale sets it. The portable test build unpacks to a new place on every start, so a rule Windows made for it does not meet the next start: the box is to be expected with an installed Nebula.
+- What’s new for 1.0.4 says it in “A firewall in the way of sync”, in four languages. The guide’s Tailscale part does not name the firewall yet: owed before the release.
+- The folder merge offer is dropped (the owner: “2 düşsün, klasör önerin de düssün”): folders of one name may stand side by side, and every note already syncs in its own folder. Struck in the plan beside the repo, where the button is now written down as done.
+- Tried: units green, 117 tests in 10 files. New tests/firewall-here.test.js (16: a rule read, which rules count and which are left alone, what PowerShell is told, and a made-up Windows that approves, declines, cannot be read, or says it ran while the rule stayed); tests/sync-server.test.js (+2: looked at only when asked afresh, the lock and another page ask nothing, what the window sends goes nowhere); tests/tailnet-sync.test.js (+1: the box, the press, declined, approved, refused, three languages). Read-only on this computer, with no rule changed and no approval asked: the real list through the module (read in about two seconds; a program this computer does block was judged blocked, a path with no rule not blocked), and the allow command’s quoting and its lookup by name, run with Get in place of Set (the rule found: exit 0; with one name that is no rule: exit 1). The real approved press was not tried: it needs the owner at Windows’ question, on a computer that is blocked. The box was not seen by eye in the app. Not run: the whole unit suite, e2e, smoke.
+
+## [2026-11-15 09:52] v1.0.3 - by Claude (the opening sync card’s button says “Hide (keeps syncing)”; test build, not released)
+
+Asked (in chat): "kücük isleri hallet 1.sini yap 2.sini ve 3.sünü acikla bana en karar vereyim" (the three small things left in section 3 of the 1.0.4 plan)
+
+- The card shown over the window while Nebula syncs on opening had a button “Skip”, which only took the card away while the sync went on. The button now says what it does: “Hide (keeps syncing)”, in four languages. Nothing else changed: it still hides the card and calls nothing off. “Skip” stays where it is a skip, on the Pomodoro widget.
+- What’s new for 1.0.4 says it in its Fixes line, in four languages. No guide change.
+- The folder merge offer and the installer’s Allow rule are not built: both were explained to the owner, who decides.
+- Tried: units green, 99 tests in 5 files; a new one in tests/tailnet-sync.test.js opens the card with a sync that does not end, reads the button, presses it and holds that the card is gone while the one sync that began is still the only call. The label is in the built page. The card was not seen by eye in the app (it shows only with a paired device and “Sync when Nebula opens”). Not run: the whole unit suite, e2e, smoke.
+
+## [2026-11-15 09:22] v1.0.3 - by Claude (Tools names the firewall when a device is online in Tailscale and Nebula is silent there; test build, not released)
+
+Asked (in chat): "yap uyariyi" (the firewall hint of the 1.0.4 plan, explained just before on "güvenlik duvari ipucu dedigin nedir ?")
+
+- Tools says so when a device stays silent while Tailscale sees it online. The device’s line reads “Online in Tailscale, but Nebula does not answer there”, and a box under the device list names the device, says that if Nebula is open there with sync on the firewall of that device is most likely blocking Nebula, and gives the way through on that device: Windows (Windows Security, Allow an app through firewall, tick Private beside Nebula), Mac (System Settings, Network, Firewall, Options), Linux (TCP port 37412 on the Tailscale interface, with a ufw command that can be selected and copied). The box goes when no device is in that state.
+- How it is known: when a check ends in silence (no answer in time, the address found), Nebula asks the Tailscale on this computer whether it sees that address online (`tailscale status --json`, read here; nothing is sent anywhere). The command is run only from the places Tailscale installs it, never found along PATH, where it could be anyone’s. One reading serves every device for eight seconds. A refusal is not silence: a device that refuses is there with Nebula shut, and no firewall is named. No Tailscale, Tailscale stopped, an address it does not know or an answer that cannot be read: “did not answer” as before, and nothing more.
+- It shows on the other devices, the ones that cannot reach the blocked one. The blocked computer itself shows nothing still: it reaches the others and cannot see that it is not reached.
+- What’s new for 1.0.4 has the item in four languages; the line and the box are in German, Polish and Turkish. The guide is not changed (help in trouble, not a tool).
+- Not done: the plan’s optional Allow rule in the installer. Added beyond the plan: the Mac step. Limits: Tailscale may show a device online for about a minute after it went off, and the firewall is named wrongly for that minute; the names of the Windows menus in German, Polish and Turkish are written from memory, not read off a Windows in those languages.
+- Tried: units green, 164 tests in 9 files (tests/tailscale-status.test.js new, 4 tests; two added to tests/sync-server.test.js with a door that takes the knock and says nothing, a port that refuses and a copy that answers; two added to tests/tailnet-sync.test.js, one of them in the sheet itself; the release notes, guide and widget files beside them). The real Tailscale on this computer, read through the new module: online, not online, and not to be told for an address it does not know. The box drawn in the built page in four languages in a headless Chrome, filled by hand as the browser build has no sync: inside the sheet, nothing cut, 187 to 223 px high, the red edge, the steps selectable. Not seen with a real blocked device. Not run: the whole unit suite, e2e, smoke.
+
+## [2026-11-15 05:18] v1.0.3 - by Claude (Appearance’s preview draws every design’s frames; widgets in the design’s face; the 1.0.4 plan’s open list read again; test build, not released)
+
+Asked (in chat): "1 denedim önizlemeyi düzeltelim 1.0.4 planindan acik olanlardan bazilari halledilmis olmasi lazim halledilenleri ciz,, birde 4 icin sunu yapalim widgetler design fontunu kullansin ,"
+
+- Appearance’s preview draws each design’s frames. Every frame a design draws on the window is named for the preview in the same rule (designs.css): the title strip, the note list’s edge and its pattern, the brand, the note’s name, the buttons and New note, the editing bar, the open note’s row, the ground under the bar and the page, a head and a quote in the note. One rule for both, so the two cannot part again; a test holds every such rule to it. Blueprint’s grid runs under the preview’s page as under the note’s frame.
+- The preview’s own frames are the window’s now, under Nebula too: the bar’s line is the ink’s (1.4), the page has its two lines and square corners and is seen whole with its foot, the open note’s row has its thin edge (the clay line at its left was never in the window), the note’s name is 600 heavy. The bar and the page stand on one ground (`.lp-shell`), as in the window.
+- Over a picture the preview’s list is its veil alone, whatever a design paints on it, as the window’s list is.
+- Widgets are written in the design’s face, whatever font their note is written in; under Nebula that is its Serif. Since 1.0.3 a widget’s body had followed the note’s writing font, while its title, the month’s name and the event menu were already in the design’s.
+- The open list of the 1.0.4 plan read against this log and the code. Done and struck: the faster close on X, tabs over the notes, world clock and weather widgets, the widget button in the editing bar, new shapes with joins, arrows, text boxes and work areas, friendlier guide pages with only the latest What’s new, slow typing in a black hole, widget fonts. Still open: Linux builds, the firewall hint, the folder merge offer, "Hide (keeps syncing)", Discord share, the translate tool, labelled projects. The plan beside the repo and memory.json say so.
+- Tried in a headless Chrome over the build, in Turkish: under each of the eight designs the colours, shadows, corners and grounds of twelve pairs (a part of the window, its like in the preview) read the same - the line widths are not compared, the preview’s own zoom rounds them; over a picture the list has no pattern in either; a widget in a note with a font of its own is in Charter, Fondamento and VT323 under Nebula, Medieval and Pixel; the eight previews looked at beside the window; no page errors. Unit: design and widgets, 133 tests, two of them new. Not run: the whole unit suite, e2e, smoke.
+
+## [2026-11-15 04:34] v1.0.3 - by Claude (the Settings sheet a tenth larger, box and all; test build, not released)
+
+Asked (in chat): "herseyi %10 büyütelim orantili, settings kutusu da dahil , ve settings kismini kastediyorum bu arada %10 olarak"
+
+- The whole Settings sheet is drawn a tenth larger as one thing: the box, the tabs, the words, the lists, the buttons, the design row and the theme editor with its preview. One zoom on the sheet (`#ov-settings .modal`, `--set-zoom: 1.1`), no size of its own changed, so the proportions are the ones it had.
+- The box: 580 wide became 638, Appearance 1000 became 1100. The narrow tabs grow in height with their words (about nine in the hundred: a line’s height falls on whole pixels). What is measured against the window is divided by the zoom, so the sheet never leaves the window.
+- Appearance was already as tall as the window let it be, so its box takes more of the window now: it starts at 4 of the hundred from the top for 7 and may be 92 tall for 86 (at a 1000 high window 920 for 860). More of it than before is reached by scrolling all the same.
+- The room held under the hints of Appearance (no shift on a design change) is measured as drawn and set as written, else it would have been a tenth too tall.
+- Not enlarged: the Tools sheet (same look, another sheet), the windows opened from Settings over it (the logo crop), the menus and the bar.
+- Tried in a headless Chrome over the build, in Turkish, at 1920×1000, 1400×900 and 900×620: the five tabs in the window with no sideways scroll, Close inside the box, widths 1.1 of the former, a list 33 high for 30, a hint’s line 18.98 for 17.25; a design chosen moves the row by 0; the Tools sheet with no zoom; no page errors. Unit: 4 files, 145 tests, with a new one for the zoom. Not run: the whole unit suite, e2e, smoke.
+
+## [2026-11-15 04:09] v1.0.3 - by Claude (the Serif is a font like the other designs’ faces, with no row added; the bar’s font name right with no caret in the note; test build, not released)
+
+Asked (in chat): "okay önerdigin degisikligi yapalim birde sunu istiyorum bilinen kusuru da düzelt" - the change offered was: only the Serif made a real font, no row added, "no font" coming back by the new button.
+
+- "Serif" no longer stands for no font. Picked in the bar’s menu it is the note’s writing font, and its title’s, under every design, as Fondamento or Courgette are; chosen in Settings → General a new note starts in it under every design. Before, a note given the Serif under Medieval went on in Fondamento. The order of the layers is as it was: the words selected, the note’s writing font, the font of new notes, the design’s face.
+- No list has a row for "no font". In Settings → General, with nothing chosen, the list shows the row of the face the design writes in, and the next design’s after a change - shown only; choosing a row makes it the font under every design.
+- "No font" comes back by **Put the design’s font on every note** (Settings → Appearance → Design): it now takes the font of new notes off as well, so a note made afterwards follows the design too, and **Put the fonts back** on the card gives new notes their font again - unless another was chosen in Settings in between. Its hint says so in the four languages.
+- A note that was given "Serif" before this build has no writing font and follows the design, as it did.
+- The known fault of the 03:36 build is mended: the bar’s font name and size are set when a note is opened or read in again and when the design changes, with no caret in the note - the note’s writing font, else the design’s face. A caret left in the note’s root by a note read in again reads the words it stands before; it used to read the root, and told the design’s face over a note written in another font.
+- The guide: "A font for each note" says that 14 goes back to the app’s own size, that the Serif is a font like the others, and where the button is, in the four languages; signatures renewed, the 03:36 ones kept as "before the Serif a font".
+- Tried in a headless Chrome over the build, in English and Turkish: the Serif picked in a new note under Nebula, then Medieval and Ink put on with Settings over the note (words, title and bar stay in the Serif); a note with no font, the bar following Ink, Medieval and Nebula with no caret in it; the Settings list with nothing chosen under two designs; the Serif chosen for new notes under Medieval (title and typed words in it); the button (bar, title and the Settings list go to the design’s face) and the fonts put back (all three in the Serif again) - no page error. Unit tests of what was touched: 15 files, 452 green.
+- Not done: no commit, no push. The e2e suites were not run; tests/e2e/settings.mjs still expects an older order of the list.
+
+## [2026-11-15 03:36] v1.0.3 - by Claude (the design’s font on every note, with a card that puts the fonts back; the 19:12 build’s font row taken out again; test build, not released)
+
+Asked (in chat): "1-2-3-4 kalsin eski haliyle, design degistirince not disindaki yerler degissin klasik olarak, ben sadece nebula temasinin notu serif olsun istedim, diger designlar gibi, design kisminda altta ayar olsun, tüm notlara design theme olsun mu diye kullanici bassin ona degissin sonra sag alttan pop up ciksin isterseniz fontlari eski haline döndürelim diye bu tüm fontlari eski haline döndürür nottaki ve not headerindaki notlari"
+
+- The 19:12 build misread the sentence before it, and that part is taken out: no "The design’s font" row in either font list, and "Serif" is again the app’s own, which is no font - picked in the bar’s menu the note has no writing font and follows the design, and in Settings → General it is what a new note starts with when nothing is chosen. The four layers are as they were: the words selected, the note’s writing font, the font of new notes, the design’s face.
+- Kept from that build: the Serif’s stack is the app’s own (`--serif`, Palatino Linotype on Windows), so selected words given the Serif are drawn in Nebula’s face and not in Georgia, and they are written under Nebula too, where the browser used to write nothing.
+- New, at the foot of Settings → Appearance → Design: **Put the design’s font on every note**. The fonts on the words of every note and each note’s writing font (its title’s font too) are taken off, so every note is written in the face of the design that is on and follows the next design. Sizes, colours and everything else stay; code keeps its own face. Left alone: the trash, the black holes, the notes set to only view (the guide arrives so).
+- A card at the bottom right, over Settings, then offers **Put the fonts back**: every note gets the fonts on its words and its writing font again. A note edited since is left as it is now and a word says so; **Close** keeps the notes as they are. What the notes had is held in memory only, never written anywhere, and a note deleted for good leaves it at once - nothing here can bring a note back.
+- Neither way is an edit: no note’s date or place in the list changes (`NoteStore.setFontsMany`, one save). For the same reason another computer that syncs keeps its fonts in a note until that note is next edited here.
+- A Settings font that the 19:12 build could set to the Serif’s stack is taken back to none on start.
+- The guide: "A font for each note" has its former sentence again, and the Designs paragraph tells of the button and its card, in the four languages; signatures renewed, the 19:12 ones kept as "before the font on every note".
+- Tried in a headless Chrome over the build, in English and Turkish: a word in Courgette and a word in the Serif, the button, the card at the corner over Settings, the design changed to Ink (words and title in Courgette), the fonts put back (both words and the title’s font), the button again and Close, the button with nothing left to take off - no page error. Seen: the bar’s font name is not redrawn until the caret is in the note again.
+- Not done: no commit, no push. The e2e suites were not run; tests/e2e/settings.mjs still expects an older order of the list.
+
+## [2026-11-14 19:12] v1.0.3 - by Claude (the Serif is a font like the other designs’ faces; "The design’s font" is the row that is none; test build, not released)
+
+Asked (in chat): "diger designlarin fontu nasil calisiyorsa öyle calissin"
+
+- Until now "Serif" in both font lists stood for no font: picked under another design, the note went on in that design’s face, and on selected words it wrote a shorter stack that this computer draws in Georgia. It is Nebula’s face now and a font as Fondamento or Courgette are: its stack is the app’s own (`--serif` in tokens.css, Palatino Linotype on Windows), words given it stay in it under every design, a note whose writing font it is keeps it, and a new note can start in it (Settings → General).
+- No font has a row of its own, the first of both lists, over the designs’ faces: **The design’s font**. In Settings it is what a vault that chose nothing has; in the bar’s menu it takes the note’s writing font off, and takes the font off the words selected - the pieces around them keep theirs, the selection stays, Undo brings it back.
+- Found while trying it: under Nebula the browser already reads the Serif on the words and wrote nothing for it, so they followed the next design after all. The Serif is written by name (as no font is), then put in its place.
+- The guide’s sentence under "A font for each note" says so in the four languages; the guide’s signatures are renewed, the former kept as "before the design’s font".
+- Words that were given the Serif before this build carry the shorter stack and stay as they are drawn (Georgia here); they are still named Serif in the bar. A note whose writing font was "Serif" had none, and follows the design as before.
+- Tried in a headless Chrome over the build: Serif on a selection under Nebula, the design changed to Ink (the word stays in the Serif, the rest in Courgette, the bar says Serif); the design’s font on it again; three words in Fondamento and the middle one back to the design, then Undo; a new note started in the Serif from Settings, and one started in no font. tests/settings.test.js holds the lists and the Serif’s stack.
+- Not done: no commit, no push. The e2e suites were not run; tests/e2e/settings.mjs still expects an older order of the list.
+
+## [2026-11-14 18:01] v1.0.3 - by Claude (the same bullets under every design; nothing moves when the design changes; test build, not released)
+
+Asked (in chat): "bullet point isaretleri tüm fontlarda nebula fontu olsun yani ayni isaretler olsun birde sey design degisimlerinde kayma var, scroll mesela kayiyor soldaki, headerlerin baslangic hizasi falan , birde serif aciklamani daha net aciklar misin ?"
+
+- The marks of a bulleted list - the dot, the ring, the square - are Nebula’s own under every design and every font: they were drawn in the design’s face, so the same list had other marks in each. A new token, `--marks`, that no design sets; the numbers of a numbered list are written, and stay in the design’s face.
+- Measured in a headless Chrome over the build, every box under each design against Nebula’s own. The window itself did not move up or down under any design (the list of notes, the note, their scroll). What moved was in Settings:
+- A head of Settings began 11 to 27 px further right under a design, by the width of the ornament the design drew before it (a leaf, a prompt, two slashes, a dimension line, a seal, a diamond, a Roman figure). The ornament now stands after the head’s words; every head starts where Nebula’s does.
+- On Appearance two hints of the left column took a line more or a line less under some designs (words are as wide as their face), so all under them moved by 17 px, and with the sheet scrolled to its foot the browser moved the whole sheet by that line. Each hint of Appearance now keeps the room of its longest wrap among the eight faces (measured when the sheet is shown, is another width, or a face arrives), and the sheet has no scroll anchoring.
+- Neon’s scroll bar was drawn wider than the others’ (`background` in short took the bar’s inset with it): the colour alone now.
+- Left as it is, told to the owner: words are as wide as their face, so in a row of words (the menu of the title bar, the tabs of Settings) the second and later words start a few px to one side under another design.
+- Tests: design.test.js 81 (the bullets’ stack and that no design sets it, the ornaments after the heads, the bars’ colour only, the stacks measured are the designs’ own); with settings.test.js and v094.test.js 146 green. In the headless Chrome, in English and in Turkish, at two window sizes and three scroll positions of Appearance: nothing moved up or down, every head starts at the same place, the bullet is the same mark in all eight.
+
+## [2026-11-14 17:22] v1.0.3 - by Claude (one face a design, the owner’s picks; the designs’ faces first in the font lists, the rest from A to Z; test build, not released)
+
+Asked (in chat): the picks - "Medieval: Fondamento, Pixel: VT323, Neon: Oxanium, Blueprint: Patrick Hand, Ink: Courgette, Art Deco: Marcellus, Clockwork: Bodoni Moda", each for the words and the heads alike - and "en üstte design seyleri olsun ve design fontlari sirada en üstte olsun hep generalde birde bu zamana kadarki önerilen fontlardan (eksiksiz olanlari ve anlasilir olanlari) eklesin font listesine [...] fontlar alfabeye göre siralansin, designdekiler pinlensin en üstte, general new notes kisminda, bu arada ön izlemede fontlar degisiyor mu design ile ve arka design onu da kontrol et".
+
+- A design writes in one face, as Nebula does: Medieval in Fondamento, Pixel in VT323, Neon in Oxanium, Blueprint in Patrick Hand, Ink in Courgette, Art Deco in Marcellus, Clockwork in Bodoni Moda. The second faces of the heads are gone (Grenze Gotisch, VT323 over Pixelify Sans, Poiret One over Josefin Sans, the trial in Old Standard TT), and the three signs Clockwork borrowed for its buttons with them. No size changes: each face is fitted to the serif’s lines, and the rows, the title and the toolbar measure the same under all eight.
+- The font lists (the Font menu, and Settings → General for the font of new notes) begin with Serif (Nebula) and the seven faces of the designs, each with its design’s name, always; the fonts pinned stand right under them; every other font, the ones added too, stands by its name from A to Z.
+- 43 faces are packed with the app (were 23): the candidates shown to the owner that hold every Turkish, Polish and German letter and read easily. Left out: Kaushan Script and Marck Script (hard to read, the owner), Rye (letters missing), the blackletters, the display faces of one word, and Special Elite (not under the OFL). Kaushan Script, Rye and Grenze Gotisch left the app; a note written in one of them falls to the next font of its stack.
+- Bold in a face of one weight (19 of them, five designs’ among them) is the same letters with a thin line round each, not the screen’s smear.
+- The preview in Settings → Appearance: its font button names the design’s face and follows a change of design. Checked there: the lettering and the colours follow the design, Pixel’s and Neon’s corners and the worlds too; the frames of the other designs (double lines, cut corners, round buttons) are not drawn in it - reported to the owner, not changed.
+- The guide’s sentence on the font list says the new order, in four languages (signatures renewed, the former kept); CREDITS.md and About name the 43.
+- Tests: design.test.js 77 (one face a design by its stacks, 178 files and 220 faces, the bold of one-weight faces), settings.test.js and v094.test.js (the order of both lists, an added font by its name), the guide’s two files; with the other files that read what was touched, 10 files green. In a headless Chrome over the build: all eight designs load their face, the sizes above, both lists read row by row, every packed family loads. The whole suite, the e2e runs and the smoke were not run.
+- Before a release: tests/e2e/design.mjs has the new faces in its map but was not run; tests/e2e/settings.mjs still expects the former order of the lists.
+
+## [2026-11-14 15:10] v1.0.3 - by Claude (Clockwork in one face, Old Standard TT; test build, not released)
+
+Asked (in chat): "hepsini bir old standard tt yapip göster misin birdaha nebula icin".
+
+- Clockwork writes in one face, as Nebula does: the places that were Rye's - a note's three heads, the note's title, the wordmark, the heads of Settings and of a dialog, the theme editor's labels, the main button - are Old Standard TT now, in the weights Nebula gives them. Clockwork's name in the Design row is in Old Standard TT as well. Its colours, spacing, Roman numerals and round buttons are as they were.
+- Rye is still a face of the font lists, still named beside Clockwork there. A trial for the owner to look at: Clockwork's face is not chosen yet (three candidates kept, seven new ones on the candidates page - print shop, typewriter, steampunk, nothing of the West).
+- Tests: design.test.js - no rule of Clockwork names a face or a heads variable, and its name in the Design row is in Old Standard TT. design.test.js 76 green. The whole suite and the e2e runs were not run, and the change was not looked at in the built app.
+- Before a release: tests/e2e/design.mjs still expects Rye on Clockwork's heads.
+
+## [2026-11-14 14:00] v1.0.3 - by Claude (code in one face in every design; Nebula's few sans places in the serif; test build, not released)
+
+Asked (in chat): "bu arada kod hepsinde ayni olsun her temada", then "okay o zaman kodlar hep cascadia olsun, gerisi tek font serif olsun".
+
+- Code is Nebula's mono (Cascadia Code) in every design: Pixel no longer names VT323 as its mono. VT323 stays a face of the Font menu and the face of the heads of Pixel's panels.
+- Nebula writes in one face: the few places that were its sans (Segoe UI on Windows) - a note's labels and the label picker, a table's handles, add button, chips, tips and size menu, the small marks of the Font menu - are the serif now (tokens.css, --sans). A design still puts its own text face there. The Sans row of the Font menu is a font a note may choose and stays.
+- Font candidates page (beside the repo, in no build): Nebula's own stands first to hold the candidates against, one card with nothing to pick; Pixel's second place is its heads only.
+- Tests: design.test.js - no rule of a design sets a mono of its own; Nebula's sans is the same stack as its serif. design.test.js 75 green; with settings.test.js 110 after the first change. The whole suite and the e2e runs were not run, and the change was not looked at in the built app.
+- Before a release: the e2e size checks of the designs, since the designs' "as Sans" faces still stand on the old sans's lines while Nebula's places are the serif's now.
+
+## [2026-11-14 11:50] v1.0.3 - by Claude (the designs' faces at the top of the font lists, each with its design's name; a page of font candidates for the owner to choose from; test build, not released)
+
+Asked (in chat): "designlarda font değişiyor evet, ama generalde mesela design fontları en üstte olsun ve design adı o fontun yanında parantez içinde olsun; bir de yeni designler için font önerileri istiyorum, hepsine 5 tane aday, sonrasında ben seçeceğim, şunu seçiyorum diye her font için (şu an seçtiklerini 1 öneri olarak sayıyorum); bunların hepsinin bold, underlined, header, caps on off nasıl gözüktüğünü göster".
+
+- The Font menu lists the designs' faces first, in the designs' order - MedievalSharp and Grenze Gotisch (Medieval), Pixelify Sans and VT323 (Pixel), Oxanium (Neon), Patrick Hand (Blueprint), Kaushan Script (Ink), Josefin Sans and Poiret One (Art Deco), Old Standard TT and Rye (Clockwork) - each with its design's name in brackets after it, dimmer, in the menu's own face and in the reader's language; a thin rule parts them from the rest. Pinned fonts stay above them and keep the name. A design's name typed in the field finds its faces, in English and in the language worn.
+- Settings, General: the font of new notes lists them first as well, "Kaushan Script (Ink)". Read as: both lists, since "generalde" may be the tab or "in general".
+- The faces no design writes in any more (Grenze, EB Garamond, Cinzel, Libre Baskerville) stand in the plain list with no name.
+- design.js says which face is whose (DESIGN_NAMES, DESIGN_FACES, designOfFace, designFacePlace); toolbar.js fontRows gives every row its design; settings-panel.js fontChoices.
+- Guide, the Font menu's paragraph, and What's new, the Designs item, in four languages; signatures renewed, the former kept as "1.0.4 before the designs’ faces on top".
+- Font candidates: a page of its own beside the repo, in no build and in no commit. Seven designs, eleven places (text and heads), five faces for each with today's first - 55 faces, all under the SIL OFL, fetched once from Fontsource and read from the folder after, every one holding the Turkish, German and Polish letters. Each card shows a head, plain words, bold, underlined, capitals off and on; a press picks one for a place, a small window of the design wears the picks, and a box holds them as lines to copy. Nothing of it is in the app until the owner chooses.
+- Tests: settings.test.js - the faces first in the designs' order and saying whose they are, a pinned face over them, a design's name found in English and Turkish, every face named a font of the menu and the first the one its design writes in; fontChoices with the names. Suite 111 files, 1980. Looked at in the built app on a throwaway profile, English and Turkish: eleven faces with their names, the rule, then Serif; the select in the same order. The candidates page: 55 faces loaded, nothing asked of the network, the picks kept over a reload.
+- The session ended while the build was packed; the build is in place (11:50) and this entry was written on resuming.
+
+## [2026-11-14 10:42] v1.0.3 - by Claude (Ink in the brush's hand, Neon's wider light, Blueprint's grid under No style, names as they are spelt, no "trial", Follow on the big Universe; test build, not released)
+
+Asked (in chat): "ink için yaptığın el yazısı header'ların yazı fontu kalkmış, ben onu istiyordum, tüm ink'e uygulansın diye; neonda biraz daha parlasın gezegenler, daha geniş; blueprint'te no style deyince arkadaki çizgiler kayboluyor; ink'te tepedeki beyaz çizgi kalksın; bir de design'da BLUEPRINT falan büyük harf gerek yok, hepsi kendi fontunda, sadece baş harfler büyük olsun; bir de trial'ı kaldır, ekleyeceğim uygulamaya" and "şeyde eklensin universe takip modu, widget'taki olduğu gibi".
+
+- Ink is written in Kaushan Script, all of it: the round before had read "the same face for everything" as the Garamond of the text, and the owner meant the heads' script. It is a text face now - drawn at 112 %, where its words are as wide as the serif's, on the serif's lines, with a twin for the sans's places - and the heads are at its one weight, the small heads in their own case. "EB Garamond as Sans" is gone; EB Garamond stays in the Font menu.
+- Ink's stroke along the top of the title strip and of a dialog is gone (by night it was a bright line); both keep their own thin line. The stroke down the side of the list and the one of a divider stay.
+- Neon: a world's light reaches 22, 30 and 42 pixels (a small world, a world, a sun; they were 14, 18 and 26), and a lit frame is written three times, not twice. The big map turns at 55 frames a second under it, 61 under the others.
+- Blueprint with No style: the note's frame is its own paper then and covered the grid. The frame draws the same grid, and both are laid from the window's corner, so a line runs on from the ground into the page.
+- The Design picker writes each name as it is spelt, in its design's face: no capitals put on, Ink's tile in the script.
+- "A trial" is out of the hint under the picker, the guide's section 1 and the title in What's new, in four languages; the comments say Designs (1.0.4).
+- The whole Universe has the widget's Follow among its buttons, before Fit: click a body, press it, and the camera rides that body; a drag, Fit, another body or closing the map lets go. Read as: the big map, since the small one takes no clicks. Not remembered between openings.
+- Guide sections 1 and the Universe's, and What's new (the Designs item, and a new one for Follow) in four languages; signatures renewed, the former kept as "1.0.4 before Ink wrote by hand".
+- Tests: design.test.js 73 (Ink in one face at one weight, no stroke along the top, Blueprint's frame draws the shell's grid, a tile's name has no capitals put on); galaxy-ui.test.js, Follow before Fit; e2e design.mjs 114 of 114 (every part as high and as wide under each design as before; the grid under No style; Ink's top; the picker's names; Follow on, and let go by Fit). Suite 111 files, 1975. The first pack stopped for want of memory (7z); the second placed the build.
+
+## [2026-11-14 09:26] v1.0.3 - by Claude (the designs in one row; a design chosen puts its Main on; test build, not released)
+
+Asked (in chat): "design soldan sağa tek satır olsun; bir de main, her design'ın main'i olsun, şu an göremiyorum senin testlerde yaptığın main'i".
+
+- The Design picker is one row of eight, left to right, as wide as the sheet (designs.css: eight columns, no width of its own; it stood four by two).
+- Choosing a design puts Main on (main.js, on `design-changed`: `theme.set('main')`). Main was each design's own colours already, but only under Main: with Dark, Light or a theme of one's own worn, a design showed its letters and frames and none of its colours - the tests start on Main, so they always saw them. The other themes are a press away and go on working under the design; nothing of a theme of one's own is lost.
+- The hint under the picker, section 1 of the guide and What's new say so in four languages; signatures renewed, the former kept as "1.0.4 before a design put on Main".
+- Tests: design.test.js 70 (the row has as many columns as there are designs; a design chosen puts Main on); e2e design.mjs 106 of 106 (one row, each name inside its button; Dark worn and Medieval chosen is Medieval's Main, Matcha worn and Pixel chosen is Pixel's, a theme pressed after it is worn under the design, Nebula's own chosen is the violet; every part as high and every section as wide under each design as before). Suite 111 files, 1969 and the two new ones.
+
+## [2026-11-14 07:19] v1.0.3 - by Claude (Clockwork and Steampunk made one, names alone in the Design picker, Ink in one face, Horizon out of the styles, no design changes a size; test build, not released)
+
+Asked (in chat): "clockwork ile steampunk birleşsin, font steampunk'tan olsun, map de clockwork olsun, gerisi clockwork; logoları silelim design'dan; ink'teki font, header'ların falan her şeyi aynı yapsın; styles'dan horizon silinsin; hiçbir temada bölümlerin yükseklikleri ve genişlikleri değişmesin".
+
+- Eight designs (`design.js` DESIGNS). Clockwork is written in what was Steampunk's lettering - Old Standard TT for the text, Rye for the heads, the three signs from the small face of the app's own - and keeps its colours, its frames and its fine gears in the Universe. A choice kept as Steampunk is worn as Clockwork (`FORMER`, `cleanDesign`). Steampunk's section of designs.css, its palette, its name in four languages and its look of the map are gone; the heavy wheel is still in galaxy-ascii.js, asked for by nothing. Libre Baskerville and Cinzel stay in the Font menu as faces to write in.
+- The picker's tiles are the designs' names in their own letters, four by two, 44 px high: the small drawings of a world are gone ("logos" read as those).
+- Ink writes everything in EB Garamond, the heads too; Kaushan Script stays in the Font menu only.
+- Horizon is out of the styles of colours: fourteen, and No style before them. A mix kept with Horizon keeps its colours and is worn in the first style (`cleanMix`).
+- No design takes room or gives any. No rule of a design sets a size of letters, a line's height, a padding, a margin, a width, a height or a border's width any more; only what is drawn before or after a thing has measures. Second lines are shadows, Ink's strokes are pictures in the background, a nudge is a transform. Every face stands on the lines of the face it takes the place of (`ascent-override`, `descent-override`, `line-gap-override` over its `size-adjust`): the serif's, the sans's ("... as Sans", the same files once more) or the mono's. Each text face is drawn at the scale at which the app's own words are as wide as in Nebula's serif, so hints take the lines they take there. Capitals on buttons are small capitals.
+- Found on the way, Nebula's own: the zoom box in the editing bar was 58 px at first and 72 after the first change of a design, having measured its widest word once. It is 58 wide, and as wide as its words only while it shows "Fit (87%)" (`is-fit`, page-zoom.js). One Turkish hint was a hair too long for its line and is shorter.
+- Guide (section 1, the styles, Appearance) and What's new in four languages; signatures renewed, the former kept as "1.0.4 before the eight designs".
+
+What a design cannot keep: the width of a word in its own letters - a menu's title, a button no wider than its word, the name beside the logo where a design spaces it. Measured in the built app on Windows: 903 boxes, none higher or lower under any design; 270 texts in four languages, three on another number of lines (one German hint under Pixel, one Turkish under Pixel and Neon: two lines become one). Exact where Nebula's serif is Palatino Linotype; a pixel may differ where it is another face.
+
+Not committed, not pushed.
+
+---
+
+
+## [2026-11-14 05:07] v1.0.3 - by Claude (five more designs - Blueprint, Ink, Art Deco, Clockwork, Steampunk - and the owner's notes on the first four, on arrows, areas, tables, rows; test build, not released)
+
+Asked (in chat): the five designs talked about, and every note of the owner's still without a colour, "all in one go".
+
+- Nine designs now (`design.js` DESIGNS), three by three in the picker. Blueprint: Patrick Hand on drafting blue. Ink: EB Garamond and Kaushan Script on paper, with a Light of its own as Medieval has. Art Deco: Josefin Sans and Poiret One. Clockwork: Libre Baskerville and Cinzel. Steampunk: Old Standard TT and Rye; its plus, minus and times come from a small face of the app's own, Rye having none that sit level. Ten palettes: each design's Main, and Light in Medieval and Ink. The faces are in `src/fonts` with their licences (SIL OFL 1.1), named in CREDITS.md and About; nothing is fetched.
+- The Universe under them (galaxy-ascii.js, galaxy-map.js LOOKS): a wire globe in Blueprint, a brush ring in Ink, a cut stone in Art Deco, a gear in Clockwork, a heavy cog painted solid in Steampunk.
+- The owner on Medieval: "like Pixel, solid cylinders that turn, the big ones with different things in ascii over them, and another face in the same style - its figures are too small". The disks are painted solid and turn, the big ones keep their drawing over the paint (`bare`: the body alone, what the paint fills); the face is MedievalSharp, Grenze Gotisch kept for titles.
+- "A shift here, in Neon too": the row at the list's foot is one row end to end under every design. "Add the faces you added to the main fonts": all of them are in the Font menu. "Divider and lines too thick": thinner. "I do not like the double layer, left and right": one line. "Not centred in Neon; under every design everything is to be centred": the logo's buttons share their row evenly, Neon's glow is the same on every side. "The files' icons are to differ with each design": a file's card is drawn in each design's way.
+- "No way to take a style off once chosen": No style, the first tile of the styles. "A fold for the Universe": the arrow before its name folds it away and brings it back, kept across a restart.
+- Arrows: the heads' button goes both ways, the other way, none, as it was drawn - the owner's order. An arrow is over the shapes of its layer: one put after it lay on the line and hid it.
+- A work area: the button that makes it hold the pictures went from its top right corner up into the bar over it; Outline draws its line whole, without it the broken line as before - it did nothing there.
+- A table: a click on the dot at its top left picks the whole table up, Delete takes it away, Escape or a press elsewhere lets go.
+- "The widget at the top left gets smaller when I pull it bigger": in a row given more than its line holds each is drawn at its part of the widths given, so the width pulled is not the width to write (`image-place.js` rowGiven). A row that held its pictures when the pull began keeps the old way: the one pulled grows to the line's end and stops, the others as wide as they were.
+- Guide: the designs' block names nine, and the blocks on tables, areas, arrows, the Universe and the styles say the new; four languages, 213 blocks each; signatures renewed, the former kept as "1.0.4 before the nine designs". What's new 1.0.4 in four languages: the designs' item rewritten, the arrows' item, a new "Folded, picked, taken off", one more fix.
+
+### Tests
+- Suite 111 files / 1960 with `npx vitest run --maxWorkers=2`. tests/design.test.js 59, tests/e2e/design.mjs 94 of 94 in the built app. check:browsers ok, Electron 45.3.2.
+- Found by a new test (a design's paint lies inside its drawing): a bare disk stood a row off the one drawn under a dome. Mended in galaxy-ascii.js.
+- Found by tests/e2e/layout.mjs: the first form of rowGiven let a picture pulled past the room left in a row squeeze its neighbour. Hence the width at the pull's start; layout.mjs 129 of 129.
+- e2e brought up to earlier rounds of 1.0.4, the app unchanged: Send to... in the menus of table.mjs (66), table-edges.mjs (152) and widgets.mjs (36, with the World clock and the Weather in the chooser); canvas.mjs (22) picks the arrow's tile and puts it with a click. galaxy.mjs 13, universe-widget.mjs 11.
+- Not tried: the whole smoke - its shape parts, and ideas-note.mjs, v090.mjs, view-snap.mjs, still press the buttons the tiles replaced, to be mended before a release; de/pl/tr by eye under the five designs; every widget and menu by eye; long use. In German and Polish the row at the list's foot may still take two lines under some designs - evenly.
+
+---
+## [2026-11-13 19:37] v1.0.3 - by Claude (Designs, a trial: Nebula, Medieval, Pixel, Neon over the Theme organizer; the Universe's worlds follow; test build, not released)
+
+Asked (in chat, after "the tabs work, I like them"): a Design over the Theme organizer - one is Nebula as it is; one Medieval, after medieval drawings, styles and letters; one Pixel, the whole interface with it; one Neon, cyberpunk. In Pixel the worlds are square cubes, in Neon they glow, in Medieval all are disks (the flat earth). "A trial version; if it does not work out we set this part apart as a special trial later."
+
+- New `src/js/design.js`: a design is one attribute on `<html>` (`data-design`; none for Nebula's own) and `nebula:design` in localStorage, worn before the first paint. Apart from the theme: every theme and the reader's own profiles go on working under a design.
+- New `src/css/designs.css`: the faces, the frames and the shapes of each design. Medieval: Grenze and Grenze Gotisch, double-ruled frames, lapis and gold. Pixel: Pixelify Sans and VT323, no round corner, hard shadows. Neon: Oxanium, lit edges, magenta and cyan on near-black.
+- Decided here, for the owner to say otherwise: Main is each design's own colours, and in Medieval Light is parchment; Dark, Matcha, White and saved profiles keep theirs (the rules step aside for `data-profile`). What is written in a note keeps its own font where it has one.
+- Settings → Appearance: the Design picker stands over the Theme organizer, four tiles each drawn in its own face, with a line saying the themes go on working.
+- The Universe (galaxy-ascii.js, galaxy-map.js): Medieval draws every body as a flat disk with a rim, the bigger ones under a dome (`disk`); Pixel as a turning cube painted in solid cells (`cube`, `cellsByShade`); Neon keeps the spheres and lights them - a saturated tube colour and a light of the same hue, written twice (`neonOf`). Frames are kept apart by design (`disk:`, `px:`).
+- Seen in the first pictures and changed: a small disk was a sliver over a bar, the ellipse sampled between rows - the plate is whole rows now, three at the least; Neon's worlds glowed weakly in pastel - hence the tube and light colours.
+- The five faces are in `src/fonts` with their licences (SIL OFL 1.1), named in CREDITS.md and About; nothing is fetched.
+- Guide: a new block "Designs - a trial" in section 1 after the themes, four languages (213 blocks each); signatures renewed, the former kept as "1.0.4 before the designs". What's new 1.0.4: "Designs - a trial", four languages.
+
+### Tests
+- New tests/design.test.js (38): the stored design cleaned and worn, the picker, the disk a coin at any size, the cube, the Neon colours, Nebula's own drawing untouched. New tests/e2e/design.mjs, 40 of 40 in the built app: each design worn, stored and kept across a restart, its faces loaded from the app and none from outside, Main differing, Dark the same under all, parchment in Medieval alone, the Universe drawn under each at 61 frames a second, a note page that fits. Suite 111 files / 1934 with `npx vitest run --maxWorkers=2`. check:browsers ok, Electron 45.3.2.
+- Seen in pictures of the built app on a throwaway profile (deleted after): Settings, the Universe and a note page under the four designs, Medieval with Light.
+- Not tried: the title bar's own buttons' colour when the design changes, long use, every widget and menu by eye under each design, de/pl/tr by eye, the whole smoke.
+
+---
+## [2026-11-13 18:10] v1.0.3 - by Claude (a note in the air over the tabs is shown as the tab it would be, not as a line; test build, not released)
+
+Asked (the owner's note, after trying the 16:55 build, under a picture of a row dragged over the tabs): "not only a line, let it be a preview of the tab". A second picture, twelve tabs and three notes side by side: "many tabs work properly" - read as it stands, nothing done for it.
+
+- note-tabs.js: the mark is gone. Over the line a note in the air stands there as a tab with its name (`.note-tab-ghost`, dashed, sized as a tab), where it would come, and the tabs after it stand aside as they will. Over the bare line it stands alone at the start, in place of the words.
+- A tab being moved is faint where it stands (`moving`); over the line it gives its room to its preview (`away`: no width, still drawn - it is what is dragged), so the line keeps its length and the preview is where the tab will be. Off the line the tab is back in its place: it does not go with the drag.
+- Nothing is shown where nothing would come: a row of the list whose note has its tab already, the note written in over the bare line. Pure and tested: `previewAt`.
+- The place is counted among the other tabs alone, the preview left out, so it does not move for the room the preview takes. A tab let go comes where its preview stood.
+- Seen in the first e2e run and changed: with the tab left in the line beside its preview, the tabs after it were pushed a place on and the pointer aimed past the last tab landed before it. Hence the room given up.
+- No guide or What's new change: neither named the mark.
+
+### Tests
+- tests/note-tabs.test.js 33 (was 26): `previewAt`, the preview over the tabs and the bare line, a tab in the air, a tab let go. tests/e2e/note-tabs.mjs 28 of 28 in the built app (was 24). Suite 110 files / 1896 with `npx vitest run --maxWorkers=2`.
+- Seen in the built app on a throwaway profile (a probe, deleted after): the preview over the bare line, between two tabs, at the end for a tab moved, in its own place for the tab written in.
+- Not tried: the light themes by eye, the preview with so many tabs that the line scrolls, a real hand's drag (the checks drive the mouse), the whole smoke.
+
+---
+## [2026-11-13 16:55] v1.0.3 - by Claude (tabs on the line under the title; a mention clicked comes as a tab; @ offers the note written in; test build, not released)
+
+Asked (in chat): "let us do the tabs" - the owner's idea note: tabs over the notes, joined to the line under the note's title; a note dragged from the left adds a tab; a tab taken and dragged onto the main area opens beside the others, and the tab is not lost by that; @ could not mention the note one is in; a mention clicked with the mouse opens a new tab above, to go to later.
+
+- New `src/js/note-tabs.js`: the tabs stand in `#note-tabs`, between the header and the page, on the header's line. A tab is a note kept at hand (`nebula:tabs` in localStorage), nothing in the note. Pure and tested: `withTab`, `movedTab`, `tabsAfter`, `stepTab`.
+- A tab comes from a row of the list let go on the line (a note in the air shows the bare line as a dashed place to let go), from a mention clicked, from ⋯ → Open in a tab. None of the three leaves the note written in; the tab that came is lit for a moment. The first tab made brings the note written in along as a tab, and one tab alone is none: the line is bare again.
+- A click opens a tab's note; ✕, the wheel pressed or Delete lets it go; Ctrl+Tab and Ctrl+Shift+Tab step; a tab dragged along the line is moved, a mark shows where. A tab carries what a row of the list carries, so let go on the page it opens beside the note there (split-view.js) and stays a tab; a tab shown beside is marked, and its ✕ closes its pane too.
+- Decided here, for the owner to say otherwise: a note opened from the list (or the map, or new) takes the tab written in, as it takes the pane; a pane clicked in whose note has no tab gets one after it; Ctrl+click on a mention goes straight to the note; a mention of an archived note opens it as before.
+- mentions.js: the list @ opens holds the note written in too (the map already left a note's mention of itself out).
+- split-view.js tells the tabs when the panes change (`onPanes`).
+- Found by the probe and fixed: the mark of the place stayed hidden, the strip's `dragleave` trusted a next target the drag does not name; it reads where the pointer is.
+- Guide: the mention block and its Try it, and a new block with its Try it in section 13, four languages (212 blocks each); signatures renewed, the former kept as "1.0.4 before the tabs". What's new 1.0.4: "Tabs over the note", four languages.
+- Electron 45.3.0 → 45.3.2.
+
+### Tests
+- New tests/note-tabs.test.js (26) and tests/e2e/note-tabs.mjs (24 of 24 in the built app, in the smoke's list). Suite 110 files / 1889 with `npx vitest run --maxWorkers=2`.
+- Seen in the built app on a throwaway profile (a probe, deleted after): the tabs on the line, the dashed place, the mark, a lit tab, a tab beside, @ with the note itself.
+- Not tried: the light themes and the other three languages by eye, many tabs in a narrow window (they shrink to 84 px, then the line scrolls), a black hole's note as a tab when its hole is locked, the bar at the sides or bottom, the whole smoke.
+
+---
+## [2026-11-13 14:18] v1.0.3 - by Claude (an arrow bends at a dot in its middle, an elbow goes round what stands between its ends; test build, not released)
+
+Asked (in chat): "let us take what was left half done on the arrows" - the bend grip and the elbow that goes round shapes, both left out of the rounds of 12 November.
+
+- The grip: a picked arrow shows a dot in its middle (`.arrow-bend`, seen on a picked arrow only). Pulled, it writes `data-bend="x,y"`: a straight line becomes a bow through that point, a curve's middle moves by that much, an elbow's middle leg moves along its own axis and not past the stubs. A double-click takes the bend back, another kind of line from the bar begins unbent, and a bend is one step of undo.
+- The way round: new `src/js/arrow-route.js`, pure (`grown`, `crosses`, `wallsFor`, `routeRound`): the shortest way with the fewest corners along the edges of what is in the way, 10 px clear of it. `goRound` in the arrows' reflow uses it for an elbow that is not bent and holds something at an end; work areas and lines of text are ground, the label riding the arrow is not in its way, and an arrow that holds nothing lies where it was laid.
+- Seen in the built app and changed: of two ways as long, the first one found turned right at the far end, a corner 16 px before the arrowhead. Now the way that turns nearer the middle is taken and the line arrives squarely (`AWAY` in arrow-route.js).
+- Found in the built app and fixed: a shape put down on an arrow's leg, or deleted from it, left the line as it was until something else moved. shapes.js now tells the arrows on a shape put down and on both deletes (`onGeometry`).
+- The guide's block on arrows and the What's new item say it in four languages; signatures renewed, the former ones kept as "1.0.4 before the bent arrows".
+
+### Tests
+- New tests/arrow-bend-route.test.js (16). Suite 109 files / 1863, run with `npx vitest run --maxWorkers=2`.
+- In the built app on a throwaway profile (a probe, deleted after): the dot only on a picked arrow; an elbow's leg pulled across; undo and redo of a bend; double-click; a square put on the leg is gone round and the line is its own again when the square is deleted; a straight line bent to a bow; curve from the bar begins unbent and bends; the bend is in the saved note.
+- Not tried: a rotated shape, a picture or a link card in the way; several things in the way at once in the app; a zoomed page; the e2e smoke.
+
+---
+## [2026-11-13 03:35] v1.0.3 - by Claude (the words and the pictures under a work area can be reached; test build, not released)
+
+Asked (in chat): "remove the known shortcoming" - the one named in the report of the 03:00 build.
+
+- What it was, measured in the built app: the report had it the wrong way round. A work area lies in the front layer and took every press in its box, so a line of the note under it could not be clicked into and a picture standing in the text under it could not be picked - the very pictures its button is there to hold.
+- Now the ground of a work area in the front layer lets the pointer through (CSS), and shapes.js reads the press (`areaAt`, `onContent`): on the words of a line, a picture, a table, a code block, it is theirs; on the page, the frame, the blank beside the words of a line, it is the area's - picked and moved as before. Its grips and its button stay its own. A double-click on the ground still writes the name.
+- Over the ground the pointer is the hand (`data-area-grab` on the editor, not in the note) and the button shows; over the words it is the caret.
+- A press an area took starts no box and no sweep of blocks (`pressTaken`, read by block-handle.js): moving an area from the blank end of a line picked the two lines it passed.
+- An area sent behind the text is as it was. No guide item: a fix.
+- Tests: tests/shape-edit.test.js, 41 (1 new). Suite 108 files / 1847. Seen in the built app: typed into a line under the area, picked the picture in the text under it, moved the area from the blank end of a line with no block picked, named it by double-click, sized it from a corner.
+- No release.
+
+## [2026-11-13 03:00] v1.0.3 - by Claude (a work area holds the pictures in it when its button is on, and has a name; test build, not released)
+
+Asked (in chat): "yes, the work area should be able to carry them, I want to tie some pictures to a work area for example; let us name work areas too, the way captions work; and the work area should have a button on its right: pressed, it catches the pictures and such, off, it works as it does now; but if a picture has an arrow tied to it and this setting is off, it should not catch the arrow either, nor the text tied to the arrow".
+
+- The button (`.area-catch`, top right of a work area, seen under the pointer, when the area is picked and whenever it is on) sets `data-catch` on the area. On: at the first pixel of a move the pictures standing in the text whose middle lies in the area are lifted out of the text, each staying where it is on the page (all measured before the first is lifted, since the text rises under a lifted one), and are carried from then on as free pictures are. A press without a move lifts nothing. Widgets are not lifted. Off: as before.
+- Off or on, an arrow held by something the area does not carry stays whole: its loose end is not moved and the text box riding it is not carried (`carriedBy`). Until now the loose end was pulled away and the arrow stretched.
+- Free pictures in the older picture layer are carried too.
+- Name: a work area's words are its name, written as a caption is (italic). Picked and empty it says "Name of the area"; the shape bar has a T button for a work area that puts the caret there; a double-click does the same.
+- `shapeGrips('area')` lists the button, so migrate writes it once into areas of the builds before; heal counts it as chrome; export leaves it out.
+- The first part of the owner's caption ("does not catch when moved") is marked green.
+- Guide: two sentences in the shapes paragraph, four languages; signatures renewed, the former kept as "1.0.4 before the held pictures". What's new 1.0.4: a sentence in the arrows item, four languages.
+- Tests: tests/shape-edit.test.js, 40 (4 new, one changed: an end held by nothing that is there no longer moves). Suite 108 files / 1846. Seen in the built app with a picture pasted into the text: off, the area moves and the picture stays in the text; on, the picture leaves the text and moves by what the area moved.
+- No release.
+
+## [2026-11-13 02:24] v1.0.3 - by Claude (a shape or an arrow follows the pointer until it is placed, a work area sized from four corners, a turning arrow on the rotate grip; test build, not released)
+
+Asked (in chat): "continue, feedback". In the note, under a picture: "the work area does not catch when it is moved; and shapes and arrows are placed by themselves the moment they are clicked, which makes trouble: it should not place at once, until the user places it there should be a kind of faint preview; and the work area grows only from the bottom right, it should from the other three corners too; and the sign for changing the angle looks like a C, not like an angle".
+
+- Placing (src/js/place.js, new): a shape or an arrow chosen from the bar is not put at once. A faint picture of it follows the pointer; it hangs on the body, no part of the note, so nothing of it is saved. A press in the note puts the real one with its middle under the pointer; Esc or a press anywhere else lets it go; opening another note lets it go. The picture lets presses through (a shape answers the pointer by itself, so the first build of it took the press that should have placed it; seen in the built app, fixed).
+- A work area has four grips, one in each corner, and none to turn it. A grip on the left or the top keeps the far corner where it is and stops at the edge of the page. `shapeGrips(kind)` says which grips a kind has; migrate writes the same, so an area from the builds before gets its four when its note is opened.
+- The rotate grip is a round one with a turning arrow (a ring with a head); the ring with a gap read as a letter C.
+- "Does not catch when moved": tried in the built app, an area takes along the shapes and the loose arrows lying in it. In the owner's picture what lies in the area are pictures standing in the text and an arrow held by them: those belong to the text and stay with it. Told to the owner, nothing changed; open until the owner says what should happen there.
+- The caption is marked green from its second part on; the first part is left as it is.
+- Guide: the shapes paragraph tells of the faint preview and the four corners, four languages; signatures renewed, the former kept as "1.0.4 before the faint preview". What's new 1.0.4: a sentence in the arrows item, four languages.
+- Tests: tests/shape-edit.test.js, 36 (5 new). Suite 108 files / 1842.
+- Before a release: the e2e scripts that click a shape or an arrow tile must also click in the note.
+- No release.
+
+## [2026-11-13 01:26] v1.0.3 - by Claude (an arrow is caught along its whole line, a fill can be taken back; test build, not released)
+
+Asked (in chat): "do the feedbacks, colour in the notes what you did". In the note, under three pictures: "an arrow is not caught when clicked in the middle once it is joined, it is caught at its head and end", "pressing the arrows is not caught in the middle, the middle line", and "the text box: you fill the background but there is no button to take it back".
+
+- The arrow's line is 1.6 px and only the line itself took a press, so the middle was nearly impossible to hit while the round ends were easy. `paint` now keeps a wide unseen line (`.arrow-hit`, 16 px, transparent) under the thin one with the same path; arrows in notes from before get theirs the first time they are painted. The line thickens under the pointer.
+- The shape bar begins with an empty dot, No fill: the shape's ground becomes transparent, a work area goes back to its own faint ground. A shape with no fill takes the note's ink for its words and a line that shows on any page.
+- The round 29 build was rebuilt and put in place at 00:19 on the owner's word; this one at 01:26.
+- The four captions answered (these three and the calendar's from round 27) are marked green in the owner's note.
+- Guide: the shape bar's sentence tells of the empty dot in four languages; signatures renewed, the former kept as "1.0.4 before the empty dot". What's new 1.0.4: a sentence in the arrows item, four languages.
+- Tests: tests/shape-edit.test.js, 31 (3 new). Suite 108 files / 1837. Seen in the built app: a press 5 px beside the line picks the arrow; a filled text box is emptied by the dot.
+- No release.
+
+## [2026-11-12 16:41] v1.0.3 - by Claude (arrows that can be edited, text boxes, work areas, labels on arrows; test build, not released)
+
+Asked (in chat): "let the arrows be edited and arranged, they are very clumsy and useless, they join at four places only; add a text box to the shapes, in the first place; in the second place a work area, the pieces of a flowchart can be put in it and then the work area moved as one piece; and text boxes should hold on above and below the arrows; round a text box it is transparent, when clicked it shows with thin lines".
+
+- An end held a side's middle or the object as a whole. Now an end let go at the edge of an object, within 18 px inside it or outside it, away from the middles, holds the outline right there (`data-from-at`, `data-to-at`: its share of the half width and height, so it stays on a shape that grows, moves or turns; `edgeSpot`, `spotPoint` in shape-ports.js). The middles of the sides still catch first; deep inside it holds the whole object as before.
+- A picked arrow has a bar (`#arrow-bar`): straight, elbow, curved (the kind it is lit), heads one / two / none (`data-heads`), dashed line (`data-dash`), a label, delete. Heads and dashes are written on the line itself (`dress`), so print and export show them. The bar hides while the arrow is in the hand, in a viewed note and when a note is opened (`arrows.reset`).
+- Shapes begin with two new tiles. A text box (`shape textbox`): no fill, no border, the note's ink; a thin dashed line under the pointer and when picked; the caret is in it as soon as it is added. A work area (`shape area`): 360 x 240, faint ground, dashed frame, its name top left, put under the shapes that are there. Moved, it carries the shapes and floating pictures whose middle lies in it and the loose ends of arrows in it (`carriedBy`, read when the move begins). It shows no side dots and holds no arrow end: an arrow let go in it holds what lies in it.
+- A text box let go within 30 px of an arrow's line rides the arrow (`data-rides` on the box, `data-aid` on the arrow, its share of the line and its offset): above or below as it was let go, and it follows when the line moves. The arrow that would take it is lit while the box is carried. Taken up again it is free; let go away from every line it stays its own. A deleted arrow leaves its labels where they are.
+- Found in the built app: the words of a text box were dark on a dark page, because the rule that darkens words on a filled ground matched the inline background. The two new kinds take the note's ink while they have no fill of their own.
+- Nothing is written into existing notes; no migration.
+- Guide: section 6's shape and arrow paragraphs tell of it in four languages; signatures renewed, the former kept as "1.0.4 before the text box". What's new 1.0.4 has an item in four languages.
+- Tests: tests/shape-edit.test.js, 28; the tile tests in tests/widgets.test.js know eight tiles. Suite 108 files / 1834.
+- Not done: no handle to bend an arrow by hand, and an arrow does not go round a shape in its way.
+- The build is packed (16:41) but not put in place: the test app was open, and it is not closed for the owner.
+- No release.
+
+## [2026-11-12 15:10] v1.0.3 - by Claude (shapes join at their four sides: flowcharts and mind maps; test build, not released)
+
+Asked (in chat): "by shapes like Lucid's I meant this: the catching at the four sides should work well, we should be able to make mind maps, to make flowcharts", and then "like draw.io, that is".
+
+- An arrow's end held a shape wherever its other end faced, and nothing could be drawn from a shape. New `shape-ports.js`: a shape under the pointer, or the selected one, shows a dot outside each of its four sides. A dot dragged draws an arrow from that side (`arrows.join`): let go over another object it holds it, let go on open ground a shape like the first is put there with its facing side under the hand; let go within 24 px it is dropped. A dot pressed puts a shape like the first beside that side, 70 px away, joined side to side (`arrows.link`), and the next press puts one under the last (`branchPlace`).
+- An end brought within 24 px of the middle of a side holds that side (`data-from-side`, `data-to-side`) and stays on it when the shapes move; anywhere else on the object it holds on as before. While an end is over an object its four sides are shown, the one it would hold lit (the editor's `nebula-arrow-target` event). Pictures and link cards have sides too; lines of text do not.
+- `arrowPath` takes the ways out of the two ends: an elbow leaves and arrives squarely with a 16 px stub (`elbowPoints`), a curve bends out of the side; a straight arrow and an arrow that holds nothing are drawn as they were. The ways are measured at each reflow and never saved. An arrow drawn from a dot is of the kind last put from the bar, an elbow until one was put.
+- Arrows already in notes keep what they hold and have no side; an elbow between two objects now leaves them squarely. Nothing is written into a note until an end is moved, so no migration.
+- Seen in the built app: dots on hover, a press adds a joined shape, a second press one under it, a drag to open ground puts a shape there, a drag to another shape's bottom holds that side, and a moved shape keeps its arrows on their sides. Not done: an arrow does not go round a shape that lies in its way.
+- Guide: section 6's arrow paragraph tells of it in four languages; signatures renewed, the former kept as "1.0.4 before the shape sides". What's new 1.0.4 has an item in four languages.
+- Tests: tests/shape-ports.test.js, 23. Suite 107 files / 1806.
+- No release.
+
+## [2026-11-12 11:49] v1.0.3 - by Claude (the calendar is as high as what it holds; test build, not released)
+
+Asked (in chat): "go on, feedback on the calendar". The feedback (the owner's note, with a picture): the part below the calendar is very empty, make it shorter.
+
+- The calendar widget was one height whatever it held (aspect-ratio .8), and under a day with nothing on it lay about a quarter of the widget, empty. It is now as high as its contents: the month, the day's line, and under it one line, or as many as its fullest day holds up to three; more scroll (widgets.js `calendarRows`, `calendarRatio`; editor.css). It goes by all its days, not the chosen one, so choosing a day moves nothing in the note.
+- Measured in the built app at 278 wide: 348 high before; now 285 empty, 305 with two events on a day, 325 with five (three lines shown, the list scrolls). Calendars already in notes follow: the height is the style sheet's, and the figure's stored ratio is set when it is drawn.
+- Tests: 3 more in tests/v104-feedback.test.js. Suite 106 files / 1783.
+- Not a guide item. No release.
+
+## [2026-11-12 11:28] v1.0.3 - by Claude (the AI panel arrives like the left one, a shape behind the text moves alone, Ctrl+Z leaves the page; test build, not released)
+
+Asked (in chat): "the AI panel is still a problem: the left panel has an animation coming and going, the AI panel has none coming; and there is feedback, a small bug, fix that too". The feedback (the owner's note): moving shapes gets mixed up with the mouse's catching; after Ctrl+Z, say a picture put back, the caret goes to the very top of the page.
+
+- AI panel: its chat page was woken the moment the panel was shown, and the window stood still through the slide. The panel now carries `ai-panel--arriving` while it comes (dock.js) and main.js opens the chat when that is gone. Measured in the built app: first opening 9 even steps, longest gap 17 ms; again 9; shut 10. The "reduce motion" guard is gone: the left panel has none.
+- Shapes: a press over a shape sent behind the text started the pick box and the block sweep as well as the move (4 lines picked while it moved). block-handle.js leaves such a press to the shape (`overBehindShape`). Measured: nothing picked, the shape moves, Ctrl+Z returns it.
+- Ctrl+Z (history.js): a step that kept no caret, or whose caret no longer fits, puts the caret back where it was instead of leaving it to the browser (the start of the note); and the page follows a caret after a step only when the caret was in view before it. Not seen going wrong in five tries before the change (shape, picture dragged, caret at the top and near, a note of large pictures); after it, a note opened again, its picture dragged 4 blocks down and undone: page stays (770), picture back. The unit test of the out-of-sight caret fails without the change.
+- Tests: tests/v104-feedback.test.js (8). Suite 106 files / 1780.
+- Not a guide item (fixes). No release.
+
+## [2026-11-12 10:59] v1.0.3 - by Claude (the arrow button opens tiles; the AI panel comes in evenly; test build, not released)
+
+Asked (in chat): "the insert arrow part should be fixed the same way, and I noticed that pressing the AI button it still does not flow in like the one on the left".
+
+- **The arrow button is one button.** It opens the three arrows (straight, elbow, curved) as one row of tiles, as the shape and widget buttons do; its ▾ and list are gone, and so are the styles of the two lists. The arrow chosen last is the tile lit.
+- **The AI panel, coming in.** Measured frame by frame in the built app: going out it moved in ten even steps, coming in it was seen in two or three. Two causes. The panel waits beyond the right edge before it slides, the chat inside it took the focus there, and the whole app scrolled 82px to the left for the length of the slide: `#app` is now clipped and cannot scroll. And showing the panel wakes its chat page, so the slide now waits at the edge until two frames in a row come evenly (at most 400 ms). Opening again: nine even steps, nothing shifts.
+- Guide (section 6) and What's new reworded in four languages; signatures renewed, the former kept as "1.0.4 before the arrow tiles".
+- Tests: 1772 unit tests pass (3 new: the arrow button, its tiles, the wait at the edge). Built app, throwaway profile: tiles in one row 8px under the button, no name cut, Elbow by click then lit, Escape adds nothing, both bar rows one line in four languages, no page errors.
+- Still uneven: the first opening after the app starts, while the chat page is being made and loaded (five steps, two pauses of about 65 ms). A longer wait, one pixel shown early and an early nudge were tried and did not move it; left as it is.
+- Not tried: the bar at the left, right or bottom; the owner's own screen and chat pages; whether anything was meant to reach outside `#app` and is now clipped (nothing seen in the run). The smoke run's shape and arrow steps still look for the old lists.
+
+## [2026-11-12 08:50] v1.0.3 - by Claude (the shape button opens tiles, the widget button left of it; test build, not released)
+
+Asked (in chat): "insert shape should be like widget too, let us fix that one as well, and take the widget to its left" - "I mean the editing bar at the top".
+
+- **The shape button is one button.** It opens the six shapes as tiles under itself, the way the widget button opens the widgets; the small ▾ beside it and its list are gone. The shape chosen last is the tile lit, so the button and Enter give it again. A second press shuts the tiles, Escape leaves nothing.
+- **The widget button stands left of the shape button**, after the divider that follows Paste; the first row ends with Table again.
+- One picker for both (`pickTile` in widgets.js; `pickWidget` calls it); opening one shuts the other.
+- The arrow button keeps its ▾ and its list: nothing was asked about it.
+- Guide (section 6 and section 17) and What's new reworded in four languages; signatures renewed, the former kept as "1.0.4 before the shape tiles".
+- Tests: 1769 unit tests pass (5 new). In the built app on a throwaway profile: tiles 8px under the button, focus stays in the note, click and arrow+Enter place a shape, one undo takes it back, both bar rows one line at 1200 wide in four languages, no page errors.
+- Not tried: the bar at the left, right or bottom; windows narrower than 1200. The smoke run's shape steps still look for the old list and must be adapted before a release.
+
+## [2026-11-12 06:38] v1.0.3 - by Claude (a widget button in the editing bar; test build, not released)
+
+Asked (in chat): "take it out and let us go on to the next stage" — of the open ideas the owner chose the widget menu in the editing bar.
+
+* The editing bar's first row ends with a widget button, after Table: it opens the picker /widget opens, under the button, and the widget chosen lands where the caret is. Arrows and Enter choose, Escape or a second press on the button shuts it, one undo takes the widget away. In Only view it does nothing, as the rest of the bar.
+* Room for it: a pixel less between the bar's buttons and beside its separators. At the window's first width (1200) the first row holds the button on one line in all four languages; the second row, which wrapped in Deutsch, Polski and Türkçe before, is one line too.
+* Guide: "Widgets from the editing bar" in section 17, four languages (210 blocks), signatures renewed, the former kept as "1.0.4 before the widget button". What's new has the item in four languages.
+
+Tests: 105 files, 1764 of 1764 (tests/widgets.test.js: the button's place, name and What's new item; tests/seed-guide.test.js: the guide tells of it once). In the built app on a throwaway profile: opens under the button with its eight widgets, the caret stays in the note, second press shuts, a click and the keys place one, undo removes it, no page errors; the bar measured in four languages. Not tried: the bar at the left, right or bottom, a window narrower than 1200, the caret in a table cell or a column, the What's new sheet on screen. Smoke not run; tests/e2e/guide.mjs still expects the flat page.
+
+## [2026-11-12 06:00] v1.0.3 - by Claude (the guide holds no list of a release any more: New in 1.0.4 is out of it; test build, not released)
+
+Asked (in chat): "what's new already says what it is; adding what was added to the guide is our part" — and, asked whether the list should then leave the guide: "take it out".
+
+* "New in 1.0.4" is out of the guide. The page is its welcome, the line that says the sections are folded, and the twenty numbered sections. What a release added is listed by Help → What's new and explained in the section it belongs to; the six things 1.0.4 added stand once now, each in its section.
+* The four languages follow (209 of 209 blocks); signatures renewed, the former kept as "1.0.4 before New in left the page". The release notes' item "A guide that folds" says it so.
+
+Tests: 105 files, 1762 of 1762 (tests/seed-guide.test.js: no heading but the numbered ones, each 1.0.4 feature named once). Not looked at in the built app after this change; smoke not run; tests/e2e/guide.mjs still expects the flat page.
+
+## [2026-11-12 05:19] v1.0.3 - by Claude (the guide tells again of what only the removed release lists told: widgets and syncing have sections of their own; test build, not released)
+
+Asked (in chat, after being told which features the guide no longer explained): "write the sections they belong to".
+
+* Two new sections, above the last two as always: "17 · Widgets" (the calculators and the calendar, the Pomodoro and the Clock, their sounds, a day's events and the corner card, the Clock's timer, the World clock and the Weather, and something to try) and "18 · Your notes on all your devices" (the Tools menu and Tailscale sync). Where your notes live is 19 and Code blocks 20.
+* Written into the sections they belong to: Settings in tabs and how much room Nebula takes (1), the German dash (2), taller columns (4), files and pictures taken out of a note and Send to… (7), a note with its files as one zip (8), the New project button and the one press that clears the Universe search (11), the Universe widget's lock and its four buttons (12), notes side by side (13), a locked black hole's initials, Pin to top and what a black hole asks before it destroys (14), words or blocks while dragging and a box inside one column (15), Appearance seen first (16).
+* The words are those the releases' own lists had, in all four languages, so nothing was translated anew but five short blocks. Three were shortened where a later release had changed what they said: the calendar's day is chosen, not marked, by a click; the alarm's sound is told with the sounds; the Tools menu is no longer called new.
+* What 1.0.4 itself added stands twice for now, under New in 1.0.4 and in its section — so that it is still told when the next release takes the list's place.
+* The page is 216 blocks in each language (190 before); signatures renewed, the former kept as "1.0.4 before the sections of the removed lists".
+
+Tests: 105 files, 1762 of 1762 (tests/seed-guide.test.js: fifteen more features named, the order and the count of sections brought along). In the built app on a throwaway profile: twenty-one folded toggles, the last four being 17 to 20, the Widgets section holding its eight blocks and the syncing one its one, no page error. Not tried by hand: the new sections read on screen in the other three languages, print and export. Not checked against the app: whether every sentence taken from the older lists (0.9.9 to 1.0.3) is still exactly how the app behaves. Smoke not run; tests/e2e/guide.mjs still expects the flat page and sections 17 and 18 as the last two.
+
+## [2026-11-12 03:47] v1.0.3 - by Claude (the guide's shapes have a place of their own in the section about shapes, what is new is a folded toggle too, earlier releases are not in the page; test build, not released)
+
+Asked (in chat): "the shapes at the very top should go, they should have a place of their own in the guide; New in 1.0.4 should be a toggle too; the older ones should not show, as I said".
+
+* The three demo shapes no longer stand above the title. They are on a stage of their own at the top of section 6, "Shapes and arrows": open the section and they are there, real ones, to drag and reshape. The page now begins with its title.
+* "New in 1.0.4" is a folded toggle heading like the numbered sections: the page opens as the welcome, one line of how to open a section, and nineteen headings with an arrow (about 1 080 px tall in the built app).
+* The earlier releases' lists (1.0.3 back to 0.9.4) are not in the page at all; the "Earlier updates" toggle of the 02:37 build is gone. Help → What's new still shows every release.
+* What this costs: some features were explained only in those lists and are in no numbered section — the widgets (calculator, calendar, Pomodoro, clock), syncing between devices, the tabs of Settings and Appearance, notes side by side, a note exported as a zip, taller columns, the Universe map's lock, a black hole asking before it destroys. Their words are in the last commit; they are to be written into sections if the owner wants them in the guide.
+* A shape on a stage keeps to it: sent behind the text or brought to the front it stays in the stage's own layers (shapes.js), an arrow's layer is looked for at the note's top only (arrows.js), and a shape nobody can see — in a folded section — is neither measured to its words nor counted in the page's order (shapes.js fitToText, page-order.js). Before that the folded shapes were cut to 34 px.
+* The four languages follow: 190 of 190 blocks each; signatures renewed, the former kept as "1.0.4 before the shapes’ own place". The release notes' item "A guide that folds" says it as it is now.
+
+Tests: 105 files, 1762 of 1762 (tests/seed-guide.test.js: the stage test rewritten, the order tests brought to the folded page). Tried in the built app on a throwaway profile: the page's top is title, four paragraphs, a divider and nineteen folded toggles; no shape above; section 6 opened shows the three shapes on their stage; in Edit mode "Send behind text" keeps the rectangle where it is, inside the stage; dragged over the section's words, the words are over it; folding the section hides them. Not tried by hand: the other three languages on screen, print and export of the folded page and of the staged shapes, an arrow snapping to a staged shape. Smoke not run; tests/e2e/guide.mjs still expects the flat page and has to be brought to the folded one before a release.
+
+## [2026-11-12 02:37] v1.0.3 - by Claude (the guide opens folded: sections are toggle headings, only the newest release under what is new; test build, not released)
+
+Asked (in the owner's Nebula note, chosen in chat as the next step): "in the guide page only the last update should show under what's new; the guide pages should be much more user-friendly, toggles should be used for the categories".
+
+* Each of the eighteen numbered sections of the guide is a folded toggle heading now: the page opens as its welcome, what is new in this release, and a list of headings with an arrow before each (about 1 800 px tall in the built app, where the open page is over 14 000). The divider between two sections went with it — the arrows part them; the one before section 1 stays, and those inside a section stay.
+* Under what is new only the newest release stands. The earlier ones (1.0.3 back to 0.9.4) were not thrown away: they are under one folded toggle, "Earlier updates", right below it. Help → What's new still shows every release.
+* A new line after the welcome says the sections are folded, how to open one, and that Ctrl+F finds a word inside a folded one and opens it.
+* The four languages: a translation still counts the page block by block — a section's heading and what is under it one by one (guide-i18n.js wordBlocks; the toggle inside section 4 that shows what a toggle is stays one block). Two blocks were added to each pack (231 of 231). Signatures renewed, the former kept as "1.0.4 before folded sections".
+* Help → Guide page: a section opened in Edit mode is saved open, and that alone no longer makes the page count as written in (seed-notes.js asFolded).
+* The release notes have the item "A guide that folds" in four languages.
+
+Tests: 105 files, 1762 of 1762 (tests/seed-guide.test.js: two new, two rewritten). Tried in the built app on a throwaway profile: 19 folded toggles and one loose "New in 1.0.4"; the arrow of section 2 opens it in Only view; Ctrl+F for a word of section 18 opens it; the code samples are painted inside; nothing opened in Only view was written to the note's file. Not tried by hand: the other three languages on screen, print and export of the folded page. Smoke not run.
+
+## [2026-11-12 01:52] v1.0.3 - by Claude (typing in a black hole's note with pictures is as quick as in a plain note; test build, not released)
+
+Asked (in the owner's Nebula note, then in chat: "fix the slow typing in a black hole"): "with memory about 92% used, a gigabyte or so free, I notice that a black hole passes on what I type visibly slower than plain notes; we lessened this once, it has to be made lighter still".
+
+* Measured first, in the built app on a throwaway profile, after a restart: a black hole's note with one 2.4 MB picture was 3 671 884 characters of markup in the window (the picture written into it as text), a plain note with the same picture 656 (the picture named by an address). Typing in the first made long tasks of about 90 ms and a slowest key of 112 ms; in the second none, and 32 ms. A sealed note keeps its pictures inside itself, so every save, every step of undo and every look through the note went over megabytes — and with memory short, over the swap file.
+* Now, while a black hole is open, the pictures of its notes are held by the main process, in memory (electron/black-holes.js: holdPictures, withPictures, picture, pictureDataUrl). The window is given each note with a short address in a picture's place (nebula-media://hole/<hole>/<note>/pic-<32 hex of its SHA-256>.<kind>), the media protocol answers it from memory (no-store), and a note that comes back to be sealed has its pictures written into it again before it is encrypted. The sealed file is what it always was — nothing to migrate, and an older build opens it. The pictures are on no disk in the clear, and are zeroed and dropped with the lock.
+* Wherever a picture leaves its note the picture itself goes, not the address: a copy (words, a block, the picture alone), an export, a crop, a drag out of the window, a copy sent to another note, and a note taken out of its black hole. A plain note that still names a held picture has it made a file of its own at its save, and which file is remembered while the app runs. A note taken from one open black hole into another takes its pictures along.
+* A picture pasted in this sitting stays written into the window's copy until the black hole is next opened — as in a plain note, where it becomes an address at the next start.
+* The release notes say it under Fixes, in four languages. Not a guide item.
+
+Tests: 105 files, 1760 of 1760 (tests/hole-pictures.test.js, 9, is new). Measured again the same way: the black hole's note 689 characters, no long task, slowest key 32 ms — as the plain note; the picture shows; what was typed was there after another restart, and the sealed file is still the whole note (3.67 MB). Not tried by hand: copy, crop, export, drag out, send and take-out of a held picture — their main-process halves are in the unit tests. Smoke not run.
+
+## [2026-11-12 01:07] v1.0.3 - by Claude (feet made level for widgets, tables and embedded pages; tables and cards stand side by side; test build, not released)
+
+Asked (in chat): "widgets have no evening-out as pictures do; the same for a table (by its table lines) and for embedded pages; and a table too should be draggable to the sides as pictures are (everything but the notes, in short)".
+
+* Feet made level: what pictures side by side did since 1.0.3 — pulled to nearly the same height they take the same height, and a dashed line along the feet says so — now holds for whatever is not words. A new src/js/level.js knows what stands at the left or right of a block and shares its height, in a row of pictures or in the column next door, and how far its foot is from the nearest foot (six pixels of the page are near enough). A widget in a row is measured by itself (it has no picture inside, which is why it was left out). A table pulled by the line under a row or by its corner stops with its last row at the neighbour's foot; an embedded page by its height, a video by its width. A picture or widget that is not in a row but in a column is levelled too. The line goes when the pull ends.
+* Side by side: a table, a card, a code block or an embedded page taken by its own grip could only go between two blocks. Held over the left or right third of another of them, or of a picture, the mark now stands at that side, and let go the two are two columns with a divider between — the columns the app already had. The middle third is still over or under. A picture or a widget pulled over the side of a table or a card goes into columns with it the same way; over another picture it is a row of pictures as before. Words are not put beside anything by this, and a picture already in a row is left to its row.
+* The guide in four languages (signatures renewed) and the release notes say both.
+
+Tests: 104 files, 1751 of 1751 (tests/level.test.js, 10, is new). Guide 229 of 229 blocks. Seen by eye on a throwaway profile: a table dragged onto the right third of another made two columns; the second table's last row pulled to within four pixels of the first's foot went level and the line showed, and went on letting go; a calculator beside a clock resized to four pixels short took its height with the line shown; no page errors. Not tried in the app: an embedded page levelled, a picture dropped beside a table. A table pulled by a column's line is not levelled (its height does not change). `npm run smoke` not run.
+
+## [2026-11-12 00:27] v1.0.3 - by Claude (every city in the World clock and the Weather; the Weather holds several cities; test build, not released)
+
+Asked (in chat): "the world clock and the weather do not have all the cities; in the world clock some countries are there but no city, it confused me — let them all be cities" and "and let more than one city be added to the weather".
+
+* The cities: 34 212 instead of 170 — every city of 15 000 people or more and the capitals, from GeoNames' "cities15000" (CC BY 4.0), still in the app and still asking nobody. scripts/build-cities.js writes src/js/city-data.js (about 1 MB) from the downloaded file; the 170 cities of before keep their names and their ids, so widgets already in notes are the same cities. The list is read only when a city is first needed.
+* The search: the city called just that first, then those with a word beginning with it, the most peopled first. A country typed (in the app's language or in English, three letters at least) gives its cities. A row shows the country's whole name, not its two letters, and a US state beside the name, so the Springfields can be told apart.
+* The Weather holds up to six cities: + Add a city adds one and shows it; the others are a line each with their sky and temperature, a press shows one in full, a × takes one away; ↻ asks for all. One city is written into the note as before. Each city is its own question to Open-Meteo, under the same rules.
+* Credits: GeoNames and Open-Meteo named in CREDITS.md and under About Nebula. The guide in four languages (signatures renewed) and the release notes say the six cities and the whole list.
+
+Tests: 103 files, 1741 of 1741. Guide 229 of 229 blocks. Seen by eye on a throwaway profile: a small town found, "türkiye" listing its cities, four cities in one Weather with live readings, no page errors. Not tried: typing speed in the city field on the owner's machine with little memory free. `npm run smoke` not run.
+
+## [2026-11-11 23:58] v1.0.3 - by Claude (two new widgets: a World clock and the Weather; test build, not released)
+
+Asked (in the owner's Nebula note): "a world clock among the widgets, and different cities can be added" and "weather among the widgets". Asked in chat how the weather is fetched: "with the safest third-party way, the one that gives away the least".
+
+* World clock: the local time on top, up to eight cities under it, each with its time, Today/Tomorrow/Yesterday and how far ahead or behind it is. + Add a city opens a list with a search field; a × on a row takes the city out. It grows with its cities and turns each new minute.
+* Weather: one city, the temperature, the sky in a word and a picture, feels like, wind, humidity and three days after. A press on the city changes it, °C/°F is turned in Nebula, ↻ asks again.
+* How the weather is asked: Open-Meteo over HTTPS, no account, no key, no cookies, no referrer, a redirect is an error. The city comes from Nebula's own list (about 170), so no place is looked up and the computer's place is never read. Only the city's coordinates rounded to a tenth of a degree are sent, always in °C and km/h. The main process asks, keeps a place 10 minutes; the note takes a reading as fresh for 30 minutes and asks only while a Weather widget with a city is shown. The IP address is seen by Open-Meteo as by any server; nothing else is.
+* New: electron/weather.js, src/js/cities.js, tests/world-weather.test.js. Changed: widgets.js, icons.js, import.js (three attributes kept), editor.css, i18n.js, main.js, preload.js, the guide in four languages (signatures renewed), release notes.
+
+Tests: 103 files, 1740 of 1740 (16 new). Guide 229 of 229 blocks. Seen by eye on a throwaway profile with a live reading for Warsaw; the city times were set in one line with the local time after it. Both items marked done in the note. Open-Meteo's free use is for non-commercial apps. `npm run smoke` not run.
+
+## [2026-11-11 22:45] v1.0.3 - by Claude (the 22:29 move taken back; the picture's own line right under its heading; test build, not released)
+
+Asked (in the owner's Nebula note, under a picture of the 22:29 build): "I did not mean this, I meant the part 'It takes the place of the drawn logo, and stays among the themes.' Go back to the one before, then do what I said."
+
+* logo-editor.js: the line on what wears the logo is under the whole editor again, as at 22:03. The picture's own line stands right under the heading Your own picture, the buttons under it.
+
+Tests: none changed, the whole set not run again (1724 of 1724 at 22:03). Seen by eye on a throwaway profile; Star's foot and the colours' foot measured equal. Built 23:07, once the owner's Nebula Test was closed; the caption marked done. `npm run smoke` not run.
+
+## [2026-11-11 22:29] v1.0.3 - by Claude (the logo's line on what wears it moved under Your own picture; test build, not released)
+
+Asked (in chat): "the description at the bottom should come under Your own picture".
+
+* logo-editor.js: the line on what wears the logo no longer stands under the whole editor; it is in the right part, under the picture's buttons and their own line, above the bar and the colours.
+
+Tests: none changed, the whole set not run again (1724 of 1724 at 22:03; only the place of one paragraph changed). Seen by eye on a throwaway profile; Star's foot and the colours' foot still measured equal. Built 22:29. `npm run smoke` not run.
+
+## [2026-11-11 22:03] v1.0.3 - by Claude (a + that adds a random theme; the logo's five parts end where the colours end; test build, not released)
+
+Asked (in the owner's Nebula note, under two pictures of the 21:20 build): "shorten the description if need be, but the foot of the colours must be level with the foot of Star — looks matter", and "a + beside try; pressed, it adds a random theme".
+
+* theme-custom.js: `randomColors` (one hue for the ground, dark more often than light, an accent of its own hue, words that can be read), `freeProfileName`, `MOST_PROFILES`.
+* theme-editor.js: a + after the last profile saves a random theme as "Random", "Random 2"… and wears it; with 24 profiles it says there is no room.
+* app.css: in the logo editor the five parts share the height of what stands at their right, so Star ends where the colours end at any width; the + wears the logo editor's + style.
+* logo-editor.js, i18n.js: the line on the picture is one short sentence; the new words in de/pl/tr. Guide: a sentence on the + in four languages, new signatures (the old under "1.0.4 before the random theme").
+* The owner's note: both captions marked done.
+
+Tests: 1724 of 1724 (new: a random theme can be read whatever falls, and takes a name no other has). Seen by eye on a throwaway profile; Star's foot and the colours' foot measured equal. Built 22:03. `npm run smoke` not run.
+
+## [2026-11-11 21:20] v1.0.3 - by Claude (a saved profile left as it is gets a new name, not a copy; the logo's picture and shortcut on top, the colours at the foot; test build, not released)
+
+Asked (in the owner's Nebula note, under two pictures): "the profile try is saved already; pressed, it need not be written again at the lower left. I made try, said save, it saved a new one though I had changed nothing — with no change let it be Save this profile / Save new name", and "take the colour bar and the palette down; put Use a picture of mine, Remove the picture and Put a shortcut on the desktop together in the room the colours leave; put a description on the picture part".
+
+* theme-custom.js: `renameProfile` — a saved profile under a new name, its colours as they are; another's name, a ready one's or none is refused.
+* theme-editor.js: a profile pressed leaves the name field empty. While the colours are a saved profile's, the button reads Save new name and the name typed renames that profile (no second one); with no name typed it says nothing has changed. A changed saved profile with no name typed is saved under its own.
+* logo-editor.js, app.css: in the right part a heading "Your own picture", the two picture buttons and the shortcut button in one row, a line on what the picture is; the bar and the squares under them, at the foot. `.logo-foot` is gone; the e2e selector in settings.mjs follows (not run).
+* i18n.js: the new words in de/pl/tr. Guide: a sentence on Save new name in four languages, new signatures (the old under "1.0.4 before Save new name").
+* The owner's note: both captions marked done.
+
+Tests: 1723 of 1723 (new: a profile takes a new name without a second one being made). Seen by eye and pressed through on a throwaway profile. Built 21:20. `npm run smoke` not run.
+
+## [2026-11-11 20:41] v1.0.3 - by Claude (the logo editor's colour bar low again, the picture buttons in the room it left; test build, not released)
+
+Asked (in the owner's Nebula note, under a picture of the 20:17 build): "what I meant: the colour palette became huge — narrow it, move the colours up, and raise the lower right into the room that frees".
+
+* app.css: the bar of the chosen colour no longer takes the height left beside the five parts; it is as low as in the theme's editor, the squares come right under it.
+* logo-editor.js: the picture buttons sit inside `.logo-pick`, under the colours, at its lower right (level with the last of the five parts); `.logo-foot` under the hint holds the shortcut button alone.
+* The owner's note: the caption marked done.
+
+Tests: 1722 of 1722. Seen by eye on a throwaway profile. Built 20:41. `npm run smoke` not run.
+
+## [2026-11-11 20:17] v1.0.3 - by Claude (the logo's own picture at the lower right; test build, not released)
+
+Asked (in the owner's Nebula note, under a picture of the 19:27 build): "let us put the Use a picture part at the lower right". Read as: the row of the two picture buttons leaves the top of the logo editor and goes to its foot, at the right.
+
+* logo-editor.js: the picture buttons are no longer the first row of `.logo-tools`; a `.logo-foot` under the hint holds the shortcut button at the left and them at the right. app.css: `.logo-foot`.
+* tests/e2e/settings.mjs: the shortcut button's selector follows (`.logo-foot > .logo-shortcut`); not run.
+* The owner's note: the caption marked done.
+
+Tests: 1722 of 1722. Seen by eye on a throwaway profile: the themes start at the top, the picture button sits at the lower right under the hint. Built 20:17. `npm run smoke` not run.
+
+## [2026-11-11 19:27] v1.0.3 - by Claude (the two marks' arrows drawn, the logo editor's colours square; test build, not released)
+
+Asked (in the owner's Nebula note, under two pictures of the 07:07 build): "the arrow at the lower left is not in the very middle, it crosses its frame; the one at the upper right is not sharp; both in one style" and "the menu below is bad — squares like the one above, not these long rectangles; the logo's part placed and proportioned again, easy on the eye".
+
+* editor.css: the two marks' arrows are no longer letters of a font (↔ ↕ sat where the font put them): a shaft through the middle (a gradient) and a head at each end (`::before`, `::after`), the same drawing turned for the second mark. Both marks 15 px high; the one under the numbers 29 px wide.
+* app.css: the logo editor — its five parts one under the other (the Settings sheet's rule for the theme's own parts put them two side by side here too, which is why the 07:07 build did not show five rows); the colours square again, fourteen to a row; the bar of the chosen colour over them takes the height that is left, the field for the code stays at its top; the logo in the middle of the editor's height.
+* The owner's note: both captions marked done.
+
+Tests: 1722 of 1722 (no test changed: styles only). Seen by eye this time, on a throwaway profile driven by a script outside the repo: both arrows in the middle of their frames, the corner unchanged; the logo editor with five rows at the left and two rows of squares under the bar. Built 19:27. `npm run smoke` not run.
+
+## [2026-11-11 07:07] v1.0.3 - by Claude (a table's two marks instead of the straight corner, the logo editor back at its size; test build, not released)
+
+Asked (in chat, on the 06:41 build): the guard works (a picture pulled out and back no longer moves); "the logo editor became far too small and there is a bug, the right side is empty — Put a theme on it on top, the five choices at the left, the colours at the right"; "pulling the table aslant is a problem again: a pull-right mark over the + at the right that only pulls to the right, a pull-down mark under the last y, a little wider, filling the gap, that only pulls down, and the lower right corner keeps what it did".
+
+* table.js: `STRAIGHT` and the corner's zones are gone — the corner is both by the same share again, however it is pulled. Two marks drawn with the table (`.tbl-pull-x` over the + at the right, `.tbl-pull-y` under the row numbers; `tbl-ui`, never saved, `isDressed` asks for both): the first changes only the columns, the second only the rows, wherever the hand strays. The tip still says ↔ or ↕ before the per cent.
+* editor.css: the two marks (dashed, seen on hover like the + buttons), the cursors while pulling. i18n: their two titles.
+* app.css: the logo editor at its first sizes again (no `max-width`); the themes on top, under them `.logo-colours` — the five parts at the left, the bar and the 28 colours at the right, seven to a row, stretched to the height of the five parts.
+* Guide (four languages, signatures renewed, the old ones kept under "1.0.4 before the two marks of a table") and the release notes say the two marks instead of the corner pulled straight.
+* The owner's note: "a picture pulled out and brought back moves" marked done, as they said.
+
+Tests: 1722 of 1722 (table.test.js: the two marks drawn once, not saved, each pulls one way only; the corner pulled straight is still both). `guide-blocks --check` 228 of 228. Built 07:07. Not seen by eye: the logo editor's layout and where the two marks sit. `npm run smoke` not run.
+
+## [2026-11-11 06:41] v1.0.3 - by Claude (the corner pulled straight, Send to… for anything, a smaller logo editor, the veil left on a card; test build, not released)
+
+Asked (in chat, on the 06:05 build): "the table only goes aslant from the lower right, there is no straight right or straight left; and Send to… should be on a right-click of everything, not only files — pictures, blocks of text". In the owner's Nebula note, under three pictures: the logo's editor in Settings "more compact and smaller, the five choices down the left, the colours at their right"; "pulled out and pulled back, this time a bug like this" (the veil stayed on the card); "a picture pulled out and brought back moves, it overlaps".
+
+* table.js: the corner pulled no more aslant than one to 2.5 (`STRAIGHT`) is pulled straight — to a side only the columns change, down or up only the rows; otherwise both by the same share as before. The tip says ↔ or ↕ before the per cent.
+* send-file.js `copyOf`: a copy of a picture, a block or the words selected as another note can hold it — a list's item in a list of its kind, a floating picture put into the text, part of a table as its words, without what only the screen draws. `send` writes it at the end of the other note; a file's card inside it is copied there as before, a picture or a video by that note's own save. context-menu.js offers Send to… on a picture, a widget, a block and the words selected, in an Only view note too.
+* logo-editor.js, app.css: the five parts in one column, the colour bar and the swatches at their right (`.logo-colours`, `.logo-pick`); smaller previews and rows. The theme editor's own layout is untouched.
+* block-drag.js, file-attach.js: when the system's drag takes a file out, the pull within the note ends (`nebula-carried-out`) — its next mouse move drew the veil again and nothing took it down.
+* file-attach.js, main.js: the button let go before the system's drag has begun calls that drag off (`media:carry-end` counted in `pulls`; `media:drag-picture` does not begin after). A drag begun with no button held is let go at once where the pointer is — the likely cause of the picture that moved; not proved.
+* Guide and What's new in four languages; the guide's signatures before this are kept.
+* Not tried in the app itself: unit tests only. The logo editor is not seen by eye. The logo and the veil lines are marked in the owner's note; the moved picture is left unmarked until the owner says it is gone.
+
+## [2026-11-11 06:05] v1.0.3 - by Claude (a table pulled larger or smaller by its corner, a picture shown while it is pulled; test build, not released)
+
+Asked (the owner's Nebula note): "there should be something round a table by which I widen and narrow it like a picture — say I pull from the lower right: let all of it grow or shrink in proportion". In chat, on the 05:24 build: "files have the preview while pulled, pictures do not"; the copy made by a card pulled out and brought back no longer happens (confirmed by the owner).
+
+* table.js: a corner (`.tbl-scale`, class `tbl-ui`, never saved) between the two +. Pulled, every column and every row takes the same share — the pull laid on the table's own slant; one step of history; no wider than the room there is, no column under the narrowest, rows between the lowest and the highest a row may be; a row with no height of its own is taken at the height it is drawn. The share is shown in per cent over the corner. `isDressed` asks for the corner too. Not there in a note that may not be changed.
+* drag-ghost.js: a picture pulled in the text is shown small, itself; a video or a widget by its name. rich-paste.js shows and takes down the chip for pictures in the text.
+* Guide and What's new in four languages; the guide's signatures before this are kept.
+* Not tried in the app itself: unit tests only. The table line and the confirmed copy line are marked in the owner's note.
+## [2026-11-11 05:24] v1.0.3 - by Claude (Send to…, a card taken anywhere, what is pulled shown, names a notch sooner; test build, not released)
+
+Asked (the owner's Nebula note): "while dragging I get no feedback — let something show what I picked and drag"; "a right-click on a file should have Send to…, the person picks a note, a copy goes there; black holes only while unlocked"; "files should be taken anywhere on them, not only by the middle"; Universe: "the other names come very late now, bring them a notch closer, keep the hierarchy, lessen the gap".
+
+* send-file.js (new): `sendTargets` (every note but the open one, the trash and the archive; a locked black hole's notes are not in the store), `initSendFile` — a field and a list at the pointer; the copy is `media:adopt-file` into the other note (sealed in an open black hole) and a card written at that note's end, after what is typed here is saved. Nothing is written when the copy fails, the hole locked meanwhile or the note was deleted. context-menu.js: a file's card offers "Send to…" (in an Only view note too); wired in main.js.
+* block-drag.js `gripOf`: a file's card is taken anywhere on it but its buttons; file-attach.js `initAttachCarry` the same.
+* drag-ghost.js (new): a veil over the pulled block and a chip with its name at the pointer, for every block block-drag.js moves. Neither is in the note and the block gets no class, so a note saved in the middle of a pull is as it was. Taken down when the system's drag takes a file out.
+* galaxy-map.js `NAME_LAYERS`: notes 3 / 5 → 2.4 / 3.4, labels 6 / 12 → 4.5 / 8; projects and folders as they were.
+* Guide and What's new in four languages; the guide's signatures before this are kept.
+* Not tried in the app itself: unit tests only. The four lines are marked in the owner's note.
+
+## [2026-11-11 04:49] v1.0.3 - by Claude (a card pulled out and brought back made a copy; test build, not released)
+
+Asked (the owner's Nebula note): "pulled to the right it works, but pulled to the right, not let go there, pulled back and let go in the note — a copy was made".
+
+* Cause: once out, the pull is the system's drag of a file; come back, it was a file dropped on the note like any other, and was attached again.
+* file-attach.js `carryOut`, `takeCarried`: the note remembers the card or picture the system's drag began with, until the mouse is seen again without its button or pressed. rich-paste.js, the drop: the note's own card goes to the gap it is let go at (not in an Only view note), its own picture stays where it was; nothing is copied.
+* Not proved: the drop itself — it needs a hand on the mouse. The copies made before stay in the owner's note for them to delete.
+
+## [2026-11-11 04:09] v1.0.3 - by Claude (pictures pulled out, numbers typed, Auto-continue ends; test build, not released)
+
+Asked (the owner, in chat): "pictures must be draggable out too; the Clock's timer without a limit; in the Pomodoro and the Timer a click on the number in the middle lets it be typed, the Pomodoro six hours at most; Auto-continue must not go on after all sessions are done — it loops for ever".
+
+* Pictures: file-attach.js `initPictureCarry` (wired in rich-paste.js beside the cards' carry; it calls off the in-note picture drag once the pointer is out). electron/opened-files.js `carriedPicture`, main.js `media:drag-picture`, preload.js `dragPicture`: the copy is made when the pointer leaves, lies among Open's copies and is cleared as they are; a locked black hole hands nothing over; the drag's icon is the picture itself. Not for a picture's handles, its caption, widgets or videos.
+* widgets.js: the Timer has no upper limit (`TIMER_LIMITS`), a Pomodoro's parts go to 360 min (`POMO_LIMITS`). The number of a stepper is a button (`typedV`): a click opens a small field over it (`askNumber`; digits only, Enter, Tab or a click elsewhere keep it, Escape drops it), for Focus, Break, Long break, Long break after, the Timer and the alarm's hour and minute. Nothing of the field is written into the note.
+* widgets.js `phaseDone`: Auto-continue starts no new part after the long break — the Pomodoro waits at Focus 1.
+* Guide and What's new: the timer's and the files' paragraphs in the four languages; signatures replaced (the last kept under "1.0.4 before pictures taken out").
+* Not proved: the system's drag of a picture — it needs a hand on the mouse.
+
+## [2026-11-11 02:53] v1.0.3 - by Claude (a file's card pulled out of the note; test build, not released)
+
+Asked (the owner's Nebula note): "files in a note — a docx, every kind — should be draggable out, to the desktop or into the AI panel".
+
+* file-attach.js `initAttachCarry`, `carriedOut`: a file's card carried past the window's edge, or over the AI panel, becomes the system's own drag of a file. The copy is the one Open makes (the `opened` folder, cleared as before); it is made when the card is first carried. In an Only view note too. While a card is carried the panel's pages let the pointer through (`body.attach-carried`).
+* electron/main.js: `media:carry-file`, `media:drag-file` (`webContents.startDrag` with the file's own system icon), `media:carry-end`; a locked black hole hands nothing over. preload.js: `carryFile`, `dragFile`, `carryEnd`.
+* Guide and What's new: "Files taken out of a note" in the four languages; signatures replaced (the timer's kept under "1.0.4 before files taken out").
+* Not proved: the system's drag itself — it needs a hand on the mouse. Only file cards; pictures and videos are not carried out.
+
+## [2026-11-11 02:43] v1.0.3 - by Claude (the Clock's timer, from the owner's Nebula note; test build, not released)
+
+Asked (the owner): go on — "the Clock should get a timer the user sets, counting down from a given time".
+
+* widgets.js: the Clock has two tabs, Clock and Timer. The timer counts down from 1 to 180 minutes (10 by default, 5-minute steps), with Start/Pause and Reset; at the end the Clock's own sound rings six times, a toast says "Time is up" and Stop ends it. The length and the tab are kept on the figure (`data-wg-timer`, `data-wg-mode="timer"`), the run in the module's `timers` map; Start, Pause, Reset and Stop work in a read-only note. `stepClock` holds the keys.
+* import.js: `data-wg-timer` allowed. i18n.js: Timer, Time is up. editor.css: the Clock a little taller (aspect-ratio .94) for the tabs.
+* Guide: one paragraph in "New in 1.0.4" in the four languages, signatures replaced (the earlier 1.0.4 ones kept under "1.0.4 before the Clock’s timer"). release-notes.js: "A timer in the Clock" in the four languages.
+* Open: the rest of the note's list is in memory.json `next`.
+
+## [2026-11-11 02:10] v1.0.3 - by Claude (three more from the owner's Nebula note; test build, not released)
+
+Asked (the owner): go on; the note has new items — "the AI panel does not open as smoothly as the Nebula panel on the left", "the project names still show early", "pictures placed side by side are all picked by the smallest band".
+
+* dock.js: the AI panel slides in from the window's edge and out again (140 ms, eased, as `.side`), by `margin-right` so the chat inside is never laid out narrower; `hidden` goes on when the slide out ends. No slide at boot, when Settings puts the panel away, or for reduced motion.
+* block-handle.js `blocksInBand`: when everything the band's height crosses is a row of pictures side by side, only those the band reaches sideways are picked — a band in the empty room beside them picks none.
+* galaxy-map.js `NAME_LAYERS`: projects are named from 1.5 × the whole-map zoom (1.85 px, near 7.5), folders after as before. A small map shows no project name when whole.
+* release-notes.js: the two fixes added to 1.0.4's Fixes item in the four languages.
+* Open: the rest of the note's list is in memory.json `next`.
+
+## [2026-11-11 01:00] v1.0.3 - by Claude (the owner's Nebula note: ideas and bugs for 1.0.4; test build, not released)
+
+Asked (the owner): open the note "Nebula" in Nebula Test and do what it asks — an Ideas list, a Bugs list with screenshots, and the two plans for 1.0.4.
+
+* The corner card of a running Pomodoro: whole seconds (the stopwatch too), and a − that leaves the time alone, then the icon alone; the icon opens it whole again. Kept for the next start.
+* About Nebula has a row, Size on this computer (the vault's size, measured after the panel is up).
+* The Only view badge has no lock; the guide says "the Only view badge" in four languages.
+* The empty line under a column's last picture: deleted with Backspace/Delete or the grip's Delete it stays away. `healColumns` gave it back every time; a column whose last line was taken away is marked `data-tight` until it ends with a line again. An older build reading the note just adds the line again, so no migration.
+* A band drawn over one column of a row picks that column's blocks, not the row (`blocksInBand`); a band may begin in a column's open room.
+* A picked divider is marked at 65 % instead of 35 %, the upright one too.
+* Deleting a picture that has no line over it (between two dividers): the caret was left at the top of the note and the next letter opened a line there. Delete now goes into the line under it, or a divider beside it is picked, as with an empty line.
+* Undo after a table no longer scrolls to the foot of the note. Widgets side by side shrink by their shares. The Universe names projects later. The zoom arrow and the Appearance swatches line up.
+* Closing with X no longer waits on the sync nudge with the window still up.
+* The guide has New in 1.0.4 in four languages (GUIDE_VERSION 1.0.4, four signatures); What's new has a 1.0.4 sheet in four languages.
+* Electron 45.2.3 → 45.3.0. Firefox told to Google: 160 from 2026-11-10 (it had fallen to 158 against 160).
+* Answered, no change: three backups are the newest of each kind (before an update, before a heal) and the dated daily one; "⇄ date" in a title is the copy kept when a note changed on two devices.
+* Not done: the translate tool, Discord share, tabs over the notes, the Clock's timer, world clock and weather widgets, a widget menu in the editing bar, new shapes, labelled projects, friendlier guide pages, dragging attachments out, the table's proportional frame, slow typing in a black hole under low memory, Linux builds, the firewall hint, the folder merge offer.
+
+---
+
 ## [2026-11-05 05:56] v1.0.3 - by release-script
 
 

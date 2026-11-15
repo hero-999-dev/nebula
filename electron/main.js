@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, dialog, shell, ipcMain, session, clipboard, screen, protocol, safeStorage, systemPreferences } from 'electron';
+import { app, BrowserWindow, Menu, dialog, shell, ipcMain, session, clipboard, screen, protocol, safeStorage, systemPreferences, nativeImage } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
@@ -9,6 +9,7 @@ import { installAiSignIn, signInWindowOpener } from './ai-browser-auth.js';
 import { AI_SERVICES, isGoogleService } from '../src/js/ai-services.js';
 import { realScaleFor } from '../src/js/page-zoom.js';
 import { fetchPageTitle, fetchVideoPoster } from './link-metadata.js';
+import { fetchWeather } from './weather.js';
 import { installContextMenu, registerEditingHandlers, writeImageToClipboard, forgetIgnoredWords } from './context-menu.js';
 import { purgeNoteFromBackupsAsync, purgeDeletedFromBackups, purgeHoleNoteFromBackupsAsync, purgeHoleFromBackupsAsync, purgeHoleFilesFromBackupsAsync, protectLegacyHoleBackups, purgeUnnamedFromBackups, shredTree, pruneLabelled, staleLabelled, oldWayCopies, dropOldWayCopies } from './backup-purge.js';
 import { measureStorage } from './storage-usage.js';
@@ -20,10 +21,12 @@ import { systemSoundDir, soundNames, readSystemSound, readOwnSound, listOwnSound
 import { filesFromArgv, readNoteFile } from './open-file.js';
 import { writeZip } from './zip.js';
 import { offerOpenWith } from './open-with.js';
-import { attachedOf, attachedName, openedPath, runsCode, clearOpened as clearOpenedIn, clearOpenedAsync as clearOpenedAsyncIn } from './opened-files.js';
+import { attachedOf, attachedName, openedPath, carriedPicture, runsCode, clearOpened as clearOpenedIn, clearOpenedAsync as clearOpenedAsyncIn } from './opened-files.js';
 import { markOfTheWeb } from './mark-of-the-web.js';
 import { vaultPresence } from './vault-presence.js';
 import { createSync } from './sync.js';
+import { createTailscaleStatus } from './tailscale-status.js';
+import { closeQuestion, CLOSE } from './sync-close.js';
 import { staysOnPage, externalUrl, popupGate } from './navigation.js';
 import { allowed, isChatSession, isEmbedSession, ASK_EMBED, askKeys, checkKey, askWords, pageAnswers } from './permissions.js';
 import { words } from './dialog-words.js';
@@ -35,6 +38,7 @@ import {
 import { initUpdater } from './updater.js';
 import { onScreenBounds } from './window-bounds.js';
 import { resolveUserData, appChannel, canSelfUpdate, syncVersion } from './user-data.js';
+import { canKeepSecret } from './safe-store.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -399,7 +403,8 @@ const helloVerify = (name, action = 'open') => helloAsk(`${action === 'delete' ?
 const holesRoot = () => path.join(storageRoot(), 'blackholes');
 const blackHoles = new BlackHoles({
   root: holesRoot,
-  canProtect: () => { try { return safeStorage.isEncryptionAvailable(); } catch { return false; } },
+  // On Linux with no keyring nothing wrapped is secret: a black hole then refuses and says why (safe-store.js).
+  canProtect: () => canKeepSecret(safeStorage),
   protect: (plain) => safeStorage.encryptString(plain.toString('base64')),
   unprotect: (box) => Buffer.from(safeStorage.decryptString(box), 'base64'),
   hello: helloVerify,
@@ -485,6 +490,28 @@ async function dropOldBackups() {
   }
 }
 
+/**
+ * A plain note that names a picture held for a black hole's note (it was taken
+ * out of the black hole, or the picture was carried over from a note in it):
+ * the picture becomes a file of its own, as any picture of a plain note is.
+ * Which file is remembered for as long as the app runs — the window goes on
+ * naming the held one until the note is next opened, and the black hole may be
+ * locked by then.
+ */
+const carriedOut = new Map();
+function outOfHole(content, noteId) {
+  const text = String(content ?? '');
+  if (!text.includes('nebula-media://hole/')) return content;
+  return blackHoles.withPictures(text, (data, name) => {
+    const key = `${noteId}/${name}`;
+    if (carriedOut.has(key)) return carriedOut.get(key);
+    if (!data) return null;
+    const stored = externalize(data, noteId, notesRoot()).text;
+    if (stored !== data) carriedOut.set(key, stored);
+    return stored;
+  });
+}
+
 /** A note's file, served to the note that shows it: a picture whole, a video in the pieces the player asks for. */
 async function serveMedia(request) {
   if (shut()) return new Response(null, { status: 403 });
@@ -505,6 +532,9 @@ async function serveMedia(request) {
       headers: { ...head, 'content-length': String(to - from + 1), ...(part ? { 'content-range': `bytes ${from}-${to}/${length}` } : {}) },
     });
   }
+  // A picture of a note in an open black hole: held in memory there, and never on the disk.
+  const held = blackHoles.picture(request.url);
+  if (held) return new Response(held.bytes, { status: 200, headers: { 'content-type': held.mime, 'content-length': String(held.bytes.length), 'cache-control': 'no-store' } });
   const named = parseMediaUrl(request.url);
   const file = named ? mediaPath(notesRoot(), named.id, named.file) : null;
   if (!file) return new Response(null, { status: 404 });
@@ -612,6 +642,8 @@ app.on('second-instance', (_event, argv, cwd) => handOver(filesFromArgv(argv, cw
 app.on('open-file', (event, file) => { event.preventDefault(); handOver([file]); });
 let saveRequestId = 0;
 const rendererSavers = new Map();
+/** How long a closing window, already hidden, waits for the other devices to pull. */
+const CLOSE_NUDGE_MS = 3000;
 
 /** Resolve only when the renderer has flushed its buffers and disk queue. */
 function requestRendererSave(win) {
@@ -882,8 +914,23 @@ function createWindow() {
     if (closing) return;
     closing = true;
     void requestRendererSave(win).then(async () => {
-      // Tailscale sync: the peer is asked to pull now, while this copy still answers (a few seconds at most).
-      await sync?.nudgePeer();
+      // Tailscale sync (1.0.4, the owner: "büyük aktarım sürerken kapatmadan önce soru"): a big file crossing
+      // right now is asked about while the window is still there; staying open is what a slip gives (sync-close.js).
+      const question = win.isDestroyed() ? null : closeQuestion(sync?.moving(), await appLanguage());
+      if (question && !win.isDestroyed() && (await dialog.showMessageBox(win, question)).response !== CLOSE) {
+        quitRequested = false;
+        closing = false;
+        return;
+      }
+      // The window goes at once (1.0.4, the owner: "slow to close on X"): the note is saved, and what is
+      // left needs nothing on screen. The save-failed dialog is the catch below, so it never meets a hidden window.
+      if (!win.isDestroyed()) win.hide();
+      // Tailscale sync: the peer is asked to pull now, while this copy still answers. A peer answers only
+      // when its whole pull is done, so closing waits CLOSE_NUDGE_MS for it and no longer.
+      await Promise.race([
+        Promise.resolve(sync?.nudgePeer(CLOSE_NUDGE_MS)).catch(() => 0),
+        new Promise((resolve) => { setTimeout(resolve, CLOSE_NUDGE_MS).unref?.(); }),
+      ]);
       if (win.isDestroyed()) return;
       allowClose = true;
       if (quitRequested) app.quit();
@@ -1113,7 +1160,7 @@ function registerShellHandlers() {
     // while it is open. A note file copied to another computer without the
     // folder beside it came there without them (the owner, 2026-11-02).
     const nebula = !binary && format === 'nebula';
-    const whole = nebula ? await travelWhole(content, notesRoot(), {
+    const whole = nebula ? await travelWhole(blackHoles.withPictures(content), notesRoot(), {
       budget: 0,
       sealed: {
         size: (holeId, noteId, name) => blackHoles.videoSize(holeId, noteId, name),
@@ -1671,12 +1718,14 @@ app.whenReady().then(async () => {
     read: () => (Array.isArray(readPrefs().spellIgnored) ? readPrefs().spellIgnored : []),
     write: (words) => writePrefs({ spellIgnored: words }),
   };
+  // A picture by its address: a file in a note's folder, or one held for a note of an open black hole (black-holes.js).
+  const pictureOf = (url) => blackHoles.pictureDataUrl(url) ?? pictureDataUrl(notesRoot(), url);
   forgetIgnoredWords(session.defaultSession, ignoredWords.read());
   ignoredWords.write([]);
-  registerEditingHandlers(ipcMain, () => mainWindow, ignoredWords, (url) => (shut() ? null : pictureDataUrl(notesRoot(), url)));
+  registerEditingHandlers(ipcMain, () => mainWindow, ignoredWords, (url) => (shut() ? null : pictureOf(url)));
   // The pictures a note names, written into its markup — for an export, a
   // copy for another program, a crop: wherever the picture itself is needed.
-  ipcMain.handle('media:inline', (e, html) => (e.sender === mainWindow?.webContents && !shut() ? inlinePictures(String(html ?? ''), notesRoot()) : String(html ?? '')));
+  ipcMain.handle('media:inline', (e, html) => (e.sender === mainWindow?.webContents && !shut() ? inlinePictures(blackHoles.withPictures(String(html ?? '')), notesRoot()) : String(html ?? '')));
   // The notes whose lost pictures and videos wait for an answer: how many each, never their names.
   ipcMain.handle('media:held', (e) => (e.sender === mainWindow?.webContents && !shut() ? [...heldMedia].map(([id, files]) => ({ id, files: files.length })) : []));
   // The answer "delete them": those files alone, and only the ones the note still does not name — out of its folder and every backup.
@@ -1707,9 +1756,9 @@ app.whenReady().then(async () => {
     heldMedia.delete(String(id));
     return { ok: true, files: files.filter((name) => fsSync.existsSync(path.join(notesRoot(), String(id), name))) };
   });
-  ipcMain.handle('media:data-url', (e, url) => (e.sender === mainWindow?.webContents && !shut() ? pictureDataUrl(notesRoot(), String(url ?? '')) : null));
+  ipcMain.handle('media:data-url', (e, url) => (e.sender === mainWindow?.webContents && !shut() ? pictureOf(String(url ?? '')) : null));
   // A copy is made while the key is still down: this one answers at once.
-  ipcMain.on('media:inline-sync', (e, html) => { e.returnValue = e.sender === mainWindow?.webContents && !shut() ? inlinePictures(String(html ?? ''), notesRoot()) : String(html ?? ''); });
+  ipcMain.on('media:inline-sync', (e, html) => { e.returnValue = e.sender === mainWindow?.webContents && !shut() ? inlinePictures(blackHoles.withPictures(String(html ?? '')), notesRoot()) : String(html ?? ''); });
   // The app's own window. Embeds and AI tabs have sessions of their own,
   // guarded where each is made (session-created, permissions.js).
   session.defaultSession.setPermissionRequestHandler((wc, permission, cb, details) => {
@@ -1911,7 +1960,7 @@ app.whenReady().then(async () => {
       catch { return true; } // unreadable state is never grounds to delete media
     });
     // The sealed videos its notes no longer show went as it opened: they leave the backups too.
-    const { swept, ...res } = await blackHoles.unlock(String(id ?? ''), by ?? {}, { preserveMedia });
+    const { swept, ...res } = await blackHoles.unlock(String(id ?? ''), by ?? {}, { preserveMedia, holdPictures: true });
     // A backup that was unreadable during the first upgrade gets another
     // chance whenever the protected live hole is authenticated again.
     if (res.ok) {
@@ -1933,7 +1982,9 @@ app.whenReady().then(async () => {
   hole('lock-all', async () => { blackHoles.lockAll(); await clearOpenedAsync({ holes: true }); dropAllPreviews(); return { ok: true }; });
   // Sealed whole: a note that still names pictures in the notes folder (it was
   // just moved in) has them written into it first — the folder goes with its plain file.
-  hole('write', async (id, noteId, json) => blackHoles.writeAsync(String(id ?? ''), String(noteId ?? ''), await inlinePicturesAsync(String(json ?? ''), notesRoot())));
+  // Its own pictures, held here while it is open and only named in the window's
+  // copy, are written into it again too: the sealed file is the whole note.
+  hole('write', async (id, noteId, json) => blackHoles.writeAsync(String(id ?? ''), String(noteId ?? ''), await inlinePicturesAsync(blackHoles.withPictures(String(json ?? ''), null, String(id ?? '')), notesRoot())));
   hole('remove', async (id, noteId) => {
     const res = await blackHoles.remove(String(id ?? ''), String(noteId ?? ''));
     // Deleted is deleted: its sealed copies leave the backups too.
@@ -2141,6 +2192,102 @@ app.whenReady().then(async () => {
       return error ? { ok: false, error } : { ok: true };
     } catch (err) { return { ok: false, error: err.message }; }
   });
+  /**
+   * A file's card pulled out of the window (1.0.4, file-attach.js initAttachCarry):
+   * the copy Open makes, handed to the system's own drag. It is made when the
+   * card is first carried, so it is there when the pointer leaves the window —
+   * the drag can only begin while the button is still held.
+   * @type {null | {dest: string, made: Promise<boolean>}}
+   */
+  let carried = null;
+  const carry = (url, name) => {
+    const of = attachedOf(url);
+    if (shut() || !of || (of.holeId && !blackHoles.isOpen(of.holeId))) return null;
+    const dest = openedPath(openedDir(), url, name);
+    if (!dest) return null;
+    if (carried?.dest === dest) return carried;
+    const made = (async () => {
+      if (fsSync.existsSync(dest)) return true;
+      const res = await attachedTo(url, dest);
+      if (res.ok) await markOfTheWeb(dest);
+      return !!res.ok;
+    })().catch(() => false);
+    carried = { dest, made };
+    return carried;
+  };
+  ipcMain.handle('media:carry-file', async (e, url, name) => {
+    if (e.sender !== mainWindow?.webContents || shut()) return { ok: false };
+    const c = carry(url, name);
+    return { ok: !!c && await c.made };
+  });
+  /** Counts the pulls: a picture's drag asked for before the button was let go is not begun after. */
+  let pulls = 0;
+  ipcMain.handle('media:carry-end', (e) => {
+    if (e.sender === mainWindow?.webContents) { carried = null; pulls += 1; }
+    return { ok: true };
+  });
+  ipcMain.handle('media:drag-file', async (e, url, name) => {
+    if (e.sender !== mainWindow?.webContents || shut()) return { ok: false };
+    const of = attachedOf(url);
+    const c = carry(url, name);
+    if (!c) return { ok: false, error: 'locked' };
+    try {
+      if (!(await c.made)) { if (carried === c) carried = null; return { ok: false, error: 'missing' }; }
+      const icon = await app.getFileIcon(c.dest, { size: 'normal' });
+      // Let go, or locked, while the copy was made: nothing is handed over.
+      if (carried !== c || e.sender.isDestroyed()) return { ok: false, canceled: true };
+      carried = null;
+      if (shut() || (of.holeId && !blackHoles.isOpen(of.holeId))) {
+        if (of.holeId) await clearOpenedAsync({ url: String(url) });
+        return { ok: false, error: 'locked' };
+      }
+      if (icon.isEmpty()) return { ok: false, error: 'icon' };
+      e.sender.startDrag({ file: c.dest, icon });
+      return { ok: true };
+    } catch (err) { return { ok: false, error: err.message }; }
+  });
+  /**
+   * A picture pulled out of the window (1.0.4, the owner: "resimin de
+   * sürüklenmesi lazim"): a copy of it among Open's copies, handed to the
+   * system's drag under a small likeness of itself. A picture is small, so
+   * its copy is made when the pointer leaves, not before.
+   */
+  ipcMain.handle('media:drag-picture', async (e, src, owner) => {
+    if (e.sender !== mainWindow?.webContents || shut()) return { ok: false };
+    const of = carriedPicture(openedDir(), blackHoles.pictureDataUrl(src) ?? src, { id: owner?.id ?? null, hole: owner?.hole ?? null });
+    const open = () => !shut() && !!of && (!of.holeId || blackHoles.isOpen(of.holeId));
+    if (!open()) return { ok: false, error: of ? 'locked' : 'missing' };
+    const pull = pulls;
+    try {
+      if (!fsSync.existsSync(of.dest)) {
+        const from = of.bytes ? null : mediaPath(notesRoot(), of.noteId, of.file);
+        if (!of.bytes && (!from || !fsSync.existsSync(from))) return { ok: false, error: 'missing' };
+        await fs.mkdir(path.dirname(of.dest), { recursive: true });
+        const tmp = of.dest + '.tmp-' + process.pid;
+        try {
+          if (of.bytes) await fs.writeFile(tmp, of.bytes); else await fs.copyFile(from, tmp);
+          await fs.rename(tmp, of.dest);
+        } catch (err) {
+          await fs.rm(tmp, { force: true }).catch(() => {});
+          throw err;
+        }
+        await markOfTheWeb(of.dest);
+      }
+      let icon = nativeImage.createFromPath(of.dest);
+      icon = icon.isEmpty() ? await app.getFileIcon(of.dest, { size: 'normal' }) : icon.resize({ width: 96 });
+      if (e.sender.isDestroyed()) return { ok: false, canceled: true };
+      // Locked while the copy was made: nothing is handed over, and the copy goes.
+      if (!open()) {
+        if (of.holeId) await clearOpenedAsync({ holeId: of.holeId, noteId: of.noteId });
+        return { ok: false, error: 'locked' };
+      }
+      if (icon.isEmpty()) return { ok: false, error: 'icon' };
+      // Let go while the copy was made: with no button held the system would let it go at once, wherever the pointer is.
+      if (pull !== pulls) return { ok: false, canceled: true };
+      e.sender.startDrag({ file: of.dest, icon });
+      return { ok: true };
+    } catch (err) { return { ok: false, error: err.message }; }
+  });
   // A file's card taken out of its note: the copy Open made of it goes now (the file itself at the next start).
   ipcMain.handle('media:forget-file', async (e, url) => {
     if (e.sender !== mainWindow?.webContents || shut()) return { ok: false };
@@ -2308,21 +2455,23 @@ app.whenReady().then(async () => {
     // comma is only the note's own mark.
     if (noteId && /[{,]\s*"hole"\s*:/.test(String(content))) return { ok: false, error: 'Encrypted notes require black-hole storage' };
     vault.assert(noteId);
+    // Tailscale sync, live (1.0.4): a note, the folders or the projects written by this computer's own doing is
+    // told to the other devices — asked now, before anything is awaited, while a pull that hands it over still waits.
+    const told = noteId ?? (/^(?:folders|projects)\.json$/.test(String(rel)) ? String(rel) : null);
+    const live = told ? !!sync?.own(told) : false;
     const abs = inStorage(rel);
     await fs.mkdir(path.dirname(abs), { recursive: true });
     // A note's pictures go to its folder as files, and its file keeps their
     // names (note-media.js): the files first, so the text never names one
     // that is not there.
-    const stored = noteId ? rehome(externalize(content, noteId, notesRoot()).text, noteId, notesRoot()) : content;
+    const stored = noteId ? rehome(externalize(outOfHole(content, noteId), noteId, notesRoot()).text, noteId, notesRoot()) : content;
     // What this write takes out of the note is written down as taken out by the person — so that the next start
     // deletes it without asking — and written down first: cut off between the two, the note still names the file.
-    if (noteId) {
-      let before = null;
-      try { before = await fs.readFile(abs, 'utf8'); } catch { /* a new note */ }
-      if (before !== null) {
-        try { if (noteReleases(released, noteId, before, stored)) writeReleased(releasedFile(), released); }
-        catch (err) { console.warn('[nebula] what is taken out of a note could not be written down:', err.message); }
-      }
+    let before = null;
+    if (noteId || live) { try { before = await fs.readFile(abs, 'utf8'); } catch { /* a new note */ } }
+    if (noteId && before !== null) {
+      try { if (noteReleases(released, noteId, before, stored)) writeReleased(releasedFile(), released); }
+      catch (err) { console.warn('[nebula] what is taken out of a note could not be written down:', err.message); }
     }
     const tmp = `${abs}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
@@ -2333,6 +2482,8 @@ app.whenReady().then(async () => {
       throw err;
     }
     if (noteId) vault.remember(noteId);
+    // Written again as it was is no change: nobody is asked to look.
+    if (live && before !== stored) sync?.changed();
     // A picture taken out of the note keeps its file until the next start: an undo may still want it.
     return { ok: true, path: abs };
   });
@@ -2366,15 +2517,20 @@ app.whenReady().then(async () => {
       vault.assert(noteIdOf(rel));
       const abs = resolveInStorage(rel);
       if (!rel || abs === storageRoot()) return { ok: false };
+      const note = /^notes[\\/]([\w-]+)\.json$/.exec(String(rel));
+      // Live (1.0.4): deleted by this computer's own doing, not let go by a pull — asked before anything is awaited.
+      const live = note ? !!sync?.own(note[1]) : false;
+      // Kept to this computer (1.0.4): read while its file is still there — its deletion is then no word to the other devices.
+      const kept = note ? !!(await sync?.isKept(note[1])) : false;
       // A note: its file is in its folder, which goes whole just below (and a flat file of an older vault with it).
       await fs.rm(abs, { recursive: true, force: true });
       // A note deleted from the vault (the Trash's Delete) leaves every backup
       // with it: a deleted note must not be recoverable (owner, 2026-09-27).
-      const note = /^notes[\\/]([\w-]+)\.json$/.exec(String(rel));
       if (note && NOTE_ID.test(note[1])) { await removeNoteFolderAsync(notesRoot(), note[1]); vault.forget(note[1]); await clearOpenedAsync({ noteId: note[1] }); }   // its pictures, videos and files with it
       if (note) await purgeNoteFromBackupsAsync(backupsRoot(), note[1]);
-      // Tailscale sync: the peer lets it go too, and nothing half-downloaded for it is left.
-      if (note) await sync?.forgetNote(note[1]);
+      // Tailscale sync: the peer lets it go too (not a note that was kept to this computer), and nothing half-downloaded for it is left.
+      if (note) await sync?.forgetNote(note[1], { kept });
+      if (live && !kept) sync?.changed();
       return { ok: true };
     } catch {
       return { ok: false };
@@ -2397,6 +2553,11 @@ app.whenReady().then(async () => {
     if (event.sender !== mainWindow?.webContents) return { ok: false };
     return fetchPageTitle(url);
   });
+  // A city's weather for the Weather widget (1.0.4): the least that can be asked, see weather.js.
+  ipcMain.handle('weather:get', (event, place) => {
+    if (event.sender !== mainWindow?.webContents) return { ok: false };
+    return fetchWeather(place);
+  });
   // A video's still and title, for an export "with video" (0.9.3).
   ipcMain.handle('links:video-poster', (event, url) => {
     if (event.sender !== mainWindow?.webContents) return { ok: false };
@@ -2411,9 +2572,12 @@ app.whenReady().then(async () => {
     version: SYNC_VERSION,
     shut,
     getWindow: () => mainWindow,
-    canProtect: () => { try { return safeStorage.isEncryptionAvailable(); } catch { return false; } },
+    // The pairing is kept only where the system keeps it secret — on Linux, in a keyring (safe-store.js).
+    canProtect: () => canKeepSecret(safeStorage),
     protect: (text) => safeStorage.encryptString(text),
     unprotect: (box) => safeStorage.decryptString(box),
+    // A device that does not answer though Tailscale sees it online: Tools then names the firewall (1.0.4).
+    tailnetOnline: createTailscaleStatus().online,
   });
   sync.register(ipcMain, (e) => e.sender === mainWindow?.webContents);
   sync.start();

@@ -124,8 +124,14 @@ export async function runCanvasChecks(check) {
     check('and selecting the shape after the image leaves only the shape bar open', bars2.shape && !bars2.image, JSON.stringify(bars2));
     await win.keyboard.press('Escape');
 
-    /* An arrow tied to the image follows it when the image is dragged. */
-    await win.evaluate(() => document.querySelector('[data-arrow-add="straight"]').click());
+    /* An arrow tied to the image follows it when the image is dragged. Its tile is picked, then a click on the page puts it (1.0.4). */
+    await win.evaluate(() => document.querySelector('[data-act="arrow"]').click());
+    await win.waitForSelector('#arrow-menu [data-arrow-add="straight"]', { timeout: 3000 });
+    await win.evaluate(() => document.querySelector('#arrow-menu [data-arrow-add="straight"]').click());
+    const put = await win.evaluate(() => { const r = document.getElementById('editor').getBoundingClientRect(); return { x: r.right - 260, y: r.top + 320 }; });
+    await win.mouse.move(put.x, put.y);
+    await win.mouse.click(put.x, put.y);
+    await win.waitForSelector('#editor .note-arrow', { timeout: 3000 });
     await win.waitForTimeout(150);
     const tip = await center('#editor .note-arrow .arrow-end[data-end="to"]');
     const target = await win.evaluate(() => { const r = document.querySelector('#editor .note-image').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });

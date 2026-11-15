@@ -89,10 +89,13 @@ describe('a background made of colours (1.0.3)', () => {
     expect(cleanMix({ style: 'nope', colors: ['#111111'] })).toEqual({ style: DEFAULT_MIX.style, colors: DEFAULT_MIX.colors, on: false });
     expect(cleanMix({ colors: ['#111111', 'red', '#22222', '#333333'] }).colors).toEqual(['#111111', '#333333']);
     expect(cleanMix({ colors: Array(9).fill('#123456') }).colors).toHaveLength(MIX_MAX);
-    expect(MIX_STYLES.length).toBe(15);
+    expect(MIX_STYLES.length).toBe(14);
     expect(MIX_STYLES.slice(8, 12).map((s) => s.id)).toEqual(['aurora', 'rings', 'mesh', 'facets']);
-    expect(MIX_STYLES.slice(-3).map((s) => s.id)).toEqual(['horizon', 'dunes', 'bubbles']);
-    for (const style of ['horizon', 'dunes', 'bubbles']) expect(cleanMix({ style }).style).toBe(style);
+    expect(MIX_STYLES.slice(-2).map((s) => s.id)).toEqual(['dunes', 'bubbles']);
+    for (const style of ['dunes', 'bubbles']) expect(cleanMix({ style }).style).toBe(style);
+    // Horizon is no more (1.0.4, the owner: "styles'dan horizon silinsin"): a mix kept with it keeps its colours.
+    expect(MIX_STYLES.some((s) => s.id === 'horizon')).toBe(false);
+    expect(cleanMix({ style: 'horizon', colors: ['#112233', '#445566'], on: true })).toEqual({ style: DEFAULT_MIX.style, colors: ['#112233', '#445566'], on: true });
   });
 
   it('softens the picture on a screen outside the laptop, or as Settings says', () => {

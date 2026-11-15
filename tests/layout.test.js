@@ -4,7 +4,7 @@
  * columns. The dragging itself is in tests/e2e/layout.mjs.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { alignOf, setAlign, putBeside, leaveRow, rowOf, inRow, tidyRows, pictureBefore, inText, ROW, inWord, putInLine, leaveLine } from '../src/js/image-place.js';
+import { alignOf, setAlign, putBeside, leaveRow, rowOf, inRow, tidyRows, pictureBefore, inText, ROW, inWord, putInLine, leaveLine, rowGiven, rowRest } from '../src/js/image-place.js';
 import JSZip from 'jszip';
 import {
   cleanSplit, sectionOf, splitAt, unsplit, healColumns, setSplit, MIN_SPLIT, MAX_SPLIT,
@@ -31,6 +31,53 @@ function note(html) {
   document.body.replaceChildren(root);
   return root;
 }
+
+// The owner, 1.0.4, eight widgets on one line: "sol üstteki widgeti büyütmeye çalıştığımda küçülüyor, ters tepiyor".
+describe('a picture of a full row, pulled wider', () => {
+  // What a row draws of a picture: its part of the widths given, of what the line holds.
+  const drawn = (given, rest, room) => (given + rest <= room ? given : (given / (given + rest)) * room);
+
+  it('a row with room to spare is given the width asked for', () => {
+    expect(rowGiven(100, 200, 400)).toBe(100);
+    expect(rowGiven(200, 200, 400)).toBe(200);
+    expect(rowGiven(120, 0, 400)).toBe(120);                    // alone on its line
+    expect(rowGiven(120, 200, 0)).toBe(120);                    // a line not yet laid out
+  });
+
+  it('a row given more than its line holds: the width written is the one that is drawn as wide as asked', () => {
+    for (const [want, rest, room] of [[300, 800, 400], [150, 1400, 700], [90, 700, 640], [250, 1750, 1000]]) {
+      const given = rowGiven(want, rest, room);
+      expect(given).toBeGreaterThan(want);
+      expect(drawn(given, rest, room)).toBeCloseTo(want, 6);
+    }
+  });
+
+  it('wider asked is wider drawn, at every step: it never turns back', () => {
+    let before = 0;
+    for (let want = 60; want <= 900; want += 20) {
+      const now = drawn(rowGiven(want, 1400, 700), 1400, 700);
+      expect(now, String(want)).toBeGreaterThanOrEqual(before);
+      before = now;
+    }
+    expect(before).toBeCloseTo(630, 6);                         // never the whole line: the others keep a tenth
+  });
+
+  it('a row that held its pictures when the pull began is not crowded: it grows to the line\'s end and stops', () => {
+    expect(rowGiven(900, 200, 907, 300)).toBe(707);             // the other keeps its 200
+    expect(rowGiven(500, 200, 907, 300)).toBe(500);             // room to spare still
+    expect(drawn(rowGiven(350, 800, 900, 300), 800, 900)).toBeCloseTo(350, 6);   // crowded before the pull: its part grows
+  });
+
+  it('the rest of a row is what its other pictures were given', () => {
+    note(`<p id="a">one</p>${pic('p1')}${pic('p2')}${pic('p3')}`);
+    putBeside($('p2'), $('p1'));
+    putBeside($('p3'), $('p2'));
+    $('p3').style.width = '340px';
+    expect(rowOf($('p1'))).toHaveLength(3);
+    expect(rowRest($('p1'))).toBe(540);
+    expect(rowRest($('p3'))).toBe(400);
+  });
+});
 
 describe('a picture in the text, on its line', () => {
   beforeEach(() => note(`<p id="a">one</p>${pic('p1')}${pic('p2')}<p id="b">two</p>${pic('p3')}<div class="shape-layer"><figure class="note-image" id="free"></figure></div>`));
@@ -115,6 +162,21 @@ describe('a picture in the text, on its line', () => {
     leaveRow($('p2'));
     expect(beside()).toBe('- - -');
     expect($('p1').getAttribute('style')).toBe('width: 651px;');
+  });
+
+  it('and its part of the widths the row was given, so a narrow line shrinks them all alike', () => {
+    const share = () => ['p1', 'p2', 'p3'].map((id) => $(id).style.getPropertyValue('--share') || '-').join(' ');
+    $('p1').style.width = '220px';
+    $('p2').style.width = '600px';
+    $('p3').style.width = '180px';
+    putBeside($('p2'), $('p1'), 'after');
+    expect(share()).toBe('0.2682 0.7317 -');                  // rounded down: never more than the line together
+    putBeside($('p3'), $('p2'), 'after');
+    expect(share()).toBe('0.22 0.6 0.18');
+    leaveRow($('p3'));
+    leaveRow($('p2'));
+    expect(share()).toBe('- - -');
+    expect($('p1').getAttribute('style')).toBe('width: 220px;');
   });
 
   it('aligning a picture in a row takes it out of the row first', () => {

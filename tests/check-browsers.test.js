@@ -5,30 +5,30 @@
 import { describe, it, expect } from 'vitest';
 import { checkBrowsers, compareVersions } from '../scripts/check-browsers.js';
 
-const NOW = Date.UTC(2026, 8, 30);
-const mozilla = (latest, esr = '140.17.0esr', next = '153.4.0esr') => ({ LATEST_FIREFOX_VERSION: `${latest}.0`, FIREFOX_ESR: esr, FIREFOX_ESR_NEXT: next, LAST_RELEASE_DATE: '2026-09-29' });
+const NOW = Date.UTC(2026, 10, 11);
+const mozilla = (latest, esr = '140.17.0esr', next = '153.4.0esr') => ({ LATEST_FIREFOX_VERSION: `${latest}.0`, FIREFOX_ESR: esr, FIREFOX_ESR_NEXT: next, LAST_RELEASE_DATE: '2026-11-10' });
 
 describe('check-browsers', () => {
   it('passes when the Firefox told is today\'s (or the one before)', async () => {
-    const r = await checkBrowsers({ now: NOW, mozilla: mozilla(157), chrome: [{ version: '154.0.1' }], engine: '152.0.0', installed: null });
+    const r = await checkBrowsers({ now: NOW, mozilla: mozilla(160), chrome: [{ version: '154.0.1' }], engine: '152.0.0', installed: null });
     expect(r.ok).toBe(true);
-    expect((await checkBrowsers({ now: NOW, mozilla: mozilla(158), chrome: [], engine: null, installed: null })).ok).toBe(true);
+    expect((await checkBrowsers({ now: NOW, mozilla: mozilla(161), chrome: [], engine: null, installed: null })).ok).toBe(true);
   });
 
   it('stops on a Firefox that fell behind, and says the line to change', async () => {
-    const r = await checkBrowsers({ now: NOW, mozilla: mozilla(160), chrome: [], engine: null });
+    const r = await checkBrowsers({ now: NOW, mozilla: mozilla(163), chrome: [], engine: null });
     expect(r.ok).toBe(false);
-    expect(r.rows.find((x) => x.name === 'Firefox').fix).toContain("{ version: 160, date: '2026-09-29' }");
+    expect(r.rows.find((x) => x.name === 'Firefox').fix).toContain("{ version: 163, date: '2026-11-10' }");
   });
 
   it('stops on an ESR that is no longer one', async () => {
-    const r = await checkBrowsers({ now: NOW, mozilla: mozilla(157, '165.0.0esr', ''), chrome: [], engine: null });   // an ESR past the one the app tells
+    const r = await checkBrowsers({ now: NOW, mozilla: mozilla(160, '165.0.0esr', ''), chrome: [], engine: null });   // an ESR past the one the app tells
     expect(r.ok).toBe(false);
     expect(r.rows.find((x) => x.name === 'Firefox ESR').fix).toContain('165');
   });
 
   it('says loudly, without stopping, that Electron\'s Chromium is years behind', async () => {
-    const r = await checkBrowsers({ now: NOW, mozilla: mozilla(157), chrome: [{ version: '154.0.8037.93' }], engine: '130.0.6723.191', installed: null });
+    const r = await checkBrowsers({ now: NOW, mozilla: mozilla(160), chrome: [{ version: '154.0.8037.93' }], engine: '130.0.6723.191', installed: null });
     expect(r.ok).toBe(true);
     const row = r.rows.find((x) => x.name === 'Chromium (Electron)');
     expect(row.warn).toBe(true);
@@ -36,7 +36,7 @@ describe('check-browsers', () => {
   });
 
   it('stops when a newer Electron is out, and says how to upgrade and what to test (the owner, 2026-09-30)', async () => {
-    const base = { now: NOW, mozilla: mozilla(157), chrome: [], engine: null };
+    const base = { now: NOW, mozilla: mozilla(160), chrome: [], engine: null };
     const behind = await checkBrowsers({ ...base, electron: '44.6.0', installed: '44.5.0' });
     expect(behind.ok).toBe(false);
     const row = behind.rows.find((x) => x.name === 'Electron');

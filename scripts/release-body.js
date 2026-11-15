@@ -15,7 +15,10 @@ export function releaseBody(version) {
     + `| Windows installer | [Nebula-Setup-${v}.exe](${assets}/Nebula-Setup-${v}.exe) | In-app update |\n`
     + `| Windows portable | [Nebula-portable-${v}.exe](${assets}/Nebula-portable-${v}.exe) | Manual replacement; keep Nebula-data |\n`
     + `| macOS Intel + Apple Silicon | [Nebula-${v}-mac.dmg](${assets}/Nebula-${v}-mac.dmg) | Manual update, steps below |\n`
-    + `| macOS alternative archive | [Nebula-${v}-mac.zip](${assets}/Nebula-${v}-mac.zip) | Same universal app |\n\n`
+    + `| macOS alternative archive | [Nebula-${v}-mac.zip](${assets}/Nebula-${v}-mac.zip) | Same universal app |\n`
+    + `| Linux, any distribution | [Nebula-${v}.AppImage](${assets}/Nebula-${v}.AppImage) | In-app update |\n`
+    + `| Ubuntu, Linux Mint, Kali | [nebula_${v}_amd64.deb](${assets}/nebula_${v}_amd64.deb) | Download the new package |\n`
+    + `| Arch, Manjaro, EndeavourOS | [nebula-${v}.pacman](${assets}/nebula-${v}.pacman) | Download the new package |\n\n`
     + 'Choose an app asset, not the automatically generated Source code archives.\n\n'
     + '## macOS: update without replacing your notes\n\n'
     + '1. Save and wait for **Saved**. If saving fails, keep Nebula open and resolve it first.\n'
@@ -26,6 +29,13 @@ export function releaseBody(version) {
     + '### macOS security warning\n\n'
     + 'This build is not Developer ID signed/notarized. A warning does not prove a file is safe. Only proceed if you trust the official download. After attempting to open it, use **System Settings → Privacy & Security → Open Anyway**, if available. A new update may prompt again. Do not disable Gatekeeper globally or bypass malware/damage warnings blindly. See [Apple guidance](https://support.apple.com/en-au/102445).\n\n'
     + `Detailed troubleshooting, save errors and backups: [Updating Nebula](${repo}/blob/v${v}/docs/UPDATING.md).\n\n`
+    + '## Linux\n\n'
+    + 'The packages are for 64-bit Intel and AMD computers (x64).\n\n'
+    + `- **Ubuntu, Linux Mint, Kali:** \`sudo apt install ./nebula_${v}_amd64.deb\`\n`
+    + `- **Arch, Manjaro, EndeavourOS:** \`sudo pacman -U nebula-${v}.pacman\`\n`
+    + `- **Any distribution:** \`chmod +x Nebula-${v}.AppImage\`, then open it. Nothing is installed; the file is the app. An AppImage needs FUSE 2 (\`libfuse2\`), and on Ubuntu 24.04 and later the system may stop it from starting, so on Ubuntu, Mint and Kali the deb is the one to take.\n\n`
+    + 'The AppImage offers **Update**, then **Restart and install**, and puts the new file in the place of the old one. The deb and the pacman package show a card that opens this page: install the new package over the old one the same way. Your notes are in `~/.config/nebula` and no package touches them; keep a backup before upgrading all the same.\n\n'
+    + 'Black holes and the sync pairing keep their keys in the system keyring: **GNOME Keyring** or **KWallet**, installed and unlocked. Without one Nebula does not store those keys weakly; it refuses to make or open a black hole or to pair, and says why. Notes, and everything else, work without a keyring.\n\n'
     + '## Windows updates\n\nInstalled copies offer **Update**, then **Restart and install**. Saving and a pre-install snapshot must succeed first. Portable copies use manual downloads. App files and note profiles are separate, but keep backups before upgrading.\n';
 }
 

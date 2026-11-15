@@ -30,15 +30,22 @@ import { t, getLang } from './i18n.js';
 import { ring, stopRing, isRinging, soundChoices, soundOf, chooseSound, addOwnSound, removeOwnSound, builtInLabel } from './alarm-sound.js';
 import { on } from './bus.js';
 import { cornerStack, placeCorner, inSight, showWidget } from './corner.js';
+import { cityOf, searchCities, countryName, wallTime, aheadText, skyOf, degrees } from './cities.js';
 
 export const WIDGETS = [
   { kind: 'calc', ic: 'calculator', label: 'Calculator', width: 240, ratio: 0.72 },
   { kind: 'sci', ic: 'sciCalc', label: 'Scientific calculator', width: 360, ratio: 0.95 },
-  { kind: 'calendar', ic: 'calendar', label: 'Calendar', width: 280, ratio: 0.92 },
+  { kind: 'calendar', ic: 'calendar', label: 'Calendar', width: 280, ratio: 0.975 },
   { kind: 'universe', ic: 'universe', label: 'Universe', width: 420, ratio: 1.6 },
   { kind: 'pomodoro', ic: 'pomodoro', label: 'Pomodoro', width: 300, ratio: 0.9 },
   { kind: 'clock', ic: 'clock', label: 'Clock', width: 260, ratio: 1.2 },
+  { kind: 'world', ic: 'worldClock', label: 'World clock', width: 280, ratio: 2.3 },
+  { kind: 'weather', ic: 'weather', label: 'Weather', width: 260, ratio: 1.6 },
 ];
+/** As many cities as one World clock holds. */
+export const WORLD_MAX = 8;
+/** As many cities as one Weather holds: each is a question asked of Open-Meteo. */
+export const WEATHER_MAX = 6;
 const byKind = (kind) => WIDGETS.find((w) => w.kind === kind) ?? null;
 
 /* ---- arithmetic ------------------------------------------------------------ */
@@ -306,7 +313,15 @@ export function eventAt(e) {
  */
 
 /** [least, most, default] of each Pomodoro setting, in minutes (rounds: sessions). */
-export const POMO_LIMITS = { focus: [1, 180, 25], short: [1, 60, 5], long: [1, 90, 15], rounds: [1, 12, 4] };
+// Six hours at most, each (the owner, 1.0.4: "pomodoroda limit ise 6 saat olsun maks").
+export const POMO_LIMITS = { focus: [1, 360, 25], short: [1, 360, 5], long: [1, 360, 15], rounds: [1, 12, 4] };
+/**
+ * The Clock's timer, in minutes (1.0.4, the owner: "clock widgetinde timer da
+ * olsun"); as long as is asked for ("saat zamanlayicilari, siniri olmasin").
+ */
+export const TIMER_LIMITS = [1, Infinity, 10];
+/** How many digits a typed length may have: a Pomodoro's part, the Clock's timer. */
+const TYPED_DIGITS = { timer: 6, h: 2, m: 2 };
 const within = (v, [lo, hi, def]) => { const n = Number.parseInt(v, 10); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : def; };
 const validAlarm = (v) => (/^([01]\d|2[0-3]):[0-5]\d$/.test(v ?? '') ? v : null);
 
@@ -326,6 +341,9 @@ export function stepMinutes(v, dir, [lo, hi]) {
 export function stepPomo(s, key) {
   if (key === 'mode-pomo' || key === 'mode-watch') return { ...s, mode: key === 'mode-watch' ? 'watch' : 'pomo' };
   if (key === 'auto') return { ...s, auto: !s.auto };
+  // A number typed in place of the one between − and + (focus=45).
+  const typed = /^(focus|short|long|rounds)=(\d{1,9})$/.exec(key ?? '');
+  if (typed) return { ...s, [typed[1]]: within(typed[2], POMO_LIMITS[typed[1]]) };
   const m = /^(focus|short|long|rounds)([+-])$/.exec(key ?? '');
   if (!m) return null;
   const dir = m[2] === '+' ? 1 : -1;
@@ -342,6 +360,23 @@ export function stepAlarm(at, key) {
   if (!hour && !min) return null;
   const mm = min > 0 ? Math.floor(m / 5) * 5 + 5 : min < 0 ? Math.ceil(m / 5) * 5 - 5 : m;
   return `${pad((h + hour + 24) % 24)}:${pad((mm + 60) % 60)}`;
+}
+
+/** A Clock key (view-timer, timer+, alarm, h+ …) on the state; null for another key. Pure — tested. */
+export function stepClock(s, key) {
+  if (key === 'view-clock' || key === 'view-timer') return { ...s, view: key === 'view-timer' ? 'timer' : 'clock' };
+  if (key === 'timer+' || key === 'timer-') return { ...s, timer: stepMinutes(s.timer, key === 'timer+' ? 1 : -1, TIMER_LIMITS) };
+  if (key === 'alarm') return { ...s, alarmOn: !s.alarmOn };
+  // Typed: the timer's minutes, the alarm's hour or minute (timer=600, h=6, m=45).
+  const typed = /^(timer|h|m)=(\d{1,9})$/.exec(key ?? '');
+  if (typed?.[1] === 'timer') return { ...s, timer: within(typed[2], TIMER_LIMITS) };
+  if (typed) {
+    const [h, m] = (validAlarm(s.alarm) ?? '07:00').split(':').map(Number);
+    const n = Number(typed[2]);
+    return { ...s, alarm: typed[1] === 'h' ? `${pad(Math.min(23, n))}:${pad(m)}` : `${pad(h)}:${pad(Math.min(59, n))}` };
+  }
+  const at = stepAlarm(s.alarm, key);
+  return at ? { ...s, alarm: at } : null;
 }
 
 /** Whether an alarm at 'HH:MM' came between two moments (ms), so a slow tick never misses it. Pure — tested. */
@@ -385,7 +420,45 @@ export function stateOf(fig) {
     auto: d.wgAuto === '1',
     alarm: validAlarm(d.wgAlarm) ?? '07:00',
     alarmOn: d.wgAlarmOn === '1',
+    view: d.widget === 'clock' && d.wgMode === 'timer' ? 'timer' : 'clock',
+    timer: within(d.wgTimer, TIMER_LIMITS),
+    // Cities are known by Nebula's own list (cities.js); one it does not know is not kept.
+    ...placesOf(d),
+    unit: d.wgUnit === 'f' ? 'f' : 'c',
   };
+}
+
+/**
+ * The cities a World clock or a Weather holds, and the one a Weather shows.
+ * Cities are known by Nebula's own list (cities.js); one it does not know is not kept.
+ */
+function placesOf(d) {
+  if (d.widget !== 'world' && d.widget !== 'weather') return { cities: [], city: null };
+  let cities = (d.wgCities ?? '').split(',').filter((id, i, all) => cityOf(id) && all.indexOf(id) === i);
+  if (d.widget === 'world') return { cities: cities.slice(0, WORLD_MAX), city: null };
+  // A Weather from before it held more than one city has only the one it shows.
+  if (cityOf(d.wgCity) && !cities.includes(d.wgCity)) cities = [d.wgCity, ...cities];
+  cities = cities.slice(0, WEATHER_MAX);
+  return { cities, city: cities.includes(d.wgCity) ? d.wgCity : cities[0] ?? null };
+}
+
+/**
+ * A World clock or a Weather widget after a key: `city+id` adds a city (the
+ * Weather shows the one just added), `city-del-id` takes one away, `city=id`
+ * shows another of the Weather's cities, `unit` turns °C into °F and back.
+ * null when nothing changes.
+ */
+export function stepPlace(s, key, max = WORLD_MAX) {
+  const [, op, id] = /^city(\+|-del-|=)([a-z0-9-]+)$/.exec(key) ?? [];
+  if (op === '+') return !cityOf(id) || s.cities.includes(id) || s.cities.length >= max ? null : { ...s, cities: [...s.cities, id], city: id };
+  if (op === '-del-') {
+    if (!s.cities.includes(id)) return null;
+    const cities = s.cities.filter((c) => c !== id);
+    return { ...s, cities, city: s.city === id ? cities[0] ?? null : s.city };
+  }
+  if (op === '=') return !s.cities.includes(id) || s.city === id ? null : { ...s, city: id };
+  if (key === 'unit') return { ...s, unit: s.unit === 'f' ? 'c' : 'f' };
+  return null;
 }
 
 function writeState(fig, s) {
@@ -406,6 +479,17 @@ function writeState(fig, s) {
   if (fig.dataset.widget === 'clock') {
     set('wgAlarm', s.alarm);
     set('wgAlarmOn', s.alarmOn ? '1' : '');
+    // Only what was changed: a clock from before the timer is written as it was.
+    set('wgMode', s.view === 'timer' ? 'timer' : '');
+    set('wgTimer', s.timer === TIMER_LIMITS[2] ? '' : String(s.timer));
+    return;
+  }
+  if (fig.dataset.widget === 'world') { set('wgCities', s.cities.join(',')); return; }
+  if (fig.dataset.widget === 'weather') {
+    // One city is written as it always was; the list only when there is more than one.
+    set('wgCities', s.cities.length > 1 ? s.cities.join(',') : '');
+    set('wgCity', s.city);
+    set('wgUnit', s.unit === 'f' ? 'f' : '');
     return;
   }
   set('wgExpr', s.expr);
@@ -511,6 +595,26 @@ export function dayLabel(day, lang = getLang()) {
 }
 
 /** Under the month: the chosen day, its mark, its events and a way to add one. */
+/**
+ * How many lines a calendar keeps under its day: as many as its fullest day holds, one at the
+ * least and three at the most (more scroll). The calendar was one height whatever it held, and
+ * under a day with nothing on it lay a quarter of the widget, empty ("the part below is very
+ * empty, make it shorter", the owner, 1.0.4). It goes by all its days and not by the chosen one,
+ * so choosing a day moves nothing in the note. Pure — tested.
+ */
+export function calendarRows(events) {
+  const perDay = new Map();
+  let most = 1;
+  for (const e of Array.isArray(events) ? events : []) {
+    const n = (perDay.get(e?.d) ?? 0) + 1;
+    perDay.set(e?.d, n);
+    if (n > most) most = n;
+  }
+  return Math.min(3, most);
+}
+/** How wide a calendar is for its height: its month, the day's line, and those lines (editor.css). */
+export const calendarRatio = (rows) => 100 / (94.8 + 7.8 * rows);
+
 function agendaHtml(s, day, marked) {
   const events = s.events.filter((e) => e.d === day);
   const list = events.length
@@ -520,7 +624,7 @@ function agendaHtml(s, day, marked) {
   return `<span class="wg-agenda"><span class="wg-agenda-head"><span class="wg-agenda-day">${esc(dayLabel(day))}</span>`
     + `<button type="button" class="wg-agenda-btn${marked ? ' on' : ''}" data-k="mark" tabindex="-1" aria-pressed="${marked}">${esc(t('Mark'))}</button>`
     + `<button type="button" class="wg-agenda-btn wg-agenda-add" data-k="add" tabindex="-1">+ ${esc(t('Event'))}</button></span>`
-    + `<span class="wg-events">${list}</span></span>`;
+    + `<span class="wg-events" data-rows="${calendarRows(s.events)}">${list}</span></span>`;
 }
 
 // The Universe's stored face: rings round a core. What is kept in the note,
@@ -535,7 +639,15 @@ function universeHtml(spec) {
 /* What runs, by widget id: a Pomodoro's phase and countdown, a stopwatch, a clock's alarm. */
 const runs = new Map();       // id -> { phase, round, left: ms|null, endAt: ms|null, watch: ms, watchAt: ms|null }
 const alarms = new Map();     // id -> { at, on, ringing }
+const timers = new Map();     // id -> { left: ms|null, endAt: ms|null }: a Clock's timer
 const LIVE_KEYS = new Set(['start', 'reset', 'skip', 'stop']);
+
+function timerOf(id) {
+  let run = timers.get(id);
+  if (!run) { run = { left: null, endAt: null }; timers.set(id, run); }
+  return run;
+}
+const timerLeft = (run, s, now) => (run.endAt ? run.endAt - now : run.left ?? s.timer * 60000);
 
 function runOf(id) {
   let run = runs.get(id);
@@ -545,14 +657,17 @@ function runOf(id) {
 const leftOf = (run, s, now) => (run.endAt ? run.endAt - now : run.left ?? s[run.phase] * 60000);
 const watchOf = (run, now) => run.watch + (run.watchAt ? now - run.watchAt : 0);
 const btn = (k, face, cls = 'wg-key') => `<button type="button" class="${cls}" data-k="${k}" tabindex="-1">${esc(face)}</button>`;
+/** The number between a stepper's keys: a click on it and it is typed (1.0.4, "ortaya tiklayinca manuel degistirebilelim"). */
+const typedV = (k, v) => `<button type="button" class="wg-set-v" data-k="type-${k}" tabindex="-1" title="${esc(t('Click to type it'))}">${esc(String(v))}</button>`;
 
 /** What the time reads now, in a Pomodoro or a clock. */
 function timeOf(fig, now = Date.now()) {
+  const s = stateOf(fig);
   if (fig.dataset.widget === 'clock') {
+    if (s.view === 'timer') return durationText(timerLeft(timerOf(fig.dataset.wgId), s, now));
     const d = new Date(now);
     return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   }
-  const s = stateOf(fig);
   const run = runOf(fig.dataset.wgId);
   return s.mode === 'watch' ? durationText(watchOf(run, now), { hundredths: true }) : durationText(leftOf(run, s, now));
 }
@@ -568,11 +683,11 @@ function pomodoroHtml(spec, fig, s) {
   const row = btn('start', t(going ? 'Pause' : 'Start'), 'wg-key wg-key--eq') + btn('reset', t('Reset')) + (watch ? '' : btn('skip', t('Skip')));
   // One panel of rows, the name on the left and the stepper in the same column on each (the owner: "menüsü cok daginik").
   const set = (k, label) => `<span class="wg-set"><span class="wg-set-name">${esc(t(label))}</span>`
-    + `${btn(`${k}-`, MINUS, 'wg-step')}<span class="wg-set-v">${s[k]}</span>${btn(`${k}+`, '+', 'wg-step')}`
+    + `${btn(`${k}-`, MINUS, 'wg-step')}${typedV(k, s[k])}${btn(`${k}+`, '+', 'wg-step')}`
     + `<span class="wg-set-unit">${esc(t('min'))}</span></span>`;
   // "pomodoroda long break hangi sessiondan sonra olsun diye bir ayar olsun": said in words, on its own line.
   const rounds = `<span class="wg-set wg-set--rounds"><span class="wg-set-name">${esc(t('Long break after'))}</span>`
-    + `${btn('rounds-', MINUS, 'wg-step')}<span class="wg-set-v">${s.rounds}</span>${btn('rounds+', '+', 'wg-step')}`
+    + `${btn('rounds-', MINUS, 'wg-step')}${typedV('rounds', s.rounds)}${btn('rounds+', '+', 'wg-step')}`
     + `<span class="wg-set-unit">${esc(t(s.rounds === 1 ? 'session' : 'sessions'))}</span></span>`;
   const opts = `<span class="wg-opts">`
     + `<button type="button" class="wg-opt wg-auto${s.auto ? ' on' : ''}" data-k="auto" tabindex="-1" aria-pressed="${s.auto}" title="${esc(t('The next part starts by itself'))}"><span class="wg-opt-name">${esc(t('Auto-continue'))}</span><span class="wg-switch" aria-hidden="true"></span></button>`
@@ -612,13 +727,182 @@ function clockHtml(spec, fig, s) {
   try { date = new Intl.DateTimeFormat(getLang(), { weekday: 'long', day: 'numeric', month: 'long' }).format(now); } catch { date = isoDay(now); }
   const ringing = alarms.get(fig.dataset.wgId)?.ringing && isRinging();
   const [h, m] = s.alarm.split(':');
-  const spin = (k, v) => `<span class="wg-spin">${btn(`${k}+`, '▲', 'wg-step')}<span class="wg-set-v">${v}</span>${btn(`${k}-`, '▼', 'wg-step')}</span>`;
-  return `${head(spec)}<span class="wg-face"><span class="wg-time">${timeOf(fig, now.getTime())}</span><span class="wg-date">${esc(date)}</span></span>`
+  const spin = (k, v) => `<span class="wg-spin">${btn(`${k}+`, '▲', 'wg-step')}${typedV(k, v)}${btn(`${k}-`, '▼', 'wg-step')}</span>`;
+  const timer = s.view === 'timer';
+  const tab = (k, label, on) => `<button type="button" class="wg-tab${on ? ' on' : ''}" data-k="${k}" tabindex="-1" aria-pressed="${on}">${esc(t(label))}</button>`;
+  const tabs = `<span class="wg-tabs">${tab('view-clock', 'Clock', !timer)}${tab('view-timer', 'Timer', timer)}</span>`;
+  if (timer) {
+    // The Pomodoro's face and keys, one length to set: it counts down and rings with the alarm's sound.
+    const going = !!timerOf(fig.dataset.wgId).endAt;
+    const row = btn('start', t(going ? 'Pause' : 'Start'), 'wg-key wg-key--eq') + btn('reset', t('Reset')) + (ringing ? btn('stop', t('Stop'), 'wg-key wg-stop') : '');
+    return `${head(spec)}${tabs}<span class="wg-face"><span class="wg-time">${esc(timeOf(fig, now.getTime()))}</span></span>`
+      + `<span class="wg-row">${row}</span>`
+      + `<span class="wg-panel"><span class="wg-set"><span class="wg-set-name">${esc(t('Timer'))}</span>`
+      + `${btn('timer-', MINUS, 'wg-step')}${typedV('timer', s.timer)}${btn('timer+', '+', 'wg-step')}`
+      + `<span class="wg-set-unit">${esc(t('min'))}</span></span></span>`;
+  }
+  return `${head(spec)}${tabs}<span class="wg-face"><span class="wg-time">${timeOf(fig, now.getTime())}</span><span class="wg-date">${esc(date)}</span></span>`
     + `<span class="wg-alarm${s.alarmOn ? ' on' : ''}">`
     + `<button type="button" class="wg-bell" data-k="alarm" tabindex="-1" aria-pressed="${s.alarmOn}" title="${esc(t(s.alarmOn ? 'Alarm on' : 'Alarm off'))}">${icon('bell')}</button>`
     + `${spin('h', h)}<span class="wg-colon">:</span>${spin('m', m)}`
     + `${ringing ? btn('stop', t('Stop'), 'wg-key wg-key--eq wg-stop') : ''}</span>`
     + `<span class="wg-opts wg-opts--clock">${soundButton('alarm', '')}</span>`;
+}
+
+/* ---- the World clock and the Weather (1.0.4) --------------------------------- */
+
+/*
+ * The owner: "widgetlara world clock gelsin ve farklı şehirler eklenebilsin",
+ * "widgetlara weather eklensin". Both choose their cities from Nebula's own
+ * list (cities.js). The World clock reads the computer's clock in each city's
+ * time zone and asks nobody anything. The Weather asks Open-Meteo through the
+ * main process, as little as can be asked (electron/weather.js).
+ */
+
+function worldHtml(spec, s, now = Date.now()) {
+  const here = new Date(now);
+  const hereDay = isoDay(here);
+  const hereAhead = -here.getTimezoneOffset();
+  let date;
+  try { date = new Intl.DateTimeFormat(getLang(), { weekday: 'long', day: 'numeric', month: 'long' }).format(here); } catch { date = hereDay; }
+  const row = (name, sub, time, id) => `<span class="wg-wrow${id ? '' : ' wg-wrow--here'}"><span class="wg-wname"><span class="wg-wcity"${id ? ' data-no-i18n' : ''}>${esc(name)}</span>`
+    + `<span class="wg-wsub">${esc(sub)}</span></span><span class="wg-wtime">${esc(time)}</span>`
+    + `${id ? `<button type="button" class="wg-wdel" data-k="city-del-${id}" tabindex="-1" title="${esc(t('Remove'))}" aria-label="${esc(t('Remove'))}">×</button>` : ''}</span>`;
+  const rows = s.cities.map((id) => {
+    const city = cityOf(id);
+    const wall = wallTime(city.tz, now);
+    if (!wall) return row(city.name, '', '–:–', id);
+    const day = wall.day > hereDay ? t('Tomorrow') : wall.day < hereDay ? t('Yesterday') : '';
+    const ahead = aheadText(wall.offset - hereAhead) || t('Same time');
+    return row(city.name, day ? `${day} · ${ahead}` : ahead, wall.time, id);
+  });
+  const add = s.cities.length < WORLD_MAX ? `<button type="button" class="wg-wadd" data-k="city-add" tabindex="-1">+ ${esc(t('Add a city'))}</button>` : '';
+  return `${head(spec)}<span class="wg-wrows">${row(t('Local time'), date, `${pad(here.getHours())}:${pad(here.getMinutes())}`, '')}${rows.join('')}</span>${add}`;
+}
+
+/** How wide a World clock is for its height: a line for here, one for each city, the key that adds one. */
+const worldRatio = (n) => 100 / (30.25 + 13 * n + (n < WORLD_MAX ? 12 : 0));
+
+const WEATHER_FRESH = 30 * 60000;     // a reading older than this is asked again
+const WEATHER_AGAIN = 60000;          // after a failure, not before this
+const WEATHER_KEY = 'nebula:weather';
+const readings = new Map();           // city id -> { at, weather }
+const asking = new Set();
+const failed = new Map();             // city id -> when
+let readingsLoaded = false;
+let weatherTimer = 0;
+
+function loadReadings() {
+  if (readingsLoaded) return;
+  readingsLoaded = true;
+  try {
+    const kept = JSON.parse(localStorage.getItem(WEATHER_KEY) || '{}');
+    for (const [id, r] of Object.entries(kept)) {
+      if (cityOf(id) && Number.isFinite(r?.at) && Number.isFinite(r?.weather?.temp)) readings.set(id, { at: r.at, weather: r.weather });
+    }
+  } catch { /* nothing kept */ }
+}
+
+function keepReadings() {
+  // The last two dozen cities looked at; the rest are asked again when they are shown.
+  const last = [...readings].sort((a, b) => b[1].at - a[1].at).slice(0, 24);
+  try { localStorage.setItem(WEATHER_KEY, JSON.stringify(Object.fromEntries(last))); } catch { /* full or shut */ }
+}
+
+const weatherFigs = (id) => [...document.querySelectorAll('.note-widget[data-widget="weather"]')].filter((f) => !id || stateOf(f).cities.includes(id));
+
+async function askWeather(id) {
+  const city = cityOf(id);
+  const api = typeof window === 'undefined' ? null : window.nebula?.weather;
+  if (!city || asking.has(id)) return;
+  if (!api) { failed.set(id, Date.now()); return; }
+  asking.add(id);
+  let answer;
+  try { answer = await api.get({ lat: city.lat, lon: city.lon }); } catch { answer = null; }
+  asking.delete(id);
+  if (answer?.ok && Number.isFinite(answer.weather?.temp)) {
+    readings.set(id, { at: Number(answer.at) || Date.now(), weather: answer.weather });
+    failed.delete(id);
+    keepReadings();
+  } else failed.set(id, Date.now());
+  for (const fig of weatherFigs(id)) renderWidget(fig);
+}
+
+/** The last reading of a city; one that is old or missing is asked for on the way. */
+function readingOf(id, now = Date.now()) {
+  loadReadings();
+  const got = readings.get(id) ?? null;
+  if ((!got || now - got.at > WEATHER_FRESH) && now - (failed.get(id) ?? 0) > WEATHER_AGAIN) void askWeather(id);
+  return got;
+}
+
+/** The weather's readings — for tests. */
+export const weatherReadings = () => ({ readings, failed, asking });
+
+function weatherHtml(spec, s, now = Date.now()) {
+  if (!s.city) {
+    return `${head(spec)}<span class="wg-wxempty"><button type="button" class="wg-key wg-key--eq wg-wxpick" data-k="city-add" tabindex="-1">${esc(t('Choose a city'))}</button>`
+      + `<span class="wg-wxnote">${esc(t('Only the city’s rough place is sent to Open-Meteo — no account, no key, nothing about you.'))}</span></span>`;
+  }
+  const city = cityOf(s.city);
+  const got = readingOf(s.city, now);
+  const del = (id) => `<button type="button" class="wg-wdel" data-k="city-del-${id}" tabindex="-1" title="${esc(t('Remove'))}" aria-label="${esc(t('Remove'))}">×</button>`;
+  const place = `<span class="wg-wxcity"><span class="wg-wxname" data-no-i18n>${esc(city.region ? `${city.name}, ${city.region}` : city.name)}</span><span class="wg-wxcc" data-no-i18n>${esc(countryName(city.country, getLang()))}</span>${del(s.city)}</span>`;
+  // The other cities, a line each: a press shows one in full. Each is asked for as the shown one is.
+  const others = s.cities.filter((id) => id !== s.city).map((id) => {
+    const c = cityOf(id);
+    const r = readingOf(id, now);
+    const sky = r ? skyOf(r.weather.code, r.weather.night) : null;
+    const temp = r ? degrees(r.weather.temp, s.unit) : asking.has(id) ? '…' : '–';
+    return `<span class="wg-wxrow"><button type="button" class="wg-wxgo" data-k="city=${id}" tabindex="-1"><span class="wg-wxrow-n" data-no-i18n>${esc(c.name)}</span>`
+      + `${sky ? icon(sky.ic, 'wg-wxrow-ic') : ''}<span class="wg-wxrow-t" data-no-i18n>${esc(temp)}</span></button>${del(id)}</span>`;
+  }).join('');
+  const add = s.cities.length < WEATHER_MAX ? `<button type="button" class="wg-wadd" data-k="city-add" tabindex="-1">+ ${esc(t('Add a city'))}</button>` : '';
+  const more = `${others ? `<span class="wg-wxrows">${others}</span>` : ''}${add}`;
+  const keys = `<button type="button" class="wg-wxkey" data-k="unit" tabindex="-1" title="°C / °F" data-no-i18n>°${s.unit === 'f' ? 'F' : 'C'}</button>`
+    + `<button type="button" class="wg-wxkey" data-k="refresh" tabindex="-1" title="${esc(t('Refresh'))}" aria-label="${esc(t('Refresh'))}">↻</button>`;
+  const credit = '<span class="wg-wxby" data-no-i18n>Open-Meteo</span>';
+  if (!got) {
+    const word = asking.has(s.city) ? '…' : t('The weather could not be fetched');
+    return `${head(spec)}${place}<span class="wg-wxempty"><span class="wg-wxnote">${esc(word)}</span></span>${more}<span class="wg-wxfoot">${credit}<span class="wg-wxkeys">${keys}</span></span>`;
+  }
+  const w = got.weather;
+  const sky = skyOf(w.code, w.night);
+  const bit = (label, value) => (value == null ? '' : `<span class="wg-wxbit"><span class="wg-wxbit-v" data-no-i18n>${esc(value)}</span><span class="wg-wxbit-n">${esc(t(label))}</span></span>`);
+  const wind = w.wind == null ? null : (s.unit === 'f' ? `${Math.round(w.wind / 1.609)} mph` : `${Math.round(w.wind)} km/h`);
+  const bits = bit('Feels like', w.feels == null ? null : degrees(w.feels, s.unit)) + bit('Wind', wind) + bit('Humidity', w.humidity == null ? null : `${Math.round(w.humidity)}%`);
+  const days = (w.days ?? []).slice(1, 4).map((d) => {
+    let name;
+    try { name = new Intl.DateTimeFormat(getLang(), { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${d.d}T00:00:00Z`)); } catch { name = d.d.slice(5); }
+    return `<span class="wg-wxday"><span class="wg-wxday-n">${esc(name)}</span>${icon(skyOf(d.code).ic, 'wg-wxday-ic')}`
+      + `<span class="wg-wxday-t" data-no-i18n>${esc(degrees(d.max, s.unit))} <span class="wg-wxday-min">${esc(degrees(d.min, s.unit))}</span></span></span>`;
+  }).join('');
+  const at = new Date(got.at);
+  const when = asking.has(s.city) ? '…' : `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+  return `${head(spec)}${place}`
+    + `<span class="wg-wxnow">${icon(sky.ic, 'wg-wxic')}<span class="wg-wxtemp" data-no-i18n>${esc(degrees(w.temp, s.unit))}</span></span>`
+    + `<span class="wg-wxword">${esc(t(sky.word))}</span>`
+    + `${bits ? `<span class="wg-wxbits">${bits}</span>` : ''}${days ? `<span class="wg-wxdays">${days}</span>` : ''}${more}`
+    + `<span class="wg-wxfoot"><span class="wg-wxwhen" data-no-i18n>${esc(when)}</span>${credit}<span class="wg-wxkeys">${keys}</span></span>`;
+}
+
+/** Weather widgets in sight are looked at again now and then: an old reading asks for a new one. */
+function watchWeather() {
+  if (weatherTimer || typeof window === 'undefined') return;
+  weatherTimer = setInterval(() => {
+    const figs = weatherFigs();
+    if (!figs.length) { clearInterval(weatherTimer); weatherTimer = 0; return; }
+    for (const fig of figs) renderWidget(fig);
+  }, 5 * 60000);
+}
+
+/** The ↻ of a Weather widget: every city of it asked now, whatever its reading's age. */
+function refreshWeather(fig) {
+  for (const id of stateOf(fig).cities) {
+    failed.delete(id);
+    void askWeather(id);
+  }
+  renderWidget(fig);
 }
 
 const say = (text) => window.dispatchEvent(new CustomEvent('nebula-toast', { detail: text }));
@@ -627,11 +911,14 @@ const figsOf = (id) => [...document.querySelectorAll('.note-widget[data-wg-id]')
 /**
  * A Pomodoro phase came to its end: ring with the sound of the part that
  * ended, say so, and wait at the next one — or, with Auto-continue on, start it.
+ * The long break is the end of the sessions: after it nothing starts by itself
+ * (the owner, 1.0.4: "tüm sessionlari bitirdikten sonra devam ettirmemesi lazim
+ * sonsuz döngüye giriyor").
  */
 function phaseDone(id, run, now = Date.now()) {
   const was = run.phase;
   Object.assign(run, phaseAfter(run.phase, run.round, run.rounds ?? POMO_LIMITS.rounds[2]), { left: null, endAt: null });
-  if (run.auto && run.mins) run.endAt = now + run.mins[run.phase] * 60000;
+  if (run.auto && run.mins && was !== 'long') run.endAt = now + run.mins[run.phase] * 60000;
   void ring({ id: soundOf(was === 'focus' ? 'focus' : 'break'), times: 2 });
   say(t(was === 'focus' ? 'Focus done — time for a break' : 'Break over — back to focus'));
   for (const fig of figsOf(id)) renderWidget(fig);
@@ -645,6 +932,16 @@ let lastTick = Date.now();
 function tick() {
   const now = Date.now();
   for (const [id, run] of runs) if (run.endAt && run.endAt <= now) phaseDone(id, run, now);
+  for (const [id, run] of timers) {
+    if (!run.endAt || run.endAt > now) continue;
+    // Time is up: it rings as the alarm does, and stands at its whole length again.
+    Object.assign(run, { left: null, endAt: null });
+    const a = alarms.get(id);
+    if (a) a.ringing = true; else alarms.set(id, { at: null, on: false, ringing: true });
+    void ring({ times: 6 });
+    say(`${t('Timer')} — ${t('Time is up')}`);
+    for (const fig of figsOf(id)) renderWidget(fig);
+  }
   for (const [id, a] of alarms) {
     if (a.on && alarmDue(a.at, lastTick, now)) {
       a.ringing = true;
@@ -663,9 +960,17 @@ function tick() {
     const text = timeOf(fig, now);
     if (el && el.textContent !== text) el.textContent = text;
   }
+  // A World clock reads minutes: drawn again when one has passed.
+  const worlds = document.querySelectorAll('.note-widget[data-widget="world"]');
+  const minute = Math.floor(now / 60000);
+  if (minute !== lastMinute) {
+    lastMinute = minute;
+    for (const fig of worlds) renderWidget(fig);
+  }
   paintPomoCard(now);
   // A paused run keeps the ticker: its card still shows when its figure goes out of sight.
-  const busy = figs.length || [...runs.values()].some(started) || [...alarms.values()].some((a) => a.on || a.ringing);
+  const busy = figs.length || worlds.length ||[...runs.values()].some(started) || [...alarms.values()].some((a) => a.on || a.ringing)
+    || [...timers.values()].some((r) => r.endAt);
   if (!busy) { clearInterval(ticker); ticker = 0; return; }
   // A going stopwatch counts hundredths, so it is looked at oftener than a timer.
   const every = [...runs.values()].some((r) => r.mode === 'watch' && going(r)) ? FAST : SLOW;
@@ -674,6 +979,7 @@ function tick() {
 const SLOW = 250;
 const FAST = 40;
 let tickEvery = SLOW;
+let lastMinute = 0;
 function wake() {
   if (ticker || typeof window === 'undefined') return;
   lastTick = Date.now();
@@ -686,10 +992,19 @@ function liveKey(fig, key) {
   const id = fig.dataset.wgId;
   const now = Date.now();
   if (fig.dataset.widget === 'clock') {
-    if (key !== 'stop') return;
-    stopRing();
-    const a = alarms.get(id);
-    if (a) a.ringing = false;
+    if (key === 'stop') {
+      stopRing();
+      const a = alarms.get(id);
+      if (a) a.ringing = false;
+      return;
+    }
+    const s = stateOf(fig);
+    if (s.view !== 'timer') return;
+    const run = timerOf(id);
+    if (key === 'start') {
+      if (run.endAt) { run.left = Math.max(0, run.endAt - now); run.endAt = null; } else run.endAt = now + timerLeft(run, s, now);
+      wake();
+    } else if (key === 'reset') Object.assign(run, { left: null, endAt: null });
     return;
   }
   const s = stateOf(fig);
@@ -710,7 +1025,7 @@ function liveKey(fig, key) {
 }
 
 /** Pomodoros and clocks running — for tests. */
-export const widgetRuns = () => ({ runs, alarms });
+export const widgetRuns = () => ({ runs, alarms, timers, tick });
 
 let host = null;                     // { noteId, openNote } from main.js
 /** What the corner's Pomodoro card needs of the app: the open note, and a way to open one. */
@@ -735,6 +1050,28 @@ export function toggleRun(id, now = Date.now()) {
 }
 
 let pomoCard = null;
+/**
+ * How much of the corner card shows (1.0.4, the owner's Ideas note: "minimize
+ * (daha kücük bir stil) ve hide (sadece logo)"): all of it, the time alone, or
+ * the icon alone. Its − steps down; the icon alone opens it whole again. Kept
+ * for the next start of the app.
+ */
+const CARD_SIZES = ['full', 'small', 'icon'];
+const CARD_SIZE_KEY = 'nebula.cornerCard';
+let cardSize = null;
+function cardSizeNow() {
+  if (cardSize) return cardSize;
+  let kept = null;
+  try { kept = localStorage.getItem(CARD_SIZE_KEY); } catch { /* no storage: whole */ }
+  cardSize = CARD_SIZES.includes(kept) ? kept : 'full';
+  return cardSize;
+}
+function setCardSize(size) {
+  cardSize = CARD_SIZES.includes(size) ? size : 'full';
+  try { localStorage.setItem(CARD_SIZE_KEY, cardSize); } catch { /* not kept, still shown so */ }
+}
+/** The size after this one: smaller each time, and whole again after the icon. */
+export const nextCardSize = (size) => CARD_SIZES[(CARD_SIZES.indexOf(size) + 1) % CARD_SIZES.length];
 /** Which run the corner shows: one going before one paused, none when one of its figures is in sight. */
 export function cornerRun(list = runs, seen = (id) => figsOf(id).some(inSight)) {
   let best = null;
@@ -754,7 +1091,7 @@ function paintPomoCard(now) {
     pomoCard.className = 'update-card corner-card pomo-card';
     pomoCard.setAttribute('role', 'button');
     pomoCard.tabIndex = 0;
-    pomoCard.innerHTML = `<span class="corner-card__ic" aria-hidden="true">${icon(byKind('pomodoro').ic, 'ic')}</span><span class="corner-card__body"><span class="corner-card__head"></span><span class="corner-card__time"></span></span><button type="button" class="btn ghost corner-card__key"></button>`;
+    pomoCard.innerHTML = `<span class="corner-card__ic" aria-hidden="true">${icon(byKind('pomodoro').ic, 'ic')}</span><span class="corner-card__body"><span class="corner-card__head"></span><span class="corner-card__time"></span></span><button type="button" class="btn ghost corner-card__key"></button><button type="button" class="corner-card__size" aria-label="${t('Make smaller')}" title="${t('Make smaller')}">−</button>`;
     const back = () => {
       const want = pomoCard.dataset.run;
       const r = runs.get(want);
@@ -763,16 +1100,27 @@ function paintPomoCard(now) {
     };
     pomoCard.addEventListener('click', (e) => {
       if (e.target.closest('.corner-card__key')) { toggleRun(pomoCard.dataset.run); return; }
+      // Its −, and the icon it was made down to, change how much shows; nothing else.
+      if (e.target.closest('.corner-card__size') || cardSizeNow() === 'icon') {
+        setCardSize(nextCardSize(cardSizeNow()));
+        tick();
+        return;
+      }
       back();
     });
-    pomoCard.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === pomoCard) { e.preventDefault(); back(); } });
+    pomoCard.addEventListener('keydown', (e) => {
+      if ((e.key !== 'Enter' && e.key !== ' ') || e.target !== pomoCard) return;
+      e.preventDefault();
+      if (cardSizeNow() === 'icon') { setCardSize('full'); tick(); } else back();
+    });
     cornerStack().append(pomoCard);
   }
   pomoCard.dataset.run = id;
   const watch = run.mode === 'watch';
   const head = watch ? t('Stopwatch')
     : run.phase === 'focus' ? `${t('Focus')} ${Math.min(run.round, run.rounds ?? run.round)}/${run.rounds ?? '–'}` : t(run.phase === 'long' ? 'Long break' : 'Break');
-  const time = watch ? durationText(watchOf(run, now), { hundredths: true }) : durationText(run.endAt ? run.endAt - now : run.left ?? 0);
+  // Whole seconds in the corner, the stopwatch too (1.0.4: "saniyenin altindaki sayilar gözükmesin").
+  const time = watch ? durationText(watchOf(run, now)) : durationText(run.endAt ? run.endAt - now : run.left ?? 0);
   const key = t(going(run) ? 'Pause' : 'Continue');
   const set = (sel, text) => { const el = pomoCard.querySelector(sel); if (el.textContent !== text) el.textContent = text; };
   set('.corner-card__head', head);
@@ -780,6 +1128,10 @@ function paintPomoCard(now) {
   set('.corner-card__key', key);
   pomoCard.classList.toggle('corner-card--paused', !going(run));
   pomoCard.classList.toggle('pomo-card--break', !watch && run.phase !== 'focus');
+  const size = cardSizeNow();
+  pomoCard.classList.toggle('corner-card--small', size === 'small');
+  pomoCard.classList.toggle('corner-card--icon', size === 'icon');
+  pomoCard.title = size === 'icon' ? `${head} ${time}` : '';
   pomoCard.setAttribute('aria-label', `${head} ${time}`);
   pomoCard.hidden = false;
   placeCorner();
@@ -806,7 +1158,21 @@ export function renderWidget(fig, { today = isoDay(new Date()) } = {}) {
   }
   // A calendar's chosen day, and an alarm's way back to it, go by its id.
   if (spec.kind === 'calendar' && !/^[a-z0-9]{6,24}$/.test(fig.dataset.wgId ?? '')) fig.dataset.wgId = newId();
+  if (spec.kind === 'world') {
+    // As high as its lines: the figure's ratio follows the cities it holds.
+    const ratio = worldRatio(s.cities.length).toFixed(3);
+    if (fig.dataset.ratio !== ratio) fig.dataset.ratio = ratio;
+    wake();
+  }
+  if (spec.kind === 'calendar') {
+    // As high as its lines too (and one placed before 1.0.4 is told so).
+    const ratio = calendarRatio(calendarRows(s.events)).toFixed(3);
+    if (fig.dataset.ratio !== ratio) fig.dataset.ratio = ratio;
+  }
+  if (spec.kind === 'weather') watchWeather();
   const html = spec.kind === 'calendar' ? calendarHtml(spec, s, today, fig)
+    : spec.kind === 'world' ? worldHtml(spec, s)
+    : spec.kind === 'weather' ? weatherHtml(spec, s)
     : spec.kind === 'universe' ? universeHtml(spec)
       : spec.kind === 'pomodoro' ? pomodoroHtml(spec, fig, s)
         : spec.kind === 'clock' ? clockHtml(spec, fig, s)
@@ -882,30 +1248,42 @@ export function gridStep(at, step, n, cols) {
  * @returns {Promise<string|null>} the kind chosen
  */
 export function pickWidget(anchor) {
+  return pickTile(anchor, { id: 'widget-menu', label: 'Add a widget', data: 'widgetKind', items: WIDGETS.map((spec) => ({ kind: spec.kind, mark: icon(spec.ic), label: spec.label })) });
+}
+
+/**
+ * Tiles to choose one of, under `anchor`: the widgets, and the shapes of the editing bar (1.0.4, the
+ * owner: "insert shape should be like widget"). One picker is open at a time.
+ * @param {{left: number, top: number, bottom: number}} anchor
+ * @param {{ id: string, label: string, data: string, items: {kind: string, mark: string, label: string}[], selected?: number }} o
+ *   `data` names the dataset key a tile carries its kind in; `mark` is its drawing, as HTML; `selected` is the tile lit first.
+ * @returns {Promise<string|null>} the kind chosen
+ */
+export function pickTile(anchor, { id, label, data, items, selected = 0 }) {
   closePicker?.();
   return new Promise((resolve) => {
     const box = document.createElement('div');
-    box.id = 'widget-menu';
+    box.id = id;
     box.className = 'float-menu link-menu widget-menu';
     box.setAttribute('role', 'dialog');
-    box.setAttribute('aria-label', t('Add a widget'));
+    box.setAttribute('aria-label', t(label));
     const title = document.createElement('div');
     title.className = 'link-menu__title';
-    title.textContent = t('Add a widget');
+    title.textContent = t(label);
     const options = document.createElement('div');
     options.className = 'widget-menu__options';
-    const buttons = WIDGETS.map((spec, n) => {
+    const buttons = items.map((spec, n) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.dataset.widgetKind = spec.kind;
-      b.className = n === 0 ? 'sel' : '';
-      b.innerHTML = `<span class="fm-ic">${icon(spec.ic)}</span><span></span>`;
+      b.dataset[data] = spec.kind;
+      b.className = n === selected ? 'sel' : '';
+      b.innerHTML = `<span class="fm-ic">${spec.mark}</span><span></span>`;
       b.lastChild.textContent = t(spec.label);
       options.appendChild(b);
       return b;
     });
     box.append(title, options);
-    let at = 0;
+    let at = selected;
     const light = () => buttons.forEach((b, n) => b.classList.toggle('sel', n === at));
 
     let done = false;
@@ -923,24 +1301,24 @@ export function pickWidget(anchor) {
     closePicker = cancel;
     function onKey(e) {
       if (e.key === 'Escape' || e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); cancel(); return; }
-      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); finish(WIDGETS[at].kind); return; }
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); finish(items[at].kind); return; }
       // A grid: ↑ ↓ go a row (the owner, 1.0.3: "alta basınca yana gidiyor").
       const cols = gridColumns(options);
       const step = { ArrowDown: cols, ArrowRight: 1, ArrowUp: -cols, ArrowLeft: -1 }[e.key];
       if (!step) { if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) cancel(); return; }
       e.preventDefault();
       e.stopPropagation();
-      at = gridStep(at, step, WIDGETS.length, cols);
+      at = gridStep(at, step, items.length, cols);
       light();
     }
     function onDown(e) { if (!box.contains(e.target)) cancel(); }
     box.addEventListener('mousedown', (e) => e.preventDefault());
     options.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-widget-kind]');
-      if (b) finish(b.dataset.widgetKind);
+      const b = e.target.closest('button');
+      if (b) finish(items[buttons.indexOf(b)].kind);
     });
     options.addEventListener('mousemove', (e) => {
-      const b = e.target.closest('[data-widget-kind]');
+      const b = e.target.closest('button');
       if (b) { at = buttons.indexOf(b); light(); }
     });
     document.body.appendChild(box);
@@ -1066,6 +1444,176 @@ export function editEvent(anchor, { day, event = null }) {
     document.addEventListener('keydown', onKey, true);
     setTimeout(() => { if (!done) document.addEventListener('mousedown', onDown, true); }, 0);
     text.focus();
+  });
+}
+
+/* ---- a number typed ---------------------------------------------------------- */
+
+let closeNumberBox = null;
+
+/**
+ * A small field laid over a stepper's number, to type it (1.0.4). Resolves to
+ * the number, or to null when left. Enter and a click elsewhere keep what was
+ * typed; Escape leaves it as it was. Over the widget, never in it: the note's
+ * text has no field in it, and a redraw of the widget does not take it away.
+ * @param {DOMRect} anchor the number's own box
+ * @param {string|number} value what it reads now
+ * @param {number} [digits] how many it may have
+ * @returns {Promise<number|null>}
+ */
+export function askNumber(anchor, value, digits = 3) {
+  closeNumberBox?.();
+  return new Promise((resolve) => {
+    const box = document.createElement('div');
+    box.className = 'float-menu link-menu number-menu';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'number-menu__v';
+    input.inputMode = 'numeric';
+    input.maxLength = digits;
+    input.dataset.noI18n = '';
+    input.setAttribute('aria-label', t('Click to type it'));
+    input.value = String(value ?? '').replace(/\D/g, '').slice(0, digits);
+    box.append(input);
+
+    let done = false;
+    function finish(v) {
+      if (done) return;
+      done = true;
+      closeNumberBox = null;
+      document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('mousedown', onDown, true);
+      window.removeEventListener('blur', cancel);
+      box.remove();
+      resolve(v);
+    }
+    const cancel = () => finish(null);
+    const save = () => finish(/^\d+$/.test(input.value) ? Number(input.value) : null);
+    closeNumberBox = cancel;
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); return; }
+      if ((e.key === 'Enter' || e.key === 'Tab') && !e.isComposing) { e.preventDefault(); e.stopPropagation(); save(); }
+    }
+    function onDown(e) { if (!box.contains(e.target)) save(); }
+    input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, '').slice(0, digits); });
+    document.body.appendChild(box);
+    const w = box.offsetWidth || 64;
+    const h = box.offsetHeight || 34;
+    // Over the number itself, its middle on the number's.
+    box.style.left = `${Math.max(8, Math.min(anchor.left + anchor.width / 2 - w / 2, window.innerWidth - w - 8))}px`;
+    box.style.top = `${Math.max(8, Math.min(anchor.top + anchor.height / 2 - h / 2, window.innerHeight - h - 8))}px`;
+    document.addEventListener('keydown', onKey, true);
+    setTimeout(() => { if (!done) document.addEventListener('mousedown', onDown, true); }, 0);
+    window.addEventListener('blur', cancel);
+    input.focus();
+    input.select();
+  });
+}
+
+/* ---- a city ------------------------------------------------------------------ */
+
+/**
+ * The cities to choose from, under the key that asked: a field that narrows
+ * them as it is typed in, the list under it. ↑ ↓ move, Enter takes, Escape or
+ * a press elsewhere leaves. The list is Nebula's own — nothing is looked up.
+ * @param {{left: number, top: number, bottom: number}} anchor
+ * @param {{without?: string[], chosen?: string|null}} [o]
+ * @returns {Promise<string|null>} the city's id
+ */
+export function pickCity(anchor, { without = [], chosen = null } = {}) {
+  closePicker?.();
+  return new Promise((resolve) => {
+    const box = document.createElement('div');
+    box.id = 'city-menu';
+    box.className = 'float-menu link-menu sound-menu city-menu';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-label', t('Choose a city'));
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'city-menu__q';
+    input.placeholder = t('Search a city');
+    input.setAttribute('aria-label', t('Search a city'));
+    input.spellcheck = false;
+    const list = document.createElement('div');
+    list.className = 'sound-menu__list';
+    list.setAttribute('role', 'listbox');
+    list.dataset.noI18n = '';
+    const none = document.createElement('div');
+    none.className = 'city-menu__none';
+    none.textContent = t('No city by that name');
+    box.append(input, list, none);
+
+    let found = [];
+    let at = 0;
+    const light = () => {
+      [...list.children].forEach((b, n) => b.classList.toggle('sel', n === at));
+      list.children[at]?.scrollIntoView?.({ block: 'nearest' });
+    };
+    const paint = () => {
+      found = searchCities(input.value, { without, lang: getLang() });
+      at = Math.max(0, input.value ? 0 : found.findIndex((c) => c.id === chosen));
+      list.replaceChildren(...found.map((c) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `sound-menu__pick${c.id === chosen ? ' on' : ''}`;
+        b.dataset.city = c.id;
+        b.setAttribute('role', 'option');
+        const name = document.createElement('span');
+        name.className = 'city-menu__name';
+        name.textContent = c.region ? `${c.name}, ${c.region}` : c.name;
+        const cc = document.createElement('span');
+        cc.className = 'city-menu__cc';
+        cc.textContent = countryName(c.country, getLang());
+        b.append(name, cc);
+        return b;
+      }));
+      none.hidden = found.length > 0;
+      light();
+    };
+
+    let done = false;
+    function finish(id) {
+      if (done) return;
+      done = true;
+      closePicker = null;
+      document.removeEventListener('keydown', onKey, true);
+      document.removeEventListener('mousedown', onDown, true);
+      window.removeEventListener('blur', cancel);
+      box.remove();
+      resolve(id);
+    }
+    const cancel = () => finish(null);
+    closePicker = cancel;
+    function onKey(e) {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); return; }
+      if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); e.stopPropagation(); finish(found[at]?.id ?? null); return; }
+      const step = { ArrowDown: 1, ArrowUp: -1 }[e.key];
+      if (!step || !found.length) return;
+      e.preventDefault();
+      e.stopPropagation();
+      at = (at + step + found.length) % found.length;
+      light();
+    }
+    function onDown(e) { if (!box.contains(e.target)) cancel(); }
+    input.addEventListener('input', paint);
+    list.addEventListener('mousedown', (e) => e.preventDefault());
+    list.addEventListener('click', (e) => {
+      const id = e.target.closest('[data-city]')?.dataset.city;
+      if (id) finish(id);
+    });
+
+    paint();
+    document.body.appendChild(box);
+    const w = box.offsetWidth || 260;
+    const h = box.offsetHeight || 300;
+    const under = anchor.bottom + 6;
+    box.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - w - 8))}px`;
+    box.style.top = `${under + h > window.innerHeight - 8 && anchor.top - h - 6 > 8 ? anchor.top - h - 6 : Math.max(8, Math.min(under, window.innerHeight - h - 8))}px`;
+    light();
+    document.addEventListener('keydown', onKey, true);
+    setTimeout(() => { if (!done) document.addEventListener('mousedown', onDown, true); }, 0);
+    window.addEventListener('blur', cancel);
+    input.focus();
   });
 }
 
@@ -1198,9 +1746,16 @@ export function initWidgets(editor, { history, selected = () => editor.querySele
     if (kind === 'pomodoro' || kind === 'clock') {
       if (LIVE_KEYS.has(key)) { liveKey(fig, key); renderWidget(fig); return; }
       const s = stateOf(fig);
-      const next = kind === 'pomodoro' ? stepPomo(s, key)
-        : key === 'alarm' ? { ...s, alarmOn: !s.alarmOn }
-          : (() => { const at = stepAlarm(s.alarm, key); return at ? { ...s, alarm: at } : null; })();
+      const next = kind === 'pomodoro' ? stepPomo(s, key) : stepClock(s, key);
+      if (!next) return;
+      // A timer that is not going takes its new length whole, not what was left of the old one.
+      if (kind === 'clock' && next.timer !== s.timer) { const run = timerOf(fig.dataset.wgId); if (!run.endAt) run.left = null; }
+      writeState(fig, next);
+      changed(fig);
+      return;
+    }
+    if (kind === 'world' || kind === 'weather') {
+      const next = stepPlace(stateOf(fig), key, kind === 'world' ? WORLD_MAX : WEATHER_MAX);
       if (!next) return;
       writeState(fig, next);
       changed(fig);
@@ -1231,12 +1786,32 @@ export function initWidgets(editor, { history, selected = () => editor.querySele
     if (slot) { e.preventDefault(); void pickSound(hit.getBoundingClientRect(), slot); return; }
     // A day is chosen in any note: the choice is this window's, not the note's.
     if (hit.dataset.day) { e.preventDefault(); chosenDays.set(fig.dataset.wgId, hit.dataset.day); renderWidget(fig); return; }
+    // The weather is asked again in any note: a reading is the window's, not the note's.
+    if (hit.dataset.k === 'refresh' && fig.dataset.widget === 'weather') { e.preventDefault(); refreshWeather(fig); return; }
     // A note that cannot be written still starts and stops its timers; only what is saved waits.
     if (editor.dataset.readonly === 'true' && !LIVE_KEYS.has(hit.dataset.k)) return;
     e.preventDefault();
+    if (hit.dataset.k === 'city-add' || hit.dataset.k === 'city-pick') { void chooseCity(fig, hit); return; }
+    const typed = /^type-(focus|short|long|rounds|timer|h|m)$/.exec(hit.dataset.k ?? '')?.[1];
+    if (typed) { void typeValue(fig, hit, typed); return; }
     if (hit.dataset.k === 'add' || hit.dataset.k === 'event') { void writeEvent(fig, hit); return; }
     act(fig, hit.dataset.k);
   });
+  /** One more city for a World clock or a Weather, from the list under the key. */
+  async function chooseCity(fig, hit) {
+    const s = stateOf(fig);
+    const world = fig.dataset.widget === 'world';
+    if (s.cities.length >= (world ? WORLD_MAX : WEATHER_MAX)) { if (world) say(t('That is as many cities as one world clock holds')); return; }
+    const id = await pickCity(hit.getBoundingClientRect(), { without: s.cities });
+    if (!id || !fig.isConnected || editor.dataset.readonly === 'true') return;
+    act(fig, `city+${id}`);
+  }
+  /** A stepper's number typed over itself: kept within what its keys allow. */
+  async function typeValue(fig, hit, name) {
+    const got = await askNumber(hit.getBoundingClientRect(), hit.textContent, TYPED_DIGITS[name] ?? 3);
+    if (got == null || !fig.isConnected || editor.dataset.readonly === 'true') return;
+    act(fig, `${name}=${got}`);
+  }
   /** An event added, changed or deleted in the box under its button. */
   async function writeEvent(fig, hit) {
     const day = chosenDay(fig);

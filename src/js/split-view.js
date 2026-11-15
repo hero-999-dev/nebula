@@ -69,7 +69,7 @@ export function withPane(panes, id, index, max = MAX_PANES) {
   return [...panes.slice(0, at), id, ...panes.slice(at)];
 }
 
-export function initSplitView({ shell, frame, titleEl, store, openNote, translate = (x) => x, render = () => {}, onLayout = () => {}, say = () => {}, map = null }) {
+export function initSplitView({ shell, frame, titleEl, store, openNote, translate = (x) => x, render = () => {}, onLayout = () => {}, onPanes = () => {}, say = () => {}, map = null }) {
   if (!shell || !frame || !titleEl) return null;
   const titleHome = { parent: titleEl.parentNode, next: titleEl.nextSibling };
   /** The notes side by side, left to right; empty when the page is not split. */
@@ -275,7 +275,7 @@ export function initSplitView({ shell, frame, titleEl, store, openNote, translat
     if (panes.length < 2 && !mapOnly()) {
       const was = !!row;
       unsplit();
-      if (was) onLayout();
+      if (was) { onLayout(); onPanes(); }
       return;
     }
     const first = !row;
@@ -335,6 +335,8 @@ export function initSplitView({ shell, frame, titleEl, store, openNote, translat
     if (!mapWas && paneEls.has(MAP)) map?.shown?.();
     else if (paneEls.has(MAP)) map?.resized?.();
     if (first || moved) onLayout();
+    // The tabs over the note mark the ones shown here (note-tabs.js, 1.0.4).
+    onPanes();
   }
 
   /**

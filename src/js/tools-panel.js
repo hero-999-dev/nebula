@@ -12,7 +12,9 @@
  * Nebula, the same code.
  */
 import { t } from './i18n.js';
+import { emit } from './bus.js';
 import { askConfirm } from './dialog.js';
+import { withKeyring } from './keyring-hint.js';
 
 const el = (tag, cls, text) => {
   const node = document.createElement(tag);
@@ -39,6 +41,18 @@ export const TAILSCALE_STEPS = [
 export const TAILSCALE_ADD = 'One more device later — a third computer, or a phone once Nebula comes to phones: install Tailscale on it with the same account and the same Nebula. On a paired device press “Show the code” and enter it on the new one. Then add the new one to the list on each device, and the others to its list.';
 export const TAILSCALE_REMOVE = 'A device lost or given away: take it off every list, then make a new code on one device and enter it on each one you keep. The old code then opens nothing.';
 export const TAILSCALE_TROUBLE = 'If a device does not answer: Tailscale must be connected and Nebula open on it. If Windows asks whether Nebula may use the network, allow it.';
+
+/**
+ * A device Tailscale sees online while Nebula there stays silent (1.0.4): what is said under the
+ * list, and the way through the firewall on each system. It was a Block rule Windows kept for
+ * Nebula after its first question had been cancelled (2026-11-05); the port is sync-core's SYNC_PORT.
+ */
+export const FIREWALL_HEAD = 'Tailscale sees {names} online, but Nebula does not answer there. If Nebula is open there with sync on, the firewall of that device is most likely blocking Nebula. To let it through, on that device:';
+export const FIREWALL_STEPS = [
+  'Windows: Windows Security → Firewall & network protection → Allow an app through firewall, press Change settings and tick Private beside Nebula.',
+  'Mac: System Settings → Network → Firewall → Options, then allow incoming connections for Nebula.',
+  'Linux: allow TCP port 37412 on the Tailscale interface, for example: sudo ufw allow in on tailscale0 to any port 37412 proto tcp',
+];
 
 /**
  * Which of two versions is older: below 0 when `a` is, above 0 when `b` is, 0
@@ -80,7 +94,7 @@ export function syncError(code, theirs, mine) {
     case 'too-many': return t('That is as many devices as one Nebula syncs with.');
     case 'no-code': return t('This device was paired before codes were kept: make a new code here and enter it on each of the others.');
     case 'starting': return t('Nebula is still opening.');
-    case 'protect': return t('This computer cannot keep the pairing safe.');
+    case 'protect': return withKeyring(t('This computer cannot keep the pairing safe.'));
     case 'code': return t('That code is not right: 24 letters and numbers.');
     case 'peer': return t('Type a Tailscale address or name.');
     default: return t('Sync failed.');
@@ -100,6 +114,8 @@ export function deviceLine(device, now = Date.now()) {
   if (reach?.ok) return { ok: true, text: `${t('Connected')} · Nebula ${reach.version}${synced}` };
   const code = reach?.error ?? seen?.error;
   if (!code) return { ok: null, text: seen ? `${t('Synced')} ${when(seen.at, now)}` : t('Not checked yet') };
+  // Silent, yet Tailscale sees it online: not "is it on?" but what stands in the way (1.0.4).
+  if (reach?.error === 'unreachable' && reach.online === true) return { ok: false, text: t('Online in Tailscale, but Nebula does not answer there'), firewall: true };
   const short = {
     unreachable: t('Not answering: is it on, with Tailscale and Nebula open?'),
     unpaired: t('Paired with another code'),
@@ -108,6 +124,16 @@ export function deviceLine(device, now = Date.now()) {
     'peer-starting': t('Nebula is still opening there'),
   }[code];
   return { ok: false, text: short ?? syncError(code, (reach ?? seen)?.theirs, (reach ?? seen)?.mine) };
+}
+
+/**
+ * What stands under the list when a device is online in Tailscale and silent in Nebula: the
+ * sentence naming those devices and the steps, or null when there is none. Pure — tested.
+ */
+export function firewallHint(devices, now = Date.now()) {
+  const names = (devices ?? []).filter((d) => deviceLine(d, now).firewall).map((d) => d.name);
+  if (!names.length) return null;
+  return { head: t(FIREWALL_HEAD).replace('{names}', names.join(', ')), steps: FIREWALL_STEPS.map((s) => t(s)) };
 }
 
 /** A device this one has reached or synced with — taking it away then asks first (the owner, 2026-11-05). */
@@ -219,6 +245,13 @@ export function initToolsPanel({ overlay, body, closeButton }) {
   const list = el('ul', 'tool-devices');
   list.id = 'tool-devices';
   ts.append(list);
+  // Under the list, only while a device is online in Tailscale and silent in Nebula: the firewall, and the way through it.
+  const firewall = el('div', 'tool-guide tool-firewall');
+  firewall.id = 'tool-firewall';
+  firewall.hidden = true;
+  firewall.setAttribute('role', 'note');
+  firewall.setAttribute('data-no-i18n', '');
+  ts.append(firewall);
   const addLine = el('label', 'set-row');
   const peer = el('input', 'set-input');
   peer.type = 'text';
@@ -311,7 +344,18 @@ export function initToolsPanel({ overlay, body, closeButton }) {
     pair.append(first, line);
   }
 
+  function paintFirewall() {
+    const said = firewallHint(state?.devices);
+    firewall.hidden = !said;
+    firewall.replaceChildren();
+    if (!said) return;
+    const steps = el('ul', 'tool-steps');
+    for (const step of said.steps) steps.append(el('li', null, step));
+    firewall.append(el('p', 'set-hint', said.head), steps);
+  }
+
   function paintDevices() {
+    paintFirewall();
     list.replaceChildren();
     const devices = state?.devices ?? [];
     if (!devices.length) { list.append(el('li', 'tool-device tool-device--none', t('None yet: add each of your other devices by its Tailscale name or address.'))); return; }
@@ -372,7 +416,7 @@ export function initToolsPanel({ overlay, body, closeButton }) {
   async function refresh() {
     if (!api) { paint(); return; }
     const s = await api.state().catch(() => null);
-    if (s && s.ok !== false) state = s;
+    if (s && s.ok !== false) { state = s; emit('sync-state', s); }   // the note's menu follows the switch (tailnet-sync.js)
     paint();
   }
   /** Each device asked whether it is there: Tailscale up, the same Nebula, the same code. */

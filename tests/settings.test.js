@@ -8,11 +8,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_SETTINGS, cleanSettings, readSettings, writeSettings, newNoteDefaults } from '../src/js/settings.js';
 import { fontChoices } from '../src/js/settings-panel.js';
-import { FONTS, FONT_SIZES, BASE_FONT_SIZE, fontRows, togglePinned, readPinnedFonts, readCustomFonts, lastFontOf, readLastFont } from '../src/js/toolbar.js';
+import { FONTS, FONT_SIZES, BASE_FONT_SIZE, fontRows, fontLabelFor, firstFamily, byFontName, togglePinned, readPinnedFonts, readCustomFonts, lastFontOf, readLastFont } from '../src/js/toolbar.js';
 import { buildMenus, commandsOf, initAppMenu } from '../src/js/app-menu.js';
 import { initDock } from '../src/js/dock.js';
 import { STRINGS, t } from '../src/js/i18n.js';
 import { on } from '../src/js/bus.js';
+import { DESIGNS, DESIGN_NAMES, DESIGN_FACES, designOfFace, designFacePlace, designStack } from '../src/js/design.js';
+
+/** The designs' faces as the font lists begin with them, one a design (the owner's picks, 1.0.4): [font, its design's name]. */
+const FACES = [['Serif', 'Nebula'], ['Fondamento', 'Medieval'], ['VT323', 'Pixel'], ['Oxanium', 'Neon'],
+  ['Patrick Hand', 'Blueprint'], ['Courgette', 'Ink'], ['Marcellus', 'Art Deco'], ['Bodoni Moda', 'Clockwork']];
+/** Every other font of the app, by its name. */
+const REST = FONTS.map(([label]) => label).filter((l) => !FACES.some(([face]) => face === l)).sort(byFontName);
+/** The menu's own fonts with nothing pinned: those faces, then the others by their names. */
+const UNPINNED = [...FACES.map(([face]) => face), ...REST];
 
 beforeEach(() => { localStorage.clear(); document.body.innerHTML = ''; });
 
@@ -84,21 +93,89 @@ describe('the settings store', () => {
 });
 
 describe('the fonts Settings offers a new note', () => {
-  it('are the app’s own — the serif standing for "none" — then the ones added', () => {
+  it('are the designs’ faces first, then every other one by its name, the ones added among them', () => {
     const rows = fontChoices(['Noto Serif', 'arial']);
-    // The app's own says what it is — and the serif is "Serif", no longer "Serif (default)":
-    // what a new note is written in is what Settings says.
-    expect(rows[0]).toEqual(['', 'Serif']);      // 1.0.0: the font's name, no "Nebula’s own"
-    expect(FONTS[0][0]).toBe('Serif');
-    expect(rows.slice(1, FONTS.length).map(([, label]) => label)).toEqual(FONTS.slice(1).map(([label]) => label));
-    expect(rows.at(-1)).toEqual(['"Noto Serif", serif', 'Noto Serif']);
-    expect(rows).toHaveLength(FONTS.length + 1);          // "arial" is the app's Arial already
+    // The Serif is a font as the other designs' faces are: a new note given it is in it under every design.
+    expect(rows[0]).toEqual([FONTS[0][1], 'Serif (Nebula)']);
+    expect(newNoteDefaults({ font: rows[0][0] || null }).font).toEqual({ family: FONTS[0][1] });
+    // No row stands for "no font": that is what a vault that chose nothing has, and what the button under the designs gives back.
+    expect(rows.every(([stack]) => stack)).toBe(true);
+    // 1.0.4: the designs' faces stand over every font, in the designs' order, each with its design's name after it.
+    const fonts = rows;
+    expect(fonts.slice(0, FACES.length).map(([, label]) => label)).toEqual(FACES.map(([face, design]) => `${face} (${design})`));
+    expect(fonts[1][0]).toBe('"Fondamento", "Palatino Linotype", Georgia, serif');
+    // The owner: "fontlar alfabeye göre sıralansın".
+    const rest = fonts.slice(FACES.length).map(([, label]) => label);
+    expect(rest).toEqual([...REST, 'Noto Serif'].sort(byFontName));
+    expect(rest.slice(0, 5)).toEqual(['Almendra', 'Architects Daughter', 'Arial', 'Calibri', 'Cascadia Code']);
+    expect(rest[rest.indexOf('Noto Serif') - 1]).toBe('MedievalSharp');
+    expect(rows.find(([, label]) => label === 'Noto Serif')).toEqual(['"Noto Serif", serif', 'Noto Serif']);
+    expect(rows).toHaveLength(FONTS.length + 1);          // "arial" is the app's Arial already; Noto Serif is the one more
+    expect(new Set(rows.map(([stack]) => stack)).size).toBe(rows.length);
   });
 
-  it('still show a font chosen earlier and since taken off the list', () => {
+  // The owner: "ben sadece Nebula temasının notu serif olsun istedim, diğer designlar gibi" — and the four
+  // layers as they were. Then, to "serif niye font yok demek?": the Serif is a font like Fondamento, with no
+  // row added for "no font" — that comes back by the button under the designs.
+  it('hold the Serif as Nebula’s face: the design’s own stack, and a font of a note’s own like any other', () => {
+    expect(FONTS[0]).toEqual(['Serif', designStack('nebula')]);
+    expect(fs.readFileSync(path.resolve('src/css/tokens.css'), 'utf8')).toContain(`--serif: ${FONTS[0][1]};`);
+    // The bar and the lists name it by its label, never by the first face of its stack.
+    expect(fontLabelFor(FONTS[0][1])).toBe('Serif');
+    expect(lastFontOf(FONTS[0][1])).toEqual({ label: 'Serif', stack: FONTS[0][1] });
+    // Words given the Serif before 1.0.4 carry the shorter stack; they are still named Serif.
+    expect(fontLabelFor('"Charter", "Iowan Old Style", Georgia, serif')).toBe('Serif');
+    // Picked in the Font menu it is the note's writing font, under every design; no list has a row of "no font".
+    const toolbar = fs.readFileSync(path.resolve('src/js/toolbar.js'), 'utf8');
+    expect(toolbar).toContain('setNoteFont?.({ family: stack || null });');
+    expect(toolbar).not.toContain('stack === FONTS[0][1] ? null');
+    expect(toolbar).not.toContain('DESIGN_FONT');
+    expect(fontChoices().filter(([stack]) => !stack)).toEqual([]);
+    expect(fontChoices().filter(([stack]) => stack === FONTS[0][1])).toEqual([[FONTS[0][1], 'Serif (Nebula)']]);
+    // Selected words given it are in it under every design; under Nebula the browser already reads the Serif
+    // there and would write nothing, so it is written under a name of its own first.
+    expect(toolbar).toContain("document.execCommand('fontName', false, serif ? SERIF_NAME : stack);");
+    // Settings keeps it as chosen, and with nothing chosen shows the row of the face the design writes in.
+    const panel = fs.readFileSync(path.resolve('src/js/settings-panel.js'), 'utf8');
+    expect(panel).not.toContain('font === FONTS[0][1]');
+    expect(panel).toContain("font.value = s.font ?? rows.find(([stack]) => firstFamily(stack).toLowerCase() === face)?.[0] ?? '';");
+    expect(panel).toContain("on('design-changed', paintFont);");
+    for (const id of DESIGNS) {
+      const face = firstFamily(designStack(id)).toLowerCase();
+      expect(fontChoices().filter(([stack]) => firstFamily(stack).toLowerCase() === face), id).toHaveLength(1);
+    }
+  });
+
+  // The known fault of the 03:36 build: the bar's font name stayed what the last caret had read.
+  it('have the bar say the note’s font with no caret in the note: on opening it, and when the design changes', () => {
+    const toolbar = fs.readFileSync(path.resolve('src/js/toolbar.js'), 'utf8');
+    expect(toolbar).toContain("on('design-changed', syncNoteFont);");
+    expect(toolbar).toContain("fontName.textContent = shownFont(font?.family || cs.fontFamily).label || 'Font';");
+    expect(toolbar).toContain('return { actions: ACTIONS, syncState, syncNoteFont, miniBarAt };');
+    // A caret left in the note's root by a note read in again reads the words it stands before, not the root.
+    expect(toolbar).toContain('if (el === editorEl && range.collapsed) {');
+    expect(toolbar).toContain('if (selectionInEditor()) { syncState(); return; }');
+    const main = fs.readFileSync(path.resolve('src/js/main.js'), 'utf8');
+    const at = main.indexOf('function openNote(id, { inPlace = false } = {}) {');
+    expect(at).toBeGreaterThan(-1);
+    const open = main.slice(at);
+    expect(open.slice(0, open.indexOf('\n  }\n'))).toContain('toolbar.syncNoteFont();');
+  });
+
+  it('say a design’s name in the reader’s language', () => {
+    const rows = fontChoices([], null, (name) => t(name, 'tr'));
+    expect(rows.find(([, label]) => label.startsWith('Courgette'))[1]).toBe('Courgette (Mürekkep)');
+    expect(rows[0][1]).toBe('Serif (Nebula)');            // the name is never declined
+  });
+
+  it('still show a font chosen earlier and since taken off the list, in its place by name', () => {
     const rows = fontChoices([], '"Candara", serif');
-    expect(rows.at(-1)).toEqual(['"Candara", serif', 'Candara']);
+    const at = rows.findIndex(([stack]) => stack === '"Candara", serif');
+    expect(rows[at]).toEqual(['"Candara", serif', 'Candara']);
+    expect([rows[at - 1][1], rows[at + 1][1]]).toEqual(['Calibri', 'Cascadia Code']);
     expect(fontChoices([], 'Arial, Helvetica, sans-serif')).toHaveLength(FONTS.length);
+    // A face that is out of the app (the brush's script) is still the choice of whoever chose it, and no design's.
+    expect(fontChoices([], '"Kaushan Script", "Segoe Script", cursive').find(([, label]) => label.startsWith('Kaushan'))[1]).toBe('Kaushan Script');
   });
 
   it('come with the sizes of the size box', () => {
@@ -119,27 +196,85 @@ describe('the fonts Settings offers a new note', () => {
 });
 
 describe('a pin beside each font', () => {
-  it('puts the pinned ones first, in the order they were pinned', () => {
+  it('puts the pinned ones right under the designs’ faces, in the order they were pinned', () => {
     const rows = fontRows('', { pinned: ['Consolas', 'arial'], custom: ['Noto Serif'] }).own;
-    expect(rows.slice(0, 3).map((r) => [r.label, r.pinned])).toEqual([['Consolas', true], ['Arial', true], ['Serif', false]]);
+    expect(rows.slice(0, FACES.length).map((r) => r.label)).toEqual(FACES.map(([face]) => face));
+    expect(rows.slice(FACES.length, FACES.length + 3).map((r) => [r.label, r.pinned])).toEqual([['Consolas', true], ['Arial', true], ['Almendra', false]]);
     expect(rows).toHaveLength(FONTS.length + 1);
     expect(rows.filter((r) => r.pinned)).toHaveLength(2);
-    // The rest keep their order.
-    expect(rows.slice(2).map((r) => r.label)).toEqual([...FONTS.map(([label]) => label).filter((l) => !['Consolas', 'Arial'].includes(l)), 'Noto Serif']);
+    // The rest by their names, the reader's own among them.
+    expect(rows.slice(FACES.length + 2).map((r) => r.label)).toEqual([...REST.filter((l) => !['Consolas', 'Arial'].includes(l)), 'Noto Serif'].sort(byFontName));
   });
 
-  it('pins a font that was added, and a search keeps the pinned first', () => {
+  it('pins a font that was added, and a search keeps the pinned over the rest', () => {
     const rows = fontRows('s', { pinned: ['Noto Serif'], custom: ['Noto Serif'] }).own;
-    expect(rows[0]).toEqual({ label: 'Noto Serif', stack: '"Noto Serif", serif', custom: true, pinned: true });
+    expect(rows.filter((r) => !r.design)[0]).toEqual({ label: 'Noto Serif', stack: '"Noto Serif", serif', custom: true, pinned: true, design: '' });
     expect(rows.every((r) => /s/i.test(r.label) || /s/i.test(r.stack))).toBe(true);
   });
 
   it('a pin on a font that is not in the list pins nothing', () => {
     const rows = fontRows('', { pinned: ['Gone Sans'] }).own;
-    expect(rows.map((r) => r.label)).toEqual(FONTS.map(([label]) => label));
+    expect(rows.map((r) => r.label)).toEqual(UNPINNED);
     expect(rows.some((r) => r.pinned)).toBe(false);
   });
+});
 
+describe('the designs’ faces in the font menu (1.0.4)', () => {
+  it('stand first, in the designs’ order, each saying whose it is', () => {
+    const rows = fontRows('').own;
+    expect(rows.slice(0, FACES.length).map((r) => [r.label, r.design])).toEqual(FACES);
+    // Nebula's is the app's own serif, the first row of all.
+    expect(rows[0]).toEqual({ label: 'Serif', stack: FONTS[0][1], custom: false, pinned: false, design: 'Nebula' });
+    expect(rows.slice(FACES.length).every((r) => r.design === '')).toBe(true);
+    // The owner: "fontlar alfabeye göre sıralansın".
+    expect(rows.slice(FACES.length).map((r) => r.label)).toEqual(REST);
+    expect(REST.slice(0, 4)).toEqual(['Almendra', 'Architects Daughter', 'Arial', 'Calibri']);
+    expect(REST.at(-1)).toBe('Verdana');
+    expect(rows).toHaveLength(FONTS.length);
+  });
+
+  // The owner: "design fontları sırada en üstte olsun hep".
+  it('nothing goes over them: a pinned face stays in its place and says so, a pinned font comes after them', () => {
+    const rows = fontRows('', { pinned: ['Bodoni Moda', 'Georgia'] }).own;
+    expect(rows.slice(0, FACES.length).map((r) => r.label)).toEqual(FACES.map(([face]) => face));
+    expect(rows[FACES.length - 1]).toMatchObject({ label: 'Bodoni Moda', pinned: true, design: 'Clockwork' });
+    expect(rows.slice(FACES.length, FACES.length + 2).map((r) => [r.label, r.pinned, r.design])).toEqual([['Georgia', true, ''], ['Almendra', false, '']]);
+    expect(rows.filter((r) => r.label === 'Bodoni Moda')).toHaveLength(1);
+  });
+
+  it('a design’s name finds its face, in English and in the reader’s language', () => {
+    expect(fontRows('art deco').own.map((r) => r.label)).toEqual(['Marcellus']);
+    expect(fontRows('mürekkep').own).toEqual([]);
+    expect(fontRows('mürekkep', { say: (name) => t(name, 'tr') }).own.map((r) => r.label)).toEqual(['Courgette']);
+    // A font's own name is found as before, and one that is no design's says none.
+    expect(fontRows('garamond').own.map((r) => [r.label, r.design])).toEqual([['Cormorant Garamond', ''], ['EB Garamond', ''], ['Garamond', '']]);
+    // The faces that went out of the app are in no list.
+    for (const gone of ['Kaushan', 'Rye', 'Grenze Gotisch']) expect(fontRows(gone).own, gone).toEqual([]);
+  });
+
+  it('every face named for a design is a font of the menu, and its design writes in it', () => {
+    const css = fs.readFileSync(path.resolve(__dirname, '../src/css/designs.css'), 'utf8');
+    expect(Object.keys(DESIGN_FACES)).toEqual(DESIGNS);
+    expect(DESIGN_FACES.nebula).toEqual([FONTS[0][0]]);
+    expect(designOfFace('serif')).toBe('Nebula');
+    for (const [id, faces] of Object.entries(DESIGN_FACES).slice(1)) {
+      expect(faces, id).toHaveLength(1);                   // one face a design, for its words and its heads
+      const own = new RegExp(`\\n:root\\[data-design="${id}"\\] \\{[^}]*\\}`).exec(css)[0];
+      for (const face of faces) {
+        expect(FONTS.some(([label, stack]) => label === face && stack.startsWith(`"${face}"`)), face).toBe(true);
+        expect(own, `${id}: ${face}`).toContain(`"${face}`);
+        expect(designOfFace(face.toUpperCase())).toBe(DESIGN_NAMES[id]);
+      }
+      expect(/--serif:\s*"([^"]+)"/.exec(own)[1]).toBe(faces[0]);
+      expect(STRINGS[DESIGN_NAMES[id]], DESIGN_NAMES[id]).toBeDefined();
+    }
+    expect(designOfFace('Georgia')).toBe('');
+    expect(designOfFace('')).toBe('');
+    expect(designFacePlace('Cinzel')).toBe(-1);
+  });
+});
+
+describe('a pin, pressed and kept', () => {
   it('a press pins, the next unpins — whatever the case of the name', () => {
     expect(togglePinned([], 'Arial')).toEqual(['Arial']);
     expect(togglePinned(['Arial'], 'Consolas')).toEqual(['Arial', 'Consolas']);

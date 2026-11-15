@@ -338,6 +338,38 @@ export function tidyAfterDelete(root, selection, before = null) {
     }
   }
 
+  // The same for a highlight or a colour, a span with a class: the lower half
+  // comes up bare — its mark dropped, or rebuilt as a style that was taken off
+  // above — and the highlight ended where Enter had been pressed (a note of the
+  // owner's in the old-notes trials, 1.0.4). The words the lower line began
+  // with, in the same mark, go back into the one the upper line ends with.
+  if (before?.marks?.length && blockCount(root) < before.blocks && range.collapsed) {
+    for (const { span, words } of before.marks) {
+      if (!span.isConnected || !block.contains(span)) continue;
+      const bare = [];
+      let run = '';
+      for (let t = span.nextSibling; t?.nodeType === Node.TEXT_NODE && run.length < words.length; t = t.nextSibling) { bare.push(t); run += t.data; }
+      if (!run.startsWith(words)) continue;
+      // What the lower line held after its mark stays outside it.
+      if (run.length > words.length) bare.at(-1).splitText(bare.at(-1).length - (run.length - words.length));
+      const end = span.lastChild;
+      if (end?.nodeType === Node.TEXT_NODE) {
+        const at = end.length;
+        end.appendData(words);
+        for (const t of bare) t.remove();
+        // The space Enter turned into a no-break space is an ordinary space again.
+        if (at > 0 && end.data.charAt(at - 1) === ' ' && /^\S/.test(words)) end.replaceData(at - 1, 1, ' ');
+        sc = end; so = at;
+      } else {
+        span.append(...bare);
+        sc = bare[0]; so = 0;
+      }
+      ec = sc; eo = so;
+      changed = true;
+      break;
+    }
+  }
+
   // Joining the lines, Chromium can also drop a styled span that was already
   // there, whole: the words stay and their style goes (a quote's upright
   // words went italic). A span that was in the note before the delete and is
@@ -422,6 +454,8 @@ export function beforeDelete(root) {
   // The block the caret stands at the very start of: a Backspace there joins
   // it to the one above, and Chromium joins only its first line (tidyAfterDelete).
   known.startBlock = blockStartAt(root);
+  // A highlight or a colour Enter split over two lines, which a join makes one again.
+  known.marks = splitMarks(root);
   // By what they are too: joining lines, Chromium rebuilds a span it moves, so
   // the one after the delete is a new element with the same style and words.
   known.spans = new Set([...root.querySelectorAll('span[style]:not([class])')].map(spanKey));
@@ -458,6 +492,33 @@ function blockStartAt(root) {
   if (head.toString().replace(/​/g, '')) return null;
   if (head.cloneContents().querySelector('br, img, hr')) return null;
   return block;
+}
+
+/**
+ * Enter inside a highlight or a colour splits its span in two: one half ends a
+ * line, the other begins the next. For the caret's line with the line over it,
+ * and with the line under it: the span the upper one ends with, and the words
+ * the lower one begins with in a span that formats alike.
+ * @returns {{span: Element, words: string}[]}
+ */
+function splitMarks(root) {
+  const LINE = 'p, li, blockquote, h1, h2, h3, h4, h5, h6, .blk-todo, div';
+  const sel = root.ownerDocument.getSelection?.();
+  if (!sel?.rangeCount || !sel.isCollapsed) return [];
+  const node = sel.anchorNode;
+  const el = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+  const block = el?.closest(LINE);
+  if (!block || block === root || !root.contains(block)) return [];
+  const marks = [];
+  for (const [upper, lower] of [[block.previousElementSibling, block], [block, block.nextElementSibling]]) {
+    if (!upper?.matches(LINE) || !lower?.matches(LINE)) continue;
+    const left = upper.lastChild;
+    const right = lower.firstChild;
+    if (left?.nodeType !== Node.ELEMENT_NODE || right?.nodeType !== Node.ELEMENT_NODE) continue;
+    if (!left.matches('span[class]') || !sameFormat(left, right) || !right.textContent) continue;
+    marks.push({ span: left, words: right.textContent });
+  }
+  return marks;
 }
 
 function blockCount(root) {

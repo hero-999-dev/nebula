@@ -11,12 +11,14 @@ import { editorZoom } from './page-zoom.js';
 import { bindLinkPreview } from './link-preview.js';
 import { resizeImageBox, ensureImageHandles } from './image-resize.js';
 import { injectIcons } from './icons.js';
-import { isVideoFile, isMediaUrl, makeVideoBlock, refreshVideoBlocks, initVideoPlayers } from './file-video.js';
-import { makeAttachBlock, refreshAttachBlocks, initAttachCards, dropKind, isAttachUrl, ownsAttachUrl } from './file-attach.js';
-import { createPictureDrag, alignOf, setAlign, inRow, leaveRow, putBeside, pictureBefore, tidyRows, inWord, putInLine, leaveLine } from './image-place.js';
+import { isVideoFile, isMediaUrl, makeVideoBlock, refreshVideoBlocks, initVideoPlayers, paintComingPicture } from './file-video.js';
+import { makeAttachBlock, refreshAttachBlocks, initAttachCards, initAttachCarry, initPictureCarry, takeCarried, dropKind, isAttachUrl, ownsAttachUrl } from './file-attach.js';
+import { createPictureDrag, alignOf, setAlign, inRow, leaveRow, putBeside, pictureBefore, tidyRows, inWord, putInLine, leaveLine, rowGiven, rowRoom, rowRest } from './image-place.js';
 import { cleanPastedHtml, cleanNebulaHtml, fromNebula, undressInserted, dressInNoteFont } from './paste-clean.js';
-import { dropTarget, insertBlocks, holdsStructure, caretAfter } from './block-handle.js';
+import { dropTarget, moveBlock, insertBlocks, holdsStructure, caretAfter } from './block-handle.js';
+import { LEVEL_SNAP, faceOf, footGap, showLevel, hideLevel } from './level.js';
 import { showDropMark, hideDropMark } from './drop-mark.js';
+import { showGhost, hideGhost } from './drag-ghost.js';
 
 // Mention left the menu (1.0.3, the owner); @site links already in notes still work.
 const LINK_KINDS = ['embed', 'bookmark', 'url'];
@@ -703,7 +705,14 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
   }
 
   const imageBar = ensureImageBar();
-  const pictureDrag = createPictureDrag(editor);
+  const pictureDrag = createPictureDrag(editor, {
+    // Beside a picture is a row of pictures; beside anything else that is not words, columns.
+    sideAt: (figure, x, y) => {
+      const t = inWord(figure) ? null : dropTarget(editor, figure, x, y, { sides: 'solid' });
+      return t?.kind === 'side' && !t.block.matches('.note-image') ? t : null;
+    },
+    toSide: (figure, side) => !!moveBlock(editor, figure, side),
+  });
   // ✂ on the bar (image-crop.js); the cropped picture comes back selected.
   const crop = initImageCrop(editor, { history, onDone: (figure) => { selectImage(figure); onGeometry?.(); } });
 
@@ -864,6 +873,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
       if (img) img.draggable = false;
       captionOf(image); // a saved caption is editable again
       if (isWidget(image)) renderWidget(image);
+      paintComingPicture(image); // still on its way from another computer: it says so (1.0.4)
     }
     // A row whose other picture was deleted, cut or undone away is no row.
     tidyRows(editor);
@@ -951,6 +961,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
       image.classList.remove('note-image--inline', 'note-image--center', 'note-image--right', 'note-image--row');
       image.style.removeProperty('--row');
       image.style.removeProperty('--beside');
+      image.style.removeProperty('--share');
       image.style.left = `${Math.round((rect.left - origin.left) / z)}px`;
       image.style.top = `${Math.round((rect.top - origin.top) / z)}px`;
       image.style.height = `${Math.round(pictureHeight / z)}px`;
@@ -1058,6 +1069,8 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
       // It sits in the text: the drag says where in the text (image-place.js),
       // and nothing moves but its alignment until the button is let go.
       editor.classList.add('image-dragging');
+      // What is pulled goes with the pointer, as a card does (1.0.4).
+      showGhost(drag.image, event.clientX, event.clientY);
       drag.target = pictureDrag.over(drag.image, event.clientX, event.clientY, event.clientX - drag.downX);
       lightPlace();
       positionImageBar();
@@ -1073,16 +1086,19 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
       // up with the pointer only at twice the pull.
       const centred = inText && !inRow(drag.image) && alignOf(drag.image) === 'center';
       const box = resizeImageBox(drag, centred ? dx * 2 : dx, dy, drag.corner, inText);
-      drag.image.style.width = Math.round(box.width) + 'px';
+      const rowed = inText && inRow(drag.image);
+      // In a row it is given what draws it as wide as it was pulled (image-place.js rowGiven).
+      drag.image.style.width = Math.round(rowed ? rowGiven(box.width, rowRest(drag.image), rowRoom(drag.image), drag.width) : box.width) + 'px';
       if (inText) {
         // Never given more than can be drawn: the rest would have to be pulled back before it got smaller.
         const drawn = parseFloat(getComputedStyle(drag.image).width);
-        if (drawn && drawn < Math.round(box.width) - 0.5) drag.image.style.width = `${Math.floor(drawn)}px`;
+        if (!rowed && drawn && drawn < Math.round(box.width) - 0.5) drag.image.style.width = `${Math.floor(drawn)}px`;
         // The pictures beside it are told what it takes now: the room is theirs or its.
-        if (inRow(drag.image)) {
+        if (rowed) {
           tidyRows(drag.image.parentElement);
           evenInRow(drag.image);
         } else if (inWord(drag.image)) evenInRow(drag.image);
+        else evenBeside(drag.image);
       }
       if (!inText) {
         drag.image.style.height = Math.round(box.height) + 'px';
@@ -1108,7 +1124,9 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
   const SNAP = 6;
   function evenInRow(image) {
     rowGuide.hidden = true;
-    const own = image.querySelector(':scope > img');
+    // A widget has no picture in it: it is measured itself (1.0.4 — "widgets have no evening-out as pictures do").
+    const drawn = (el) => el.querySelector(':scope > img') ?? (isWidget(el) ? el : null);
+    const own = drawn(image);
     if (!own) return;
     const word = inWord(image);
     const box = image.getBoundingClientRect();
@@ -1124,7 +1142,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     let best = null;
     let bestImg = null;
     for (const mate of mates) {
-      const img = mate.querySelector(':scope > img');
+      const img = drawn(mate);
       const m = img?.getBoundingClientRect();
       if (m?.height && Math.abs(m.height - h) <= SNAP && (!best || Math.abs(m.height - h) < Math.abs(best.height - h))) { best = m; bestImg = img; }
     }
@@ -1145,9 +1163,25 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     rowGuide.hidden = false;
   }
 
+  /**
+   * A picture or a widget on a line of its own, level with what stands in the
+   * column beside it — a table, a card, another picture (1.0.4, level.js).
+   */
+  function evenBeside(image) {
+    hideLevel();
+    const gap = footGap(editor, image, LEVEL_SNAP * editorZoom(editor));
+    if (gap === null) return;
+    const h = faceOf(image).getBoundingClientRect().height;
+    const given = parseFloat(image.style.width);
+    if (Math.abs(gap) >= 0.5 && h > 0 && given > 0) image.style.width = `${Math.round(given * (h + gap) / h)}px`;
+    showLevel(editor, image);
+  }
+
   function finishDrag() {
     if (!drag) return;
+    hideGhost();
     rowGuide.hidden = true;
+    hideLevel();
     if (drag.layer !== editor) {
       drag.layer.style.minHeight = '';
       if (!drag.layer.getAttribute('style')) drag.layer.removeAttribute('style');
@@ -1284,18 +1318,37 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     const dx = (event.clientX - d.x) / z;
     const dy = (event.clientY - d.y) / z;
     // A side moves the way it is pulled: outward grows the embed, inward shrinks it.
+    const wide = (w) => { d.card.style.width = `${Math.round(Math.min(d.max, Math.max(260, w)))}px`; };
+    const high = (h) => d.card.style.setProperty('--embed-h', `${Math.round(Math.min(1400, Math.max(120, h)))}px`);
+    let w = null;
+    let h = null;
     if (/[ew]/.test(d.edge)) {
-      const w = d.width + (d.edge.includes('w') ? -dx : dx);
-      d.card.style.width = `${Math.round(Math.min(d.max, Math.max(260, w)))}px`;
+      w = d.width + (d.edge.includes('w') ? -dx : dx);
+      wide(w);
     }
     if (/[ns]/.test(d.edge) && !d.video) {
-      const h = d.height + (d.edge.includes('n') ? -dy : dy);
-      d.card.style.setProperty('--embed-h', `${Math.round(Math.min(1400, Math.max(120, h)))}px`);
+      h = d.height + (d.edge.includes('n') ? -dy : dy);
+      high(h);
+    }
+    // Its foot within a few pixels of the foot of what stands beside it: level with it, and the line
+    // says so (1.0.4, level.js). A page by its height; a video, which keeps its shape, by its width.
+    hideLevel();
+    if (h !== null || (d.video && w !== null)) {
+      const gap = footGap(editor, d.card, LEVEL_SNAP * z);
+      if (gap !== null) {
+        if (Math.abs(gap) >= 0.5) {
+          const tall = d.card.getBoundingClientRect().height / z;
+          if (h !== null) high(h + gap / z);
+          else if (tall > 0) wide(Math.min(d.max, Math.max(260, w)) * (tall + gap / z) / tall);
+        }
+        showLevel(editor, d.card);
+      }
     }
     onGeometry?.();
   });
   window.addEventListener('mouseup', () => {
     if (!embedDrag) return;
+    hideLevel();
     embedDrag = null;
     document.body.classList.remove('resizing');
     dirty();
@@ -1567,15 +1620,41 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
         return;
       }
       const above = inText ? selectedImage.previousElementSibling : null;
+      const below = inText ? selectedImage.nextElementSibling : null;
       selectedImage.remove();
       selectImage(null);
-      if (above && !above.matches('.shape-layer, .image-layer, .note-image, .link-block, .blk-code, hr')) {
+      const NO_LINE = '.shape-layer, .image-layer, .note-image, .link-block, .blk-code, .blk-table, .blk-cols, hr';
+      if (above && !above.matches(NO_LINE)) {
         const r = document.createRange();
         r.selectNodeContents(above);
         r.collapse(false);
         editor.focus({ preventScroll: true });
         window.getSelection().removeAllRanges();
         window.getSelection().addRange(r);
+      } else if (inText) {
+        // No line over it — a divider, another picture, nothing: the caret was
+        // left at the very top of the note, and what was typed next opened a
+        // line up there ("iki divider arasindaki seyi silince yukaridan gene
+        // alta aciliyor", the owner's Nebula note, 1.0.4). It stays where the
+        // picture was: Delete goes on into the line under it, a divider beside
+        // it is picked, as it is when an empty line there is taken away.
+        const line = below && !below.matches(NO_LINE) ? below : null;
+        const hr = [above, below].find((el) => el?.matches('hr.blk-hr'));
+        // A picture right under it — else right over it — is selected, as it was before
+        // (0.9.3, the owner: nothing stands between a divider and the picture under it).
+        const beside = [below, above].find((el) => el?.matches('.note-image'));
+        editor.focus({ preventScroll: true });
+        if (line && (event.key === 'Delete' || !hr)) placeCaretIn(line);
+        else if (beside) {
+          // The caret beside it, where a picture's selection keeps it (toolbar.js settleGap).
+          const r = document.createRange();
+          r.setStartBefore(beside);
+          r.collapse(true);
+          window.getSelection().removeAllRanges();
+          window.getSelection().addRange(r);
+          selectImage(beside);
+        }
+        else if (hr) editor.dispatchEvent(new CustomEvent('nebula-pick-divider', { detail: hr }));
       }
       dirty();
     }
@@ -1769,7 +1848,7 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     if (event.target.closest?.('.code-src, .shape-text')) return;
     const holder = document.createElement('div');
     holder.append(range.cloneContents());
-    if (!holder.querySelector('img[src^="nebula-media://note/"]')) return;
+    if (!holder.querySelector('img[src^="nebula-media://note/"], img[src^="nebula-media://hole/"]')) return;
     let html = holder.innerHTML;
     try { html = window.nebula.media.inlineSync(html); } catch { return; }
     event.clipboardData.setData('text/html', html);
@@ -1976,12 +2055,40 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     return insertAttachFiles(res.paths, at);
   }
   initAttachCards(editor, { say, owner: () => ({ id: noteId?.() ?? null, hole: noteHole?.() ?? null }) });
+  initAttachCarry(editor, { owner: () => ({ id: noteId?.() ?? null, hole: noteHole?.() ?? null }) });
+  // A picture carried out of the window is no longer moved in the note: it stays where it was.
+  initPictureCarry(editor, {
+    owner: () => ({ id: noteId?.() ?? null, hole: noteHole?.() ?? null }),
+    onOut: () => {
+      if (!drag || drag.kind !== 'move') return;
+      if (drag.image.classList.contains('note-image--inline')) {
+        pictureDrag.cancel(drag.image);
+        drag.cancelled = true;
+        drag.target = null;
+      } else if (drag.moved) {
+        drag.image.style.left = `${drag.left}px`;
+        drag.image.style.top = `${drag.top}px`;
+        drag.moved = false;
+      }
+      finishDrag();
+    },
+  });
 
   editor.addEventListener('drop', (event) => {
     // Where the mark stood, worked out again at the very place it was let go.
     const gap = filesOnly(event.dataTransfer) ? dropTarget(editor, null, event.clientX, event.clientY, { sides: false }) : null;
     forgetGap();
     const dropped = [...(event.dataTransfer?.files || [])];
+    // The note's own card or picture, pulled out and brought back: no copy. A card goes where it is let go.
+    const own = takeCarried(dropped);
+    if (own && editor.contains(own)) {
+      event.preventDefault();
+      if (own.matches('.link-attach') && editor.dataset.readonly !== 'true' && gap && gap.ref !== own) {
+        history?.push();
+        if (putAtGap(gap, [own])) { onGeometry?.(); dirty(); }
+      }
+      return;
+    }
     // Anything that is neither a picture nor a video among them: every file is attached (0.9.6).
     if (dropKind(dropped, { isImage: (f) => isImageMime(f.type), isVideo: isVideoFile }) === 'attach') {
       event.preventDefault();
@@ -2098,11 +2205,13 @@ export function initRichPaste(editor, { history, onGeometry, onHeal, noteFont, n
     pickVideo,
     insertAttachFiles,
     pickFiles,
-    reset: () => { generation += 1; drag = null; editor.classList.remove('image-dragging'); selectImage(null); hideLinkMenu(); crop.cancel(); embedDrag = null; },
+    reset: () => { generation += 1; drag = null; hideGhost(); editor.classList.remove('image-dragging'); selectImage(null); hideLinkMenu(); crop.cancel(); embedDrag = null; },
     insertImageBlob,
     copyImage,
     deleteImage,
     editCaption,
+    /** A picture standing in the text is lifted out of it, staying where it is (a work area that holds its pictures, shapes.js). */
+    float: (figure) => (figure && !isWidget(figure) ? setImageFloating(figure, true) : null),
     selectImage,
   };
 }import { ensureLayer as ensureCanvas } from './shapes.js';

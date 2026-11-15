@@ -77,7 +77,7 @@ export function conflictCopy(text, id, copyId) {
  * @param {Map<string,string>} p.base     id → the hash both last had
  * @param {Map<string,number>} p.localTombs  id → when it was deleted here
  * @param {Map<string,number>} p.remoteTombs id → when it was deleted there
- * @param {Set<string>} [p.keepOut] this copy's own guide, never sent nor taken
+ * @param {Set<string>} [p.keepOut] this copy's own guide and the notes kept to it, never sent nor taken
  * @returns {{take: object[], drop: object[], copies: object[], same: object[]}}
  *   take   {id, hash, expect}  the peer's version replaces (or becomes) this one;
  *          `expect` is the local updatedAt seen, null for a new note — the window

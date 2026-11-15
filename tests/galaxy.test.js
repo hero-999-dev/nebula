@@ -774,7 +774,7 @@ describe('galaxy-map (engine)', () => {
     const fitView = map.view();
     seen.clear();
     for (let i = 0; i < 5; i++) step(70);
-    expect(seen.has('Projecta')).toBe(true);
+    expect(seen.has('Projecta')).toBe(false);       // a map this size named its projects when whole until the owner's second try (1.0.4)
     expect(seen.has('Folderly')).toBe(false);
     expect(seen.has('Alphanote')).toBe(false);
     expect(seen.has('Labelle')).toBe(false);
@@ -792,20 +792,35 @@ describe('galaxy-map (engine)', () => {
   it('the name layers: projects, then folders and holes, then notes, then labels (owner, 2026-10-22)', () => {
     const fitK = 1;
     const order = ['project', 'folder', 'note', 'label'];
-    const firstAt = (role) => [0.5, 1, 2, 3, 5, 8, 13, 20].find((k) => nameShownAt(role, k, fitK));
+    const firstAt = (role) => [0.5, 1, 1.3, 1.6, 1.85, 2, 3, 5, 8, 13, 20].find((k) => nameShownAt(role, k, fitK));
     for (let i = 1; i < order.length; i++) expect(firstAt(order[i])).toBeGreaterThan(firstAt(order[i - 1]));
     expect(firstAt('hole')).toBe(firstAt('folder'));
     expect(nameShownAt('core', 100, fitK)).toBe(false);
     // Going out they hide in the same order backwards.
-    expect(nameShownAt('label', 10, fitK)).toBe(false);
-    expect(nameShownAt('note', 10, fitK)).toBe(true);
-    // Far past the whole-map view not even a project is named (1.0.3).
-    expect(nameShownAt('project', fitK, fitK)).toBe(true);
+    expect(nameShownAt('label', 7, fitK)).toBe(false);
+    expect(nameShownAt('note', 7, fitK)).toBe(true);
+    // Notes and labels a notch sooner than they were, still after the folders (1.0.4).
+    expect(nameShownAt('note', 3.4, fitK)).toBe(true);
+    expect(nameShownAt('note', 3, fitK)).toBe(false);
+    expect(nameShownAt('label', 8, fitK)).toBe(true);
+    // The whole-map view names nothing; a project comes only a little before its folders (1.0.4).
+    expect(nameShownAt('project', fitK, fitK)).toBe(false);
+    expect(nameShownAt('project', fitK * 1.5, fitK)).toBe(false);   // close enough, but still under 1.85 px a unit
+    expect(nameShownAt('project', 1.6, fitK)).toBe(false);          // where it showed before the owner's second try
+    expect(nameShownAt('project', 1.85, fitK)).toBe(true);
+    expect(nameShownAt('folder', 1.85, fitK)).toBe(false);
     expect(nameShownAt('project', fitK * 0.3, fitK)).toBe(false);
     expect(nameShownAt('project', fitK * 0.6, fitK)).toBe(false);
-    // Without projects, folders are the outermost layer and named at the whole-map view.
-    expect(nameShownAt('folder', fitK, fitK, 1)).toBe(true);
-    expect(nameShownAt('folder', fitK, fitK, 0)).toBe(false);
+    // Without projects, folders are the outermost layer and take the projects' rung.
+    expect(nameShownAt('folder', 1.85, fitK, 1)).toBe(true);
+    expect(nameShownAt('folder', fitK, fitK, 1)).toBe(false);
+    expect(nameShownAt('folder', 1.85, fitK, 0)).toBe(false);
+    // A small map is large when whole: its outer layers are named there.
+    expect(nameShownAt('project', 7, 7)).toBe(false);
+    expect(nameShownAt('project', 7.5, 7.5)).toBe(true);
+    expect(nameShownAt('folder', 7, 7)).toBe(false);
+    expect(nameShownAt('folder', 9, 9)).toBe(true);
+    expect(nameShownAt('note', 30, 30)).toBe(false);
   });
 
   it('a turning sun keeps at most 48 frames, so it never churns the shared cache (Codex, 2026-10-20)', () => {

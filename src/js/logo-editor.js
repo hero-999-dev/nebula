@@ -194,7 +194,17 @@ export function initLogoEditor({ host }) {
   pictureRemove.type = 'button';
   pictureRemove.id = 'logo-picture-remove';
   pictureRow.append(pictureChoose, pictureRemove, pictureFile);
-  tools.append(pictureRow, themesLabel, themesEl, slotsEl, barRow, grid);
+  const pictureLabel = el('div', 'te-label', 'Your own picture');
+  const pictureHint = el('p', 'set-hint', 'It takes the place of the drawn logo, and stays among the themes.');
+  // The five parts down the left, the colours to choose from at their right (1.0.4).
+  const colours = el('div', 'logo-colours');
+  const pick = el('div', 'logo-pick');
+  // The picture of one's own and the shortcut on top, with a word on what the picture is; the bar and
+  // the colours under them, at the foot ("renk ve renk seçme paletini alta al").
+  // The line on the picture stands right under its heading, the buttons under the line.
+  pick.append(pictureLabel, pictureHint, pictureRow, barRow, grid);
+  colours.append(slotsEl, pick);
+  tools.append(themesLabel, themesEl, colours);
 
   const editor = el('div', 'logo-editor');
   editor.id = 'logo-editor';
@@ -213,7 +223,8 @@ export function initLogoEditor({ host }) {
     toast(!res?.ok ? (res?.error === 'exists' ? 'Another shortcut of that name is on the desktop' : 'The shortcut could not be made')
       : res.made ? 'A shortcut with the logo is on the desktop' : 'The shortcut on the desktop wears the logo');
   });
-  host.replaceChildren(editor, hint, shortcut);
+  pictureRow.append(shortcut);
+  host.replaceChildren(editor, hint);
 
   const slotButtons = LOGO_SLOTS.map((slot, i) => {
     const row = el('button', 'te-slot');

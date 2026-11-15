@@ -217,6 +217,53 @@ describe('Enter then Backspace in a line set in a font (the owner\'s notes, 0.9.
   });
 });
 
+describe('Enter then Backspace inside a highlight (a note of the owner\'s, 1.0.4)', () => {
+  /** Before: the line Enter split, the lower line as `lower`. After: Chromium's join, the lower line come up as `came`. */
+  const joined = (lower, came) => {
+    document.body.innerHTML = `<div id="ed"><p><span class="h-green">the widget grows&nbsp;</span></p><p>${lower}</p><hr></div>`;
+    const root = document.getElementById('ed');
+    const sel = window.getSelection();
+    const caret = (node, offset) => { const r = document.createRange(); r.setStart(node, offset); r.collapse(true); sel.removeAllRanges(); sel.addRange(r); };
+    caret(root.querySelectorAll('p')[1].querySelector('span').firstChild, 0);
+    const before = beforeDelete(root);
+    root.querySelectorAll('p')[1].remove();
+    root.querySelector('p').insertAdjacentHTML('beforeend', came);
+    const t = root.querySelector('p span').firstChild;
+    caret(t, t.length);
+    return { root, sel, before };
+  };
+  const WHOLE = '<p><span class="h-green">the widget grows smaller, not larger</span></p><hr>';
+
+  it('puts the lower half back into the highlight when it came up bare, the space a plain space', () => {
+    const { root, sel, before } = joined('<span class="h-green">smaller, not larger</span>', 'smaller, not larger');
+    expect(tidyAfterDelete(root, sel, before)).toBe(true);
+    expect(root.innerHTML).toBe(WHOLE);
+    // The caret is where the lines met.
+    const r = sel.getRangeAt(0);
+    expect(r.startContainer.data.slice(0, r.startOffset)).toBe('the widget grows ');
+  });
+
+  it('and when Chromium rebuilt it as a style of its own', () => {
+    const { root, sel, before } = joined('<span class="h-green">smaller, not larger</span>', '<span style="background-color: rgb(1, 2, 3);">smaller, not larger</span>');
+    expect(tidyAfterDelete(root, sel, before)).toBe(true);
+    expect(root.innerHTML).toBe(WHOLE);
+  });
+
+  it('leaves outside the words that stood after the highlight in the lower line', () => {
+    const { root, sel, before } = joined('<span class="h-green">smaller,</span> not larger', 'smaller, not larger');
+    expect(tidyAfterDelete(root, sel, before)).toBe(true);
+    expect(root.innerHTML).toBe('<p><span class="h-green">the widget grows smaller,</span> not larger</p><hr>');
+  });
+
+  it('keeps another highlight apart, and words that were never highlighted out of it', () => {
+    const other = joined('<span class="h-yellow">smaller, not larger</span>', '<span class="h-yellow">smaller, not larger</span>');
+    tidyAfterDelete(other.root, other.sel, other.before);
+    expect(other.root.querySelectorAll('p span')).toHaveLength(2);
+    const plain = joined('<span style="font-size: 14px;">smaller</span>', 'smaller');
+    tidyAfterDelete(plain.root, plain.sel, plain.before);
+    expect(plain.root.querySelector('p').innerHTML).toBe('<span class="h-green">the widget grows&nbsp;</span><span style="font-size: 14px;">smaller</span>');
+  });
+});
 
 describe('a slash command on a line in a font (the owner\'s Ideas note, 0.9.1)', () => {
   it('leaves the new heading somewhere to type: the <br> inside the font it kept', () => {

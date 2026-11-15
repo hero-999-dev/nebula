@@ -29,7 +29,16 @@ function parse(html) {
   return new DOMParser().parseFromString(`<!doctype html><body>${String(html ?? '')}</body>`, 'text/html').body;
 }
 
-const wordBlocks = (body) => [...body.children].filter((el) => !el.matches(NOT_WORDS));
+/**
+ * A section of the guide is a folded toggle heading (1.0.4): its heading and
+ * what is under it count one by one, as they did while the page was flat. A
+ * toggle inside a section — the one that shows what a toggle is — is one block.
+ */
+const wordBlocks = (body) => [...body.children].flatMap((el) => {
+  if (el.matches(NOT_WORDS)) return [];
+  if (!el.matches('.blk-toggle')) return [el];
+  return [...el.children].flatMap((part) => (part.matches('.toggle-body') ? [...part.children].filter((in_) => !in_.matches(NOT_WORDS)) : [part]));
+});
 
 /** The English guide's blocks that have words, as HTML, in order. */
 export function guideBlocks(html) {

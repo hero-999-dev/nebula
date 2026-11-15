@@ -22,7 +22,9 @@
  *   – pulled sideways on its own line, it snaps left, centre or right;
  *   – held over another picture, a mark stands at that picture's side — let
  *     go, and the two share the line;
- *   – held between two blocks, a mark lies there — let go, and it moves.
+ *   – held between two blocks, a mark lies there — let go, and it moves;
+ *   – held over a side of a table, a card or a code block, an upright mark
+ *     stands there — let go, and the two stand in columns (1.0.4).
  */
 
 import { showDropMark, hideDropMark } from './drop-mark.js';
@@ -89,6 +91,7 @@ export function putInLine(figure, range = null) {
     span.classList.remove(ALIGN_CLASS.center, ALIGN_CLASS.right, ROW);
     span.style.removeProperty('--row');
     span.style.removeProperty('--beside');
+    span.style.removeProperty('--share');
     span.classList.add(IN_WORD);
     span.removeAttribute('data-block-type');
   }
@@ -215,8 +218,48 @@ export function tidyRows(root) {
     if (beside !== figure.style.getPropertyValue('--beside')) {
       if (beside) figure.style.setProperty('--beside', beside); else figure.style.removeProperty('--beside');
     }
+    // Its part of the widths the row was given (`--share`, rounded down so the
+    // parts never add up to more than the line). Where the line is too narrow
+    // for all of them, each gives way by that part — the owner, 1.0.3, with a
+    // Pomodoro beside a Universe: "the widgets do not narrow in proportion".
+    const total = row.reduce((sum, other) => sum + givenWidth(other), 0);
+    const share = row.length && total > 0 ? String(Math.floor((givenWidth(figure) / total) * 10000) / 10000) : '';
+    if (share !== figure.style.getPropertyValue('--share')) {
+      if (share) figure.style.setProperty('--share', share); else figure.style.removeProperty('--share');
+    }
   }
 }
+
+/**
+ * The width to give a picture of a row so that it is drawn `want` wide. A row
+ * given more than its line holds draws each picture at its part of the widths
+ * given, so the width asked for is not the width to write: written as it was,
+ * a widget pulled wider got a smaller part and shrank (the owner, 1.0.4, eight
+ * widgets on a line: "büyütünce küçülüyor").
+ * @param {number} want the width it is to be drawn at
+ * @param {number} rest the widths given to the others of its row
+ * @param {number} room what the line holds of them all, the gaps taken off
+ * @param {number} [from] the width it was drawn at when the pull began: a row
+ *   that held its pictures then is not crowded by the pull — the one pulled
+ *   grows into the room that is left and stops at the line's end, the others
+ *   as wide as they were
+ */
+export function rowGiven(want, rest, room, from) {
+  if (!(room > 0) || !(rest > 0) || want + rest <= room) return want;
+  if (from != null && from + rest <= room + 1) return room - rest;
+  // Never the whole line: the others keep a tenth of it between them.
+  const x = Math.min(want, room * 0.9);
+  return (x * rest) / (room - x);
+}
+/** What a row's line holds of its pictures: the line, less the pixel and the gaps the style sheet takes off. */
+export function rowRoom(figure) {
+  const parent = figure.parentElement;
+  if (!parent) return 0;
+  const cs = getComputedStyle(parent);
+  return parent.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0) - 1 - ROW_GAP * rowOf(figure).length;
+}
+/** The widths given to the others of a picture's row. */
+export const rowRest = (figure) => rowOf(figure).reduce((sum, other) => sum + (other === figure ? 0 : givenWidth(other)), 0);
 
 /** Out of its row, onto a line of its own right under it. */
 export function leaveRow(figure) {
@@ -344,9 +387,12 @@ export function gapAwayFrom(el, parent, y) {
 
 /**
  * @param {HTMLElement} editor
+ * @param {{sideAt?: (figure: HTMLElement, x: number, y: number) => object|null, toSide?: (figure: HTMLElement, side: object) => boolean}} [o]
+ *   beside what is no picture — a table, a card, a code block — a picture stands in columns (1.0.4): sideAt says
+ *   where (with the mark's `line`), toSide puts it there. rich-paste.js hands both over from block-handle.js.
  * @returns the drag of a picture in the text: over() while it moves, drop() when let go
  */
-export function createPictureDrag(editor) {
+export function createPictureDrag(editor, { sideAt = null, toSide = null } = {}) {
   /** Where the picture stood when it was taken, to give it back on Esc. */
   let origin = null;
 
@@ -374,6 +420,12 @@ export function createPictureDrag(editor) {
       if (already && figure.classList.contains(ROW) && other.classList.contains(ROW)) { hideDropMark(); return null; }
       showDropMark({ left: (side === 'before' ? r.left - 7 : r.right + 4), top: r.top, width: 3, height: r.height });
       return { kind: 'beside', target: other, side };
+    }
+    // Over a table, a card or a code block, a third of it at either side: beside it, in columns.
+    const side = sideAt?.(figure, x, y);
+    if (side) {
+      showDropMark(side.line);
+      return { kind: 'side', side };
     }
     const own = figure.getBoundingClientRect();
     // On its own line, pulled sideways: left, centre or right, whichever its edge is nearest.
@@ -408,6 +460,13 @@ export function createPictureDrag(editor) {
       return true;
     }
     if (target.kind === 'beside') return putBeside(figure, target.target, target.side);
+    if (target.kind === 'side') {
+      const was = figure.parentElement;
+      if (!toSide?.(figure, target.side)) return false;
+      figure.classList.remove(ALIGN_CLASS.center, ALIGN_CLASS.right);
+      tidyRows(was);
+      return true;
+    }
     if (target.kind === 'gap') {
       const was = figure.parentElement;
       figure.classList.remove(ROW);

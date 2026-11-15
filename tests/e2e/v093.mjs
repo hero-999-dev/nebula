@@ -207,7 +207,7 @@ export async function runV093Checks(check) {
     await win.waitForFunction(() => !document.getElementById('ctx-menu')?.hidden, null, { polling: 50, timeout: 5000 }).catch(() => {});
     // One menu everywhere (0.9.4): the suggestions stand in the main menu, under the formatting row.
     check('a misspelt word gets its suggestions, "Add to dictionary" and "Ignore", in the one menu', await win.evaluate(() =>
-      [...document.querySelectorAll('#ctx-menu > button')].map((b) => b.textContent).join('|') === 'text|test|Add to dictionary|Ignore|Cut|Copy|Paste as Nebula format|Paste original format|Paste only text|Select all'
+      [...document.querySelectorAll('#ctx-menu > button')].map((b) => b.textContent).join('|') === 'text|test|Add to dictionary|Ignore|Cut|Copy|Paste as Nebula format|Paste original format|Paste only text|Send to…|Select all'
       && document.querySelectorAll('#ctx-menu .ctx-format button').length > 0),
       await win.evaluate(() => [document.getElementById('ctx-menu')?.hidden, [...document.querySelectorAll('#ctx-menu > button')].map((b) => b.textContent).join('|')].join(' ')));
     await win.keyboard.press('Escape');
@@ -215,8 +215,9 @@ export async function runV093Checks(check) {
     await app.evaluate(({ BrowserWindow }, p) => BrowserWindow.getAllWindows()[0].webContents.send('ui:context-menu',
       { x: p.x, y: p.y, misspelledWord: '', suggestions: [], isEditable: true, mediaType: 'image', selectionText: '' }), pic);
     await win.waitForTimeout(200);
-    check('a picture gets Copy image, its caption and Delete image', await win.evaluate(() =>
-      [...document.querySelectorAll('#ctx-menu button')].map((b) => b.textContent).join('|') === 'Copy image|Edit caption|Delete image'));
+    check('a picture gets Copy image, Send to… (1.0.4), its caption and Delete image', await win.evaluate(() =>
+      [...document.querySelectorAll('#ctx-menu button')].map((b) => b.textContent).join('|') === 'Copy image|Send to…|Edit caption|Delete image'),
+      await win.evaluate(() => [...document.querySelectorAll('#ctx-menu button')].map((b) => b.textContent).join('|')));
     await win.keyboard.press('Escape');
 
     // ---- The toggle list ---------------------------------------------------
@@ -340,9 +341,12 @@ export async function runV093Checks(check) {
     const walk = await win.evaluate(() => { const n = getSelection().anchorNode; const el = n?.nodeType === 1 ? n : n?.parentElement; return { at: el?.closest('p, div')?.id || el?.closest('p, div')?.textContent, chips: document.querySelectorAll('#editor .note-tag[data-tag="one"], #editor .note-tag[data-tag="two"]').length }; });
     check('ArrowDown walks through lines of #chips and they stay', walk.at === 'under' && walk.chips === 2, JSON.stringify(walk));
     const chip = await win.evaluate(() => { const r = document.querySelector('#editor a.note-mention').getBoundingClientRect(); return { x: r.left + 8, y: r.top + r.height / 2 }; });
+    // A plain click opens it as a tab over this note since 1.0.4 (note-tabs.mjs); with Ctrl held it goes there.
+    await win.keyboard.down('Control');
     await win.mouse.click(chip.x, chip.y);
+    await win.keyboard.up('Control');
     await win.waitForFunction(() => document.querySelector('#title').value === 'Shopping list', null, { polling: 50, timeout: 3000 }).catch(() => {});
-    check('a click on a mention opens that note', await win.evaluate(() => document.querySelector('#title').value === 'Shopping list'));
+    check('Ctrl + click on a mention opens that note', await win.evaluate(() => document.querySelector('#title').value === 'Shopping list'));
 
     // ---- The note's writing font --------------------------------------------
     await open('blocks');
@@ -777,7 +781,7 @@ export async function runV093Checks(check) {
     for (let i = 0; i < 40 && previewFiles() > 0; i += 1) await win.waitForTimeout(150);
     const leftBehind = (() => { try { return fs.readdirSync(path.join(profile, 'pdf-preview'), { recursive: true }); } catch { return []; } })();
     check('turned back to landscape and closed: no preview left behind', !(await previewState()).open && previewFiles() === 0
-      && await win.evaluate(() => localStorage.getItem('nebula:nw-orientation') === 'landscape'), JSON.stringify({ leftBehind, state: await previewState() }));
+      && await win.evaluate(() => localStorage.getItem('nebula:nw-orientation') === 'landscape'), JSON.stringify({ leftBehind, files: previewFiles(), kept: await win.evaluate(() => localStorage.getItem('nebula:nw-orientation')), state: await previewState() }));
     // ---- Auto order page (0.9.3) -----------------------------------------
     // A shape across the first page line goes to just under it; NW has nothing to order.
     check('Auto order page does nothing on Nebula Wide (the button is off, and faded)', await win.evaluate(() => {

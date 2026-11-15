@@ -1,8 +1,9 @@
 name: Release
 
-# Pushing a v* tag (npm run push) builds Windows + macOS and publishes one
-# GitHub Release. Installed copies of Nebula read latest.yml from that release,
-# so the release must NOT be a draft.
+# Pushing a v* tag (npm run push) builds Windows + macOS + Linux and publishes
+# one GitHub Release. Installed copies of Nebula read latest.yml from that
+# release (an AppImage reads latest-linux.yml), so the release must NOT be a
+# draft.
 #
 # A precheck/* branch runs the very same jobs and publishes nothing. `npm run
 # push` sends the release commit there first and tags it only when this run
@@ -136,8 +137,93 @@ jobs:
           if-no-files-found: error
           retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 3 }}
 
+  # 1.0.4: an AppImage, a deb (Ubuntu, Mint, Kali) and a pacman package (Arch),
+  # x64. This job is the only place they are ever built: the owner's machine is
+  # Windows and has no Linux on it.
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'   # Electron 44 needs Node 22.12+ (0.9.3)
+          cache: npm
+
+      - run: npm ci
+
+      - name: Unit regressions on Linux
+        run: npm test
+
+      - name: Build renderer + main
+        run: npm run build
+
+      - name: Electron binary
+        run: npx install-electron --no
+
+      # Ubuntu 24.04 keeps unprivileged programs out of the user namespaces
+      # Electron's sandbox is made of, and the binary npm fetched is not the
+      # setuid one a package installs. The runner is told to allow it; the app
+      # is never started with its sandbox off.
+      - name: Let Electron's sandbox start on the runner
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+      # The real app on a throwaway profile, on a screen that is not there:
+      # open, write a note, close, open again. The Windows job runs the whole
+      # smoke suite; that one has never run on Linux and needs a keyring.
+      - name: First run on Linux
+        run: xvfb-run -a node tests/e2e/first-run.mjs
+
+      # bsdtar is what makes the pacman package.
+      - name: Packaging tools
+        run: sudo apt-get update && sudo apt-get install -y libarchive-tools
+
+      - name: Package AppImage + deb + pacman
+        run: npx electron-builder --linux AppImage deb pacman --x64 --publish never
+
+      - name: Assert the Linux packages and the update manifest
+        run: |
+          version=$(node -p "require('./package.json').version")
+          ls -la release
+          test -s "release/Nebula-${version}.AppImage"
+          test -s "release/nebula_${version}_amd64.deb"
+          test -s "release/nebula-${version}.pacman"
+          # Without latest-linux.yml no AppImage can ever see this release.
+          test -f release/latest-linux.yml || { echo "release/latest-linux.yml missing"; exit 1; }
+          cat release/latest-linux.yml
+          grep -q "Nebula-${version}.AppImage" release/latest-linux.yml || { echo "latest-linux.yml does not name the AppImage"; exit 1; }
+
+      - name: Assert electron-updater is inside the asar
+        run: |
+          npx asar list release/linux-unpacked/resources/app.asar > asar.txt
+          grep -qE 'node_modules[\\/]electron-updater' asar.txt || { echo "electron-updater not packaged"; exit 1; }
+
+      # What a desktop reads: the name, the icon, the documents Nebula opens,
+      # and the keyring library among what the package asks the system for.
+      - name: Assert what the deb says of itself
+        run: |
+          version=$(node -p "require('./package.json').version")
+          dpkg-deb --info "release/nebula_${version}_amd64.deb"
+          dpkg-deb --field "release/nebula_${version}_amd64.deb" Depends | grep -q libsecret-1-0 || { echo "the deb does not ask for libsecret"; exit 1; }
+          dpkg-deb --fsys-tarfile "release/nebula_${version}_amd64.deb" | tar -xO ./usr/share/applications/nebula.desktop > nebula.desktop
+          cat nebula.desktop
+          grep -q '^Name=Nebula$' nebula.desktop
+          grep -q '^Categories=Office' nebula.desktop
+          grep -q '^MimeType=.*application/vnd.oasis.opendocument.text' nebula.desktop
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            release/Nebula-*.AppImage
+            release/nebula_*_amd64.deb
+            release/nebula-*.pacman
+            release/latest-linux.yml
+          if-no-files-found: error
+          retention-days: ${{ startsWith(github.ref, 'refs/tags/') && 90 || 3 }}
+
   publish:
-    needs: [build-win, build-mac]
+    needs: [build-win, build-mac, build-linux]
     # A precheck branch only proves the build; only a tag publishes.
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -155,7 +241,7 @@ jobs:
 
       - run: ls -la dist
 
-      - name: Generate user-facing release notes and Mac instructions
+      - name: Generate user-facing release notes, Mac and Linux instructions
         run: node scripts/release-body.js "${{ github.ref_name }}" release-body.md
 
       - name: Publish the release

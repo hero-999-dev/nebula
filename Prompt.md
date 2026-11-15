@@ -120,7 +120,9 @@ page on every release.
 
 ---
 
-## Current implementation state (v1.0.3)
+## Current implementation state (v1.0.4)
+
+**2026-11-11, in the working tree for 1.0.4, not released:** the owner's Nebula note — the corner card steps through three sizes and counts whole seconds (widgets.js `nextCardSize`); About shows the vault's size; the Only view badge has no lock; a column whose last line was deleted is marked `data-tight` so `healColumns` does not give the line back (columns.js `tightenColumn`); a band over one column picks that column's blocks (block-handle.js `blocksInBand`); deleting a picture with no line over it keeps the caret there (rich-paste.js); the guide and What's new are at 1.0.4 in four languages; Electron 45.3.0. Open items are in memory.json `next`.
 
 **2026-11-01, in the working tree for the next release, not released:** several blocks picked together (Shift+click on a second grip, Shift+↑/↓, a box from the page's empty side; keys and a drag by the grip of any of them act on the whole pick); a window saved on a monitor that is gone opens on a screen there is (`electron/window-bounds.js`); a background picture (`electron/backdrop.js`, `src/js/backdrop.js`: one JPEG in the profile, inside no note); a picture logo with an in-app crop (`src/js/logo-crop.js`); a level pull of a column divider cuts only the part under it; one orbit pace on every computer, no hover speed-up, no cap on picked labels, only initials on locked holes and the whole name on open ones; New project beside New folder; a snapshot's message names its folder. Guide 1.0.3.
 

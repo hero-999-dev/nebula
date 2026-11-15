@@ -24,9 +24,17 @@
   --fern: #8FD1B0;
   --madder: #F2789A;
   --shadow: rgba(8, 4, 20, 0.55);
-  --serif: "Charter", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --sans: "Inter", "Segoe UI", system-ui, sans-serif;
+  /* The three after Palatino Linotype are the Palatino a Linux system has (1.0.4, the Linux builds);
+     Windows and a Mac never reach them. The same stack stands in designs.css, design.js and toolbar.js. */
+  --serif: "Charter", "Iowan Old Style", "Palatino Linotype", "TeX Gyre Pagella", "URW Palladio L", "P052", Georgia, serif;
+  /* Nebula writes in one face (the owner: "gerisi tek font serif olsun"): the small places that were
+     Segoe UI — a note's labels, a table's tools — are the serif too. A design puts its own face here. */
+  --sans: "Charter", "Iowan Old Style", "Palatino Linotype", "TeX Gyre Pagella", "URW Palladio L", "P052", Georgia, serif;
   --mono: "Cascadia Code", "Consolas", monospace;
+  /* The marks of a bulleted list — the dot, the ring, the square — are Nebula's own under every design
+     and every font (the owner: "bullet point işaretleri tüm fontlarda nebula fontu olsun yani aynı
+     işaretler olsun"). No design sets this one. */
+  --marks: "Charter", "Iowan Old Style", "Palatino Linotype", "TeX Gyre Pagella", "URW Palladio L", "P052", Georgia, serif;
 
 
   /* Note colours, per theme.

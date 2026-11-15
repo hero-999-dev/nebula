@@ -15,7 +15,7 @@
  */
 
 import { readSettings, writeSettings, SPELL_LANGUAGES, DEFAULT_SETTINGS } from './settings.js';
-import { FONTS, FONT_SIZES, BASE_FONT_SIZE, readCustomFonts, customFontStack, firstFamily } from './toolbar.js';
+import { FONTS, FONT_SIZES, BASE_FONT_SIZE, readCustomFonts, customFontStack, firstFamily, fontLabelFor, byFontName } from './toolbar.js';
 import { PAGE_MODES } from './page-mode.js';
 import { initAppLockSettings } from './app-lock.js';
 import { initLogoEditor } from './logo-editor.js';
@@ -27,6 +27,7 @@ import {
 import { t } from './i18n.js';
 import { icon } from './icons.js';
 import { on } from './bus.js';
+import { initDesign, designOfFace, designFacePlace, designStack, DESIGNS, DESIGN_FACES, currentDesign } from './design.js';
 import { ring, stopRing, isRinging, soundChoices, soundOf, chooseSound, addOwnSound, removeOwnSound } from './alarm-sound.js';
 
 const el = (tag, cls, text) => {
@@ -44,25 +45,33 @@ function option(value, text) {
 }
 
 /**
- * The fonts a new note may start in: the app's own, then the ones the reader
- * added. [stack, label] — '' is the app's own, and says which it is.
+ * The fonts a new note may start in: the designs' faces first, each with its
+ * design's name after it (1.0.4: "design fontları en üstte olsun ve design adı
+ * o fontun yanında parantez içinde", "designdekiler pinlensin en üstte, general
+ * new notes kısmında"), then every other one by its name ("fontlar alfabeye
+ * göre sıralansın") — the app's and the ones the reader added alike.
+ * [stack, label] — the Serif is Nebula's face and so the first of them, and a
+ * font as the others are: no row here means "no font" (a new note with no font
+ * chosen is in the design's face, and the list then shows that face's row).
+ * @param {(name: string) => string} [say] puts a design's name into the reader's language
  */
-export function fontChoices(custom = [], current = null) {
+export function fontChoices(custom = [], current = null, say = (name) => name) {
   // The app's own font is shown by its name, as the others are (1.0.0: "stop
   // writing Nebula's own, just the chosen font and the size number", the owner).
-  const out = [['', FONTS[0][0]], ...FONTS.slice(1).map(([label, stack]) => [stack, label])];
-  const have = new Set(out.map(([stack]) => firstFamily(stack).toLowerCase()));
-  have.add(firstFamily(FONTS[0][1]).toLowerCase());
+  const plain = FONTS.map(([label, stack]) => [stack, label]);
+  const have = new Set(FONTS.map(([, stack]) => firstFamily(stack).toLowerCase()));
   for (const name of custom) {
     const stack = customFontStack(name);
     const key = firstFamily(stack).toLowerCase();
     if (!key || have.has(key)) continue;
     have.add(key);
-    out.push([stack, firstFamily(stack)]);
+    plain.push([stack, firstFamily(stack)]);
   }
   // A font chosen earlier and since taken off the list is still the choice, and still shown.
-  if (current && !have.has(firstFamily(current).toLowerCase())) out.push([current, firstFamily(current)]);
-  return out;
+  if (current && !have.has(firstFamily(current).toLowerCase())) plain.push([current, firstFamily(current)]);
+  const faces = plain.filter(([, label]) => designOfFace(label)).sort((a, b) => designFacePlace(a[1]) - designFacePlace(b[1]));
+  return [...faces.map(([stack, label]) => [stack, `${label} (${say(designOfFace(label))})`]),
+    ...plain.filter(([, label]) => !designOfFace(label)).sort((a, b) => byFontName(a[1], b[1]))];
 }
 
 /** The Settings sheet's tabs, in order: [id, label]. */
@@ -92,8 +101,9 @@ export function formatBytes(n) {
  * @param {HTMLElement} deps.body
  * @param {HTMLElement} [deps.closeButton]
  * @param {() => Promise<void>} deps.saveNow
+ * @param {() => Promise<number>} [deps.fontsOnAll] the design's font on every note (design-fonts.js)
  */
-export function initSettingsPanel({ overlay, body, closeButton, saveNow, emptyTrash, noteTitle, themeEditor }) {
+export function initSettingsPanel({ overlay, body, closeButton, saveNow, emptyTrash, noteTitle, themeEditor, fontsOnAll }) {
   if (!overlay || !body) return null;
 
   // One category to a tab (1.0.3, the plan's round 2): a small row of quiet
@@ -218,6 +228,44 @@ export function initSettingsPanel({ overlay, body, closeButton, saveNow, emptyTr
   locked.append(lockHost);
   const lock = initAppLockSettings({ host: lockHost, saveNow });
 
+  // ── Designs (1.0.4), over the Theme organizer (the owner: "theme
+  // organizer üstünde design olsun"): Nebula's own look, Medieval, Pixel,
+  // Neon, then Blueprint, Ink, Art Deco and Clockwork, in one row. Each button is its
+  // design's name in its design's face (the owner: "logoları silelim
+  // design'dan" — a small world stood over each name). design.js wears the
+  // choice and keeps it.
+  const designs = group('Design', 'look');
+  const designRow = el('div', 'design-pick');
+  designRow.id = 'design-pick';
+  designRow.setAttribute('role', 'group');
+  designRow.setAttribute('aria-label', t('Design'));
+  for (const [id, name] of [['nebula', 'Nebula'], ['medieval', 'Medieval'], ['pixel', 'Pixel'], ['neon', 'Neon'], ['blueprint', 'Blueprint'],
+    ['ink', 'Ink'], ['deco', 'Art Deco'], ['clockwork', 'Clockwork']]) {
+    const btn = el('button', '');
+    btn.type = 'button';
+    btn.dataset.design = id;
+    const label = el('span', 'dp-name', name);
+    if (id === 'nebula') label.dataset.noI18n = '';   // a name
+    btn.append(label);
+    designRow.append(btn);
+  }
+  designs.append(designRow, el('p', 'set-hint', 'A design changes the whole of Nebula: its lettering, its frames and the worlds of the Universe. Choosing one puts on Main, the colours of the design itself; your themes go on working under each one, and in Medieval and Ink Light is the design’s own too.'));
+  initDesign(designRow);
+  // Under the designs (the owner: "design kısmında altta ayar olsun, tüm notlara design theme olsun mu diye,
+  // kullanıcı bassın"): the fonts come off every note, and a card at the bottom right puts them back (design-fonts.js).
+  if (fontsOnAll) {
+    const all = el('button', 'btn', 'Put the design’s font on every note');
+    all.type = 'button';
+    all.id = 'design-fonts-all';
+    all.addEventListener('click', async () => {
+      all.disabled = true;
+      try { await fontsOnAll(); } finally { all.disabled = false; }
+    });
+    const buttons = el('div', 'set-buttons');
+    buttons.append(all);
+    designs.append(buttons, el('p', 'set-hint', 'The fonts chosen in your notes and for their titles are taken off, and the font of new notes with them, so every note is written in the design’s face and follows the next design too. Right after, a card at the bottom right puts them back. Notes in the trash, in a black hole or set to only view are left alone.'));
+  }
+
   // ── Appearance (1.0.3). One theme organizer, laid out as the logo's editor
   // is (the owner: "ayarlardaki logo düzenleme gibi olsun"): at the left a
   // Nebula in small — the title strip, the whole note list with its foot, the
@@ -336,7 +384,10 @@ export function initSettingsPanel({ overlay, body, closeButton, saveNow, emptyTr
     el('blockquote', 'lp-quote', 'A theme, a picture and a font, seen at once.'),
   );
   pvPage.append(pvNote);
-  pvMain.append(pvHead, pvTools, pvPage);
+  // The bar and the page stand on one ground, as they do in the window (.edit-shell): a design paints it.
+  const pvShell = el('div', 'lp-shell');
+  pvShell.append(pvTools, pvPage);
+  pvMain.append(pvHead, pvShell);
   const pvBody = el('div', 'lp-body');
   pvBody.append(pvSide, pvMain);
   stage.append(pvBar, pvBody);
@@ -361,7 +412,8 @@ export function initSettingsPanel({ overlay, body, closeButton, saveNow, emptyTr
     const s = readSettings();
     pvNote.style.fontFamily = s.font || '';
     pvNote.style.setProperty('--lp-size', `${s.size || BASE_FONT_SIZE}px`);
-    pvFont.textContent = firstFamily(s.font || '') || t('Font');
+    // With no font of its own a new note is written in the design's face, and the bar says which.
+    pvFont.textContent = fontLabelFor(s.font || '') || firstFamily(s.font || '') || DESIGN_FACES[currentDesign()]?.[0] || FONTS[0][0];
     pvSize.textContent = String(s.size || BASE_FONT_SIZE);
     pvMenus.replaceChildren(...[...document.querySelectorAll('#app-menu .am-title')].map((m) => el('span', null, m.textContent)));
     pvVersion.textContent = document.getElementById('app-version')?.textContent ?? '';
@@ -375,6 +427,7 @@ export function initSettingsPanel({ overlay, body, closeButton, saveNow, emptyTr
   copyLogo();
   if (tbLogo) new MutationObserver(copyLogo).observe(tbLogo, { childList: true, subtree: true, attributes: true, characterData: true });
   on('settings-changed', paintPreview);
+  on('design-changed', paintPreview);
 
   // At the right: the themes, then Your own theme — whose bar and colours
   // also choose the styles' colours (the owner: "your own theme kismi ile
@@ -460,6 +513,21 @@ export function initSettingsPanel({ overlay, body, closeButton, saveNow, emptyTr
   function drawMixButtons() {
     const mix = readMix();
     mixStyles.replaceChildren();
+    // The first takes the style off again (the owner, 1.0.4: "stili kaldırmanın yolu yok").
+    const none = el('button', `set-mix-style${mix.on ? '' : ' on'}`);
+    none.type = 'button';
+    none.dataset.mixStyle = 'none';
+    none.setAttribute('aria-pressed', String(!mix.on));
+    const sheet = document.createElement('canvas');
+    sheet.width = 128;
+    sheet.height = 72;
+    sheet.setAttribute('aria-hidden', 'true');
+    none.append(sheet, el('span', null, t('No style')));
+    none.addEventListener('click', async () => {
+      pointed = null;
+      if (readMix().on) { await removeBackdrop(); paintBackdrop(); }
+    });
+    mixStyles.append(none);
     for (const style of MIX_STYLES) {
       const b = el('button', `set-mix-style${mix.on && mix.style === style.id ? ' on' : ''}`);
       b.type = 'button';
@@ -472,7 +540,14 @@ export function initSettingsPanel({ overlay, body, closeButton, saveNow, emptyTr
       const ctx = drawing.getContext('2d');
       if (ctx) drawMix(ctx, drawing.width, drawing.height, style.id, mix.colors);
       b.append(drawing, el('span', null, t(style.label)));
-      b.addEventListener('click', () => { pointed = null; keepMix({ style: style.id }); wearMix(); });
+      // The one worn, clicked again, is taken off.
+      b.addEventListener('click', async () => {
+        pointed = null;
+        const worn = readMix();
+        if (worn.on && worn.style === style.id) { await removeBackdrop(); paintBackdrop(); return; }
+        keepMix({ style: style.id });
+        wearMix();
+      });
       // Pointed at, the style is shown in the preview, in the colours chosen.
       const show = () => { pointed = mixPicture({ style: style.id, colors: readMix().colors }); paintPreview(); };
       const hide = () => { if (pointed) { pointed = null; paintPreview(); } };
@@ -763,11 +838,27 @@ export function initSettingsPanel({ overlay, body, closeButton, saveNow, emptyTr
   }
   measure.addEventListener('click', () => { void paintStorage(true); });
 
+  /**
+   * The font of new notes. With none chosen a new note is written in the face
+   * of the design that is on, so that face's row is the one shown — and the
+   * next design's after a change. Choosing a row makes it the font under every
+   * design, the Serif like any other (1.0.4); "none" comes back by the button
+   * under the designs.
+   */
+  function paintFont() {
+    const s = readSettings();
+    // Font names are names (the list is not translated); a design's name after its face is.
+    const rows = fontChoices(readCustomFonts(), s.font, t);
+    font.replaceChildren(...rows.map(([stack, label]) => option(stack, label)));
+    const face = firstFamily(designStack(currentDesign())).toLowerCase();
+    font.value = s.font ?? rows.find(([stack]) => firstFamily(stack).toLowerCase() === face)?.[0] ?? '';
+  }
+  on('design-changed', paintFont);
+  on('settings-changed', paintFont);
+
   function paint() {
     const s = readSettings();
-    // Font names are names (the list is not translated).
-    font.replaceChildren(...fontChoices(readCustomFonts(), s.font).map(([stack, label]) => option(stack, label)));
-    font.value = s.font ?? '';
+    paintFont();
     // Sizes are numbers only; the app's own (14) is one of them, and choosing it is choosing nothing.
     size.replaceChildren(...[...new Set([...FONT_SIZES, BASE_FONT_SIZE, ...(s.size ? [s.size] : [])])].sort((a, b) => a - b).map((px) => option(String(px), String(px))));
     size.value = String(s.size ?? BASE_FONT_SIZE);
@@ -787,6 +878,41 @@ export function initSettingsPanel({ overlay, body, closeButton, saveNow, emptyTr
   for (const box of spellBoxes) {
     box.addEventListener('change', () => writeSettings({ spell: spellBoxes.filter((b) => b.checked).map((b) => b.value) }));
   }
+
+  // A hint is as many lines as its words are wide in the design's face: a line more or less under
+  // another design moved all that stood under it, and the sheet's scroll with it (the owner: "design
+  // değişimlerinde kayma var, scroll mesela kayıyor soldaki"). On Appearance, where the designs are
+  // tried, each hint keeps the room of its longest wrap among the designs' faces.
+  const lookPanel = panels.get('look');
+  const stacks = DESIGNS.map(designStack);
+  function holdHintRoom() {
+    if (overlay.hidden || lookPanel.hidden) return;
+    const hints = [...lookPanel.querySelectorAll('.set-hint')].filter((h) => h.offsetParent);
+    for (const h of hints) h.style.minHeight = '';
+    const room = hints.map(() => 0);
+    // The sheet is drawn a tenth larger (app.css, `zoom`): a box is measured as drawn, a height is set as written.
+    const zoom = lookPanel.getBoundingClientRect().width / Math.max(1, lookPanel.offsetWidth) || 1;
+    for (const stack of stacks) {
+      for (const h of hints) h.style.fontFamily = stack;
+      hints.forEach((h, i) => { room[i] = Math.max(room[i], h.getBoundingClientRect().height / zoom); });
+    }
+    hints.forEach((h, i) => {
+      h.style.fontFamily = '';
+      h.style.minHeight = `${Math.ceil(room[i] * 10) / 10}px`;
+    });
+  }
+  // Measured again when the sheet is shown or is another width, when a hint has other words, and when a face has arrived.
+  if (typeof ResizeObserver === 'function') {
+    let wide = -1;
+    new ResizeObserver(([entry]) => {
+      const now = Math.round(entry.contentRect.width);
+      if (now === wide) return;
+      wide = now;
+      holdHintRoom();
+    }).observe(lookPanel);
+  }
+  lookPanel.addEventListener('change', holdHintRoom);
+  document.fonts?.addEventListener?.('loadingdone', holdHintRoom);
 
   function close() { overlay.hidden = true; }
   function open(tab = null) {

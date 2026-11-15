@@ -10,7 +10,7 @@ import { paperSize, marginMm, getWideOrientation, isFluid, sheetMm } from './pag
 import { toDocx, toOdt, toDoc, toEnex, enexToNotes, previewDocument, docxToHtml, odtToHtml, rtfToHtml, docKind } from './office.js';
 import { prepareVideos, getVideoMode, setVideoMode, hasVideos } from './export-video.js';
 import { initPdfPreview, PAGED } from './pdf-preview.js';
-import { getWidgetPrint, setWidgetPrint, hasWidgets, withoutWidgets } from './widgets.js';
+import { getWidgetPrint, setWidgetPrint, hasWidgets, withoutWidgets, pickWidget, pickTile } from './widgets.js';
 import { addShape } from './shapes.js';
 import { insertCodeBlock } from './codeblock.js';
 import { pickTableSize } from './table-size.js';
@@ -27,6 +27,9 @@ import { dropCopiedAnchor } from './arrows.js';
 import { noteFromFile } from './import.js';
 import { makeToggle, unmakeToggle, toggleHandled } from './toggles.js';
 import { icon } from './icons.js';
+import { tightenColumn } from './columns.js';
+import { designOfFace, designFacePlace } from './design.js';
+import { t } from './i18n.js';
 
 /**
  * Colours are CLASSES, not values written into the note.
@@ -78,8 +81,10 @@ export const U_STYLES = ['u-single', 'u-double', 'u-bold', 'u-wavy', 'u-dash'];
  */
 export const FONTS = [
   // "Serif", not "Serif (default)" (the owner, 0.9.4): what a new note is written in is chosen in Settings now.
-  ['Serif', '"Charter", "Iowan Old Style", Georgia, serif'],
-  ['Sans', '"Inter", "Segoe UI", system-ui, sans-serif'],
+  // Nebula's face (1.0.4: "nebula temasının notu serif olsun, diğer designlar gibi"): its stack is the app's own
+  // (css/tokens.css). It had no Palatino Linotype, and words given the Serif were drawn in Georgia on Windows.
+  ['Serif', '"Charter", "Iowan Old Style", "Palatino Linotype", "TeX Gyre Pagella", "URW Palladio L", "P052", Georgia, serif'],
+  ['Sans','"Inter", "Segoe UI", system-ui, sans-serif'],
   ['Arial', 'Arial, Helvetica, sans-serif'],
   ['Calibri', 'Calibri, "Segoe UI", sans-serif'],
   ['Segoe UI', '"Segoe UI", system-ui, sans-serif'],
@@ -93,6 +98,52 @@ export const FONTS = [
   ['Courier New', '"Courier New", Courier, monospace'],
   ['Consolas', 'Consolas, "Cascadia Mono", monospace'],
   ['Cascadia Code', '"Cascadia Code", Consolas, monospace'],
+  // The faces packed with the app (1.0.4, the owner: "eklediğin fontları ana fontlara ekle", then "önerilen
+  // fontlardan eksiksiz ve anlaşılır olanları eklesin"): files of the app (css/designs.css, src/fonts), so a
+  // note written in one reads the same on every machine. The lists put them in order (fontRows).
+  ['Almendra', '"Almendra", "Palatino Linotype", Georgia, serif'],
+  ['Architects Daughter', '"Architects Daughter", "Comic Sans MS", cursive'],
+  ['Bodoni Moda', '"Bodoni Moda", "Bodoni MT", Didot, Georgia, serif'],
+  ['Caveat Brush', '"Caveat Brush", "Segoe Print", cursive'],
+  ['Chakra Petch', '"Chakra Petch", "Segoe UI", sans-serif'],
+  ['Cinzel', '"Cinzel", "Palatino Linotype", Georgia, serif'],
+  ['Cormorant Garamond', '"Cormorant Garamond", Garamond, Georgia, serif'],
+  ['Courgette', '"Courgette", "Segoe Script", cursive'],
+  ['Courier Prime', '"Courier Prime", "Courier New", monospace'],
+  ['Cutive', '"Cutive", Georgia, serif'],
+  ['Cutive Mono', '"Cutive Mono", "Courier New", monospace'],
+  ['EB Garamond', '"EB Garamond", Garamond, Georgia, serif'],
+  ['Exo 2', '"Exo 2", "Segoe UI", sans-serif'],
+  ['Fondamento', '"Fondamento", "Palatino Linotype", Georgia, serif'],
+  ['Glass Antiqua', '"Glass Antiqua", "Palatino Linotype", Georgia, serif'],
+  ['Grenze', '"Grenze", "Palatino Linotype", Georgia, serif'],
+  ['Handjet', '"Handjet", Consolas, monospace'],
+  ['Inknut Antiqua', '"Inknut Antiqua", Georgia, serif'],
+  ['Jersey 15', '"Jersey 15", Consolas, monospace'],
+  ['Josefin Sans', '"Josefin Sans", "Century Gothic", sans-serif'],
+  ['Jost', '"Jost", "Century Gothic", sans-serif'],
+  ['Kalam', '"Kalam", "Segoe Print", cursive'],
+  ['Libre Baskerville', '"Libre Baskerville", Georgia, serif'],
+  ['Libre Caslon Text', '"Libre Caslon Text", Georgia, serif'],
+  ['Marcellus', '"Marcellus", "Palatino Linotype", Georgia, serif'],
+  ['MedievalSharp', '"MedievalSharp", "Palatino Linotype", Georgia, serif'],
+  ['Old Standard TT', '"Old Standard TT", Georgia, serif'],
+  ['Oldenburg', '"Oldenburg", Georgia, serif'],
+  ['Oxanium', '"Oxanium", "Segoe UI", sans-serif'],
+  ['Patrick Hand', '"Patrick Hand", "Comic Sans MS", cursive'],
+  ['Pixelify Sans', '"Pixelify Sans", Consolas, monospace'],
+  ['Poiret One', '"Poiret One", "Century Gothic", sans-serif'],
+  ['Rajdhani', '"Rajdhani", "Segoe UI", sans-serif'],
+  ['Raleway', '"Raleway", "Segoe UI", sans-serif'],
+  ['Sedgwick Ave', '"Sedgwick Ave", "Segoe Print", cursive'],
+  ['Shadows Into Light Two', '"Shadows Into Light Two", "Segoe Print", cursive'],
+  ['Sorts Mill Goudy', '"Sorts Mill Goudy", "Palatino Linotype", Georgia, serif'],
+  ['Space Mono', '"Space Mono", Consolas, monospace'],
+  ['Tektur', '"Tektur", "Segoe UI", sans-serif'],
+  ['Tenor Sans', '"Tenor Sans", "Segoe UI", sans-serif'],
+  ['Texturina', '"Texturina", "Palatino Linotype", Georgia, serif'],
+  ['Tiny5', '"Tiny5", Consolas, monospace'],
+  ['VT323', '"VT323", Consolas, monospace'],
 ];
 
 /** First family of a CSS stack, unquoted — for labelling the picker. */
@@ -121,6 +172,9 @@ export function cleanFontStack(raw) {
   return Array.from(String(raw ?? '').replace(/[;{}<>\\()@!]/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 200).join(''); // characters, not UTF-16 units: never half an emoji (hunt B24)
 }
 
+/** Two fonts' names in the order of the alphabet, whatever their case: how the font lists are sorted. */
+export const byFontName = (a, b) => String(a).localeCompare(String(b), 'en', { sensitivity: 'base', numeric: true });
+
 /** The stack a font added by name is written with: quoted, and a generic after it. */
 export function customFontStack(name) {
   return `"${cleanFontName(name)}", serif`;
@@ -130,14 +184,21 @@ export function customFontStack(name) {
  * The font menu's rows for what was typed in its search (0.9.4): the app's
  * own fonts and the ones the reader added first, then the fonts of this
  * computer that are not among them. Pure — tested.
- * Pinned fonts (0.9.4: "a pin beside the fonts, so the ones I like stand at
- * the top") come first, in the order they were pinned.
+ * The designs' faces come first, always (1.0.4: "design fontları en üstte
+ * olsun ve design adı o fontun yanında parantez içinde", then "design fontları
+ * sırada en üstte olsun hep"), in the designs' order, each row saying whose it
+ * is; a design's name typed in the search finds its face too. After them the
+ * pinned fonts (0.9.4: "a pin beside the fonts, so the ones I like stand at
+ * the top"), in the order they were pinned, then every other one by its name
+ * ("fontlar alfabeye göre sıralansın"), the reader's own among them.
  * @param {string} query
- * @param {{custom?: string[], installed?: string[], pinned?: string[], limit?: number}} [have]
- * @returns {{own: Array<{label: string, stack: string, custom: boolean, pinned: boolean}>, installed: string[], add: string}}
+ * @param {{custom?: string[], installed?: string[], pinned?: string[], limit?: number, say?: (name: string) => string}} [have]
+ *   `say` puts a design's name into the reader's language, for the search
+ * @returns {{own: Array<{label: string, stack: string, custom: boolean, pinned: boolean, design: string}>, installed: string[], add: string}}
+ *   `design` is the English name of the design that writes in the font, or ''.
  *   `add` is the name typed when no row is exactly it — the name "Add" would add
  */
-export function fontRows(query, { custom = [], installed = [], pinned = [], limit = 40 } = {}) {
+export function fontRows(query, { custom = [], installed = [], pinned = [], limit = 40, say = (name) => name } = {}) {
   const q = String(query ?? '').trim().toLowerCase();
   const known = new Set(FONTS.map(([, stack]) => firstFamily(stack).toLowerCase()));
   const mine = [];
@@ -150,9 +211,13 @@ export function fontRows(query, { custom = [], installed = [], pinned = [], limi
   const pins = pinned.map((name) => String(name ?? '').toLowerCase());
   const place = (row) => pins.indexOf(row.label.toLowerCase());
   const every = [...FONTS.map(([label, stack]) => ({ label, stack, custom: false })), ...mine]
-    .map((row) => ({ ...row, pinned: place(row) >= 0 }));
-  const own = [...every.filter((row) => row.pinned).sort((a, b) => place(a) - place(b)), ...every.filter((row) => !row.pinned)]
-    .filter((row) => !q || row.label.toLowerCase().includes(q) || firstFamily(row.stack).toLowerCase().includes(q));
+    .map((row) => ({ ...row, pinned: place(row) >= 0, design: designOfFace(row.label) }));
+  const loose = every.filter((row) => !row.design);
+  const own = [...every.filter((row) => row.design).sort((a, b) => designFacePlace(a.label) - designFacePlace(b.label)),
+    ...loose.filter((row) => row.pinned).sort((a, b) => place(a) - place(b)),
+    ...loose.filter((row) => !row.pinned).sort((a, b) => byFontName(a.label, b.label))]
+    .filter((row) => !q || row.label.toLowerCase().includes(q) || firstFamily(row.stack).toLowerCase().includes(q)
+      || (row.design && (row.design.toLowerCase().includes(q) || String(say(row.design)).toLowerCase().includes(q))));
   const seen = new Set();
   const others = [];
   for (const family of installed) {
@@ -238,7 +303,26 @@ export function hasExplicitFont(node, root) {
   return false;
 }
 
-export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTitle, noteLabels, onImport, onPaste, onLink, noteFont, setNoteFont, translate = (x) => x, onWideOrientation } = {}) {
+/** The shapes of the bar’s shape button, as its tiles show them (in the bar’s own menu until 1.0.4). */
+export const SHAPE_TILES = [
+  { kind: 'textbox', label: 'Text box', mark: '<svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 5V4h9v1M9 4v10M7.2 14h3.6"/></svg>' },
+  { kind: 'area', label: 'Work area', mark: '<svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="2.8" width="14.4" height="12.4" rx="1.6" stroke-dasharray="2.4 2"/><rect x="4.6" y="6" width="4" height="3" rx=".5"/><rect x="10" y="9.6" width="4" height="3" rx=".5"/></svg>' },
+  { kind: 'rect', label: 'Rectangle', mark: '<svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="1.6" y="4.6" width="14.8" height="8.8" rx="1"/></svg>' },
+  { kind: 'square', label: 'Square', mark: '<svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3.6" y="3.6" width="10.8" height="10.8" rx="1"/></svg>' },
+  { kind: 'ellipse', label: 'Ellipse', mark: '<svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><ellipse cx="9" cy="9" rx="7.4" ry="4.6"/></svg>' },
+  { kind: 'circle', label: 'Circle', mark: '<svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="9" cy="9" r="5.6"/></svg>' },
+  { kind: 'diamond', label: 'Diamond', mark: '<svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M9 2.4 15.6 9 9 15.6 2.4 9Z"/></svg>' },
+  { kind: 'triangle', label: 'Triangle', mark: '<svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M9 2.8 15.8 15.2H2.2Z"/></svg>' },
+];
+
+/** The arrows of the bar’s arrow button, as its tiles show them. */
+export const ARROW_TILES = [
+  { kind: 'straight', label: 'Straight arrow', mark: '<svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 15.5 14.5 3.5"/><path d="M8.5 3.5h6v6"/></svg>' },
+  { kind: 'elbow', label: 'Elbow arrow', mark: '<svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h7v9h6"/><path d="M12.5 10.5l3 3-3 3"/></svg>' },
+  { kind: 'curve', label: 'Curved arrow', mark: '<svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 14.5C3.5 6 9 3.5 15 4.5"/><path d="M11.5 2l3.6 2.6-2.6 3.4"/></svg>' },
+];
+
+export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTitle, noteLabels, onImport, onPaste, onLink, onWidget, noteFont, setNoteFont, translate = (x) => x, onWideOrientation } = {}) {
   const toolbar = document.getElementById('toolbar');
   const miniBar = document.getElementById('mini-bar');
   if (!toolbar || !editorEl) return null;
@@ -1158,7 +1242,8 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     dirty();
   }
 
-  const insertShape = (kind) => (shapes ? shapes.addShape(kind) : addShape(editorEl, kind));
+  // From the bar it is not put at once: it follows the pointer until a press says where (place.js).
+  const insertShape = (kind) => (shapes ? (shapes.place ?? shapes.addShape)(kind) : addShape(editorEl, kind));
 
   /**
    * Export the open note.
@@ -1189,7 +1274,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     let html = serializeNote(editorEl);
     // Widgets with the note or left out (1.0.0): the same choice as Ctrl+P's.
     if (getWidgetPrint() === 'without') html = withoutWidgets(html);
-    if (window.nebula?.media?.inline && html.includes('nebula-media://note/')) html = await window.nebula.media.inline(html).catch(() => html);
+    if (window.nebula?.media?.inline && html.includes('nebula-media://')) html = await window.nebula.media.inline(html).catch(() => html);
     return prepareVideos(html, getVideoMode(), { poster: (url) => window.nebula?.links?.videoPoster?.(url) });
   }
 
@@ -1429,15 +1514,47 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     // Through the shapes controller when there is one, so a new shape arrives
     // selected with its colour bar open — adding one and then having to hunt
     // for it to recolour it is not the point of a shape button.
-    // The button inserts whatever kind was chosen last — picking Circle from
-    // the menu and then pressing the button again gave a rectangle.
-    'shape-rect': () => insertShape(lastShape),
+    // The button opens the kinds as tiles, as the widget button does (1.0.4, the owner: "insert shape
+    // should be like widget"); until then it put the last kind and a ▾ beside it held the list. The
+    // kind chosen last is the tile lit, so Enter gives it again.
+    shape: () => {
+      if (Date.now() - shapeLeftAt < 300) return;
+      const anchor = toolbar.querySelector('[data-act="shape"]')?.getBoundingClientRect() ?? { left: 200, top: 100, bottom: 100 };
+      const selected = Math.max(0, SHAPE_TILES.findIndex((tile) => tile.kind === lastShape));
+      void pickTile(anchor, { id: 'shape-menu', label: 'Insert shape', data: 'shapeAdd', items: SHAPE_TILES, selected }).then((kind) => {
+        if (!kind) { shapeLeftAt = Date.now(); return; }
+        lastShape = kind;
+        insertShape(kind);
+      });
+    },
+    // The arrows the same way (the owner, the same day); until then the button put a straight one and a ▾ held the three.
+    arrow: () => {
+      if (Date.now() - arrowLeftAt < 300) return;
+      const anchor = toolbar.querySelector('[data-act="arrow"]')?.getBoundingClientRect() ?? { left: 200, top: 100, bottom: 100 };
+      const selected = Math.max(0, ARROW_TILES.findIndex((tile) => tile.kind === lastArrow));
+      void pickTile(anchor, { id: 'arrow-menu', label: 'Insert arrow', data: 'arrowAdd', items: ARROW_TILES, selected }).then((kind) => {
+        if (!kind) { arrowLeftAt = Date.now(); return; }
+        lastArrow = kind;
+        (arrows?.place ?? arrows?.add)?.(kind);
+      });
+    },
     // With the caret in a table's cell it goes under the table: a cell holds words (table.js).
     codeblock: () => { const table = tableAt(editorEl); insertCodeBlock(editorEl, 'javascript', history, table ? { after: table } : {}); },
     // Its size is asked for first (table-size.js): Enter makes five by five.
     table: () => {
       const anchor = toolbar.querySelector('[data-act="table"]')?.getBoundingClientRect() ?? { left: 200, top: 100, bottom: 100 };
       void pickTableSize(anchor).then((size) => { if (size) withSelection(() => insertTable(editorEl, history, size)); });
+    },
+    // The widgets to choose from, under their button (1.0.4, the owner: "a widget menu in the editing
+    // bar"): the picker /widget opens, and the one chosen lands where the caret is.
+    widget: () => {
+      // A second press on the button shuts the picker: its mousedown has just done that.
+      if (Date.now() - widgetLeftAt < 300) return;
+      const anchor = toolbar.querySelector('[data-act="widget"]')?.getBoundingClientRect() ?? { left: 200, top: 100, bottom: 100 };
+      void pickWidget(anchor).then((kind) => {
+        if (!kind) { widgetLeftAt = Date.now(); return; }
+        withSelection(() => onWidget?.(kind));
+      });
     },
     divider: () => insertDivider(),
     bold: () => { cmd('bold'); notePending('bold'); },
@@ -1476,6 +1593,13 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       ACTIONS[name] = (...args) => (editorEl.dataset.readonly === 'true' ? undefined : run(...args));
     }
   }
+
+  /** When the widget picker, and the shapes’, was last left with nothing chosen: a press on its button just then had shut it. */
+  let widgetLeftAt = 0;
+  let shapeLeftAt = 0;
+  let arrowLeftAt = 0;
+  /** The arrow chosen last: the tile lit when the arrows open. */
+  let lastArrow = 'straight';
 
   const toolbarMenus = [...toolbar.querySelectorAll('.tb-menu')];
   // A scrolling rail clips descendants even when they have a high z-index.
@@ -1532,11 +1656,6 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     }
     const ustyle = e.target.closest('[data-ustyle]')?.dataset.ustyle;
     if (ustyle) { applyUnderline(ustyle); closeMenus(); return; }
-
-    const shapeKind = e.target.closest('[data-shape-add]')?.dataset.shapeAdd;
-    if (shapeKind) { lastShape = shapeKind; insertShape(shapeKind); closeMenus(); }
-    const arrowKind = e.target.closest('[data-arrow-add]')?.dataset.arrowAdd;
-    if (arrowKind) { arrows?.add(arrowKind); closeMenus(); }
   }
   toolbar.addEventListener('click', toolbarClick);
   toolbarMenus.forEach((menu) => menu.addEventListener('click', toolbarClick));
@@ -1632,9 +1751,13 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     // The font picked last is the note's writing font (0.9.3): a new line is
     // written in it. The owner: "I picked a font in a note and I am writing —
     // that is the default for that note now, where I left off; the places I
-    // wrote in other fonts keep those". The serif is the app's own and means
-    // "none". Nothing already written changes.
-    setNoteFont?.({ family: stack === FONTS[0][1] ? null : stack });
+    // wrote in other fonts keep those". Nothing already written changes.
+    // The Serif is a font as the other designs' faces are (1.0.4, the owner's
+    // yes to "Serif seçilince not her tasarımda Serif kalır"): until then it
+    // stood for "none", and under Medieval a note given the Serif stayed in
+    // Fondamento. A note goes back to no font by the button under the designs
+    // (design-fonts.js).
+    setNoteFont?.({ family: stack || null });
     // Nothing selected, nothing to restyle. 0.6.0 gave this a whole-block
     // fallback because picking a font with the caret parked in a line appeared
     // to do nothing; the user's answer to that is explicit — "when changing the
@@ -1645,9 +1768,16 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     if (!editorEl.contains(document.activeElement)) editorEl.focus();
     history?.push();
     document.execCommand('styleWithCSS', false, true);
-    document.execCommand('fontName', false, stack);
+    // Selected words given the Serif are in it under every design. Under
+    // Nebula it is what the browser already reads there, and
+    // it would write nothing — so it is written under a name no font has, and
+    // the Serif put in that name's place.
+    const serif = stack === FONTS[0][1];
+    document.execCommand('fontName', false, serif ? SERIF_NAME : stack);
+    if (serif) for (const el of editorEl.querySelectorAll(`[style*="${SERIF_NAME}"]`)) el.style.fontFamily = stack;
     dirty();
   }
+  const SERIF_NAME = 'nebula-serif-font';
 
   /* ----- the font menu (0.9.4: "a search in the fonts, and a button to add a
      font" — the owner). A search field on top; under it the app's fonts and
@@ -1838,10 +1968,11 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       lastEl.append(head, btn);
     };
 
-    const row = (label, stack, { onPick, removable = false, pinned = null } = {}) => {
+    const row = (label, stack, { onPick, removable = false, pinned = null, design = '' } = {}) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.dataset.font = stack;
+      btn.classList.toggle('of-design', !!design);
       // Set in its own face, so the list is a preview and not fifteen identical
       // rows. Assigned as a property, not written into a style="" attribute:
       // the stacks contain double quotes ("Segoe UI"), which end the attribute
@@ -1852,7 +1983,17 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       labelEl.textContent = label;
       labelEl.style.fontFamily = stack;
       btn.appendChild(labelEl);
-      // The pin: a press puts the font at the top of the list, or takes it down again.
+      // A design's face says whose it is, right after its name: "Courgette (Ink)".
+      // Beside the label, not in it — the label stays the font's name alone — and in
+      // the menu's own face, in the reader's language.
+      if (design) {
+        const of = document.createElement('span');
+        of.className = 'tb-menu__of';
+        of.dataset.noI18n = '';
+        of.textContent = `(${t(design)})`;
+        btn.appendChild(of);
+      }
+      // The pin: a press puts the font right under the designs’ faces, or takes it down again.
       if (pinned !== null) {
         const pin = document.createElement('span');
         pin.className = 'tb-menu__pin';
@@ -1866,7 +2007,7 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
           pinnedFonts = togglePinned(pinnedFonts, label);
           writeNames(PINNED_FONTS_KEY, pinnedFonts);
           paintRows();
-          if (!pinned) rows.scrollTop = 0;       // it went to the top: shown there
+          if (!pinned) rows.scrollTop = 0;       // it went up, under the designs' faces: shown there
         });
         btn.appendChild(pin);
       }
@@ -1893,16 +2034,18 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     };
 
     function paintRows() {
-      const found = fontRows(search.value, { custom: customFonts, pinned: pinnedFonts, installed: (showInstalled || search.value.trim()) ? (installedFonts ?? []) : [] });
+      const found = fontRows(search.value, { custom: customFonts, pinned: pinnedFonts, say: t, installed: (showInstalled || search.value.trim()) ? (installedFonts ?? []) : [] });
       rows.replaceChildren();
+      const line = () => {
+        const rule = document.createElement('div');
+        rule.className = 'tb-menu__rule';
+        rows.appendChild(rule);
+      };
+      // The designs' faces, the pinned ones, the rest: a thin line where one part ends and the next begins.
+      const part = (f) => (f.design ? 0 : f.pinned ? 1 : 2);
       found.own.forEach((f, i) => {
-        // A thin line under the pinned ones, where the rest of the list begins.
-        if (i > 0 && !f.pinned && found.own[i - 1].pinned) {
-          const rule = document.createElement('div');
-          rule.className = 'tb-menu__rule';
-          rows.appendChild(rule);
-        }
-        rows.appendChild(row(f.label, f.stack, { removable: f.custom, pinned: f.pinned }));
+        if (i > 0 && part(f) !== part(found.own[i - 1])) line();
+        rows.appendChild(row(f.label, f.stack, { removable: f.custom, pinned: f.pinned, design: f.design }));
       });
       if (found.installed.length) {
         const head = document.createElement('div');
@@ -2115,6 +2258,17 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     let el = range.startContainer;
     if (el.nodeType !== Node.ELEMENT_NODE) el = el.parentElement;
     if (!el) return;
+    // A note read in again leaves the caret in the note's root, in none of its
+    // words: read there, the bar said the design's face over a note written in
+    // another font (1.0.4). What is typed at that caret lands in the words it
+    // stands before, so those are the ones read.
+    if (el === editorEl && range.collapsed) {
+      const lines = [...editorEl.childNodes].filter((n) => !n.matches?.('.shape-layer, .note-widget'));   // the shapes' layer is no line
+      let at = lines.find((n) => [...editorEl.childNodes].indexOf(n) >= range.startOffset) ?? lines[lines.length - 1];
+      while (at?.firstChild) at = at.firstChild;
+      const inner = at && at.nodeType !== Node.ELEMENT_NODE ? at.parentElement : at;
+      if (inner && editorEl.contains(inner)) el = inner;
+    }
     const cs = getComputedStyle(el);
     // On a new line of a note with a writing font, the bar shows what will be typed.
     const writing = writingFontAt(range);
@@ -2169,6 +2323,26 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       b.classList.toggle('active', pend && b.dataset.act in pend ? pend[b.dataset.act] : wearing(mark));
     });
   }
+
+  /**
+   * The bar's font and size with no caret to read them from (1.0.4): the note
+   * was just opened or read again from the store, or the design was changed
+   * with Settings over the note — and the name stayed what the last caret had
+   * found. It says what the note is written in: its writing font, else the
+   * face of the design that is on. With a caret in the note, what the caret
+   * sits in, as ever.
+   */
+  function syncNoteFont() {
+    if (selectionInEditor()) { syncState(); return; }
+    const cs = getComputedStyle(editorEl);
+    const font = noteFont?.();
+    if (fontName) fontName.textContent = shownFont(font?.family || cs.fontFamily).label || 'Font';
+    if (sizeInput && document.activeElement !== sizeInput) {
+      const px = font?.size || Math.round(parseFloat(cs.fontSize));
+      if (px) sizeInput.value = String(px);
+    }
+  }
+  on('design-changed', syncNoteFont);
 
   /**
    * Ctrl+B, Ctrl+I and the buttons with a bare caret. Chromium only changes
@@ -2278,7 +2452,9 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
         // no line of text to stand in, the picture is selected; Enter on it
         // opens a line under it again.
         history?.push();
+        const col = line.parentElement;
         line.remove();
+        tightenColumn(col);
         if (next && !next.matches('.note-image, hr, .blk-code, .link-block, .shape-layer, .image-layer')) placeCaretAt(next, !back);
         else editorEl.dispatchEvent(new CustomEvent('nebula-select-image', { detail: edge }));
         dirty();
@@ -2295,7 +2471,9 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
       const line = lineOf(window.getSelection().getRangeAt(0).startContainer);
       if (line && isBlankLine(line)) {
         history?.push();
+        const col = line.parentElement;
         line.remove();
+        tightenColumn(col);
       }
       editorEl.dispatchEvent(new CustomEvent('nebula-pick-card', { detail: edge }));
       dirty();
@@ -2749,5 +2927,5 @@ export function initToolbar(editorEl, { onSave, shapes, arrows, history, noteTit
     if (e.target === document.body || e.target === document.documentElement) undoKey(e);
   });
 
-  return { actions: ACTIONS, syncState, miniBarAt };
+  return { actions: ACTIONS, syncState, syncNoteFont, miniBarAt };
 }

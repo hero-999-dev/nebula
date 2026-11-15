@@ -28,6 +28,12 @@ const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AA
 
 /** In the page: the note as structure and text, without what only the UI changes (selection, inline geometry). */
 function signatureSource() {
+  // A widget's face is drawn from its state, kept on the figure (widgets.js), whenever the note is
+  // shown. A world clock, a weather and a clock draw the time of day and what the weather service
+  // last said: the minute turned in the middle of the trials, the weather arrived, and every trial
+  // after it found the note "changed" (a note of the owner's, 1.0.4). Their state is compared, not
+  // their drawing.
+  const LIVE_FACE = ['world', 'weather', 'clock'].map((kind) => `.note-widget[data-widget="${kind}"] > .wg`).join(', ');
   window.__denseSig = (rootEl) => {
     const out = [];
     const walk = (n) => {
@@ -39,6 +45,10 @@ function signatureSource() {
       // angle readout, a video's bar, what is drawn round a table, an attached
       // file's Open and Save buttons, the Universe's live map layer. Drawn whenever a note is shown.
       if (n.matches('.code-paint, .katex, .shape-angle, .video-bar, .tbl-ui, .attach-bar, .wg-live')) return;
+      if (n.matches(LIVE_FACE)) {
+        out.push(`<span.wg>${JSON.stringify(Object.entries(n.parentElement.dataset).filter(([key]) => /^(widget$|wg)/.test(key)).sort())}</>`);
+        return;
+      }
       // Code is coloured by spans that are redrawn after every restore: its text is what counts.
       if (n.matches('.code-src')) { out.push(`<code.code-src>${JSON.stringify(n.textContent)}</>`); return; }
       // A link card's title is the page's, fetched when it answers — sometimes long after
@@ -80,7 +90,8 @@ function signatureSource() {
   };
   // Without link cards' titles, for the same reason as above: a title arriving
   // shortens or lengthens the note's text, and that is not a key taking text away.
-  window.__denseText = (rootEl) => { const c = rootEl.cloneNode(true); c.querySelectorAll('.link-card__title').forEach((t) => t.remove()); return c.textContent.replace(/\u200b/g, '').replace(/\u00a0/g, ' '); };
+  // Nor is a clock's hour going from 9:59 to 10:00.
+  window.__denseText = (rootEl) => { const c = rootEl.cloneNode(true); c.querySelectorAll(`.link-card__title, ${LIVE_FACE}`).forEach((t) => t.remove()); return c.textContent.replace(/\u200b/g, '').replace(/\u00a0/g, ' '); };
 }
 
 /** Places in the open note where the trials happen. */

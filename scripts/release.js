@@ -7,9 +7,9 @@
  * the docs site, and the USB mirror.
  *
  * Pushing the tag is what starts everything else: .github/workflows/release.yml
- * builds the Windows installer and the macOS DMG, and publishes them as a
+ * builds the Windows installer, the macOS DMG and the Linux packages, and publishes them as a
  * GitHub Release. Installed copies of Nebula see it on their next check.
- * BOTH platforms build on every tag and neither is asked about: the repository
+ * ALL platforms build on every tag and none is asked about: the repository
  * is public, and GitHub Actions is free and unlimited on public repos —
  * including the macOS runner, which is billed at 10x only on private ones.
  *

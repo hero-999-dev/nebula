@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { attachedOf, attachedName, openedFolder, openedPath, runsCode, clearOpened, clearOpenedAsync } from '../electron/opened-files.js';
+import { attachedOf, attachedName, openedFolder, openedPath, carriedPicture, runsCode, clearOpened, clearOpenedAsync } from '../electron/opened-files.js';
 import { shredTree } from '../electron/backup-purge.js';
 
 // The real shredder, watched: a copy is overwritten before it goes, not just unlinked.
@@ -124,6 +124,43 @@ describe('where Open puts a copy', () => {
       const dest = openedPath(root, PLAIN, name);
       expect(path.relative(openedFolder(root, PLAIN), dest)).not.toMatch(/^\.\.|[\\/]/);
     }
+  });
+});
+
+describe('where a picture pulled out of a note is copied', () => {
+  const DATA = `data:image/png;base64,${Buffer.from('a picture').toString('base64')}`;
+  it('a file of the note: beside Open’s copies of that note, under its own name', () => {
+    const of = carriedPicture(root, 'nebula-media://note/n1/img-m1abc-0a1b2c3d.png', { id: 'n1', hole: null });
+    expect(of).toMatchObject({ dest: path.join(root, 'note', 'n1', 'img-m1abc-0a1b2c3d', 'img-m1abc-0a1b2c3d.png'), noteId: 'n1', holeId: null, bytes: null });
+  });
+
+  it('one written into the text: written out under a name made of what it holds, in its black hole’s folder if it has one', () => {
+    const plain = carriedPicture(root, DATA, { id: 'n1', hole: null });
+    expect(plain.bytes.toString()).toBe('a picture');
+    expect(path.dirname(path.dirname(plain.dest))).toBe(path.join(root, 'note', 'n1'));
+    expect(path.basename(plain.dest)).toMatch(/^picture-[0-9a-f]{12}\.png$/);
+    expect(carriedPicture(root, DATA, { id: 'n1', hole: null }).dest).toBe(plain.dest);
+    const sealed = carriedPicture(root, DATA.replace('image/png', 'image/jpeg'), { id: 'n2', hole: 'bh-1' });
+    expect(path.dirname(path.dirname(sealed.dest))).toBe(path.join(root, 'hole', 'bh-1', 'n2'));
+    expect(sealed.dest.endsWith('.jpg')).toBe(true);
+    // It goes with its black hole, as an opened file does.
+    fs.mkdirSync(path.dirname(sealed.dest), { recursive: true });
+    fs.writeFileSync(sealed.dest, sealed.bytes);
+    clearOpened(root, { holeId: 'bh-1' });
+    expect(fs.existsSync(sealed.dest)).toBe(false);
+  });
+
+  it('nothing that is not a picture of a note: an attached file, a video, a path, a page’s picture, a note with no id', () => {
+    expect(carriedPicture(root, PLAIN, { id: 'n1' })).toBeNull();
+    expect(carriedPicture(root, 'nebula-media://note/n1/vid-m1abc-0a1b2c3d.mp4', { id: 'n1' })).toBeNull();
+    expect(carriedPicture(root, 'nebula-media://note/../x.png', { id: 'n1' })).toBeNull();
+    expect(carriedPicture(root, 'https://example.com/a.png', { id: 'n1' })).toBeNull();
+    expect(carriedPicture(root, DATA, { id: null })).toBeNull();
+    expect(carriedPicture(root, DATA, { id: '../n1' })).toBeNull();
+    expect(carriedPicture(root, DATA, { id: 'n1', hole: '../bh' })).toBeNull();
+    expect(carriedPicture(root, 'data:text/html;base64,PGI+', { id: 'n1' })).toBeNull();
+    // A stored picture's address in a black hole's note names no file of that hole.
+    expect(carriedPicture(root, 'nebula-media://note/n1/img-m1abc-0a1b2c3d.png', { id: 'n1', hole: 'bh-1' })).toBeNull();
   });
 });
 

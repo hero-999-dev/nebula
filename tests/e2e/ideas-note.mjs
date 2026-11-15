@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { putFromBar } from './put.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -99,7 +100,8 @@ export async function runIdeasChecks(check) {
     check('the angle readout is not saved into the note', saved.includes('data-rot') && !saved.includes('shape-angle'));
 
     /* Arrows: attach, follow, delete while the editor has focus. */
-    await win.evaluate(() => document.querySelector('[data-arrow-add="straight"]').click());
+    // Its tile, then a press on open ground puts it (1.0.4).
+    await putFromBar(win, 'arrow', 'straight', await win.evaluate(() => { const r = document.getElementById('editor').getBoundingClientRect(); return { x: Math.round(r.right - 260), y: Math.round(r.top + 320) }; }));
     c = await centre();
     const end = await win.evaluate(() => { const r = document.querySelector('#editor .note-arrow .arrow-end[data-end="to"]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
     await win.mouse.move(end.x, end.y); await win.mouse.down();

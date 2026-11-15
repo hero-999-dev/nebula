@@ -63,6 +63,19 @@
  * file, the piece's number and the whole length bound in — pieces cannot be
  * swapped, dropped or cut off unnoticed). The player asks for parts of a
  * video; only the pieces it asks for are opened, and never onto the disk.
+ *
+ * A picture is sealed inside its note, written into the note's text. Open, the
+ * window would carry every picture as megabytes of text in the note it shows —
+ * each save, each step of undo went over all of it, and typing in a black hole
+ * was slower than in a plain note (the owner, 1.0.4). So while a black hole is
+ * open its pictures are held here, in memory (holdPictures): the window is
+ * given the note with a short address in each one's place,
+ *
+ *   nebula-media://hole/<hole>/<note>/pic-<sha-256 of the picture, 32 hex>.png
+ *
+ * and a note that comes back to be sealed has them written into it again
+ * (withPictures). The sealed file is what it always was; the pictures are on
+ * no disk in the clear, and go — zeroed — with the lock.
  */
 
 import fs from 'node:fs';
@@ -80,6 +93,12 @@ const VIDEO_HEAD = 16;                       // magic 4 + piece size 4 + length 
 /** A video's name in a note: as the vault names one, and of a kind a note can hold — or an attached file's, of any kind (note-media.js). */
 const VIDEO_NAME = new RegExp(`^(?:vid-[a-z0-9]+-[0-9a-f]{8}\\.(${VIDEO_EXTENSIONS.join('|')})|att-[a-z0-9]+-[0-9a-f]{8}\\.[a-z0-9]{2,5})$`);
 const sealedVideo = (noteId, name) => `${noteId}~${name}.bhv`;
+/** A picture written into a note's text (as note-media.js finds one), and the address the window is given in its place while the black hole is open. */
+const PICTURE_DATA = /data:image\/(png|jpe?g|gif|webp|bmp|avif|svg\+xml);base64,([A-Za-z0-9+/]{400,}={0,2})/g;
+const PICTURE_EXT = { png: 'png', jpeg: 'jpg', jpg: 'jpg', gif: 'gif', webp: 'webp', bmp: 'bmp', avif: 'avif', 'svg+xml': 'svg' };
+const PICTURE_MIME = { png: 'image/png', jpg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', avif: 'image/avif', svg: 'image/svg+xml' };
+const HELD_PICTURE = /nebula-media:\/\/hole\/([\w-]{1,120})\/([\w-]{1,120})\/(pic-[0-9a-f]{32}\.(png|jpg|gif|webp|bmp|avif|svg))/g;
+const HELD_ONE = new RegExp(`^${HELD_PICTURE.source}(?:[?#].*)?$`);
 export const KDF = { name: 'scrypt', N: 1 << 16, r: 8, p: 1 };
 /**
  * A PIN is six digits (the owner, on the first build: "six, not four"). A
@@ -159,6 +178,8 @@ const un64 = (text) => Buffer.from(String(text ?? ''), 'base64');
 export class BlackHoles {
   /** id → the hole's key, while it is open */
   #keys = new Map();
+  /** id → (a picture's name → the picture), while the hole is open: what its notes show, kept out of their text */
+  #pictures = new Map();
   /** A paused media response can still hold a Windows file handle. */
   #activeVideo = new Map();
   #activeWrites = new Map();
@@ -409,6 +430,8 @@ export class BlackHoles {
       if (!hello) return { ok: false, error: 'hello' };
       const kept = meta.lock === 'hello' ? meta.key.box : meta.passkey?.box;
       if (!kept) return { ok: false, error: 'hello' };
+      // What the system wrapped is not read where it keeps nothing secret (Linux with no keyring): said as that, not as another computer.
+      if (!this.canProtect()) return { ok: false, error: 'storage-unavailable' };
       let box;
       try { box = this.unprotect(un64(kept)); } catch { return { ok: false, error: 'other-computer' }; }
       if (box.length === 32 && box.every((b) => b === 0)) return { ok: false, error: 'damaged' };
@@ -420,6 +443,7 @@ export class BlackHoles {
     if (!isPinOf(meta, pin)) return { ok: false, error: 'pin' };
     let inner = un64(meta.key.box);
     if (meta.key.os) {
+      if (!this.canProtect()) return { ok: false, error: 'storage-unavailable' };
       try { inner = this.unprotect(inner); } catch { return { ok: false, error: 'other-computer' }; }
     }
     try { return { ok: true, by: 'pin', key: unseal(derive(pin, un64(meta.key.salt), meta.kdf), inner, `${id}/pin`) }; } catch { return this.#fail(meta); }
@@ -456,12 +480,14 @@ export class BlackHoles {
    * changed opens nothing (`error: 'locked'`).
    * @param {string} id
    * @param {{pin?: string, hello?: boolean, recovery?: string}} by
-   * @param {{preserveMedia?: boolean}} [opts] true: the sweep of videos no note
-   * shows is left to the caller, which is restoring notes that name them (the
-   * main process only — the window never chooses this).
+   * @param {{preserveMedia?: boolean, holdPictures?: boolean}} [opts] preserveMedia:
+   * the sweep of videos no note shows is left to the caller, which is restoring
+   * notes that name them (the main process only — the window never chooses
+   * this). holdPictures: the notes are given with their pictures held here and
+   * an address in each one's place (holdPictures, for the window).
    * @returns {Promise<{ok: boolean, notes?: string[], damaged?: number, error?: string, waitMs?: number, triesLeft?: number}>}
    */
-  async unlock(id, { pin, recovery, hello } = {}, { preserveMedia = false } = {}) {
+  async unlock(id, { pin, recovery, hello } = {}, { preserveMedia = false, holdPictures = false } = {}) {
     // Before the meta read: even a read can write (a legacy label upgrade), and the
     // hole's files are being destroyed — nothing of it is touched until it is gone.
     if (this.#deletionBusy(id)) return { ok: false, error: 'in-use' };
@@ -505,6 +531,7 @@ export class BlackHoles {
       this.#keys.set(id, key);
     }
     const notes = [];
+    const owners = [];
     let damaged = 0;
     const files = this.#noteFiles(id);
     const decryptKey = files.length ? await crypto.webcrypto.subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt']) : null;
@@ -522,6 +549,7 @@ export class BlackHoles {
         const text = Buffer.from(clear).toString('utf8');
         new Uint8Array(clear).fill(0);
         notes.push(text);
+        owners.push(file.slice(0, -3));
       } catch { if (!this.#stillHolds(id, key)) return { ok: false, error: 'locked' }; damaged += 1; }
     }
     // A video taken out of a note since the black hole was last opened goes now —
@@ -530,16 +558,87 @@ export class BlackHoles {
     // The sweep awaited: the hole may have been locked while it shredded. The
     // notes are plaintext in hand — they leave with the lock, not after it.
     if (!this.#stillHolds(id, key)) return { ok: false, error: 'locked' };
+    // The window is given the notes with their pictures held here, a short address in each one's place.
+    if (holdPictures) for (let i = 0; i < notes.length; i += 1) notes[i] = this.holdPictures(id, owners[i], notes[i]);
     return { ok: true, notes, damaged, ...(swept.length ? { swept } : {}) };
   }
 
   isOpen(id) { return this.#keys.has(id); }
 
-  /** Let go of the key. The files stay as they are: sealed. */
+  /**
+   * A note's text with its pictures taken out of it and held for as long as
+   * the black hole is open: each is an address in the text. The same picture
+   * twice is held once. A closed black hole holds nothing: the text is as it was.
+   * @returns {string}
+   */
+  holdPictures(id, noteId, text) {
+    const source = String(text ?? '');
+    if (!this.#keys.has(id) || !ID.test(String(noteId)) || !source.includes('data:image/')) return source;
+    let held = this.#pictures.get(id);
+    if (!held) this.#pictures.set(id, held = new Map());
+    return source.replace(PICTURE_DATA, (all, kind, data) => {
+      const ext = PICTURE_EXT[kind.toLowerCase()];
+      const bytes = Buffer.from(data, 'base64');
+      const name = `pic-${crypto.createHash('sha256').update(bytes).digest('hex').slice(0, 32)}.${ext}`;
+      if (held.has(name)) bytes.fill(0); else held.set(name, bytes);
+      return `nebula-media://hole/${id}/${noteId}/${name}`;
+    });
+  }
+
+  /** A held picture by its name: in the black hole its address names, or — a note moved, or copied, from one open black hole to another — in any open one. */
+  #held(id, name) {
+    const own = this.#pictures.get(id)?.get(name);
+    if (own) return own;
+    for (const held of this.#pictures.values()) if (held.has(name)) return held.get(name);
+    return null;
+  }
+
+  /**
+   * The picture a held address names, while its black hole is open — for the
+   * note that shows it. Null for any other address, and once it is locked.
+   * @returns {{bytes: Buffer, mime: string}|null}
+   */
+  picture(url) {
+    const m = HELD_ONE.exec(String(url ?? ''));
+    const bytes = m ? this.#held(m[1], m[3]) : null;
+    return bytes ? { bytes, mime: PICTURE_MIME[m[4]] } : null;
+  }
+
+  /** That picture written out as text — for a copy, a crop, a drag out of the window. Null when it is not held. */
+  pictureDataUrl(url) {
+    const found = this.picture(url);
+    return found ? `data:${found.mime};base64,${found.bytes.toString('base64')}` : null;
+  }
+
+  /**
+   * A text with every held picture it names: `put(dataUrl, name, address)`
+   * says what stands there — the picture itself when it is not given. An
+   * address whose picture is not held (its black hole is locked) is handed to
+   * `put` with null, and stays as it is without one: nothing is dropped.
+   * @param {string} text
+   * @param {((dataUrl: string|null, name: string, address: string) => string|null)|null} [put]
+   * @param {string|null} [into] the open black hole the text is sealed into: it holds these pictures from now on
+   * @returns {string}
+   */
+  withPictures(text, put = null, into = null) {
+    const source = String(text ?? '');
+    if (!source.includes('nebula-media://hole/')) return source;
+    const target = into !== null && this.#keys.has(into) ? (this.#pictures.get(into) ?? this.#pictures.set(into, new Map()).get(into)) : null;
+    return source.replace(HELD_PICTURE, (address, id, _noteId, name, ext) => {
+      const bytes = this.#held(id, name);
+      if (bytes && target && !target.has(name)) target.set(name, Buffer.from(bytes));
+      const data = bytes ? `data:${PICTURE_MIME[ext]};base64,${bytes.toString('base64')}` : null;
+      return (put ? put(data, name, address) : data) ?? address;
+    });
+  }
+
+  /** Let go of the key, and of the pictures held for its notes. The files stay as they are: sealed. */
   lock(id) {
     this.#bump(id);
     const key = this.#keys.get(id);
     if (key) key.fill(0);
+    for (const bytes of this.#pictures.get(id)?.values() ?? []) bytes.fill(0);
+    this.#pictures.delete(id);
     return this.#keys.delete(id);
   }
 

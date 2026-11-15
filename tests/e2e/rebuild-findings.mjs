@@ -155,19 +155,24 @@ export async function runRebuildFindingChecks(check) {
     check('/divider on an empty line goes to the top level, and the heading after it too', rule.heading && rule.hr, JSON.stringify(rule));
 
     /* Arrows have their own menu beside the shapes, with icons and whole names (0.8.6). */
-    const menus = await win.evaluate(() => {
-      document.querySelector('[data-menu="menu-arrows"]').click();
-      const m = document.getElementById('menu-arrows');
-      const rows = [...m.querySelectorAll('[data-arrow-add]')];
-      const out = {
-        inShapes: !!document.querySelector('#menu-shapes [data-arrow-add]'),
+    // Tiles of their own since 1.0.4, opened by the arrow button.
+    await win.evaluate(() => document.querySelector('#toolbar [data-act="shape"]').click());
+    await win.waitForSelector('#shape-menu [data-shape-add]', { state: 'attached', timeout: 3000 });
+    const inShapes = await win.evaluate(() => !!document.querySelector('#shape-menu [data-arrow-add]'));
+    await win.keyboard.press('Escape');
+    await win.evaluate(() => document.querySelector('#toolbar [data-act="arrow"]').click());
+    await win.waitForSelector('#arrow-menu [data-arrow-add]', { state: 'attached', timeout: 3000 });
+    const menus = await win.evaluate((inShapes) => {
+      const rows = [...document.querySelectorAll('#arrow-menu [data-arrow-add]')];
+      return {
+        inShapes,
         rows: rows.length,
         icons: rows.every((b) => b.querySelector('svg')),
-        truncated: rows.filter((b) => { const l = b.querySelector('.label'); return l.scrollWidth > l.clientWidth + 1; }).map((b) => b.textContent),
+        truncated: rows.filter((b) => { const l = b.lastElementChild; return l.scrollWidth > l.clientWidth + 1; }).map((b) => b.textContent),
       };
-      document.querySelector('[data-menu="menu-arrows"]').click();
-      return out;
-    });
+    }, inShapes);
+    await win.keyboard.press('Escape');
+    await win.waitForTimeout(450);
     check('arrows are in their own menu, not the shape list', !menus.inShapes && menus.rows === 3, JSON.stringify(menus));
     check('every arrow row has an icon and its whole name', menus.icons && menus.truncated.length === 0, JSON.stringify(menus));
 

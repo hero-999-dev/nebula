@@ -234,14 +234,14 @@ describe('palettes', () => {
 });
 
 describe('the Firefox that Google is told about (0.9.3)', () => {
-  it('is today\'s, counted from 157 on 29 September 2026, four weeks a version', async () => {
+  it('is today\'s, counted from 160 on 10 November 2026, four weeks a version', async () => {
     const { currentFirefox, firefoxUserAgentFor } = await import('../src/js/ai-services.js');
-    expect(currentFirefox(Date.UTC(2026, 8, 30))).toBe(157);
-    expect(currentFirefox(Date.UTC(2026, 9, 27))).toBe(158);
-    expect(currentFirefox(Date.UTC(2027, 8, 30))).toBe(170);
-    expect(currentFirefox(Date.UTC(2025, 0, 1))).toBe(157);      // never older
-    expect(firefoxUserAgentFor('win32', Date.UTC(2026, 8, 30))).toBe('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:157.0) Gecko/20100101 Firefox/157.0');
-    expect(firefoxUserAgentFor('darwin', Date.UTC(2026, 8, 30))).toContain('Macintosh');
+    expect(currentFirefox(Date.UTC(2026, 10, 11))).toBe(160);
+    expect(currentFirefox(Date.UTC(2026, 11, 8))).toBe(161);
+    expect(currentFirefox(Date.UTC(2027, 10, 11))).toBe(173);
+    expect(currentFirefox(Date.UTC(2025, 0, 1))).toBe(160);      // never older
+    expect(firefoxUserAgentFor('win32', Date.UTC(2026, 10, 11))).toBe('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:160.0) Gecko/20100101 Firefox/160.0');
+    expect(firefoxUserAgentFor('darwin', Date.UTC(2026, 10, 11))).toContain('Macintosh');
   });
 });
 

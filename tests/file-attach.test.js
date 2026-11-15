@@ -6,7 +6,7 @@
  * black hole in tests/black-holes.test.js.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fileExt, clipName, fileKind, fileSize, fileLabel, isAttachUrl, ownsAttachUrl, makeAttachBlock, refreshAttachBlocks, initAttachCards, dropKind, shownName } from '../src/js/file-attach.js';
+import { fileExt, clipName, fileKind, fileSize, fileLabel, isAttachUrl, ownsAttachUrl, makeAttachBlock, refreshAttachBlocks, initAttachCards, initAttachCarry, initPictureCarry, takeCarried, carriedOut, dropKind, shownName } from '../src/js/file-attach.js';
 import { fileVideoLines, plainVideosOf, sealedVideosOf } from '../src/js/file-video.js';
 import { serializeNote } from '../src/js/note-markup.js';
 import { heldMarkup } from '../src/js/held-media.js';
@@ -255,6 +255,164 @@ describe('a note opens only its own files', () => {
     expect(adoptFile).toHaveBeenCalledWith('n-2', null, URL);
     expect(saveFile).toHaveBeenCalledWith(OWN, 'theirs.pdf');
     expect(editor.querySelector('.link-attach').dataset.src).toBe(OWN);
+  });
+});
+
+describe('a card pulled out of the note', () => {
+  const move = (x, y, buttons = 1) => window.dispatchEvent(new MouseEvent('mousemove', { clientX: x, clientY: y, buttons }));
+  const press = (el, x, y) => el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: x, clientY: y }));
+  const page = (owner) => {
+    const editor = document.createElement('div');
+    document.body.append(editor);
+    editor.append(makeAttachBlock(URL, 'a.pdf', 10));
+    const media = { carryFile: vi.fn(async () => ({ ok: true })), dragFile: vi.fn(async () => ({ ok: true })), carryEnd: vi.fn() };
+    window.nebula = { media };
+    initAttachCarry(editor, { owner });
+    return { editor, media, title: editor.querySelector('.link-card__title') };
+  };
+
+  it('is out past the window’s edge, and over the AI panel', () => {
+    expect(carriedOut(200, 200)).toBe(false);
+    expect(carriedOut(0, 200)).toBe(true);
+    expect(carriedOut(200, -4)).toBe(true);
+    expect(carriedOut(window.innerWidth, 200)).toBe(true);
+    expect(carriedOut(200, window.innerHeight + 30)).toBe(true);
+    const panel = document.createElement('aside');
+    panel.id = 'ai-panel';
+    panel.innerHTML = '<div id="in"></div>';
+    document.body.append(panel);
+    document.elementFromPoint = () => panel.querySelector('#in');
+    expect(carriedOut(200, 200)).toBe(true);
+    delete document.elementFromPoint;
+  });
+
+  it('has its copy made when it is first carried, and is handed to the system’s drag once it is out', async () => {
+    const { media, title } = page(() => ({ id: 'n-1_Ab', hole: null }));
+    press(title, 100, 100);
+    move(103, 102);
+    expect(media.carryFile).not.toHaveBeenCalled();
+    move(140, 100);
+    expect(media.carryFile).toHaveBeenCalledWith(URL, 'a.pdf');
+    expect(document.body.classList.contains('attach-carried')).toBe(true);
+    expect(media.dragFile).not.toHaveBeenCalled();
+    move(-5, 100);
+    expect(media.dragFile).toHaveBeenCalledWith(URL, 'a.pdf');
+    expect(document.body.classList.contains('attach-carried')).toBe(false);
+    // The system has it from here, its drag over: nothing more is asked, and nothing is called off.
+    await new Promise((done) => setTimeout(done, 0));
+    move(-40, 100);
+    window.dispatchEvent(new MouseEvent('mouseup'));
+    expect(media.dragFile).toHaveBeenCalledTimes(1);
+    expect(media.carryEnd).not.toHaveBeenCalled();
+  });
+
+  it('let go inside the note is called off; a press that does not move, another note’s card and the × are nothing', () => {
+    const { editor, media, title } = page(() => ({ id: 'n-1_Ab', hole: null }));
+    press(title, 100, 100);
+    move(140, 100);
+    window.dispatchEvent(new MouseEvent('mouseup'));
+    expect(media.carryEnd).toHaveBeenCalledTimes(1);
+    move(-5, 100);
+    expect(media.dragFile).not.toHaveBeenCalled();
+    // The button let go where the window could not see it.
+    press(title, 100, 100);
+    move(140, 100);
+    move(-5, 100, 0);
+    expect(media.dragFile).not.toHaveBeenCalled();
+    press(title, 100, 100);
+    window.dispatchEvent(new MouseEvent('mouseup'));
+    press(editor.querySelector('[data-link-remove]'), 100, 100);
+    move(-5, 100);
+    expect(media.dragFile).not.toHaveBeenCalled();
+    expect(media.carryFile).toHaveBeenCalledTimes(2);
+
+    document.body.innerHTML = '';
+    const other = page(() => ({ id: 'n-2', hole: null }));
+    press(other.title, 100, 100);
+    move(-5, 100);
+    expect(other.media.carryFile).not.toHaveBeenCalled();
+    expect(other.media.dragFile).not.toHaveBeenCalled();
+  });
+
+  it('brought back and let go in the note is known as the note’s own, once, and not after the system’s drag is over', async () => {
+    const { editor, title } = page(() => ({ id: 'n-1_Ab', hole: null }));
+    const card = editor.querySelector('.link-attach');
+    const out = () => { press(title, 100, 100); move(-5, 100); };
+    expect(takeCarried([{ name: 'a.pdf' }])).toBe(null);
+    out();
+    expect(takeCarried([{ name: 'a.pdf' }])).toBe(card);
+    expect(takeCarried([{ name: 'a.pdf' }])).toBe(null);
+    // Another file, or several: somebody else's drop.
+    out();
+    expect(takeCarried([{ name: 'b.docx' }])).toBe(null);
+    out();
+    expect(takeCarried([{ name: 'a.pdf' }, { name: 'c.pdf' }])).toBe(null);
+    // Let go outside: the mouse is seen again without its button, and the next drop is another's.
+    out();
+    // (The button let go before that drag has answered calls it off, and the card is still the note's own.)
+    move(120, 100, 0);
+    expect(takeCarried([{ name: 'a.pdf' }])).toBe(card);
+    out();
+    await new Promise((done) => setTimeout(done, 0));
+    move(120, 100, 0);
+    expect(takeCarried([{ name: 'a.pdf' }])).toBe(null);
+    out();
+    card.remove();
+    expect(takeCarried([{ name: 'a.pdf' }])).toBe(null);
+  });
+});
+
+describe('a picture pulled out of the note', () => {
+  const move = (x, y, buttons = 1) => window.dispatchEvent(new MouseEvent('mousemove', { clientX: x, clientY: y, buttons }));
+  const press = (el, x, y) => el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: x, clientY: y }));
+  const SRC = 'nebula-media://note/n-1_Ab/img-m1abc-0a1b2c3d.png';
+  const page = (src = SRC) => {
+    const editor = document.createElement('div');
+    document.body.append(editor);
+    editor.innerHTML = `<figure class="note-image note-image--inline"><img src="${src}"><span class="image-h"></span></figure>`
+      + '<figure class="note-image note-image--inline note-widget"><img src="' + SRC + '"></figure>';
+    const media = { dragPicture: vi.fn(async () => ({ ok: true })) };
+    window.nebula = { media };
+    const onOut = vi.fn();
+    initPictureCarry(editor, { owner: () => ({ id: 'n-1_Ab', hole: null }), onOut });
+    return { editor, media, onOut, img: editor.querySelector('img') };
+  };
+
+  it('is moved in the note as before, and handed to the system’s drag once it is out', () => {
+    const { media, onOut, img } = page();
+    press(img, 100, 100);
+    move(140, 100);
+    expect(document.body.classList.contains('attach-carried')).toBe(true);
+    expect(media.dragPicture).not.toHaveBeenCalled();
+    move(-5, 100);
+    expect(onOut).toHaveBeenCalledTimes(1);
+    expect(media.dragPicture).toHaveBeenCalledWith(SRC, { id: 'n-1_Ab', hole: null });
+    expect(document.body.classList.contains('attach-carried')).toBe(false);
+    move(-40, 100);
+    expect(media.dragPicture).toHaveBeenCalledTimes(1);
+    // Brought back and let go in the note, it is the note's own picture: no second one.
+    expect(takeCarried([{ name: 'img-m1abc-0a1b2c3d.png' }])).toBe(img.closest('figure'));
+    expect(takeCarried([{ name: 'img-m1abc-0a1b2c3d.png' }])).toBe(null);
+  });
+
+  it('written into the text goes too; let go inside, a corner, a widget and a picture from the web are nothing', () => {
+    const data = 'data:image/png;base64,iVBORw0KGgo=';
+    const { editor, media, img } = page(data);
+    press(img, 100, 100);
+    move(-5, 100);
+    expect(media.dragPicture).toHaveBeenCalledWith(data, { id: 'n-1_Ab', hole: null });
+    press(img, 100, 100);
+    move(140, 100);
+    window.dispatchEvent(new MouseEvent('mouseup'));
+    move(-5, 100);
+    press(editor.querySelector('.image-h'), 100, 100);
+    move(-5, 100);
+    press(editor.querySelector('.note-widget img'), 100, 100);
+    move(-5, 100);
+    img.setAttribute('src', 'https://example.com/a.png');
+    press(img, 100, 100);
+    move(-5, 100);
+    expect(media.dragPicture).toHaveBeenCalledTimes(1);
   });
 });
 

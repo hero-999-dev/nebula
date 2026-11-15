@@ -369,6 +369,23 @@ describe('off this computer', () => {
     expect(bare.list()).toEqual([]);
   });
 
+  // 1.0.4, the Linux builds: with no keyring Electron wraps with a password every copy knows (safe-store.js).
+  it('opens nothing the system wrapped while it keeps nothing secret, and says that, not "another computer"', async () => {
+    let available = true;
+    const machine = { ...computer('mine'), canProtect: () => available };
+    const h = holes(machine);
+    const { hole } = await h.create({ name: 'Both', pin: '482193', passkey: true });
+    h.write(hole.id, 'n1', note('n1'));
+    h.lock(hole.id);
+    available = false;
+    expect(await h.unlock(hole.id, { pin: '482193' })).toEqual({ ok: false, error: 'storage-unavailable' });
+    expect(await h.unlock(hole.id, { hello: true })).toEqual({ ok: false, error: 'storage-unavailable' });
+    expect((await h.create({ name: 'New', pin: '482193' })).error).toBe('storage-unavailable');
+    // No guess was counted against the PIN: with the keyring back, the first try opens it.
+    available = true;
+    expect((await h.unlock(hole.id, { pin: '482193' })).notes).toEqual([note('n1')]);
+  });
+
   it('keeps an old unprotected wrapper readable, then upgrades it on a valid PIN when OS protection returns', async () => {
     let available = true;
     const machine = { ...computer('mine'), canProtect: () => available };

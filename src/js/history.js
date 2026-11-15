@@ -271,6 +271,23 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
     selection.addRange(range);
   }
 
+  /** Where the caret lies: the element it is in, and whether the page shows it. Null with no caret, or nothing laid out. */
+  function caretPlace(selection, scroller) {
+    if (!selection?.rangeCount || !editorEl.contains(selection.anchorNode)) return null;
+    const range = selection.getRangeAt(0);
+    const host = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
+    const at = range.getClientRects?.()[0] ?? host?.getBoundingClientRect?.();
+    const view = (scroller ?? editorEl).getBoundingClientRect?.();
+    if (!at || !view || !view.height || (!at.height && !at.width && !at.top)) return null;   // nothing laid out
+    return { host, seen: !(at.bottom <= view.top || at.top >= view.bottom) };
+  }
+
+  /** The caret a step put back, brought into view only when the kept scroll position leaves it outside. */
+  function showCaret(selection, scroller) {
+    const place = caretPlace(selection, scroller);
+    if (place && !place.seen) place.host?.scrollIntoView?.({ block: 'center', inline: 'nearest' });
+  }
+
   function apply(state) {
     restoring = true;
     // Replacing the HTML drops the focused element when it was inside the note
@@ -278,6 +295,14 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
     // Ctrl+Z went to Chromium's own undo instead of this one.
     const hadFocus = editorEl.contains(editorEl.ownerDocument.activeElement);
     const html = unpack(state.html);
+    // The page stays where it is. Emptied for a moment by innerHTML, the note is
+    // shorter than its scroll position, and what came back was shown from
+    // wherever that left it: "after adding a table, Ctrl+Z always throws me to
+    // the bottom of the page" (the owner, 1.0.4).
+    const scrolled = [];
+    for (let el = editorEl; el; el = el.parentElement) {
+      if (el.scrollHeight > el.clientHeight || el.scrollTop || el.scrollLeft) scrolled.push([el, el.scrollTop, el.scrollLeft]);
+    }
     // A video's player is the same player after the step. Put back as markup
     // it was a new one, black until its file had been read again — "Ctrl+Z
     // makes the video I added a black screen for a second" (the owner, 0.9.4).
@@ -286,6 +311,16 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
       const src = player.getAttribute('src');
       if (!players.has(src)) players.set(src, player);
     }
+    // The caret as it is now, and whether the page shows it. A step that kept no caret (the first
+    // of a note just opened; a picture or a shape moved with nothing but the mouse) left the caret
+    // to the browser, which put it at the very start of the emptied note; and a caret the reader
+    // had scrolled away from pulled the page back to itself: "Ctrl+Z, say I put the picture back
+    // where it was, and the caret goes to the very top of the page, I have to go down again"
+    // (the owner, 1.0.4). Such a step puts the caret back where it was, and the page follows a
+    // caret only when it was looking at one.
+    const live = editorEl.ownerDocument.defaultView?.getSelection?.();
+    const liveCaret = readCaret(editorEl, live);
+    const liveSeen = caretPlace(live, scrolled[0]?.[0])?.seen;
     editorEl.innerHTML = html;
     for (const fresh of players.size ? editorEl.querySelectorAll('video[src]') : []) {
       const kept = players.get(fresh.getAttribute('src'));
@@ -295,7 +330,8 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
     }
     if (hadFocus && !editorEl.contains(editorEl.ownerDocument.activeElement)) editorEl.focus({ preventScroll: true });
     const selection = editorEl.ownerDocument.defaultView?.getSelection?.();
-    writeCaret(editorEl, state.caret, selection);
+    const caret = writeCaret(editorEl, state.caret, selection) ? state.caret : liveCaret;
+    if (caret !== state.caret) writeCaret(editorEl, caret, selection);
     // A caret in code: repainting (onRestore) swaps the code's text nodes for
     // coloured ones, and the caret fell to the start of the block, outside its
     // focus, where Backspace did nothing (long-note trials, 0.8.9). Kept as a
@@ -303,8 +339,8 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
     const inCode = codeCaret(selection);
     onRestore?.(html);
     if (inCode) putCodeCaret(inCode, selection);
-    else if (state.caret) {
-      const node = nodeAt(editorEl, state.caret.start);
+    else if (caret) {
+      const node = nodeAt(editorEl, caret.start);
       const el = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
       const host = el?.closest('.shape-text, .image-caption, .blk-table td');
       if (host && hadFocus) {
@@ -312,8 +348,10 @@ export function initHistory(editorEl, { onRestore, limit = DEFAULT_LIMIT, maxCha
         host.closest('.shape')?.classList.add('editing');
         host.focus({ preventScroll: true });
       }
-      writeCaret(editorEl, state.caret, selection);
+      writeCaret(editorEl, caret, selection);
     }
+    for (const [el, top, left] of scrolled) { el.scrollTop = top; el.scrollLeft = left; }
+    if (liveSeen !== false) showCaret(selection, scrolled[0]?.[0]);
     // Rehydrating controls must not look like a new edit and discard redo.
     present = { html: snapshotHtml(), caret: state.caret };
     restoring = false;

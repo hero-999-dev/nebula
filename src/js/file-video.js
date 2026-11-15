@@ -25,6 +25,16 @@
  *
  * In a black hole the video is sealed beside its note (electron/black-holes.js)
  * and played from there while the black hole is open.
+ *
+ * A video whose note came over Tailscale sync before its file (1.0.4, the
+ * owner: "oynatıcıda video eşitleniyor · % kartı"): a big file follows its
+ * note in the background, and until it is here the player has nothing to
+ * play. Its card says so in place — "Video syncing · 62 %", with a line that
+ * fills — instead of "cannot be played", and is a player again the moment the
+ * file is whole. Like the bar it stands in, that is the screen's, never the
+ * note's. An attached file and a picture over the same size follow their note
+ * the same way, and say it the same way: "File syncing · 62 %" in the card's
+ * bar, "Picture syncing · 62 %" where the picture will be.
  */
 
 /**
@@ -160,6 +170,161 @@ function cannotPlay(card, player) {
   }
 }
 
+/** The files still on their way from another computer: `<note>/<file>` → how many per cent of it are here. */
+const coming = new Map();
+/**
+ * What a card says, given the per cent and what it shows — 'video', 'picture'
+ * or 'file': the window's half of sync puts it in the app's language (tailnet-sync.js).
+ */
+let comingWords = (pct, kind = 'video') => `${kind === 'picture' ? 'Picture' : kind === 'file' ? 'File' : 'Video'} syncing · ${pct} %`;
+/** A note's own file, as `<note>/<file>`, from its address: only such a one is ever synced — never one sealed in a black hole. */
+const keyOf = (src) => /^nebula-media:\/\/note\/([\w-]{1,120}\/[\w-]{1,80}\.[a-z0-9]{2,5})$/.exec(String(src ?? ''))?.[1] ?? null;
+/** The note's own file a player shows. */
+const fileOf = (player) => keyOf(player?.getAttribute('src'));
+/** Whole only when it has arrived: never 100 while it is still coming. */
+const perCent = (f) => (Number(f?.size) > 0 ? Math.max(0, Math.min(99, Math.floor((Number(f.got) || 0) / Number(f.size) * 100))) : 0);
+
+/**
+ * The card of a video still coming says how much of it is here; one that is
+ * not (any more) loses that word. Never "cannot be played" meanwhile: there
+ * is nothing to play yet.
+ * @returns {boolean} whether the video is still coming
+ */
+function paintComing(card, player) {
+  const pct = coming.get(fileOf(player));
+  const bar = card.querySelector(':scope > .video-bar');
+  let word = bar?.querySelector('.video-coming') ?? null;
+  if (pct === undefined || !bar) {
+    card.classList.remove('is-coming');
+    word?.remove();
+    return false;
+  }
+  card.classList.remove('cannot-play');
+  bar.querySelector('.video-miss')?.remove();
+  bar.querySelector('[data-video="outside"]')?.remove();
+  card.classList.add('is-coming');
+  if (!word) {
+    word = card.ownerDocument.createElement('span');
+    word.className = 'video-coming';
+    word.innerHTML = '<span class="video-coming__text"></span><span class="video-coming__meter"><i></i></span>';
+    bar.prepend(word);
+  }
+  word.firstChild.textContent = comingWords(pct);
+  word.lastChild.firstChild.style.width = `${pct}%`;
+  return true;
+}
+
+/** The word and the line that fills, as `<span class="name"><span class="name__text"></span><span class="name__meter"><i></i></span></span>`. */
+function comingWord(doc, name) {
+  const word = doc.createElement('span');
+  word.className = name;
+  word.innerHTML = `<span class="${name}__text"></span><span class="${name}__meter"><i></i></span>`;
+  return word;
+}
+
+/**
+ * An attached file still coming (1.0.4, the owner: "tailscale yapalim
+ * kücükleri"): its bar says how much of it is here, in place of Open and Save
+ * a copy, which have nothing to act on yet; one that is not (any more) has its
+ * buttons again. In the bar, so never saved (note-markup.js).
+ * @param {HTMLElement} card a `.link-attach` card whose bar is drawn (file-attach.js)
+ * @returns {boolean} whether the file is still coming
+ */
+export function paintComingAttach(card) {
+  const pct = coming.get(keyOf(card?.dataset?.src));
+  const bar = card?.querySelector?.(':scope > .attach-bar') ?? null;
+  let word = bar?.querySelector('.file-coming') ?? null;
+  if (pct === undefined || !bar) {
+    card?.classList?.remove('is-coming');
+    word?.remove();
+    return false;
+  }
+  card.classList.add('is-coming');
+  if (!word) {
+    word = comingWord(card.ownerDocument, 'file-coming');
+    bar.prepend(word);
+  }
+  word.firstChild.textContent = comingWords(pct, 'file');
+  word.lastChild.firstChild.style.width = `${pct}%`;
+  return true;
+}
+
+/**
+ * A picture still coming (1.0.4): its frame says how much of it is here, where
+ * the picture will be; one that is not (any more) is a picture again. Drawn on
+ * the screen, never saved (note-markup.js). A widget and an exported video's
+ * still are no pictures of the note's folder.
+ * @param {HTMLElement} figure a `.note-image`
+ * @returns {boolean} whether the picture is still coming
+ */
+export function paintComingPicture(figure) {
+  const img = figure?.matches?.('.note-image:not(.note-widget):not(.note-video)') ? figure.querySelector('img') : null;
+  const pct = img ? coming.get(keyOf(img.getAttribute('src'))) : undefined;
+  let word = figure?.querySelector?.(':scope > .picture-coming') ?? null;
+  if (pct === undefined) {
+    figure?.classList?.remove('is-coming');
+    word?.remove();
+    return false;
+  }
+  figure.classList.add('is-coming');
+  if (!word) {
+    word = comingWord(figure.ownerDocument, 'picture-coming');
+    word.setAttribute('contenteditable', 'false');
+    figure.append(word);
+  }
+  word.firstChild.textContent = comingWords(pct, 'picture');
+  word.lastChild.firstChild.style.width = `${pct}%`;
+  return true;
+}
+
+function paintAllComing(root, only = null) {
+  for (const card of root?.querySelectorAll?.('.link-block.link-file') ?? []) {
+    const player = card.querySelector('video');
+    if (player && (only === null || fileOf(player) === only)) paintComing(card, player);
+  }
+  for (const card of root?.querySelectorAll?.('.link-block.link-attach') ?? []) {
+    if (only === null || keyOf(card.dataset.src) === only) paintComingAttach(card);
+  }
+  for (const figure of root?.querySelectorAll?.('.note-image') ?? []) {
+    if (only === null || keyOf(figure.querySelector('img')?.getAttribute('src')) === only) paintComingPicture(figure);
+  }
+}
+
+/**
+ * The words of a card, in the app's language: `say(perCent, kind)`, the kind
+ * being 'video', 'picture' or 'file'. (Named for the video, the first to have a card.)
+ */
+export function comingVideoWords(say) {
+  if (typeof say === 'function') comingWords = say;
+}
+
+/**
+ * The big files still on their way, whole: `[{ id, name, got, size }]`, the
+ * note, the file, and how many of its bytes are here. Every player on the page
+ * showing one of them says so, and so does every attached file's card and
+ * every picture; one no longer listed is a player, a card, a picture again.
+ */
+export function setComingVideos(list, root = document) {
+  coming.clear();
+  for (const f of Array.isArray(list) ? list : []) if (f && typeof f.id === 'string' && typeof f.name === 'string') coming.set(`${f.id}/${f.name}`, perCent(f));
+  paintAllComing(root);
+}
+
+/** One of them moved on: `{ id, name, got, size }`. Told with every piece that comes, drawn once per cent. */
+export function videoComing(f, root = document) {
+  if (!f || typeof f.id !== 'string' || typeof f.name !== 'string') return;
+  const key = `${f.id}/${f.name}`;
+  const pct = perCent(f);
+  if (coming.get(key) === pct) return;
+  coming.set(key, pct);
+  paintAllComing(root, key);
+}
+
+/** One of them is here, whole: its card is a player, a file's card, a picture again (the window's half of sync loads it anew). */
+export function videoArrived(id, name, root = document) {
+  if (coming.delete(`${id}/${name}`)) paintAllComing(root);
+}
+
 /** A player is a control: it never takes the caret, and a saved one is given its controls again. */
 export function refreshVideoBlocks(root) {
   for (const card of root.querySelectorAll('.link-block.link-file')) {
@@ -169,6 +334,8 @@ export function refreshVideoBlocks(root) {
     player.controls = true;
     if (!isMediaUrl(player.getAttribute('src'))) player.removeAttribute('src');   // only ever a note's own file
     ensureVideoBar(card, player);
+    // Still on its way from another computer: nothing has failed.
+    if (paintComing(card, player)) continue;
     // A file that failed before this was looked at: the card is told now.
     if (player.error && player.error.code >= 3) cannotPlay(card, player);
   }
@@ -206,6 +373,8 @@ export function initVideoPlayers(editor) {
   for (const name of ['timeupdate', 'loadedmetadata', 'durationchange', 'ratechange', 'seeked']) editor.addEventListener(name, show, true);
   editor.addEventListener('error', (e) => {
     const card = e.target?.tagName === 'VIDEO' ? cardOf(e.target) : null;
+    // A file still on its way is not there to be read: the card says how far it is, not that it cannot be played.
+    if (card && paintComing(card, e.target)) return;
     // 3: it cannot be decoded; 4: its kind is not one the player has.
     if (card && e.target.error && e.target.error.code >= 3) cannotPlay(card, e.target);
   }, true);

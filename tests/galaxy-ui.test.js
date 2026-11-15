@@ -240,6 +240,62 @@ describe('the map starting', () => {
     expect(lit.at(-1)).toEqual([]);
   });
 
+  // The owner: "universe takip modu, widget'taki olduğu gibi".
+  it('Follow stands before Fit: it rides the body picked, and lets go when pressed again', () => {
+    document.body.innerHTML = '<div id="slot"></div>';
+    const done = [];
+    let picked = null, riding = null;
+    const fake = (canvas, o) => ({
+      view: () => ({ x: 0, y: 0, zoom: 1, holeId: null }), restore() {}, resize() {}, pause() {}, resume() {}, refresh() {}, follow() {},
+      dimension: () => null, bodies: () => [], focus() {}, shown() {}, hidden() {}, fit() {}, labels: () => [],
+      overview() { if (!o.mini) riding = null; },
+      selected: () => picked, tracked: () => riding,
+      track(id) { if (o.mini) return false; done.push(id); riding = id; return !!id; },
+    });
+    const galaxy = initGalaxy({
+      mount: document.getElementById('slot'), createMap: fake,
+      store: { live: () => [], inHole: () => [], activeId: null },
+      folders: { all: () => [] }, projects: { all: () => [], of: () => null },
+      blackHoles: { list: () => [] }, holeInitials: (n) => n, openNote: () => {},
+    });
+    document.body.append(galaxy.pane.el);
+    galaxy.pane.shown();
+    const tools = galaxy.pane.el.querySelector('.galaxy-tools');
+    const follow = tools.querySelector('.galaxy-follow');
+    expect(follow.nextElementSibling.classList.contains('galaxy-whole')).toBe(true);
+    expect(follow.getAttribute('aria-pressed')).toBe('false');
+    expect(follow.title).toBe('Follow the body picked');
+
+    // Nothing picked: it says what to do first, and follows nothing.
+    const said = [];
+    const hear = (e) => said.push(e.detail);
+    window.addEventListener('nebula-toast', hear);
+    follow.click();
+    expect(said).toEqual(['Click a body on the map first']);
+    expect(done).toEqual([]);
+    expect(follow.classList.contains('on')).toBe(false);
+
+    picked = 'n1';
+    follow.click();
+    expect(done).toEqual(['n1']);
+    expect(follow.classList.contains('on')).toBe(true);
+    expect(follow.getAttribute('aria-pressed')).toBe('true');
+    expect(follow.title).toBe('Stop following');
+
+    follow.click();
+    expect(done).toEqual(['n1', null]);
+    expect(follow.classList.contains('on')).toBe(false);
+    expect(follow.title).toBe('Follow the body picked');
+
+    // Fit lets go, and the button says so.
+    follow.click();
+    expect(follow.classList.contains('on')).toBe(true);
+    tools.querySelector('.galaxy-whole').click();
+    expect(follow.classList.contains('on')).toBe(false);
+    expect(said).toHaveLength(1);
+    window.removeEventListener('nebula-toast', hear);
+  });
+
   it('the minimap steps aside while the big map is open, and comes back after (owner, 2026-10-21)', () => {
     document.body.innerHTML = '<div id="slot"></div>';
     const made = [];

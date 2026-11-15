@@ -87,6 +87,7 @@ export function orderPage(editorEl) {
 
   // Shapes and pictures on the canvas, front and back: moved by their top.
   for (const el of editorEl.querySelectorAll('.shape-layer > .shape, .shape-layer > .note-image')) {
+    if (!el.getClientRects().length) continue;   // folded away with its section: it is nowhere on a page
     const b = box(el);
     const to = placeBelow(b.top, b.height, origin, pageHeight);
     if (to === null) continue;

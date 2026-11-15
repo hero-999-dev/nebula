@@ -10,6 +10,8 @@
  * ('exeDir' | 'userData' | 'storage' | 'backups' | 'snapshots') and main resolves it.
  */
 
+import { formatBytes } from './settings-panel.js';
+
 const $ = (id) => document.getElementById(id);
 
 const CHANNEL_LABEL = {
@@ -47,6 +49,16 @@ function credits() {
     table.appendChild(row(c.name, `“${c.file}” by ${c.author} (${c.year}), public domain — commons.wikimedia.org/wiki/File:${c.file}`));
   }
   box.appendChild(table);
+  // The cities of the World clock and the Weather (1.0.4), and who answers for the weather.
+  const places = document.createElement('p');
+  places.className = 'about-note';
+  places.innerHTML = '<strong>Cities</strong> — from GeoNames (geonames.org), under CC BY 4.0. <strong>Weather</strong> — forecast data by Open-Meteo (open-meteo.com), under CC BY 4.0.';
+  box.appendChild(places);
+  // The faces of the designs (1.0.4): packed with the app, each under the SIL Open Font License 1.1.
+  const faces = document.createElement('p');
+  faces.className = 'about-note';
+  faces.innerHTML = '<strong>Fonts</strong> — the designs’ faces and the others packed with the app, under the SIL Open Font License 1.1: Fondamento (Brian J. Bonislawsky DBA Astigmatic), VT323 (The VT323 Project Authors), Oxanium (The Oxanium Project Authors), Patrick Hand (Patrick Wagesreiter), Courgette (Sorkin Type Co), Marcellus (Brian J. Bonislawsky DBA Astigmatic), Bodoni Moda (The Bodoni Moda Project Authors), Almendra (Ana Sanfelippo), Architects Daughter (Kimberly Geswein), Caveat Brush (Google Inc.), Chakra Petch (The Chakra Petch Project Authors), Cinzel (The Cinzel Project Authors), Cormorant Garamond (The Cormorant Project Authors), Courier Prime (The Courier Prime Project Authors), Cutive (The Cutive Project Authors), Cutive Mono (The Cutive Project Authors), EB Garamond (The EB Garamond Project Authors), Exo 2 (The Exo 2 Project Authors), Glass Antiqua (Denis Masharov), Grenze (The Grenze Project Authors), Handjet (The Handjet Project Authors), Inknut Antiqua (The Inknut Antiqua Project Authors), Jersey 15 (The Soft Type Project Authors), Josefin Sans (The Josefin Sans Project Authors), Jost (The Jost Project Authors), Kalam (Indian Type Foundry), Libre Baskerville (The Libre Baskerville Project Authors), Libre Caslon Text (The Libre Caslon Text Project Authors), MedievalSharp (Wojciech ’wmk69’ Kalinowski), Old Standard TT (The Old Standard Project Authors), Oldenburg (Sorkin Type Co), Pixelify Sans (The Pixelify Sans Project Authors), Poiret One (The Poiret One Project Authors), Rajdhani (Indian Type Foundry), Raleway (The Raleway Project Authors), Sedgwick Ave (The Sedgwick Ave Project Authors), Shadows Into Light Two (Kimberly Geswein), Sorts Mill Goudy (Barry Schwartz), Space Mono (The Space Mono Project Authors), Tektur (The Tektur Project Authors), Tenor Sans (Denis Masharov), Texturina (The Texturina Project Authors), Tiny5 (The Tiny5 Project Authors).';
+  box.appendChild(faces);
   return box;
 }
 
@@ -101,6 +113,17 @@ async function open({ sounds = false } = {}) {
     table.appendChild(row('Backups', info.backups, 'backups'));
     table.appendChild(row('Snapshots', info.snapshots, 'snapshots'));
     table.appendChild(row('Profile', info.userData, 'userData'));
+    // What all of it takes on the disk (1.0.4, the owner's Ideas note: "sol
+    // alttan tiklandiginda nebulanin ne kadar depolama alani kullandigini
+    // göstersin … ve about kisminda"). Measured after the panel is up: a large
+    // vault takes a moment, and Settings → Storage has every part of it.
+    const size = row('Size on this computer', '…');
+    table.appendChild(size);
+    void window.nebula?.storage?.usage?.().then((u) => {
+      const cell = size.lastElementChild;
+      if (u && typeof u.total === 'number') cell.textContent = formatBytes(u.total);
+      else size.remove();
+    }).catch(() => size.remove());
     body.appendChild(table);
 
     const note = document.createElement('p');

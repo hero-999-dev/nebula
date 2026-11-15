@@ -64,8 +64,8 @@ export async function runWidgetChecks(check) {
       const m = document.getElementById('widget-menu');
       return { kinds: [...m.querySelectorAll('[data-widget-kind]')].map((b) => `${b.dataset.widgetKind}:${b.textContent.trim()}:${!!b.querySelector('.fm-ic svg')}`), slashLeft: (document.getElementById('b').textContent || '').includes('/') };
     });
-    check('the chooser offers the calculator, the scientific one, the calendar, the Universe, the Pomodoro and the Clock, each with its icon',
-      JSON.stringify(picker.kinds) === JSON.stringify(['calc:Calculator:true', 'sci:Scientific calculator:true', 'calendar:Calendar:true', 'universe:Universe:true', 'pomodoro:Pomodoro:true', 'clock:Clock:true']) && !picker.slashLeft, JSON.stringify(picker));
+    check('the chooser offers the calculator, the scientific one, the calendar, the Universe, the Pomodoro, the Clock, the World clock and the Weather, each with its icon',
+      JSON.stringify(picker.kinds) === JSON.stringify(['calc:Calculator:true', 'sci:Scientific calculator:true', 'calendar:Calendar:true', 'universe:Universe:true', 'pomodoro:Pomodoro:true', 'clock:Clock:true', 'world:World clock:true', 'weather:Weather:true']) && !picker.slashLeft, JSON.stringify(picker));
     await win.keyboard.press('Escape');
     await win.waitForTimeout(100);
     check('Escape closes the chooser and adds nothing', await win.evaluate(() => !document.getElementById('widget-menu') && !document.querySelector('#editor .note-widget')));
@@ -159,7 +159,7 @@ export async function runWidgetChecks(check) {
     await win.mouse.click(head.x, head.y, { button: 'right' });
     await win.waitForFunction(() => !document.getElementById('ctx-menu')?.hidden, null, { polling: 50, timeout: 5000 }).catch(() => {});
     const items = await win.evaluate(() => [...document.querySelectorAll('#ctx-menu > button')].map((b) => b.textContent));
-    check('a right-click on a widget offers Copy widget and Delete widget, no picture or caption items', JSON.stringify(items) === '["Copy widget","Delete widget"]', JSON.stringify(items));
+    check('a right-click on a widget offers Copy widget, Send to… and Delete widget, no picture or caption items', JSON.stringify(items) === '["Copy widget","Send to…","Delete widget"]', JSON.stringify(items));
     await win.keyboard.press('Escape');
     await win.waitForTimeout(100);
 

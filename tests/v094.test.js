@@ -237,10 +237,15 @@ describe('the font menu: a search, and adding a font', () => {
     expect(cleanFontStack(`${'x'.repeat(199)}🌙 bold`)).toBe(`${'x'.repeat(199)}🌙`); // hunt B24: never half an emoji
   });
 
-  it('lists the app’s fonts, then the ones added, then this computer’s, narrowed by what is typed', () => {
+  it('lists the app’s fonts and the ones added, then this computer’s, narrowed by what is typed', () => {
     const all = fontRows('', { custom: ['Noto Serif', 'arial'], installed: ['Bahnschrift', 'Arial', 'Candara'] });
     expect(all.own.length).toBe(FONTS.length + 1);          // "arial" is the app's Arial already
-    expect(all.own.at(-1)).toEqual({ label: 'Noto Serif', stack: '"Noto Serif", serif', custom: true, pinned: false });
+    // 1.0.4: an added font stands by its name among the others, not after them.
+    const added = all.own.findIndex((r) => r.label === 'Noto Serif');
+    expect(all.own[added]).toEqual({ label: 'Noto Serif', stack: '"Noto Serif", serif', custom: true, pinned: false, design: '' });
+    expect(all.own[added - 1].label.localeCompare('Noto Serif', 'en')).toBeLessThan(0);
+    expect(all.own[added + 1].label.localeCompare('Noto Serif', 'en')).toBeGreaterThan(0);
+    expect(all.own.at(-1).label).toBe('Verdana');
     expect(all.installed).toEqual(['Bahnschrift', 'Candara']);
     expect(all.add).toBe('');
     const found = fontRows('can', { installed: ['Bahnschrift', 'Candara', 'Cancun Sans'] });

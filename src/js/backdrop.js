@@ -219,8 +219,9 @@ export const MIX_STYLES = [
   { id: 'rings', label: 'Rings' },
   { id: 'mesh', label: 'Mesh' },
   { id: 'facets', label: 'Facets' },
-  // Three more (1.0.3, the owner: "3 tane daha styles eklensin").
-  { id: 'horizon', label: 'Horizon' },
+  // Three more (1.0.3, the owner: "3 tane daha styles eklensin"): Horizon, Dunes, Bubbles —
+  // and Horizon taken out again (1.0.4, the owner: "styles'dan horizon silinsin"). A mix kept
+  // with it is the first style's (cleanMix).
   { id: 'dunes', label: 'Dunes' },
   { id: 'bubbles', label: 'Bubbles' },
 ];
@@ -404,24 +405,6 @@ export function drawMix(ctx, w, h, style, colors) {
         }
       }
     }
-  } else if (style === 'horizon') {
-    // A sky of the colours down to the horizon, the last one a sun low on it, the ground the first.
-    const line = h * 0.66;
-    const sky = colors.length > 2 ? colors.slice(0, -1) : colors;
-    ctx.fillStyle = gradient(ctx.createLinearGradient(0, 0, 0, line), sky);
-    ctx.fillRect(0, 0, w, line);
-    const sun = colors[colors.length - 1];
-    const glow = ctx.createRadialGradient(w / 2, line, 0, w / 2, line, h * 0.55);
-    glow.addColorStop(0, sun);
-    glow.addColorStop(0.25, `${sun}cc`);
-    glow.addColorStop(1, `${sun}00`);
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, w, line);
-    const ground = ctx.createLinearGradient(0, line, 0, h);
-    ground.addColorStop(0, colorAt(colors, 0.2));
-    ground.addColorStop(1, colors[0]);
-    ctx.fillStyle = ground;
-    ctx.fillRect(0, line, w, h - line);
   } else if (style === 'dunes') {
     // Smooth hills one before the other, each a colour fading into the one before it.
     ctx.fillStyle = gradient(ctx.createLinearGradient(0, 0, 0, h), colors.slice(0, 2));

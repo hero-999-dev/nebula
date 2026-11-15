@@ -182,7 +182,7 @@ export function cleanProfiles(raw, ready = READY_PROFILES) {
     seen.add(name.toLowerCase());
     out.push({ name, colors });
   }
-  return out.slice(0, 24);
+  return out.slice(0, MOST_PROFILES);
 }
 
 /**
@@ -201,6 +201,65 @@ export function saveProfile(profiles, name, colors, ready = READY_PROFILES) {
   if (at >= 0) list[at] = entry; else list.push(entry);
   return { profiles: cleanProfiles(list, ready) };
 }
+
+/**
+ * A saved profile under a new name, its colours as they are (1.0.4, the owner:
+ * "hiç değişiklik yoksa … save new name olsun"). Another profile's name, saved
+ * or ready, cannot be taken; its own name in other letters can.
+ * @returns {{profiles: Array, name?: string, error?: 'missing'|'name'|'ready'|'taken'}}
+ */
+export function renameProfile(profiles, from, to, ready = READY_PROFILES) {
+  const list = cleanProfiles(profiles, ready);
+  const at = list.findIndex((p) => p.name.toLowerCase() === String(from ?? '').toLowerCase());
+  if (at < 0) return { profiles: list, error: 'missing' };
+  const clean = cleanProfileName(to);
+  if (!clean) return { profiles: list, error: 'name' };
+  const low = clean.toLowerCase();
+  if (ready.some((p) => p.name.toLowerCase() === low)) return { profiles: list, error: 'ready' };
+  if (list.some((p, i) => i !== at && p.name.toLowerCase() === low)) return { profiles: list, error: 'taken' };
+  list[at] = { ...list[at], name: clean };
+  return { profiles: list, name: clean };
+}
+
+const hsl = (h, s, l) => {
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => { const k = (n + h / 30) % 12; return 255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))); };
+  return hexOf([f(0), f(8), f(4)]);
+};
+
+/**
+ * Five colours nobody chose (1.0.4, the + after the profiles: "+ ya basınca
+ * random bir theme eklensin"): one hue for the ground, dark more often than
+ * light, an accent of a hue of its own, and words that can be read on it.
+ * @param {() => number} [rnd] 0 ≤ n < 1
+ */
+export function randomColors(rnd = Math.random) {
+  const hue = rnd() * 360;
+  const light = rnd() < 0.3;
+  const sat = 0.12 + rnd() * 0.3;
+  const accentHue = (hue + 40 + rnd() * 280) % 360;
+  const l = light ? 0.9 + rnd() * 0.06 : 0.07 + rnd() * 0.09;
+  const colors = {
+    bg: hsl(hue, sat, l),
+    dark: hsl(hue, sat, light ? l - 0.07 : l * 0.6),
+    lines: hsl(hue, sat * 0.8, light ? l - 0.2 : l + 0.14),
+    accent: hsl(accentHue, 0.55 + rnd() * 0.35, light ? 0.42 : 0.68),
+    text: hsl(hue, 0.2, light ? 0.12 : 0.93),
+  };
+  return hardToRead(colors) ? { ...colors, text: light ? '#000000' : '#FFFFFF' } : colors;
+}
+
+/** A name no profile has, saved or ready: the base, then "base 2", "base 3". */
+export function freeProfileName(base, profiles = [], ready = READY_PROFILES) {
+  const have = new Set([...ready, ...profiles].map((p) => p.name.toLowerCase()));
+  const stem = cleanProfileName(base).slice(0, 28) || 'Random';
+  if (!have.has(stem.toLowerCase())) return stem;
+  for (let n = 2; n < 1000; n += 1) if (!have.has(`${stem} ${n}`.toLowerCase())) return `${stem} ${n}`;
+  return `${stem} ${Date.now()}`;
+}
+
+/** As many profiles as are kept. */
+export const MOST_PROFILES = 24;
 
 /** The profile these colours are, ready or saved — its name, or null. */
 export function profileOf(colors, profiles = [], ready = READY_PROFILES) {

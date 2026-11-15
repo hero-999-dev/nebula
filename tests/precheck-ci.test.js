@@ -33,7 +33,7 @@ describe('precheck on GitHub before the tag', () => {
   it('runs the release workflow on precheck branches and publishes only from a tag', () => {
     expect(precheckBranch('v1.2.3')).toBe('precheck/v1.2.3');
     expect(workflow).toMatch(/branches:\s*\n\s*- 'precheck\/\*\*'/);
-    expect(workflow).toMatch(/publish:\s*\n\s*needs: \[build-win, build-mac\]\s*\n(?:\s*#.*\n)?\s*if: startsWith\(github\.ref, 'refs\/tags\/v'\)/);
+    expect(workflow).toMatch(/publish:\s*\n\s*needs: \[build-win, build-mac, build-linux\]\s*\n(?:\s*#.*\n)*\s*if: startsWith\(github\.ref, 'refs\/tags\/v'\)/);
   });
 
   it('gives a smoke run that could not finish (exit 2) one more attempt on CI, as the local release does', () => {

@@ -190,7 +190,7 @@ export async function runV094Checks(check) {
     }));
     check('a right-click on selected words opens one menu: formatting, then cut, copy and the pastes',
       merged.row === 'bold,italic,underline,strike,color,hilite,code,link'
-      && merged.items === 'Cut|Copy|Paste as Nebula format|Paste original format|Paste only text|Select all' && !merged.barAlone, JSON.stringify(merged));
+      && merged.items === 'Cut|Copy|Paste as Nebula format|Paste original format|Paste only text|Send to…|Select all' && !merged.barAlone, JSON.stringify(merged));
     check('and the words stay selected while it is open', merged.stillSelected === 'grow me', JSON.stringify(merged));
     await win.evaluate(() => document.querySelector('#ctx-menu .ctx-format [data-act="bold"]').click());
     check('its Bold makes the selected words bold and closes the menu', await win.evaluate(() =>
@@ -356,7 +356,7 @@ export async function runV094Checks(check) {
 
     await copy(DRESSED, 'dressed words');
     await rightClickAfter('#p');
-    check('a right-click in the note is the one menu: the formatting row, cut and copy (grey with nothing selected), the three ways to paste — "Paste only text" back in 1.0.3', await menuItems() === 'Cut·|Copy·|Paste as Nebula format|Paste original format|Paste only text|Select all'
+    check('a right-click in the note is the one menu: the formatting row, cut and copy (grey with nothing selected), the three ways to paste — "Paste only text" back in 1.0.3', await menuItems() === 'Cut·|Copy·|Paste as Nebula format|Paste original format|Paste only text|Send to…|Select all'
       && await win.evaluate(() => document.querySelectorAll('#ctx-menu .ctx-format button').length > 0), await menuItems());
     await win.keyboard.press('Escape');
 
@@ -437,7 +437,7 @@ export async function runV094Checks(check) {
           plus: !!row?.querySelector('.tb-menu__plus'), pin: row?.querySelector('.tb-menu__pin')?.getAttribute('aria-pressed') ?? null,
           over: !box.hidden && box.getBoundingClientRect().bottom <= add.top + 1,
           tools: row ? [...row.querySelectorAll('.tb-menu__plus, .tb-menu__pin')].map((x) => getComputedStyle(x).opacity).join(',') : '',
-          first: document.querySelector('#font-rows > button .label')?.textContent, listed: [...document.querySelectorAll('#font-rows > button .label')].map((x) => x.textContent),
+          first: document.querySelector('#font-rows > button:not(.of-design) .label')?.textContent, listed: [...document.querySelectorAll('#font-rows > button .label')].map((x) => x.textContent),
         };
       });
     };
@@ -455,7 +455,7 @@ export async function runV094Checks(check) {
     check('its pin is drawn when the pointer is on it', pickedFont.tools === '0' && hoveredFont.tools === '0.7', JSON.stringify({ before: pickedFont.tools, on: hoveredFont.tools }));
     await win.click('#font-last .tb-menu__pin');
     const pinnedLastFont = await lastFont();
-    check('and puts it at the top of the list', pinnedLastFont.first === 'Georgia' && pinnedLastFont.pin === 'true', JSON.stringify({ first: pinnedLastFont.first, pin: pinnedLastFont.pin }));
+    check('and puts it at the top of the list, right under the designs’ faces (1.0.4)', pinnedLastFont.first === 'Georgia' && pinnedLastFont.pin === 'true', JSON.stringify({ first: pinnedLastFont.first, pin: pinnedLastFont.pin }));
     await win.click('#font-last .tb-menu__pin');
     await win.fill('#font-search', 'ver');
     check('while a font is searched for, the list is the search’s alone', await win.evaluate(() => document.getElementById('font-last').hidden));
@@ -995,6 +995,8 @@ export async function runV094Checks(check) {
     // ---- An AI tab: clear its session, and Delete asks first -----------------------
     await win.evaluate(() => { if (document.getElementById('ai-panel').hidden) document.querySelector('[data-pad="ai"]').click(); });
     await win.waitForFunction(() => document.querySelectorAll('#ai-tabs .ai-tab').length > 1, null, { polling: 50, timeout: 8000 }).catch(() => {});
+    // The panel slides in (1.0.4): a tab is pressed where it stands only once the panel is at rest.
+    await win.waitForTimeout(700);
     const tabMenu = async () => {
       const tab = await win.evaluate(() => { const r = document.querySelector('#ai-tabs [data-ai="mistral"]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
       await win.evaluate(() => document.querySelector('#ai-tabs [data-ai="mistral"]').scrollIntoView({ inline: 'center' }));

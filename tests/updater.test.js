@@ -57,6 +57,48 @@ describe('update safety', () => {
   });
 });
 
+// 1.0.4, the Linux builds: one of the three packages can replace itself.
+describe('which copy may replace itself', () => {
+  it('the installed Windows build and the AppImage, and nothing else', async () => {
+    const { selfUpdates } = await import('../electron/updater.js');
+    expect(selfUpdates({ packaged: true, platform: 'win32' })).toBe(true);
+    expect(selfUpdates({ packaged: true, platform: 'linux', appImage: '/home/someone/Nebula-1.0.4.AppImage' })).toBe(true);
+    // A deb and a pacman package are packaged and on Linux too.
+    expect(selfUpdates({ packaged: true, platform: 'linux' })).toBe(false);
+    expect(selfUpdates({ packaged: true, platform: 'linux', appImage: '' })).toBe(false);
+    expect(selfUpdates({ packaged: true, platform: 'win32', portable: true })).toBe(false);
+    expect(selfUpdates({ packaged: true, platform: 'darwin', appImage: '/x.AppImage' })).toBe(false);
+    expect(selfUpdates({ packaged: false, platform: 'linux', appImage: '/x.AppImage' })).toBe(false);
+    expect(selfUpdates({ packaged: true, platform: 'win32', allowed: false })).toBe(false);
+    expect(selfUpdates({ packaged: true, platform: 'linux', appImage: '/x.AppImage', allowed: false })).toBe(false);
+    expect(selfUpdates()).toBe(false);
+  });
+  it('an AppImage downloads and installs like the Windows build', async () => {
+    vi.stubGlobal('process', { ...process, platform: 'linux', env: { ...process.env, APPIMAGE: '/home/someone/Nebula-1.0.4.AppImage' } });
+    const beforeInstall = vi.fn(async () => {});
+    const { initUpdater } = await import('../electron/updater.js');
+    expect(await initUpdater({ version: '1.0.4', beforeInstall })).toEqual({ mode: 'auto' });
+    fake.events.get('update-downloaded')({ version: '1.0.5' });
+    await fake.handlers.get('update:install')(); await vi.advanceTimersByTimeAsync(1);
+    expect(beforeInstall).toHaveBeenCalledTimes(1);
+    expect(fake.install).toHaveBeenCalledWith(true, true);
+  });
+  it('a deb or a pacman package is told of the release and replaces nothing', async () => {
+    const env = { ...process.env }; delete env.APPIMAGE;
+    vi.stubGlobal('process', { ...process, platform: 'linux', env });
+    fake.fetch.mockResolvedValue({ ok: true, json: async () => ({ tag_name: 'v1.0.5' }) });
+    const beforeInstall = vi.fn();
+    const { initUpdater } = await import('../electron/updater.js');
+    expect(await initUpdater({ version: '1.0.4', beforeInstall })).toEqual({ mode: 'manual' });
+    expect(await fake.handlers.get('update:check')()).toMatchObject({ state: 'manual', version: '1.0.5' });
+    await fake.handlers.get('update:download')();
+    await fake.handlers.get('update:install')();
+    expect(beforeInstall).not.toHaveBeenCalled();
+    expect(fake.install).not.toHaveBeenCalled();
+    expect(fake.events.size).toBe(0);
+  });
+});
+
 describe('test builds follow GitHub', () => {
   const release = (tag, names, prerelease = true) => ({ tag_name: tag, prerelease, html_url: `page/${tag}`,
     assets: names.map((name) => ({ name, size: 7, browser_download_url: `dl/${tag}/${name}` })) });

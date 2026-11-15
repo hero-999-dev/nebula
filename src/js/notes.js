@@ -495,6 +495,25 @@ export class NoteStore {
   }
 
   /**
+   * Kept to this computer (1.0.4): Tailscale sync neither hands the note out
+   * nor takes one under its id (tailnet-sync.js, electron/sync.js) — the
+   * note's menu, or the badge by its title. Keeping it out is a flag, like
+   * pinning. Putting it back is an edit: it goes back in as the newest
+   * version, so a copy another device deleted meanwhile does not take this
+   * one along, and one changed there is kept beside it.
+   */
+  setNoSync(id, on) {
+    const note = this.get(id);
+    if (!note || !!note.noSync === !!on) return note ?? null;
+    return this.#mark(id, on ? { noSync: true } : { noSync: undefined, updatedAt: Date.now() });
+  }
+
+  toggleNoSync(id) {
+    const note = this.get(id);
+    return note ? this.setNoSync(id, !note.noSync) : null;
+  }
+
+  /**
    * Store a note as this version brought it up to date on the way in
    * (migrate.js and the controllers' rehydration) — a repair, not an edit, so
    * its date and its place in the list stay. `markupVersion` records which
@@ -542,6 +561,30 @@ export class NoteStore {
     const same = JSON.stringify(font) === JSON.stringify(note.font || {});
     if (same) return note;
     return this.#mark(id, Object.keys(font).length ? { font } : { font: undefined });
+  }
+
+  /**
+   * Many notes' fonts at once, one save (design-fonts.js, 1.0.4): each note's
+   * markup as it reads without its fonts — or with them again — and its
+   * writing font. A setting, not an edit — every note keeps its date and its
+   * place in the list.
+   * @param {{id: string, content: string, font?: {family?: string, size?: number}}[]} writes
+   * @returns {number} notes written
+   */
+  setFontsMany(writes) {
+    const written = [];
+    for (const { id, content, font } of writes ?? []) {
+      const note = this.get(id);
+      if (!note || typeof content !== 'string') continue;
+      note.content = content;
+      if (font && Object.keys(font).length) note.font = { ...font };
+      else delete note.font;
+      written.push(id);
+    }
+    if (!written.length) return 0;
+    this.save(written);
+    emit('note-changed', { id: null });
+    return written.length;
   }
 
   /** Auto order page for this note (0.9.3, page-order.js): a setting, not an edit. */

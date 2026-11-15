@@ -13,7 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 /** The prefixes the checks give fs.mkdtempSync, which then appends six characters. */
-const PROFILE = /^nebula-(table-edges|rich-paste|shortcuts|findings|openwith|recovery|reported|settings|viewsnap|aisleep|deleted|folders|rebuild|canvas|export|layout|office|dense|edges|guide|holes|ideas|probe|purge|shots|smoke|table|desk|v090|v093|v094|web)-[A-Za-z0-9]{6}$/;
+const PROFILE = /^nebula-(table-edges|rich-paste|shortcuts|findings|openwith|recovery|reported|settings|viewsnap|aisleep|deleted|folders|rebuild|canvas|export|layout|office|dense|edges|first|guide|holes|ideas|probe|purge|shots|smoke|table|desk|v090|v093|v094|web)-[A-Za-z0-9]{6}$/;
 
 export function sweepStaleProfiles(maxAgeMs = 3 * 60 * 60 * 1000) {
   const tmp = os.tmpdir();

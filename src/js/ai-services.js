@@ -5,7 +5,7 @@
  * Google answers with "Try using a different browser". When that check says
  * so, these two lines are what to change.
  */
-export const FIREFOX_RELEASE = { version: 157, date: '2026-09-29' };
+export const FIREFOX_RELEASE = { version: 160, date: '2026-11-10' };
 export const FIREFOX_ESR = 153;
 
 function osPart(platform) {

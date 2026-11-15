@@ -5,7 +5,10 @@
  * tests/e2e/note-folders.mjs.
  */
 import { describe, it, expect } from 'vitest';
-import { isVideoFile, isMediaUrl, makeVideoBlock, refreshVideoBlocks, fileVideoLines, plainVideosOf, sealedVideosOf, initVideoPlayers, videoClock, VIDEO_EXTENSIONS, VIDEO_SPEEDS } from '../src/js/file-video.js';
+import {
+  isVideoFile, isMediaUrl, makeVideoBlock, refreshVideoBlocks, fileVideoLines, plainVideosOf, sealedVideosOf, initVideoPlayers, videoClock, VIDEO_EXTENSIONS, VIDEO_SPEEDS,
+  comingVideoWords, setComingVideos, videoComing, videoArrived,
+} from '../src/js/file-video.js';
 import { serializeNote } from '../src/js/note-markup.js';
 import { VIDEO_EXTENSIONS as MAIN_EXTENSIONS } from '../electron/note-media.js';
 import { toMarkdown, toHtml } from '../src/js/export.js';
@@ -177,6 +180,113 @@ describe('the player’s own bar', () => {
     hole.querySelector('video').dispatchEvent(new Event('error'));
     expect(hole.querySelector('.video-miss')).not.toBeNull();
     expect(hole.querySelector('[data-video="outside"]')).toBeNull();
+  });
+
+  // 1.0.4, the owner, 2026-11-15: "oynatıcıda video eşitleniyor · % kartı".
+  describe('of a video whose file is still on its way from another computer', () => {
+    const file = { id: 'n-1_Ab', name: 'vid-m1abc-0a1b2c3d.mp4' };
+    const said = (card) => card.querySelector('.video-coming__text')?.textContent ?? null;
+    const filled = (card) => card.querySelector('.video-coming__meter i')?.style.width ?? null;
+    const english = (pct) => `Video syncing · ${pct} %`;
+
+    it('says so in place, with how much of it is here — never whole before it is, never that it cannot be played, and none of it saved', () => {
+      const root = shown();
+      const stored = serializeNote(root);
+      const card = root.querySelector('.link-file');
+      const player = root.querySelector('video');
+      try {
+        // The whole list: one of them is this player's, the other nobody's on this page; what is no file is passed over.
+        setComingVideos([{ ...file, got: 0, size: 1000 }, { id: 'other', name: 'vid-x-00000000.mp4', got: 5, size: 10 }, null, { id: 1 }], root);
+        expect(card.classList.contains('is-coming')).toBe(true);
+        expect(said(card)).toBe('Video syncing · 0 %');
+        expect(filled(card)).toBe('0%');
+        // In the bar, before its buttons.
+        expect(card.querySelector('.video-bar').firstElementChild.className).toBe('video-coming');
+        // The player finds nothing to play yet: that is no failure.
+        Object.defineProperty(player, 'error', { value: { code: 4 }, configurable: true });
+        player.dispatchEvent(new Event('error'));
+        expect(card.classList.contains('cannot-play')).toBe(false);
+        expect(card.querySelector('.video-miss')).toBeNull();
+        expect(card.querySelector('[data-video="outside"]')).toBeNull();
+        // It moves on, piece by piece.
+        videoComing({ ...file, got: 625, size: 1000 }, root);
+        expect(said(card)).toBe('Video syncing · 62 %');
+        expect(filled(card)).toBe('62%');
+        // Every byte here, yet not checked and put in its place: 99, not 100.
+        videoComing({ ...file, got: 1000, size: 1000 }, root);
+        expect(said(card)).toBe('Video syncing · 99 %');
+        videoComing({ ...file, got: 5000, size: 1000 }, root);
+        expect(said(card)).toBe('Video syncing · 99 %');
+        // A size nobody knows is none of it; a word about no file is no word.
+        videoComing({ ...file, got: 10, size: 0 }, root);
+        expect(said(card)).toBe('Video syncing · 0 %');
+        videoComing(null, root);
+        videoComing({ id: 'n-1_Ab' }, root);
+        expect(said(card)).toBe('Video syncing · 0 %');
+        // The note shown again meanwhile: still one word, still no failure.
+        refreshVideoBlocks(root);
+        expect(card.querySelectorAll('.video-coming')).toHaveLength(1);
+        expect(card.classList.contains('cannot-play')).toBe(false);
+        expect(serializeNote(root)).toBe(stored);
+        // In the app's language, when the window's half of sync gives the words.
+        comingVideoWords((pct) => `Wideo · ${pct}`);
+        comingVideoWords('not a function');
+        videoComing({ ...file, got: 500, size: 1000 }, root);
+        expect(said(card)).toBe('Wideo · 50');
+        // Another file arriving changes nothing here; this one arriving makes the card a player again.
+        videoArrived('other', 'vid-x-00000000.mp4', root);
+        expect(card.classList.contains('is-coming')).toBe(true);
+        videoArrived(file.id, file.name, root);
+        expect(card.classList.contains('is-coming')).toBe(false);
+        expect(card.querySelector('.video-coming')).toBeNull();
+        expect([...card.querySelectorAll('.video-bar [data-video]')].map((b) => b.dataset.video)).toEqual(['back', 'on', 'speed', 'full']);
+        expect(serializeNote(root)).toBe(stored);
+      } finally {
+        setComingVideos([], root);
+        comingVideoWords(english);
+      }
+    });
+
+    it('takes back "cannot be played" once the file turns out to be on its way, and a list without it makes it a player again', () => {
+      const root = shown();
+      const stored = serializeNote(root);
+      const card = root.querySelector('.link-file');
+      const player = root.querySelector('video');
+      try {
+        // The player failed before the window had heard which files are coming.
+        Object.defineProperty(player, 'error', { value: { code: 4 }, configurable: true });
+        player.dispatchEvent(new Event('error'));
+        expect(card.classList.contains('cannot-play')).toBe(true);
+        setComingVideos([{ ...file, got: 300, size: 1000 }], root);
+        expect(card.classList.contains('cannot-play')).toBe(false);
+        expect(card.querySelector('.video-miss')).toBeNull();
+        expect(card.querySelector('[data-video="outside"]')).toBeNull();
+        expect(said(card)).toBe('Video syncing · 30 %');
+        // No longer listed (its note was deleted there, say): the word goes.
+        setComingVideos([], root);
+        expect(card.classList.contains('is-coming')).toBe(false);
+        expect(said(card)).toBeNull();
+        setComingVideos('not a list', root);
+        expect(card.classList.contains('is-coming')).toBe(false);
+        expect(serializeNote(root)).toBe(stored);
+      } finally {
+        setComingVideos([], root);
+      }
+    });
+
+    it('is only ever a note’s own file: a video sealed in a black hole is never said to be coming', () => {
+      const hole = document.createElement('div');
+      hole.innerHTML = makeVideoBlock('nebula-media://hole/bh-1/n-1_Ab/vid-m1abc-0a1b2c3d.mp4', 'x.mp4').outerHTML;
+      document.body.replaceChildren(hole);
+      refreshVideoBlocks(hole);
+      try {
+        setComingVideos([{ ...file, got: 300, size: 1000 }], hole);
+        expect(hole.querySelector('.link-file').classList.contains('is-coming')).toBe(false);
+        expect(hole.querySelector('.video-coming')).toBeNull();
+      } finally {
+        setComingVideos([], hole);
+      }
+    });
   });
 
   it('tells the time as a clock', () => {

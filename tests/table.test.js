@@ -402,12 +402,38 @@ describe('a table among the other blocks', () => {
     pick(at(2, 2), 'Insert row below');
     pick(at(0, 2), 'Insert column right');
     expect([gridOf(table).rows, gridOf(table).cols]).toEqual([4, 4]);
-    // A click on the corner selects nothing (it is only taken to move the table); a right-click on it deletes the table.
-    const before = tables.selection();
-    wrap.querySelector('.tbl-corner').click();
-    expect(tables.selection()).toEqual(before);
+    // A click on the corner picks the table up as one thing (the owner, 1.0.4: "noktaya tıklayınca tüm table
+    // seçilmiyor, delete tuşuna basınca işe yaramıyor"): no cell is selected, nothing is offered, Escape lets go.
+    const corner = wrap.querySelector('.tbl-corner');
+    const press = (k, target = document.body) => {
+      const e = new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true });
+      target.dispatchEvent(e);
+      return e.defaultPrevented;
+    };
+    expect(press('Delete')).toBe(false);                        // not picked: the key is the note's
+    expect(host.querySelector('.blk-table')).not.toBeNull();
+    corner.click();
+    expect(corner.classList.contains('picked')).toBe(true);
+    expect(tables.selection()).toBeNull();
     expect(wrap.querySelector('.tbl-chip [data-tbl="del-table"]')).toBeNull();
-    pick(wrap.querySelector('.tbl-corner'), 'Delete table');
+    press('Escape');
+    expect(corner.classList.contains('picked')).toBe(false);
+    expect(press('Delete')).toBe(false);
+    expect(host.querySelector('.blk-table')).not.toBeNull();
+    // A press anywhere else lets go of it too.
+    corner.click();
+    host.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(corner.classList.contains('picked')).toBe(false);
+    // Picked, a key typed in a box of the app is that box's.
+    corner.click();
+    const box = document.createElement('input');
+    document.body.append(box);
+    expect(press('Backspace', box)).toBe(false);
+    expect(host.querySelector('.blk-table')).not.toBeNull();
+    box.remove();
+    // Picked, Delete takes the whole table away; a right-click on the corner offers the same.
+    expect(corner.classList.contains('picked')).toBe(true);
+    expect(press('Delete')).toBe(true);
     expect(host.querySelector('.blk-table')).toBeNull();
     expect(host.innerHTML).toBe('<p><br></p>');
   });
@@ -775,7 +801,7 @@ describe('a table and the room it has', () => {
     key('x');                                                                      // a letter is the note's: this is in the way no longer
     expect(await second).toBeNull();
     expect(document.querySelector('.tbl-size')).toBeNull();
-    for (const text of ['Rows', 'Columns', 'Insert', 'Drag to move the table']) expect(STRINGS[text], text).toHaveLength(3);
+    for (const text of ['Rows', 'Columns', 'Insert', 'Drag to move the table. A click picks it up: Delete takes it away']) expect(STRINGS[text], text).toHaveLength(3);
   });
 });
 
@@ -914,5 +940,121 @@ describe('a row and the height it was pulled to', () => {
     window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     expect(heights(table)).toEqual([0, 0]);
     expect(document.body.classList.contains('tbl-resizing')).toBe(false);
+  });
+});
+
+describe('the whole table pulled by its corner', () => {
+  const widths = (table) => colsOf(table).map((col) => Number.parseFloat(col.style.width));
+  const tall = (table) => rowsOf(table).map(heightOf);
+  const sized = () => {
+    const made = make(2, 2);
+    colsOf(made.table)[0].style.width = '100px';
+    colsOf(made.table)[1].style.width = '200px';
+    setHeight(rowsOf(made.table)[0], 40);
+    return made;
+  };
+  const move = (x, y) => window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, buttons: 1, clientX: x, clientY: y }));
+
+  it('is drawn with the table and never saved', () => {
+    const { host, wrap } = sized();
+    dressTable(wrap);
+    expect(wrap.querySelectorAll(':scope > .tbl-scale.tbl-ui').length).toBe(1);
+    dressTable(wrap);
+    expect(wrap.querySelectorAll('.tbl-scale').length).toBe(1);
+    expect(serializeNote(host)).not.toMatch(/tbl-scale/);
+    expect(STRINGS['Drag to resize the whole table']?.length).toBe(3);
+  });
+
+  it('every column and every row takes the same share: one step of history, and back to what it was', () => {
+    const { host, wrap, table } = sized();
+    let pushed = 0;
+    let inputs = 0;
+    host.addEventListener('input', () => { inputs += 1; });
+    initTables(host, { history: { push: () => { pushed += 1; } } }).refresh();
+    const corner = wrap.querySelector('.tbl-scale');
+    corner.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, clientX: 300, clientY: 40 }));
+    expect(document.body.classList.contains('tbl-scaling')).toBe(true);
+    expect(wrap.querySelector('.tbl-tip').dataset.label).toBe('100%');
+    move(300, 40);
+    expect(pushed).toBe(0);                                                   // not moved yet
+    move(560, 380);                                                           // aslant: as far again, measured along the table's own slant
+    expect(pushed).toBe(1);
+    expect(widths(table)).toEqual([200, 400]);
+    expect(tall(table)).toEqual([80, 0]);                                     // a row with nothing drawn is left as it is
+    expect(wrap.querySelector('.tbl-tip').dataset.label).toBe('200%');
+    move(-5000, -5000);                                                       // no column narrower than a column may be
+    expect(widths(table)).toEqual([MIN_COL, MIN_COL]);
+    expect(tall(table)).toEqual([MIN_ROW, 0]);
+    move(300, 40);
+    expect(widths(table)).toEqual([100, 200]);
+    expect(tall(table)).toEqual([40, 0]);
+    move(430, 210);
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    expect(widths(table)).toEqual([150, 300]);
+    expect(tall(table)).toEqual([60, 0]);
+    expect(pushed).toBe(1);
+    expect(inputs).toBe(1);
+    expect(wrap.querySelector('.tbl-tip')).toBeNull();
+    expect(document.body.classList.contains('tbl-scaling')).toBe(false);
+    expect(serializeNote(host)).toContain('<tr style="height: 60px;">');
+  });
+
+  it('the mark over the + at the right makes it only wider, the one under the numbers only higher (1.0.4)', () => {
+    const { host, wrap, table } = sized();
+    initTables(host, {}).refresh();
+    expect(wrap.querySelectorAll(':scope > .tbl-pull.tbl-ui').length).toBe(2);
+    dressTable(wrap);
+    expect(wrap.querySelectorAll('.tbl-pull').length).toBe(2);
+    expect(serializeNote(host)).not.toMatch(/tbl-pull/);
+    expect(STRINGS['Drag to make the table wider or narrower']?.length).toBe(3);
+    expect(STRINGS['Drag to make the table higher or lower']?.length).toBe(3);
+    const press = (cls) => wrap.querySelector(cls).dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, clientX: 300, clientY: 40 }));
+    const up = () => window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    press('.tbl-pull-x');
+    expect(document.body.classList.contains('tbl-scaling-x')).toBe(true);
+    move(600, 300);                                                           // however far down the hand strays
+    expect(widths(table)).toEqual([200, 400]);
+    expect(tall(table)).toEqual([40, 0]);
+    expect(wrap.querySelector('.tbl-tip').dataset.label).toBe('↔ 200%');
+    move(150, 0);
+    expect(widths(table)).toEqual([50, 100]);
+    expect(tall(table)).toEqual([40, 0]);
+    move(300, 40);
+    up();
+    expect(document.body.classList.contains('tbl-scaling-x')).toBe(false);
+    expect(widths(table)).toEqual([100, 200]);
+    press('.tbl-pull-y');
+    expect(document.body.classList.contains('tbl-scaling-y')).toBe(true);
+    move(900, 80);                                                            // however far to the side
+    expect(widths(table)).toEqual([100, 200]);
+    expect(tall(table)).toEqual([80, 0]);
+    expect(wrap.querySelector('.tbl-tip').dataset.label).toBe('↕ 200%');
+    move(310, -5000);                                                         // no row lower than a row may be
+    expect(widths(table)).toEqual([100, 200]);
+    expect(tall(table)).toEqual([MIN_ROW, 0]);
+    up();
+    expect(document.body.classList.contains('tbl-scaling')).toBe(false);
+    expect(serializeNote(host)).toContain(`<tr style="height: ${MIN_ROW}px;">`);
+  });
+
+  it('the corner pulled straight to a side is still both, by the same share', () => {
+    const { host, wrap, table } = sized();
+    initTables(host, {}).refresh();
+    wrap.querySelector('.tbl-scale').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, clientX: 300, clientY: 40 }));
+    move(600, 80);
+    expect(widths(table)).toEqual([200, 400]);
+    expect(tall(table)).toEqual([80, 0]);
+    expect(wrap.querySelector('.tbl-tip').dataset.label).toBe('200%');
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+
+  it('a note that may not be changed has no corner to pull', () => {
+    const { host, wrap, table } = sized();
+    initTables(host, { isLocked: () => true }).refresh();
+    wrap.querySelector('.tbl-scale').dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, clientX: 300, clientY: 40 }));
+    move(600, 80);
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    expect(widths(table)).toEqual([100, 200]);
+    expect(document.body.classList.contains('tbl-scaling')).toBe(false);
   });
 });

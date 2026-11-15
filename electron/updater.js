@@ -1,14 +1,18 @@
 /**
  * Update checking, in two modes behind one renderer contract.
  *
- *   auto   — packaged Windows installer build. electron-updater reads
- *            latest.yml from the GitHub release, downloads on request, and
- *            installs on restart.
+ *   auto   — packaged Windows installer build, and on Linux the AppImage
+ *            (1.0.4). electron-updater reads latest.yml (latest-linux.yml)
+ *            from the GitHub release, downloads on request, and installs on
+ *            restart: the installer on Windows, the one file put in the old
+ *            one's place on Linux.
  *   manual — everything else: macOS (Squirrel.Mac refuses to update an app
  *            that is not code-signed, and we have no Apple certificate), the
- *            portable exe (there is no installer to hand the update to), and
- *            `npm run dev`. We ask the GitHub API what the latest release is
- *            and, if it is newer, offer to open the download page.
+ *            portable exe (there is no installer to hand the update to), the
+ *            deb and the pacman package (the system's package manager owns
+ *            those files, and replacing them needs root), and `npm run dev`.
+ *            We ask the GitHub API what the latest release is and, if it is
+ *            newer, offer to open the download page.
  *   test   — the test build (2026-11-05: "testte güncellensin, track etsin").
  *            It follows the newest `test-*` pre-release on GitHub: its
  *            test-build.json says when that build was packed, and a later one
@@ -43,6 +47,20 @@ const TEST_STAMP_FILE = 'test-build.json';
 
 /** Portable builds set this; there is no installer for an update to replace. */
 const isPortable = () => !!process.env.PORTABLE_EXECUTABLE_DIR;
+
+/**
+ * May this copy replace itself? Only two may: the installed Windows build, and
+ * on Linux the AppImage — the AppImage runtime sets APPIMAGE to the file it
+ * was started from, and that one file is what an update replaces. A deb or a
+ * pacman package is packaged and on Linux too and sets no such thing: its
+ * files are root's, so it is told of a newer release and shown the page.
+ */
+export function selfUpdates({ packaged, platform, portable = false, appImage = '', allowed = true } = {}) {
+  if (!allowed || !packaged) return false;
+  if (platform === 'win32') return !portable;
+  if (platform === 'linux') return !!appImage;
+  return false;
+}
 
 let mode = 'manual';
 let autoUpdater = null;
@@ -276,10 +294,13 @@ export async function initUpdater(opts = {}) {
   currentVersion = opts.version ?? app.getVersion();
   testStamp = opts.testStamp ?? null;
 
-  // Only an installed Windows build may replace itself. A test build is
-  // packaged and on Windows too, so "packaged and win32" is not enough.
-  const wantsAuto = opts.canSelfUpdate !== false
-    && app.isPackaged && process.platform === 'win32' && !isPortable();
+  // Only an installed Windows build and an AppImage may replace themselves. A
+  // test build is packaged and on Windows too, so "packaged and win32" is not
+  // enough.
+  const wantsAuto = selfUpdates({
+    packaged: app.isPackaged, platform: process.platform, portable: isPortable(),
+    appImage: process.env.APPIMAGE, allowed: opts.canSelfUpdate !== false,
+  });
   if (wantsAuto) {
     autoUpdater = await loadAutoUpdater();
     if (autoUpdater) {
@@ -321,7 +342,8 @@ export async function initUpdater(opts = {}) {
     // assisted installer opens its wizard and waits for clicks, so the user
     // presses "Restart and install", the app closes, and they are left staring
     // at a setup dialog. They already consented by pressing the button — run it
-    // silently and relaunch.
+    // silently and relaunch. An AppImage has no wizard: the second `true` is
+    // what opens the new file once it stands in the old one's place.
     setImmediate(() => autoUpdater.quitAndInstall(true, true));
     return status;
   });

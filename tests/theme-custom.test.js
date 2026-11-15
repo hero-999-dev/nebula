@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   SLOTS, MATCHA, READY_PROFILES, SWATCHES, cleanHex, mix, luminance, contrast, toneOf, cleanColors,
-  deriveTokens, hardToRead, cleanProfiles, saveProfile, profileOf, cleanProfileName,
+  deriveTokens, hardToRead, cleanProfiles, saveProfile, renameProfile, randomColors, freeProfileName, profileOf, cleanProfileName,
 } from '../src/js/theme-custom.js';
 import { initTheme, readCustom, THEMES, CUSTOM } from '../src/js/theme.js';
 
@@ -104,6 +104,34 @@ describe('profiles', () => {
     expect(saveProfile([], '   ', MATCHA.colors).error).toBe('name');
     expect(saveProfile([], 'matcha', MATCHA.colors).error).toBe('ready');
     expect(saveProfile([], 'matcha', MATCHA.colors).profiles).toEqual([]);
+  });
+
+  it('take a new name without a second one being made (1.0.4)', () => {
+    const { profiles } = saveProfile(saveProfile([], 'try', MATCHA.colors).profiles, 'Other', { ...MATCHA.colors, accent: '#58a6ff' });
+    const done = renameProfile(profiles, 'TRY', '  New   name ');
+    expect(done.name).toBe('New name');
+    expect(done.profiles.map((p) => p.name)).toEqual(['New name', 'Other']);
+    expect(done.profiles[0].colors).toEqual(profiles[0].colors);
+    // Its own name in other letters is a new name; another's, a ready one's or none is not.
+    expect(renameProfile(profiles, 'try', 'Try').name).toBe('Try');
+    expect(renameProfile(profiles, 'try', 'other').error).toBe('taken');
+    expect(renameProfile(profiles, 'try', 'Matcha').error).toBe('ready');
+    expect(renameProfile(profiles, 'try', '  ').error).toBe('name');
+    expect(renameProfile(profiles, 'gone', 'x').error).toBe('missing');
+    expect(renameProfile(profiles, 'try', 'other').profiles).toEqual(profiles);
+  });
+
+  it('a random one can be read, whatever falls, and takes a name no other has (1.0.4)', () => {
+    let seed = 7;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < 300; i += 1) {
+      const colors = randomColors(rnd);
+      expect(cleanColors(colors)).toEqual(colors);
+      expect(hardToRead(colors)).toBe(false);
+    }
+    expect(freeProfileName('Random', [])).toBe('Random');
+    expect(freeProfileName('Random', [{ name: 'random', colors: MATCHA.colors }, { name: 'Random 2', colors: MATCHA.colors }])).toBe('Random 3');
+    expect(freeProfileName('Matcha', [])).toBe('Matcha 2');
   });
 
   it('are kept only when they are whole', () => {

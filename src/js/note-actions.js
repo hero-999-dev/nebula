@@ -20,9 +20,11 @@ const LABELS = {
   // Auto order page (0.9.3): what a page line falls across, put right by itself in this note.
   // Says where it stands (the owner: "say not active"); choosing it turns it the other way.
   autoorder: (note) => (note.autoOrder ? 'Auto order page: active' : 'Auto order page: not active'),
+  // Kept to this computer (1.0.4): what choosing it switches to, like Pin.
+  nosync: (note) => (note.noSync ? 'Sync this note again' : 'Do not sync this note'),
 };
 
-export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder, onHole, holeLabel, trashedHoles, onHoleRestore, onHoleDelete, canBeside, onBeside }) {
+export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder, onHole, holeLabel, trashedHoles, onHoleRestore, onHoleDelete, canBeside, onBeside, canTab, onTab, canKeepOff, canDiscord, onDiscord }) {
   const menu = document.getElementById('note-menu');
   const drawerBody = document.getElementById('drawer-body');
   const tabs = [...document.querySelectorAll('.drawer-tab')];
@@ -65,6 +67,15 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
       order.textContent = LABELS.autoorder(note);
       order.hidden = !note.page || note.page === 'nw';    // Nebula Wide has no pages to order
     }
+    // Left out of Tailscale sync (1.0.4): offered once sync is on (the owner, 2026-11-15).
+    const keep = menu.querySelector('[data-note-act="nosync"]');
+    if (keep) {
+      keep.hidden = !canKeepOff?.(note);
+      keep.textContent = LABELS.nosync(note);
+    }
+    // Copy for Discord (1.0.4): not on a black hole’s note or the guide (discord-share.js).
+    const discord = menu.querySelector('[data-note-act="discord"]');
+    if (discord) discord.hidden = !canDiscord?.(note);
     // Black holes (0.9.4): into one, or out of the one it is in. A note in a
     // black hole is in no folder.
     const hole = menu.querySelector('[data-note-act="hole"]');
@@ -78,6 +89,9 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
     // Notes side by side (1.0.0): beside the one being written in.
     const beside = menu.querySelector('[data-note-act="beside"]');
     if (beside) beside.hidden = !canBeside?.(id);
+    // Tabs over the note (1.0.4): kept at hand, the page staying where it is.
+    const tab = menu.querySelector('[data-note-act="tab"]');
+    if (tab) tab.hidden = !canTab?.(id);
     menu.hidden = false;
     // Below the button, pulled back inside the window if there is no room.
     const r = point
@@ -113,9 +127,12 @@ export function initNoteActions({ store, onChanged, openNote, onLabels, onFolder
     if (act === 'folder') { onFolder?.(id, button); return; }
     if (act === 'hole') { onHole?.(id, button); return; }
     if (act === 'beside') { onBeside?.(id); return; }
+    if (act === 'tab') { onTab?.(id); return; }
+    if (act === 'discord') { onDiscord?.(id); return; }
     if (act === 'pin') store.togglePin(id);
     else if (act === 'readonly') store.toggleReadOnly(id);
     else if (act === 'autoorder') store.toggleAutoOrder(id);
+    else if (act === 'nosync') store.toggleNoSync(id);
     else if (act === 'archive') store.archive(id);
     else if (act === 'trash') store.trash(id);
     onChanged?.();
